@@ -71,6 +71,7 @@ describe("TurnAssembler", () => {
         final: true,
         startMs: 100,
         endMs: 420,
+        speakerMappingUncertain: false,
       },
     ]);
     expect(assembler.openTurns()).toEqual([]);
@@ -123,6 +124,7 @@ describe("TurnAssembler", () => {
         final: true,
         startMs: 100,
         endMs: 170,
+        speakerMappingUncertain: false,
       },
       {
         turnId: "0:0",
@@ -131,6 +133,7 @@ describe("TurnAssembler", () => {
         final: true,
         startMs: 0,
         endMs: 220,
+        speakerMappingUncertain: false,
       },
     ]);
   });
@@ -148,6 +151,89 @@ describe("TurnAssembler", () => {
 
     expect(assembler.finalTurns().map((turn) => turn.turnId)).toEqual(["0:0", "1:0"]);
     expect(turnKey(1, 0)).toBe("1:0");
+  });
+
+  it("maps a later session's labels onto the known speakers by order of first appearance", () => {
+    const assembler = new TurnAssembler({ clock: new SimulatedClock() });
+    // Session 0 meets A then B.
+    assembler.accept(speechStart(0, 0, 0));
+    assembler.accept(speaker(10, "A", 0));
+    assembler.accept(speechEnd(20, 0, 0));
+    assembler.accept(speechComplete(30, 0, " A first. ", 0));
+    assembler.accept(speechStart(40, 1, 0));
+    assembler.accept(speaker(50, "B", 0));
+    assembler.accept(speechEnd(60, 1, 0));
+    assembler.accept(speechComplete(70, 1, " B second. ", 0));
+
+    // The 60-minute limit hit; session 1 labels the same room from scratch and
+    // happens to hear the second speaker first.
+    assembler.accept(speechStart(100, 0, 1));
+    assembler.accept(speaker(110, "B", 1));
+    assembler.accept(speechEnd(120, 0, 1));
+    assembler.accept(speechComplete(130, 0, " Still going. ", 1));
+    assembler.accept(speechStart(140, 1, 1));
+    assembler.accept(speaker(150, "A", 1));
+    assembler.accept(speechEnd(160, 1, 1));
+    assembler.accept(speechComplete(170, 1, " Me too. ", 1));
+    // A label already seen in this session keeps the speaker it was given.
+    assembler.accept(speechStart(180, 2, 1));
+    assembler.accept(speaker(190, "B", 1));
+    assembler.accept(speechEnd(200, 2, 1));
+    assembler.accept(speechComplete(210, 2, " And again. ", 1));
+
+    expect(assembler.finalTurns().map((turn) => turn.speaker)).toEqual(["A", "B", "A", "B", "A"]);
+    expect(assembler.finalTurns().map((turn) => turn.speakerMappingUncertain)).toEqual([
+      false,
+      false,
+      true,
+      true,
+      true,
+    ]);
+    expect(assembler.speakers()).toEqual(["A", "B"]);
+  });
+
+  it("flags a reconnected turn as uncertain from its first partial, before any label", () => {
+    const assembler = new TurnAssembler({ clock: new SimulatedClock() });
+    assembler.accept(speechStart(0, 0, 0));
+    assembler.accept(speaker(10, "A", 0));
+    assembler.accept(speechEnd(20, 0, 0));
+    assembler.accept(speechComplete(30, 0, " Before. ", 0));
+
+    const opened = assembler.accept(speechStart(100, 0, 1));
+    expect(opened).toMatchObject({ speaker: null, speakerMappingUncertain: true });
+    expect(assembler.openTurns()).toEqual([
+      {
+        turnId: "1:0",
+        speaker: null,
+        text: "",
+        final: false,
+        startMs: 100,
+        endMs: null,
+        speakerMappingUncertain: true,
+      },
+    ]);
+  });
+
+  it("gives a voice beyond the ones already heard a new speaker rather than folding it in", () => {
+    const assembler = new TurnAssembler({ clock: new SimulatedClock() });
+    assembler.accept(speechStart(0, 0, 0));
+    assembler.accept(speaker(10, "A", 0));
+    assembler.accept(speechEnd(20, 0, 0));
+    assembler.accept(speechComplete(30, 0, " Only me so far. ", 0));
+
+    // Session 1's first label maps to the one known speaker; its second is
+    // somebody new, and keeps a label of its own even though "A" is taken.
+    assembler.accept(speechStart(100, 0, 1));
+    assembler.accept(speaker(110, "B", 1));
+    assembler.accept(speechEnd(120, 0, 1));
+    assembler.accept(speechComplete(130, 0, " Same voice. ", 1));
+    assembler.accept(speechStart(140, 1, 1));
+    assembler.accept(speaker(150, "A", 1));
+    assembler.accept(speechEnd(160, 1, 1));
+    assembler.accept(speechComplete(170, 1, " A different voice. ", 1));
+
+    expect(assembler.finalTurns().map((turn) => turn.speaker)).toEqual(["A", "A", "B"]);
+    expect(assembler.speakers()).toEqual(["A", "B"]);
   });
 
   it("reports speaking while a turn is open and silence from the last speechEnd", () => {
@@ -252,6 +338,8 @@ describe.each(captures)("replaying the %s capture", (fixture) => {
       expect(turn.speaker).not.toBeNull();
       expect(turn.endMs).not.toBeNull();
       expect(turn.endMs as number).toBeGreaterThanOrEqual(turn.startMs);
+      // Every capture is one session, so no label was remapped.
+      expect(turn.speakerMappingUncertain).toBe(false);
     }
     // Turn keys are unique, and the conversation reads in the order it happened.
     expect(new Set(turns.map((turn) => turn.turnId)).size).toBe(turns.length);

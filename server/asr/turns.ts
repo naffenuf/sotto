@@ -14,6 +14,13 @@
  * the most recent `speechStart` that has no `speechEnd` yet. That is also why
  * a partial has no speaker label: the `speaker` frame lands just before the
  * turn closes.
+ *
+ * One assembler spans a whole conversation, including the reconnects the
+ * 60-minute session limit forces (US-005). A new session restarts both the
+ * turn numbering — hence `turnKey` — and the diarization labels, so labels
+ * from a later session are mapped onto the speakers already known, by order
+ * of first appearance, and every turn from that session is flagged
+ * `speakerMappingUncertain`.
  */
 import { asAsrEvent, type AsrEvent, type AsrFrameRecord } from "../../shared/asr.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
@@ -33,10 +40,13 @@ export interface TurnAssemblerOptions {
 
 interface OpenTurn {
   turnId: string;
+  /** The ASR session the turn's `speechStart` arrived in. */
+  session: number;
   speaker: string | null;
   text: string;
   startMs: number;
   endMs: number | null;
+  speakerMappingUncertain: boolean;
 }
 
 /** Builds the key that identifies a turn across reconnects. */
@@ -54,6 +64,13 @@ export class TurnAssembler {
   /** Keys of turns still waiting for a `speechEnd`, oldest first. */
   private readonly unclosed: string[] = [];
   private readonly finals: TurnUpdate[] = [];
+
+  /** Speakers as first met, in order; a later session's labels map onto these. */
+  private readonly speakerOrder: string[] = [];
+  /** Per session, that session's labels resolved to a {@link speakerOrder} entry. */
+  private readonly labelMaps = new Map<number, Map<string, string>>();
+  /** The session whose labels are taken at face value: the first one seen. */
+  private firstSession: number | undefined;
 
   private silenceSinceMs: number;
   private malformed = 0;
@@ -112,10 +129,17 @@ export class TurnAssembler {
     return { speaking: false, silentForMs: Math.max(0, nowMs - this.silenceSinceMs) };
   }
 
+  /** The speakers met so far, in order of first appearance. */
+  speakers(): readonly string[] {
+    return this.speakerOrder;
+  }
+
   private apply(event: AsrEvent, session: number, atMs: number): TurnUpdate | null {
+    // The first session carrying turns is the one whose labels are trusted.
+    this.firstSession ??= session;
     switch (event.type) {
       case "speechStart":
-        return this.openTurn(turnKey(session, event.turnId), atMs);
+        return this.openTurn(turnKey(session, event.turnId), session, atMs);
       case "transcript":
         // The only `final: true` transcript is the empty marker the server
         // sends after `endStream`; it belongs to no turn.
@@ -129,12 +153,20 @@ export class TurnAssembler {
     }
   }
 
-  private openTurn(turnId: string, atMs: number): TurnUpdate | null {
+  private openTurn(turnId: string, session: number, atMs: number): TurnUpdate | null {
     if (this.live.has(turnId)) {
       this.logger.warn(`[turns] ignoring repeated speechStart for ${turnId}`);
       return null;
     }
-    const turn: OpenTurn = { turnId, speaker: null, text: "", startMs: atMs, endMs: null };
+    const turn: OpenTurn = {
+      turnId,
+      session,
+      speaker: null,
+      text: "",
+      startMs: atMs,
+      endMs: null,
+      speakerMappingUncertain: session !== this.firstSession,
+    };
     this.live.set(turnId, turn);
     this.unclosed.push(turnId);
     return this.emit(turn, false);
@@ -162,8 +194,49 @@ export class TurnAssembler {
   private setSpeaker(label: string): TurnUpdate | null {
     const turn = this.currentTurn("speaker");
     if (turn === null) return null;
-    turn.speaker = label;
+    turn.speaker = this.resolveSpeaker(label, turn.session);
     return this.emit(turn, false);
+  }
+
+  /**
+   * Resolves one session's diarization label to a speaker that spans the whole
+   * conversation.
+   *
+   * The first session's labels *are* the speakers. A reconnected session
+   * starts labelling over from `"A"`, and the API gives nothing to tie the two
+   * numberings together, so the n-th label a later session introduces is taken
+   * to be the n-th speaker met so far: order of first appearance. A session
+   * that introduces more voices than the conversation has heard gets a new
+   * speaker instead of being folded into an existing one.
+   */
+  private resolveSpeaker(label: string, session: number): string {
+    let labels = this.labelMaps.get(session);
+    if (labels === undefined) {
+      labels = new Map<string, string>();
+      this.labelMaps.set(session, labels);
+    }
+    const mapped = labels.get(label);
+    if (mapped !== undefined) return mapped;
+
+    const speaker = this.speakerOrder[labels.size] ?? this.addSpeaker(label);
+    labels.set(label, speaker);
+    return speaker;
+  }
+
+  /** Adds a voice nobody has heard yet, keeping its label when that is free. */
+  private addSpeaker(label: string): string {
+    const name = this.speakerOrder.includes(label) ? this.unusedLabel() : label;
+    this.speakerOrder.push(name);
+    return name;
+  }
+
+  /** First unused single letter, so an extra voice still reads like a label. */
+  private unusedLabel(): string {
+    for (let i = 0; i < 26; i += 1) {
+      const candidate = String.fromCharCode(65 + i);
+      if (!this.speakerOrder.includes(candidate)) return candidate;
+    }
+    return `S${this.speakerOrder.length + 1}`;
   }
 
   private closeTurn(turnId: string, atMs: number): TurnUpdate | null {
@@ -219,5 +292,6 @@ function snapshot(turn: OpenTurn, final: boolean): TurnUpdate {
     final,
     startMs: turn.startMs,
     endMs: turn.endMs,
+    speakerMappingUncertain: turn.speakerMappingUncertain,
   });
 }

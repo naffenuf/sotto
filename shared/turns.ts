@@ -30,6 +30,16 @@ export interface TurnUpdate {
   startMs: number;
   /** Arrival time of its `speechEnd`, or `null` while the speaker is talking. */
   endMs: number | null;
+  /**
+   * True when this turn came from a session after the first one, so its
+   * `speaker` is a *guess*: the API renumbers diarization labels from scratch
+   * in every session (`fixtures/events/NOTES.md`), and the assembler maps the
+   * new labels onto the speakers it already knows by order of first
+   * appearance. That ordering is usually right and occasionally not, so the
+   * UI should show these labels with less confidence rather than silently
+   * merging two people.
+   */
+  speakerMappingUncertain: boolean;
 }
 
 /** Whether anybody is talking, and for how long nobody has been. */

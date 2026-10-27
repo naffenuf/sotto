@@ -26,6 +26,8 @@ import {
   WAKE_KEYWORDS,
 } from "./realtimeClient.js";
 import type { AsrFrameRecord } from "../../shared/asr.js";
+import { SimulatedClock } from "../clock.js";
+import { TurnAssembler } from "./turns.js";
 
 /** Emits `count` chunks as fast as the client will take them, then ends. */
 function stubSource(count: number): AudioSource {
@@ -92,8 +94,27 @@ class FakeAsr {
   private readonly server: WebSocketServer;
   private readonly ready: Promise<void>;
 
-  constructor(behave: (socket: ServerSocket, connection: Connection, index: number) => void) {
-    this.server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  /**
+   * @param behave decides how each connection ends.
+   * @param admit optionally holds the n-th upgrade open until it resolves, so a
+   * test can make audio pile up while the client has no socket.
+   */
+  constructor(
+    behave: (socket: ServerSocket, connection: Connection, index: number) => void,
+    admit?: (index: number) => Promise<void>,
+  ) {
+    let upgrades = 0;
+    this.server = new WebSocketServer({
+      host: "127.0.0.1",
+      port: 0,
+      ...(admit
+        ? {
+            verifyClient: (_info: unknown, cb: (ok: boolean) => void) => {
+              void admit(upgrades++).then(() => cb(true));
+            },
+          }
+        : {}),
+    });
     this.ready = new Promise((resolve) => this.server.once("listening", resolve));
     this.server.on("connection", (socket) => {
       const connection: Connection = { handshake: {}, binaryFrames: 0, textFrames: [] };
@@ -236,7 +257,7 @@ describe("RealtimeTranscriptionClient", () => {
     asr = new FakeAsr((socket, _connection, index) => {
       if (index === 0) {
         // Drop the first session the moment the handshake lands.
-        socket.on("message", () => socket.close(CLOSE_INTERNAL, MAX_SESSION_DURATION_REASON));
+        socket.on("message", () => socket.close(CLOSE_INTERNAL, "backend went away"));
         return;
       }
       socket.on("message", (data: Buffer, isBinary: boolean) => {
@@ -271,5 +292,143 @@ describe("RealtimeTranscriptionClient", () => {
     expect(asr.connections[0]?.binaryFrames).toBe(0);
     expect(asr.connections[1]?.binaryFrames).toBe(5);
     expect(asr.connections[1]?.textFrames.at(-1)).toBe(JSON.stringify({ type: "endStream" }));
+  });
+});
+
+/**
+ * The 60-minute session limit, end to end: the client reconnects and the
+ * assembler carries the conversation across the seam.
+ *
+ * The limit arrives as a 1011 like a backend failure does, but it is expected,
+ * so it reconnects straight away rather than waiting out the retry backoff —
+ * audio is still arriving while the client has no socket.
+ */
+describe("reconnecting across the 60-minute session limit", () => {
+  /** One complete turn, framed the way `fixtures/events/NOTES.md` records it. */
+  function turnFrames(
+    turnId: number,
+    label: string,
+    text: string,
+    atMs: number,
+  ): Record<string, unknown>[] {
+    return [
+      { type: "speechStart", turnId, audioProcessedMs: atMs },
+      { type: "transcript", transcript: text.slice(0, 6), final: false, audioProcessedMs: atMs + 100 },
+      { type: "transcript", transcript: text, final: false, audioProcessedMs: atMs + 200 },
+      { type: "speaker", label, audioProcessedMs: atMs + 250 },
+      { type: "speechEnd", turnId, audioProcessedMs: atMs + 300 },
+      { type: "speechComplete", turnId, transcript: text, audioProcessedMs: atMs + 300 },
+    ];
+  }
+
+  it("opens a new session, keeps the queued audio, and maps the new speaker labels", async () => {
+    const endStream = JSON.stringify({ type: "endStream" });
+    let secondUpgradeStarted = false;
+    let admitSecond = () => {};
+    const heldUpgrade = new Promise<void>((resolve) => {
+      admitSecond = resolve;
+    });
+
+    asr = new FakeAsr(
+      (socket, connection, index) => {
+        socket.on("message", (data: Buffer, isBinary: boolean) => {
+          if (isBinary) return;
+          const text = data.toString("utf8");
+          if (text === endStream) {
+            socket.close(CLOSE_NORMAL, "done");
+            return;
+          }
+          // React to the handshake only: two turns, then the limit.
+          if (connection.textFrames.length !== 1) return;
+          const frames =
+            index === 0
+              ? [...turnFrames(0, "A", " First speaker. ", 0), ...turnFrames(1, "B", " Second speaker. ", 1_000)]
+              : // A fresh session labels the room from scratch, and here it
+                // hears the second speaker first.
+                [...turnFrames(0, "B", " Still here. ", 0), ...turnFrames(1, "A", " So am I. ", 1_000)];
+          for (const frame of frames) socket.send(JSON.stringify(frame));
+          if (index === 0) socket.close(CLOSE_INTERNAL, MAX_SESSION_DURATION_REASON);
+        });
+      },
+      (index) => {
+        if (index === 0) return Promise.resolve();
+        secondUpgradeStarted = true;
+        return heldUpgrade;
+      },
+    );
+
+    const assembler = new TurnAssembler({ clock: new SimulatedClock(), startedAtMs: 0 });
+    const delays: number[] = [];
+    const source = manualSource();
+    const client = new RealtimeTranscriptionClient({
+      apiKey: "test-key",
+      url: await asr.url(),
+      clock: fastRetryClock(delays),
+      onFrame: (record) => void assembler.accept(record),
+      logger: { log: () => {}, warn: () => {}, error: () => {} },
+    });
+    const run = client.run(source);
+
+    // The second session's upgrade is held open, so the client has no socket:
+    // these chunks only reach the API if they were queued, not dropped.
+    await waitFor(() => secondUpgradeStarted);
+    expect(asr.connections).toHaveLength(1);
+    for (let i = 0; i < 4; i += 1) source.push();
+    admitSecond();
+
+    await waitFor(() => (asr?.connections[1]?.binaryFrames ?? 0) === 4);
+    source.end();
+    const result = await run;
+
+    expect(result.sessionCount).toBe(2);
+    expect(result.sessionIds).toEqual(["fake/session/0", "fake/session/1"]);
+    expect(asr.connections[0]?.binaryFrames).toBe(0);
+    expect(asr.connections[1]?.binaryFrames).toBe(4);
+    // The limit is not a failure, so none of the retry budget was spent.
+    expect(delays.filter((ms) => RETRY_BACKOFF_MS.includes(ms))).toEqual([]);
+
+    const turns = assembler.finalTurns();
+    expect(turns.map((turn) => turn.turnId)).toEqual(["0:0", "0:1", "1:0", "1:1"]);
+    expect(turns.map((turn) => turn.text)).toEqual([
+      " First speaker. ",
+      " Second speaker. ",
+      " Still here. ",
+      " So am I. ",
+    ]);
+    // Session 1's "B" is session 0's "A": same order of first appearance.
+    expect(turns.map((turn) => turn.speaker)).toEqual(["A", "B", "A", "B"]);
+    expect(turns.map((turn) => turn.speakerMappingUncertain)).toEqual([false, false, true, true]);
+    expect(assembler.malformedFrames()).toBe(0);
+  });
+
+  it("does not spend the retry budget on repeated session limits", async () => {
+    const endStream = JSON.stringify({ type: "endStream" });
+    // Five sessions in a row hit the limit — more than the three-retry budget.
+    asr = new FakeAsr((socket, connection, index) => {
+      socket.on("message", (data: Buffer, isBinary: boolean) => {
+        if (isBinary) return;
+        const text = data.toString("utf8");
+        if (text === endStream) {
+          socket.close(CLOSE_NORMAL, "done");
+          return;
+        }
+        if (connection.textFrames.length !== 1) return;
+        if (index < 5) socket.close(CLOSE_INTERNAL, `${MAX_SESSION_DURATION_REASON}.`);
+      });
+    });
+
+    const source = manualSource();
+    const client = new RealtimeTranscriptionClient({
+      apiKey: "test-key",
+      url: await asr.url(),
+      logger: { log: () => {}, warn: () => {}, error: () => {} },
+    });
+    const run = client.run(source);
+
+    await waitFor(() => asr?.connections.length === 6);
+    source.end();
+    const result = await run;
+
+    expect(result.sessionCount).toBe(6);
   });
 });

@@ -75,6 +75,9 @@ speechComplete(turnId: n, transcript)
   chip, or with the chip from the previous turn.
 - `speaker` labels are per session only. In every capture the labels tracked the
   fixture's own A/B alternation exactly, with no errors — see the per-fixture table.
+  Across a reconnect there is nothing tying one session's labels to the next one's, so
+  the assembler maps them by **order of first appearance** and marks every turn from the
+  later session `speakerMappingUncertain` (see "Close codes").
 - **No overlapping turns were observed.** Fixture audio is rendered line by line, so
   two people never talk at once; the assembler still has to key partials by the open
   turn rather than assume there is only ever one.
@@ -172,6 +175,18 @@ Only 1000 was seen in these captures. The client (`server/asr/realtimeClient.ts`
 handles the rest as the docs describe: 1008 is fatal (configuration or audio pacing);
 1011 and 1013 are retried with 1 s, 2 s, 4 s backoff, at most three retries, with audio
 produced during the backoff held and sent on the new session; anything else fails the
-run. The 60-minute session limit arrives as 1011 with the reason
-`Max session duration reached`, which the retry path already covers — no capture here is
-long enough to have hit it, so that path is only covered by the unit tests.
+run.
+
+The 60-minute session limit arrives as 1011 too, and the **reason text is the only thing
+that tells it apart from a backend failure**: `Max session duration reached`. It is not a
+failure, so the client treats it separately — it opens the next session immediately
+(queued audio is waiting), and it spends none of the three-retry error budget, which a
+multi-hour session would otherwise exhaust on its fourth hour. Because the reason is
+load-bearing, the client matches it case-insensitively and allows trailing detail.
+
+No capture here is long enough to have hit the limit, so both the reconnect and the
+retry paths are covered only by unit tests. What they assume, from the docs plus the
+per-session facts above, is that a new session restarts `turnId` from 0 *and* restarts
+the diarization labels from `A` — hence the `"<session>:<turnId>"` turn keys and the
+label mapping in `server/asr/turns.ts`. If a long live session ever shows otherwise,
+this is the note to correct.

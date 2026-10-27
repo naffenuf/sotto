@@ -45,6 +45,20 @@ function isRetriable(code: number): boolean {
   return code === CLOSE_INTERNAL || code === CLOSE_RATE_LIMITED;
 }
 
+/**
+ * Whether a close is the 60-minute session limit rather than a failure.
+ *
+ * It arrives as a 1011 like any backend error does, and the only thing that
+ * tells them apart is the reason text, so match it loosely: any casing, and
+ * trailing detail allowed.
+ */
+export function isMaxSessionDuration(code: number, reason: string): boolean {
+  return (
+    code === CLOSE_INTERNAL &&
+    reason.toLowerCase().includes(MAX_SESSION_DURATION_REASON.toLowerCase())
+  );
+}
+
 export class RealtimeTranscriptionError extends Error {
   constructor(
     message: string,
@@ -141,9 +155,23 @@ export class RealtimeTranscriptionClient implements AudioSink {
     this.streamStartedAt = this.clock.now();
 
     try {
-      for (let attempt = 0; ; attempt += 1) {
-        const outcome = await this.runSession(attempt === 0);
+      // Retries are counted separately from sessions: hitting the 60-minute
+      // limit is a normal part of a long conversation, not a failure, so it
+      // opens the next session without spending any of the error budget.
+      for (let retry = 0; ; ) {
+        const outcome = await this.runSession(this.session === 0);
         if (outcome.code === CLOSE_NORMAL) break;
+
+        if (isMaxSessionDuration(outcome.code, outcome.reason)) {
+          this.logger.log(
+            `[asr] session ${this.session} reached the 60-minute limit; ` +
+              `continuing in session ${this.session + 1}`,
+          );
+          this.session += 1;
+          // Reaching the limit means the stream was healthy right up to it.
+          retry = 0;
+          continue;
+        }
 
         if (outcome.code === CLOSE_POLICY) {
           this.logger.error(
@@ -158,7 +186,7 @@ export class RealtimeTranscriptionClient implements AudioSink {
         }
 
         const retriable = isRetriable(outcome.code);
-        const backoffMs = retriable ? RETRY_BACKOFF_MS[attempt] : undefined;
+        const backoffMs = retriable ? RETRY_BACKOFF_MS[retry] : undefined;
         if (backoffMs === undefined) {
           const why = retriable
             ? `gave up after ${RETRY_BACKOFF_MS.length} retries`
@@ -175,6 +203,7 @@ export class RealtimeTranscriptionClient implements AudioSink {
             `(${outcome.reason || "no reason given"}); retrying in ${backoffMs} ms`,
         );
         await this.sleep(backoffMs);
+        retry += 1;
         this.session += 1;
       }
     } finally {
