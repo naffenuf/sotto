@@ -1,0 +1,73 @@
+{
+  "name": "ask-diagram",
+  "sampleRate": 24000,
+  "durationMs": 41980,
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "A",
+      "startMs": 0,
+      "endMs": 3106
+    },
+    {
+      "index": 1,
+      "speaker": "B",
+      "startMs": 3806,
+      "endMs": 7804
+    },
+    {
+      "index": 2,
+      "speaker": "A",
+      "startMs": 8404,
+      "endMs": 9841
+    },
+    {
+      "index": 3,
+      "speaker": "B",
+      "startMs": 10341,
+      "endMs": 13588
+    },
+    {
+      "index": 4,
+      "speaker": "A",
+      "startMs": 14288,
+      "endMs": 16699
+    },
+    {
+      "index": 5,
+      "speaker": "B",
+      "startMs": 17299,
+      "endMs": 20217
+    },
+    {
+      "index": 6,
+      "speaker": "A",
+      "startMs": 20917,
+      "endMs": 22913
+    },
+    {
+      "index": 7,
+      "speaker": "B",
+      "startMs": 23513,
+      "endMs": 27329
+    },
+    {
+      "index": 8,
+      "speaker": "A",
+      "startMs": 28529,
+      "endMs": 32297
+    },
+    {
+      "index": 9,
+      "speaker": "B",
+      "startMs": 34797,
+      "endMs": 37727
+    },
+    {
+      "index": 10,
+      "speaker": "A",
+      "startMs": 38427,
+      "endMs": 41080
+    }
+  ]
+}

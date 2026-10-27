@@ -16,7 +16,8 @@ Full spec: [`tasks/prd-sotto-core.md`](tasks/prd-sotto-core.md).
   API key, talks to Meta's APIs, runs tools, writes session files.
 - **`web/`** — React 18 + Vite browser UI.
 - **`shared/`** — types used by both.
-- **`fixtures/`** — test conversations so every feature is testable without live speakers.
+- **`fixtures/`** — scripted test conversations plus rendered audio, so every feature is testable
+  without live speakers. See [`fixtures/README.md`](fixtures/README.md).
 
 Meta APIs: `muse-voice-transcribe-1.0` for realtime diarized transcription,
 `muse-spark-1.3` for board updates, interjection candidates, answers and eval judging.
@@ -41,4 +42,5 @@ cp .env.example .env    # then set MODEL_API_KEY to your Meta Model API key
 | `npm run typecheck` | `tsc --noEmit` across `server/`, `web/` and `shared/` |
 | `npm test` | Vitest unit tests. Makes no network calls |
 | `npm run test:integration` | Vitest tests that call the real Meta APIs. Skipped with a message if `MODEL_API_KEY` is missing |
+| `npm run fixtures:check` | Validates the fixture scripts in `fixtures/scripts/` against their rendered audio and timings |
 | `npm run verify:ui` | Playwright check of the running UI; writes a screenshot. Needs `npm run dev` already up |

@@ -1,0 +1,79 @@
+{
+  "name": "no-wake",
+  "sampleRate": 24000,
+  "durationMs": 44949,
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "A",
+      "startMs": 0,
+      "endMs": 3975
+    },
+    {
+      "index": 1,
+      "speaker": "B",
+      "startMs": 4675,
+      "endMs": 8377
+    },
+    {
+      "index": 2,
+      "speaker": "A",
+      "startMs": 9177,
+      "endMs": 12468
+    },
+    {
+      "index": 3,
+      "speaker": "B",
+      "startMs": 13468,
+      "endMs": 19885
+    },
+    {
+      "index": 4,
+      "speaker": "A",
+      "startMs": 20685,
+      "endMs": 22556
+    },
+    {
+      "index": 5,
+      "speaker": "B",
+      "startMs": 23156,
+      "endMs": 25715
+    },
+    {
+      "index": 6,
+      "speaker": "A",
+      "startMs": 26615,
+      "endMs": 29665
+    },
+    {
+      "index": 7,
+      "speaker": "B",
+      "startMs": 30365,
+      "endMs": 33186
+    },
+    {
+      "index": 8,
+      "speaker": "A",
+      "startMs": 33986,
+      "endMs": 37572
+    },
+    {
+      "index": 9,
+      "speaker": "B",
+      "startMs": 38272,
+      "endMs": 40487
+    },
+    {
+      "index": 10,
+      "speaker": "A",
+      "startMs": 41487,
+      "endMs": 42521
+    },
+    {
+      "index": 11,
+      "speaker": "B",
+      "startMs": 43121,
+      "endMs": 44049
+    }
+  ]
+}

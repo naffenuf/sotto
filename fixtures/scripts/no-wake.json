@@ -1,0 +1,66 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "We should keep the whole thing quiet, so to speak. The app shouldn't be shouting at you.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Like the opposite of the ones that push you a notification right at dinner time.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Exactly. Sotto voce, if you want to be fancy about it.",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "B",
+      "text": "Ha. My uncle ran a place called Soto's restaurant, and he had one rule. Never interrupt a table that's enjoying itself.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "How did he know when to come over, though?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "He waited for the fork to go down. That was the whole signal.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "That's a decent rule for software too. Wait for the fork.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "It really is. Quiet by default, helpful when you ask.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "And when it does speak, it should have something worth saying, so to speak.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Otherwise you're just another notification.",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "A",
+      "text": "So to speak.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "So to speak.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": []
+}

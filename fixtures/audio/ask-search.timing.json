@@ -1,0 +1,73 @@
+{
+  "name": "ask-search",
+  "sampleRate": 24000,
+  "durationMs": 48485,
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "A",
+      "startMs": 0,
+      "endMs": 3893
+    },
+    {
+      "index": 1,
+      "speaker": "B",
+      "startMs": 4593,
+      "endMs": 7991
+    },
+    {
+      "index": 2,
+      "speaker": "A",
+      "startMs": 8591,
+      "endMs": 12179
+    },
+    {
+      "index": 3,
+      "speaker": "B",
+      "startMs": 12879,
+      "endMs": 16794
+    },
+    {
+      "index": 4,
+      "speaker": "A",
+      "startMs": 17594,
+      "endMs": 21416
+    },
+    {
+      "index": 5,
+      "speaker": "B",
+      "startMs": 22116,
+      "endMs": 25045
+    },
+    {
+      "index": 6,
+      "speaker": "A",
+      "startMs": 26245,
+      "endMs": 29052
+    },
+    {
+      "index": 7,
+      "speaker": "B",
+      "startMs": 31552,
+      "endMs": 35077
+    },
+    {
+      "index": 8,
+      "speaker": "A",
+      "startMs": 35877,
+      "endMs": 40108
+    },
+    {
+      "index": 9,
+      "speaker": "B",
+      "startMs": 40808,
+      "endMs": 43009
+    },
+    {
+      "index": 10,
+      "speaker": "A",
+      "startMs": 43609,
+      "endMs": 47585
+    }
+  ]
+}

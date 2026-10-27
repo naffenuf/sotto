@@ -1,0 +1,66 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "Before we go any further on pricing, I want to know what we're up against.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Same. I keep hearing numbers thrown around but I've never actually checked them.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "I mean the meal planning apps, the fridge scanners, that whole crowd.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Right. And whether they charge monthly or do the one time unlock thing.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Monthly, mostly, I think. But I'd rather not guess at this stage.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "No, let's not. We've been guessing at it for two weeks.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "Sotto, what do the main competitors charge per month?",
+      "pauseAfterMs": 2500
+    },
+    {
+      "speaker": "B",
+      "text": "Good. Let's see what comes back before we argue about our own number.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Because if they're all clustered in one place, we either match it or we have a reason not to.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "And if there's a gap in the middle, that's interesting too.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Right. A gap usually means nobody's figured out how to make that tier work.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [
+    {
+      "line": 6,
+      "question": "what do the main competitors charge per month?"
+    }
+  ],
+  "moments": []
+}

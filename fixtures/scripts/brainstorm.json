@@ -1,0 +1,126 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "Okay, so where do we want to start with this fridge app idea?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "I think we start with the core loop. You photograph what's in your fridge, and we suggest three things you could actually cook tonight.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "A",
+      "text": "Three feels right. More than that and people freeze up.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Right. And the suggestions have to respect what you don't have, not just what you do.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "That's the whole trick, honestly. I've had it happen to me a dozen times, a recipe that needs two things I didn't buy.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "So, point one. Suggestions are limited to what's on hand, plus a short pantry list we assume everyone has.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "A",
+      "text": "Salt, oil, flour, that kind of thing.",
+      "pauseAfterMs": 400
+    },
+    {
+      "speaker": "B",
+      "text": "Exactly.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "A",
+      "text": "Second thing I keep coming back to is speed. If it takes longer than about ten seconds from photo to suggestions, I'd just order takeout.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Agreed. Ten seconds is the bar.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "Third, I want it to learn a little. If you skip the same recipe four times, stop showing it to me.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Mm, that's a nice one. Low effort, feels smart.",
+      "pauseAfterMs": 1100
+    },
+    {
+      "speaker": "A",
+      "text": "Fourth, a shopping nudge. Not a full grocery list, just, you're one ingredient away from three more meals.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Oh, I like that a lot. That's the bit someone would screenshot.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "A",
+      "text": "Fifth, and this one's less fun. We need some way to handle leftovers. Half a lemon, a bit of rice.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Yeah. Leftovers are most of the real problem.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Alright, let's decide something concrete. For the first build, we do photo in, three suggestions out, and nothing else.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Yes. Let's commit to that. No accounts, no social feed, no meal planning calendar for version one.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Decided then. Photo to three suggestions, and we cut everything else.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "B",
+      "text": "One thing I genuinely don't know is how good the recognition has to be before it stops feeling like a toy.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "That's the open question, isn't it. Does it need to see every single item, or is roughly right fine as long as the suggestions are good?",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "I don't have an answer. We should try it on a few real fridges before we tune anything.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Let's leave it open and come back to it after the first prototype.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "Works for me.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": []
+}

@@ -1,0 +1,66 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "So walk me through the flow one more time, start to finish.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "You open the app and it goes straight to the camera. No home screen, no dashboard.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "You take the photo of the fridge.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "We show you what we recognised, and you can tap to remove anything that's wrong.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Then three suggestions, and you pick one.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "And picking one takes you to the steps. That's the whole thing.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Five screens at most, by my count.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Four, if the recognition screen and the suggestions screen are the same screen.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "Sotto, can you sketch the user flow we just described as a diagram?",
+      "pauseAfterMs": 2500
+    },
+    {
+      "speaker": "B",
+      "text": "Yeah, I want to see whether it looks as simple as it sounds.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "If it needs a legend, we've already overbuilt it.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [
+    {
+      "line": 8,
+      "question": "can you sketch the user flow we just described as a diagram?"
+    }
+  ],
+  "moments": []
+}

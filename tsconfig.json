@@ -6,5 +6,12 @@
     "types": ["node"],
     "jsx": "react-jsx"
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts", "web/src/**/*.ts", "web/src/**/*.tsx", "*.ts"]
+  "include": [
+    "server/**/*.ts",
+    "shared/**/*.ts",
+    "scripts/**/*.ts",
+    "web/src/**/*.ts",
+    "web/src/**/*.tsx",
+    "*.ts"
+  ]
 }

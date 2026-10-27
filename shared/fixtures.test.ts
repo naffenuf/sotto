@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+import { FixtureScriptSchema } from "./fixtures.js";
+
+const line = (speaker: "A" | "B", text: string) => ({ speaker, text, pauseAfterMs: 500 });
+
+const lines = [
+  line("A", "The budget is under five thousand."),
+  line("B", "Noted."),
+  line("A", "Let's hire the twenty thousand dollar agency."),
+  line("B", "Sure."),
+];
+
+const moment = {
+  id: "budget-contradiction",
+  type: "contradiction" as const,
+  setupLines: [0],
+  triggerLine: 2,
+  deadlineLine: 3,
+  expectedLevel: "interject" as const,
+  description: "A said under $5K at line 0, then proposes a $20K agency at line 2.",
+};
+
+const messages = (result: ReturnType<typeof FixtureScriptSchema.safeParse>) =>
+  result.success ? [] : result.error.issues.map((issue) => issue.message);
+
+describe("FixtureScriptSchema", () => {
+  it("accepts a script with a moment and defaults the optional arrays", () => {
+    const result = FixtureScriptSchema.safeParse({ lines, moments: [moment] });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.wakeQuestions).toEqual([]);
+      expect(result.data.moments).toHaveLength(1);
+    }
+  });
+
+  it("rejects line indexes that do not exist", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      wakeQuestions: [{ line: 9, question: "what now?" }],
+    });
+    expect(messages(result)).toContainEqual(expect.stringContaining("line 9 does not exist"));
+  });
+
+  it("rejects a setup line at or after the trigger line", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, setupLines: [2] }],
+    });
+    expect(messages(result)).toContainEqual(expect.stringContaining("must come before triggerLine"));
+  });
+
+  it("rejects a deadline before the trigger line", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, deadlineLine: 1 }],
+    });
+    expect(messages(result)).toContainEqual(
+      expect.stringContaining("must be at or after triggerLine"),
+    );
+  });
+
+  it("rejects an unknown moment type", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, type: "vibes" }],
+    });
+    expect(result.success).toBe(false);
+  });
+});
