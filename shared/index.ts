@@ -40,6 +40,30 @@ export type {
   WakeQuestion,
 } from "./fixtures.js";
 export type { PauseState, TurnUpdate } from "./turns.js";
+export {
+  BOARD_OPS_SCHEMA_NAME,
+  BoardOpSchema,
+  BoardUpdateSchema,
+  addOpSections,
+  boardOpKinds,
+  boardOpsJsonSchema,
+  boardSections,
+  emptyBoard,
+  itemStatuses,
+  sectionAddOps,
+  sectionIdPrefixes,
+} from "./board.js";
+export type {
+  AddOp,
+  AddOpKind,
+  Board,
+  BoardOp,
+  BoardOpKind,
+  BoardSection,
+  BoardUpdate,
+  Item,
+  ItemStatus,
+} from "./board.js";
 export { statusChannels, statusStates } from "./events.js";
 export type {
   ServerEvent,
