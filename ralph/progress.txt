@@ -302,3 +302,40 @@
   Checked: npm run typecheck, npm test (134 tests, 13 files), npm run test:integration (5 tests,
   2 files — the Meta API reachability test ran too), npm run fixtures:check (9 OK).
   No browser criterion in this story. Nothing human-only is pending.
+
+[2026-10-27 17:40] US-011 — completed — Live transcript panel: coloured chips, partials, renaming, jump-to-live.
+  Arrived on a clean tree. Story is ralph US-011 = PRD US-007.
+  WHERE IT LIVES: `web/src/TranscriptPanel.tsx` in a new `.layout` grid — left column
+  (`minmax(16rem, 25%)`, the `.sidebar`, where US-009's board goes underneath) and the stage
+  on the right. `.app` is now `height: 100vh; overflow: hidden` so the transcript scrolls
+  inside its own panel rather than the page.
+  SPEAKER NAMES ARE SERVER STATE, NOT PANEL STATE. A new `speakers` event on `/ws/events`
+  carries the whole `{ label: name }` map; `EventBus` remembers it (so a browser attaching
+  mid-session is caught up) and CLEARS IT on any `session` event, because diarization labels
+  belong to one session. `POST /api/session/speaker` ({ label, name: string | null }) is the
+  one way to set one: 400 on a bad body, 409 when nothing is running (names can only be given
+  while a session runs — the folder is closed afterwards), otherwise it returns the new map.
+  It goes through `SessionManager.renameSpeaker`, which publishes to the bus AND writes to the
+  session folder, which rewrites `transcript.md`. A session whose folder failed to open still
+  renames: the panel must not depend on the disk. Verified end to end — the verify run's folder
+  had `**[00:01] Craig:**` lines and `speakers: { A: { name: "Craig" } }`.
+  THE SNAPSHOT IS NOW FIVE EVENTS, not four (three dots, session, speakers). Any test counting
+  snapshot events has to know that; `server/app.test.ts` and `bus.test.ts` were updated.
+  CLIENT: `useSessionEvents` keeps `turns: TurnUpdate[]` (a snapshot replaces the turn with the
+  same `turnId`, so a partial becoming final never doubles the row), capped at `MAX_TURNS` 500,
+  and resets turns/speakers only when a session STARTS — stopping leaves the transcript up to
+  read, which is deliberate.
+  THE 3-SECOND CRITERION IS MEASURED TWICE: `server/session/transcriptLatency.test.ts` replays
+  the brainstorm capture at `max` and compares the first non-empty `TurnUpdate` against
+  `fixtures/audio/brainstorm.timing.json` line 0 — 1.24 s, since the API's first `transcript`
+  frame is at `atMs` 1238 and line 0 starts at 0. `npm run verify:ui` measures the same thing
+  from the Start click in the browser: 1,297 ms.
+  BROWSER GOTCHA, COST ME A RUN: "jump to live" cannot appear until the list actually
+  overflows, and the brainstorm capture needs ~60 s of 1x replay to fill the panel at
+  1200x760. `verify:ui` now waits for `scrollHeight > clientHeight + 48` (up to 120 s) before
+  scrolling to the top, so the whole run takes ~1.5 min. It also asserts each label keeps one
+  colour, two labels never share one, renaming A leaves B alone, and the jump pill returns the
+  list to the bottom. Screenshots: `<path>.png`, `<path>-scrolled.png`, `<path>-idle.png`.
+  Checked: npm run typecheck, npm test (142 tests, 15 files), npm run fixtures:check (9 OK),
+  browser verification (screenshots looked at). No network calls added to the unit tests.
+  Nothing human-only is pending for this story.

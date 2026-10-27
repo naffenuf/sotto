@@ -197,8 +197,8 @@
         "Verify in browser using webapp-testing skill (Playwright screenshot)"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done; all 7 criteria met (npm run typecheck, npm test: 142 tests / 15 files, npm run fixtures:check 9 OK, browser verification via npm run verify:ui). Panel is web/src/TranscriptPanel.tsx in a new .layout left column; names travel over a new `speakers` event on /ws/events (the bus remembers them, and drops them when the session changes) and POST /api/session/speaker, which also writes through SessionManager.renameSpeaker to SessionStore. First text measured 1.24 s after the first spoken word in server/session/transcriptLatency.test.ts and 1,297 ms in the browser. Nothing human-only pending."
     },
     {
       "id": "US-012",

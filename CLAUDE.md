@@ -179,3 +179,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   cannot name a date, so `SessionStore` takes a separate wall-clock function for folder names and
   ISO stamps. Freeze it in tests with a Date built from **local** parts (`new Date(2026, 9, 27,
   13, 4)`) — folder names are local time, so a UTC literal fails outside UTC.
+- **Speaker names belong to the session, not the panel.** `/ws/events` carries a `speakers`
+  event with the whole `{ label: name }` map; `EventBus` remembers it so a browser attaching
+  mid-session is caught up, and **clears it on every `session` event**, because the API
+  renumbers diarization labels per session. `POST /api/session/speaker` is the only way to set
+  one — it goes through `SessionManager.renameSpeaker`, which publishes to the bus *and* writes
+  to the session folder (which rewrites `transcript.md`), and answers 409 when nothing is
+  running. A session whose folder failed to open still renames: the panel must not depend on
+  the disk. The bus snapshot is therefore **five** events, not four.
+- **A turn arrives many times; the row must not.** `useSessionEvents` keeps `turns:
+  TurnUpdate[]` and replaces the entry with the same `turnId` in place, so a partial becoming
+  final never doubles a row. The list is capped at `MAX_TURNS` (the whole transcript is on disk
+  anyway), and only a session *starting* clears it — stopping leaves the transcript up to read.
+- **"Jump to live" needs a list that overflows.** The brainstorm capture takes ~60 s of 1x
+  replay to fill the panel at 1200x760, so a Playwright check must wait for
+  `scrollHeight > clientHeight + 48` before scrolling up; scrolling a non-overflowing list
+  fires no event and the button never appears. `npm run verify:ui` does this and now also
+  measures US-007's three-second budget from the Start click (1,297 ms), the same number
+  `server/session/transcriptLatency.test.ts` gets off the capture instantly (1.24 s).
