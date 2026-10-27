@@ -1,0 +1,503 @@
+{
+  "project": "Sotto",
+  "branchName": "ralph/sotto-core",
+  "description": "Sotto Core: a local web app (Node server on 127.0.0.1 + React UI) that listens to a group brainstorm via Meta Muse Voice Transcribe (realtime, DIARIZATION), keeps a living board, and contributes to the group only when it matters: scored, pause-timed, rate-limited interjections (contradiction, factual error, untested assumption, dropped thread), measured by an eval harness against fixtures with planted moments. Also answers when addressed by wake word, using Muse Spark 1.3 with web search and sandboxed HTML artifacts. Every session saves to a folder. Full spec: tasks/prd-sotto-core.md",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project scaffold (PRD US-001)",
+      "description": "As a developer, I need a working TypeScript project with a server and a browser UI so later stories have somewhere to land.",
+      "acceptanceCriteria": [
+        "Single npm package with server/ (Node 22, Fastify, @fastify/websocket), web/ (React 18 + Vite), and shared/ for types used by both",
+        "TypeScript strict: true across server/, web/ and shared/",
+        "Scripts: dev (server + Vite together; Vite proxies /api and /ws to the server), build, typecheck, test (Vitest unit tests, no network), test:integration (Vitest tests that call real Meta APIs; skipped with a clear message if MODEL_API_KEY is missing)",
+        "Server loads MODEL_API_KEY from .env via dotenv and exits with a clear message if it is missing (except under test)",
+        "Server binds to 127.0.0.1 only",
+        "GET /api/health returns { \"ok\": true }",
+        "Web page shows the app name 'Sotto' and a 'server: connected' indicator driven by /api/health",
+        ".env.example contains MODEL_API_KEY=; .gitignore covers .env, node_modules/, dist/, sessions/",
+        "README.md states this repo was built during the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026) and lists dev commands",
+        "Tests pass",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Fixture generator, script schema, and conversation fixtures (PRD US-002 part 1)",
+      "description": "As a developer, I need recorded two-speaker conversations generated from scripts so features can be tested without people talking into a mic.",
+      "acceptanceCriteria": [
+        "Zod schema in shared/fixtures.ts for fixtures/scripts/<name>.json: { lines: [{ speaker: 'A'|'B', text, pauseAfterMs }], wakeQuestions: [{ line, question }], moments: [{ id, type: 'contradiction'|'factual_error'|'untested_assumption'|'dropped_thread', setupLines: number[], triggerLine, deadlineLine, expectedLevel: 'glow'|'interject', description }] } (line numbers are 0-based indexes into lines)",
+        "fixtures/make_fixture.py turns a script into fixtures/audio/<name>.wav (mono, 16-bit PCM, 24 kHz) using Chatterbox TTS run with ~/Developer/Chatterbox/venv/bin/python; speaker A uses ~/Developer/Chatterbox/voices/maddie.pt, speaker B uses Chatterbox's default voice; lines joined with their pauses",
+        "make_fixture.py also writes fixtures/audio/<name>.timing.json with startMs and endMs for every line",
+        "fixtures/README.md documents usage: ~/Developer/Chatterbox/venv/bin/python fixtures/make_fixture.py fixtures/scripts/<name>.json",
+        "npm run fixtures:check validates every script against the schema, checks setupLines < triggerLine <= deadlineLine and all line indexes exist, and checks each script has a matching .wav and .timing.json",
+        "Fixtures created, scripted, generated and committed: brainstorm (1–3 min, two speakers planning a product; at least 5 points, 1 decision, 1 open question; no moments, no wake phrase), ask-search (~45 s; includes 'Sotto, what do the main competitors charge per month?'), ask-diagram (~45 s; includes 'Sotto, can you sketch the user flow we just described as a diagram?'), no-wake (~45 s; includes 'so to speak', 'Soto's restaurant', 'sotto voce'; no wake phrase, no moments)",
+        "npm run fixtures:check passes",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Planted-moment fixtures (PRD US-002 part 2)",
+      "description": "As a developer, I need conversations containing planted moments Sotto should catch, so the interjection engine can be measured.",
+      "acceptanceCriteria": [
+        "Fixtures scripted with annotated moments, generated and committed (each 1–3 min, two speakers planning a product, natural-sounding with some filler and back-and-forth):",
+        "moment-contradiction: a budget or deadline constraint stated early (setupLines), contradicted later (triggerLine); expectedLevel interject",
+        "moment-fact: a confidently stated, checkably wrong fact (e.g. a wrong product launch year or market size); expectedLevel interject",
+        "moment-assumption: the plan rests on an assumption nobody questions (e.g. 'users will obviously pay monthly'); expectedLevel glow",
+        "moment-dropped: a promising idea raised, interrupted, never returned to; later the discussion reaches a point where it applies; expectedLevel glow",
+        "moment-mixed: ~3 minutes, two moments of different types, with long stretches where nothing should be said",
+        "Each moment's description explains the setup and trigger in one or two sentences",
+        "npm run fixtures:check passes",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "AudioSource interface and WAV replay (PRD US-003 part 1)",
+      "description": "As a developer, I want to stream a fixture WAV through the same audio interface the mic will use.",
+      "acceptanceCriteria": [
+        "server/audio/AudioSource.ts defines an interface emitting PCM16 mono 24 kHz chunks of 80 ms (3,840 bytes) plus an end signal",
+        "WavReplaySource reads a WAV from fixtures/audio/ and emits chunks paced at real time with a drift-corrected timer (not bare setInterval)",
+        "WavReplaySource rejects WAVs that are not mono 16-bit 24 kHz with a clear error",
+        "Unit test: replaying a 2.0 s WAV emits 25 chunks over 1.9–2.2 s",
+        "Unit test: average chunk interval over a 10 s WAV is 80 ms ± 10 ms",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Realtime transcription client and event capture (PRD US-004)",
+      "description": "As a developer, I need recorded event streams from Meta's realtime transcription so the parser is built against what the API actually sends.",
+      "acceptanceCriteria": [
+        "server/asr/realtimeClient.ts opens wss://api.meta.ai/v1/asr/realtime and sends the JSON handshake as the first frame within 10 s: authorization.accessToken 'Bearer <key>', audioEncoding 'PCM_24KHZ', model 'muse-voice-transcribe-1.0', mode 'DIARIZATION', keywords ['Sotto'] (see https://dev.meta.ai/docs/speech-to-text and https://dev.meta.ai/docs/api-reference/voice/realtime)",
+        "Streams binary chunks from an AudioSource, sends {\"type\":\"endStream\"} at end of input, and reads until the server closes with code 1000",
+        "Close codes: 1000 done; 1008 logged as fatal config/pacing error; 1011 and 1013 retried with backoff 1 s, 2 s, 4 s (max 3 tries)",
+        "Every server frame is appended with receive time (ms since stream start) to a JSONL file",
+        "npm run capture -- <fixture> replays fixtures/audio/<fixture>.wav and writes fixtures/events/<fixture>.jsonl; npm run capture -- --all does every fixture",
+        "Captured event files for all fixtures are committed",
+        "fixtures/events/NOTES.md documents the actual event shapes seen (speechStart, transcript partials, speechEnd, speechComplete, speaker), how speaker events relate to turns and partials, and how 'Sotto' was spelled in transcripts",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Injected clock, turn assembler and pause detection (PRD US-005 part 1)",
+      "description": "As a developer, I need raw transcription events turned into clean speaker-labeled turns, plus a reliable signal for when nobody is talking.",
+      "acceptanceCriteria": [
+        "server/clock.ts provides a Clock interface (now(), setTimeout-like scheduling) with a real implementation and a simulated one for tests; all time-based server code uses an injected Clock, never Date.now() directly",
+        "Pure module server/asr/turns.ts consumes timestamped events and emits TurnUpdate (type in shared/): { turnId, speaker: string | null, text, final: boolean, startMs, endMs: number | null }",
+        "Partials replace (not append to) the current turn's text; a turn becomes final on speechComplete using that event's text",
+        "Speaker labels are attached per the behavior documented in fixtures/events/NOTES.md",
+        "Overlapping turns are tracked by turnId",
+        "Exposes pauseState(nowMs): { speaking: boolean, silentForMs: number }; speaking is true while any turn has speechStart without speechEnd",
+        "Unit tests replay every fixtures/events/*.jsonl file; for brainstorm: at least 2 distinct speakers, every final turn has non-empty text, final turns in time order, and at least one pause of >= 1.5 s",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Transcription reconnect and speaker-label continuity (PRD US-005 part 2)",
+      "description": "As a user, I want long sessions to keep going across the API's 60-minute session limit without losing who is who.",
+      "acceptanceCriteria": [
+        "On close 1011 with reason 'Max session duration reached', the client opens a new realtime session and keeps streaming without dropping buffered audio",
+        "The assembler continues across sessions; new labels are mapped to existing speakers by order of first appearance, and a speakerMappingUncertain flag is set on subsequent TurnUpdates",
+        "Unit test with a mocked WebSocket server: forced 1011 mid-stream → reconnect → turns continue with mapped speakers and the flag set",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Fast event replay with simulated time (PRD US-006)",
+      "description": "As a developer, I want captured conversations to run through the pipeline in seconds without calling the transcription API, so interjection tuning is fast and cheap.",
+      "acceptanceCriteria": [
+        "EventReplaySource feeds fixtures/events/<name>.jsonl into the turn assembler on a simulated Clock at a configurable speed ('1x' or 'max')",
+        "At 'max', idle time is skipped but simulated time does not advance past an in-flight async task registered with the clock (e.g. a model call) until it finishes",
+        "Unit test: replaying brainstorm events at 'max' produces the same final turns as at '1x' (run 1x on the simulated clock with real-time ratio check skipped)",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Session pipeline, event bus and controls",
+      "description": "As a user, I want to pick an input source and start or stop a listening session from the UI.",
+      "acceptanceCriteria": [
+        "POST /api/session/start { source } where source is { kind: 'wav', fixture } | { kind: 'events', fixture } | { kind: 'mic' } starts a session: source → (realtime client for wav/mic) → turn assembler → in-process event bus",
+        "POST /api/session/stop ends it cleanly (endStream, close sockets); GET /api/fixtures lists available WAV and event fixtures",
+        "/ws/events pushes typed server events (union type in shared/) to the browser: TurnUpdate and status updates for server, transcription and model",
+        "Header UI: source selector (each WAV fixture, 'Replay events: <fixture>' at 1x, and Microphone shown disabled until US-012), Start/Stop buttons, and status dots for server, transcription and model",
+        "Starting the brainstorm events replay shows status dots go active and Stop returns them to idle",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot)"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Session folder persistence (PRD US-008)",
+      "description": "As a user, I want every session saved so I can review it later, and so the build and evaluation can be checked by reading files.",
+      "acceptanceCriteria": [
+        "SessionStore creates sessions/<YYYY-MM-DD_HHMM>-<source>/ on session start",
+        "Writes session.json { id, startedAt, endedAt | null, source, speakers: { [label]: { name: string | null } }, asrSessions: string[], settings } on every change",
+        "Appends every raw transcription event to events.jsonl",
+        "Appends one line per final turn to transcript.md as '**[mm:ss] Name-or-label:** text'",
+        "Provides append/write methods (used by later stories) for board.md, board.json, candidates.jsonl, feedback.jsonl, answers.jsonl and artifacts/",
+        "Renaming a speaker rewrites transcript.md with the new name",
+        "All whole-file writes are atomic (temp file + rename)",
+        "Integration test (events replay at max): brainstorm produces a folder where transcript.md has at least 10 lines and session.json has endedAt set",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Live transcript panel (PRD US-007)",
+      "description": "As a user, I want to see who said what as it happens.",
+      "acceptanceCriteria": [
+        "Transcript panel in the left column shows one row per turn: colored speaker chip, then text; partial turns gray italic, final turns normal",
+        "Each speaker label gets a consistent color",
+        "Clicking a speaker chip lets the user type a display name that applies to every turn from that label and is saved via SessionStore",
+        "Auto-scrolls to the newest turn unless the user has scrolled up; a 'jump to live' button appears when they have",
+        "With the brainstorm WAV replaying, the first text appears within 3 s of the first spoken word (timing.json startMs of line 0)",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot)"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Browser microphone capture (PRD US-003 part 2)",
+      "description": "As a user, I want to stream my microphone into a session.",
+      "acceptanceCriteria": [
+        "Browser captures the mic with getUserMedia + an AudioWorklet (not ScriptProcessor), resamples to 24 kHz PCM16 mono, and sends binary 80 ms chunks over /ws/audio",
+        "Server MicSource implements AudioSource from /ws/audio chunks; the Microphone option in the source selector is enabled",
+        "Unit test for the resampler: a 48 kHz 1 kHz sine converts to 24 kHz with the expected sample count and dominant frequency",
+        "Denied mic permission shows a clear inline error, not a crash",
+        "Tests pass",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright with fake media stream flags --use-fake-device-for-media-stream --use-fake-ui-for-media-stream): starting a Microphone session shows the transcription status dot active"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Board model, operations and markdown rendering (PRD US-009 part 1)",
+      "description": "As a developer, I need a board data model updated by small operations so items keep stable IDs and the board never churns.",
+      "acceptanceCriteria": [
+        "Board type in shared/: { summary, constraints: Item[], points: Item[], questions: Item[], decisions: Item[] }, Item = { id, text, status: 'open'|'covered'|'dropped', sourceTurnIds: string[], createdAtMs, updatedAtMs }",
+        "BoardOp union: add_constraint | add_point | add_question | add_decision { text, sourceTurnIds }, set_status { id, status }, edit_text { id, text }, set_summary { text }; plus a JSON Schema for it usable as strict structured output",
+        "Pure applyOps(board, ops, nowMs) never deletes items (drop = status 'dropped'), ignores and reports unknown IDs, and assigns stable IDs (c1, p1, q1, d1…)",
+        "renderBoardMarkdown(board) produces board.md with sections Summary, Constraints, Points, Open Questions, Decisions using - [ ] / - [x] and ~~dropped~~",
+        "Unit tests cover every op, unknown IDs, and markdown output",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Board update loop with Muse Spark (PRD US-009 part 2)",
+      "description": "As a user, I want the discussion organized automatically into constraints, points, questions and decisions without anyone asking.",
+      "acceptanceCriteria": [
+        "Update runs when >= 4 new final turns arrived or 45 s passed (on the injected Clock) with >= 1 new final turn; only one update in flight; triggers during flight merge into the next run",
+        "Each update calls muse-spark-1.3 (openai SDK, baseURL https://api.meta.ai/v1) with the board JSON, new final turns with turn IDs, and the 10 preceding turns; strict JSON-Schema output of BoardOp[]; response validated with zod",
+        "Prompt lives in server/prompts/board.md and instructs: items <= 12 words, prefer edit_text over duplicates, record every stated constraint, mark covered only when clearly addressed, summary <= 2 sentences",
+        "After each update: board.json and board.md written via SessionStore, and the board pushed over /ws/events",
+        "Integration test (events replay at max): brainstorm yields >= 4 points, >= 1 decision, >= 1 question, non-empty summary; moment-contradiction yields a constraint whose sourceTurnIds include a turn overlapping the planted setup line (use timing.json)",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Board panel (PRD US-010)",
+      "description": "As a user, I want to glance at the board and see what's covered and what's still open.",
+      "acceptanceCriteria": [
+        "Board panel (left column, below transcript) shows summary, then Constraints, Points, Open Questions, Decisions",
+        "Open items: empty checkbox; covered: checked with strike-through; dropped: hidden behind a 'show dropped (n)' toggle",
+        "Items added or changed in the latest update get a highlight that fades over 3 s",
+        "'updated 12s ago' indicator plus a spinner while an update is in flight",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot after a brainstorm events replay)"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Stage layout and card component (PRD US-011)",
+      "description": "As a user, I want one large, glanceable area where everything Sotto contributes appears.",
+      "acceptanceCriteria": [
+        "Layout: left column ~25% (transcript top, board below), stage ~75%, header from US-009",
+        "One Card component with variants: answer (small question + asker, headline >= 28 px, 'details ▾' expands markdown, numbered sources), interject (answer-size, accent border, label 'Sotto noticed…', 'why now' line, evidence quotes), glow (compact one line, muted accent, click to expand to full card)",
+        "Cards stack newest on top; glow cards collapse into an 'n quiet thoughts' tray after 2 minutes",
+        "Every variant supports thinking (animated indicator) and error (muted message) states",
+        "Dark theme by default",
+        "Dev page /dev/cards renders every variant and state with sample data",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot of /dev/cards)"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Observer: interjection candidates (PRD US-012)",
+      "description": "As the system, I need to notice things worth raising (contradictions, factual errors, untested assumptions, dropped threads) and score them.",
+      "acceptanceCriteria": [
+        "Observer runs right after each board update with the board, turns since its last run, and the last 3 final turns marked as current topic",
+        "Calls muse-spark-1.3 with strict structured output returning 0–3 candidates: { type, headline (<= 90 chars), detail (<= 60 words), whyNow (<= 20 words), evidenceTurnIds, relatedBoardItemIds, scores: { relevance, novelty, importance, confidence } } (each 0–1); validated with zod",
+        "Prompt in server/prompts/observer.md defines each type with one example and states that zero candidates is the normal result",
+        "Each candidate gets an ID and is appended to candidates.jsonl before any policy decision",
+        "Duplicates of earlier candidates (same type and overlapping relatedBoardItemIds) are marked duplicate and not passed on",
+        "Integration test (events replay at max): moment-contradiction produces >= 1 contradiction candidate whose evidenceTurnIds include a turn overlapping the trigger line",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Fact verification with web search (PRD US-013)",
+      "description": "As the system, before I tell a group they've got a fact wrong, I need to check it.",
+      "acceptanceCriteria": [
+        "Every factual_error candidate is verified with a Responses API call (muse-spark-1.3, tools [{ type: 'web_search' }]) returning structured { verdict: 'wrong'|'right'|'unclear', correction (<= 30 words), citations: { url, title }[] }; citations taken from url_citation annotations (see https://dev.meta.ai/docs/cookbook/search-grounding)",
+        "wrong: candidate continues with correction appended to detail and citations attached; right/unclear: marked unverified in candidates.jsonl and stops",
+        "Verification runs asynchronously and does not block other candidates",
+        "Integration test (events replay at max): moment-fact yields a verified factual_error candidate with >= 1 citation",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Interjection policy (PRD US-014)",
+      "description": "As a user, I want Sotto to speak up rarely, at good moments, and only about things that matter.",
+      "acceptanceCriteria": [
+        "Pure module server/interject/policy.ts decides silent | glow | interject | hold for a candidate given the Clock, pauseState and history",
+        "score = importance × confidence × (0.5 + 0.5 × relevance) × novelty",
+        "Chattiness thresholds (glow / interject): quiet 0.45 / 0.75, normal 0.35 / 0.6 (default), active 0.25 / 0.45",
+        "Timing: glow and interject only delivered during a pause (not speaking and silentForMs >= 1500); otherwise hold and re-check when pauseState changes",
+        "Expiry: held candidates become silent (reason stale) after 90 s or 6 new final turns",
+        "Budget: after an interject, further interjects downgrade to glow for 3 minutes; at most 3 interjects per 15 minutes",
+        "Courtesy: nothing delivered while an answer is thinking or within 5 s after a wake phrase is detected (expose hooks the answer and wake stories will call)",
+        "Every decision logged to candidates.jsonl with score, thresholds and reason (below_threshold, cooldown, budget, stale, courtesy, delivered)",
+        "Chattiness selectable live in the header and saved to session.json settings",
+        "Unit tests on a simulated clock cover threshold boundaries, hold→deliver on pause, expiry by time and by turns, cooldown downgrade, budget cap, courtesy suppression",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Interjection delivery and feedback (PRD US-015)",
+      "description": "As a user, I want Sotto's contributions shown calmly and clearly, and I want to tell it when it got the call wrong.",
+      "acceptanceCriteria": [
+        "interject decisions render as interject cards with headline, why now, detail, evidence quotes and citations; glow decisions render as glow cards",
+        "Clicking an evidence quote scrolls the transcript to that turn and highlights it",
+        "Each delivered card has feedback buttons 👍 useful, 👎 not useful, ⏱ wrong moment; clicks append to feedback.jsonl with candidate ID and level",
+        "No sound and no modal on delivery",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot after a moment-contradiction events replay shows an interject card)"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Eval runner and judge (PRD US-016 part 1)",
+      "description": "As a developer, I want to replay every evaluation fixture through the interjection engine and match delivered cards to planted moments.",
+      "acceptanceCriteria": [
+        "npm run eval replays captured events at max speed for brainstorm, no-wake and every moment-* fixture through board → observer → verification → policy, at --chattiness quiet|normal|active|all (default normal)",
+        "Collects every delivered card with level, simulated delivery time, and whether delivery happened during a pause",
+        "Judge: muse-spark-1.3 strict structured output { matches: boolean, reason } for each (delivered card, moment in that fixture) pair; prompt in server/prompts/judge.md",
+        "Judge results cached on disk in eval/cache/ keyed by hash of (card headline + detail, moment id, judge prompt hash) so reruns are cheap",
+        "Raw run results written to eval/runs/<timestamp>.json",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Eval scoring, report and gates (PRD US-016 part 2)",
+      "description": "As a developer, I want clear numbers on how well Sotto chooses what to raise and when.",
+      "acceptanceCriteria": [
+        "Per moment outcome: caught (matched, expected level or higher, within window: after triggerLine ends and before deadlineLine ends per timing.json), caught_low (glow when interject expected), late (after deadline), missed",
+        "Per fixture: false interjects (interject cards matching no moment) and false glows",
+        "Timing: percent of deliveries during a pause (must be 100%) and median delay from triggerLine end to delivery",
+        "Headline metrics: moment recall = (caught + caught_low) / total; interject precision = true interjects / all interjects; false interjects on brainstorm + no-wake",
+        "Writes eval/reports/<timestamp>.md with per-moment table, totals, settings, git commit, prompt file hashes and estimated API cost; prints a terminal table",
+        "Exits non-zero if recall < 0.7, any false interject on brainstorm or no-wake, or any delivery outside a pause",
+        "Scoring logic is a pure function with unit tests using hand-built run results",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Tune interjections to targets",
+      "description": "As the team, we want the interjection engine to meet its targets before building the remaining features.",
+      "acceptanceCriteria": [
+        "Run npm run eval at normal chattiness; iterate on server/prompts/observer.md (and, only if needed, policy weights) until recall >= 0.7, zero false interjects on brainstorm and no-wake, and 100% deliveries during pauses",
+        "Do NOT edit fixtures, moment annotations, the judge prompt, or the scoring code to reach targets",
+        "Spot-check at least 5 judge decisions by reading the cards and moments; record agreement in the report notes",
+        "Commit the passing report in eval/reports/ and summarize what changed in progress.txt",
+        "If targets are not reached after 5 eval iterations, commit the best report, leave passes false, and write the gap and hypotheses in notes",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Wake-phrase detection (PRD US-017)",
+      "description": "As a user, I want to address Sotto by name mid-conversation and have it know I'm asking it something.",
+      "acceptanceCriteria": [
+        "Pure module server/wake.ts: detect(text) → { triggered, question | null }",
+        "Triggers when the wake word starts a sentence or follows hey/okay/ok, followed by a comma or a question; spellings configurable, default ['sotto', 'soto', 'sota'] plus any spellings recorded in fixtures/events/NOTES.md",
+        "Does not trigger on 'so to speak', 'so to', 'sotto voce', or 'Soto' as a name inside a sentence ('Soto's restaurant')",
+        "Unit tests: >= 8 positive and >= 8 negative sentences, including the no-wake look-alikes",
+        "Partial turn trigger shows a 'Sotto is listening…' indicator in the UI and calls the policy courtesy hook; the question is emitted only when the turn is final; at most one trigger per turnId",
+        "Integration test (events replay at max): ask-search gives exactly 1 trigger; no-wake, brainstorm and all moment-* give 0",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Answer agent with web search (PRD US-018)",
+      "description": "As a user, I want a short, sourced answer that uses the conversation as context.",
+      "acceptanceCriteria": [
+        "On a wake question, calls the Responses API (muse-spark-1.3, tools [{ type: 'web_search' }], streaming) with the board, the last 10 minutes of final turns with speaker names, and the question; prompt in server/prompts/answer.md",
+        "Prompt: line 1 is a headline <= 90 chars for people glancing at a shared screen, then optional markdown detail <= 150 words",
+        "Parses into Answer { id, question, askedBy, headline, detailMd, citations: { url, title }[], status: thinking|done|error, createdAtMs, latencyMs }; citations from url_citation annotations, deduped by URL",
+        "Streams as an answer card: thinking immediately, headline as soon as line 1 completes, full answer when done; calls the policy courtesy hook while thinking",
+        "Answers run in their own queue and never wait for board or observer",
+        "API errors produce status error with a short message; session continues",
+        "Each answer appended to answers.jsonl",
+        "Integration test (events replay at max): ask-search gives 1 answer with status done, headline <= 90 chars, >= 1 citation",
+        "Tests pass",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot after ask-search events replay shows the answer card)"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Typed questions (PRD US-019)",
+      "description": "As a user, I want to type a question when speaking isn't practical or the wake word was misheard.",
+      "acceptanceCriteria": [
+        "'Ask Sotto…' input at the bottom of the stage; Enter submits",
+        "Typed questions use the same path as spoken ones with askedBy 'typed'",
+        "Works during a session and after Stop (using the last session's context)",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright: type a question, see an answer card)"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "HTML artifacts on the stage (PRD US-020)",
+      "description": "As a user, I want to ask for a diagram, table or mockup and see it rendered.",
+      "acceptanceCriteria": [
+        "Answer agent can call function tool show_html({ title, html }) where html is a complete self-contained document (inline CSS/JS/SVG, no external requests)",
+        "Server saves to artifacts/<nn>-<slug>.html and attaches { title, path } to the answer",
+        "Card renders it in <iframe sandbox=\"allow-scripts\"> (no allow-same-origin) served from /api/sessions/<id>/artifacts/<file> with header Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:",
+        "Artifact card has an 'open full screen' button",
+        "If the API rejects web_search combined with function tools in one request, route by intent: a cheap classification call picks 'search' or 'visual' and the matching tool set; record the approach used in fixtures/events/NOTES.md",
+        "Integration test (events replay at max): ask-diagram gives an answer with exactly 1 artifact whose file exists and contains <svg or <div",
+        "Tests pass",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot of the rendered artifact)"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "End-to-end live-audio check (PRD US-021)",
+      "description": "As a developer, I want one command proving the whole loop works against the real APIs from audio, not just captured events.",
+      "acceptanceCriteria": [
+        "npm run e2e replays WAVs (real-time pace, real transcription) for brainstorm, moment-contradiction, ask-search and ask-diagram headlessly through the full pipeline",
+        "Asserts: transcript and session files as in US-010; board criteria as in US-014; wake trigger counts as in US-024; ask-search answer as in US-025; ask-diagram artifact as in US-027; moment-contradiction caught; no interject cards on brainstorm",
+        "Prints per-fixture latency: wake → headline, wake → done, moment trigger → delivery",
+        "Exits non-zero on any failure",
+        "Prints estimated API cost; total under $0.50",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

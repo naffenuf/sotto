@@ -1,0 +1,7 @@
+# Sotto — Ralph loop progress log
+# One entry per completed iteration. Append-only. Newest at the bottom.
+# Format:
+#   [YYYY-MM-DD HH:MM] US-XXX — <result: completed | blocked | failed> — <one-line summary>
+#   <optional: key decisions, gotchas, or context the NEXT iteration needs>
+#
+# Codebase patterns and learnings worth keeping live in CLAUDE.md, not here.

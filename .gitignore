@@ -1,0 +1,8 @@
+.env
+node_modules/
+dist/
+sessions/
+ralph/loop.log
+ralph/STOP
+.DS_Store
+ralph/iterations/
