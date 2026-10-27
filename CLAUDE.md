@@ -50,3 +50,15 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `deadlineLine`, line indexes in range, unique moment ids) in a `superRefine`, so every reader
   gets them. `scripts/check-fixtures.ts` (`npm run fixtures:check`) adds only what needs the
   filesystem: WAV format and timing/script agreement. Add new script rules to the schema.
+- **Audio contract.** `server/audio/AudioSource.ts` fixes the one shape audio takes on the server:
+  PCM16 mono 24 kHz in 80 ms chunks of exactly `AUDIO_CHUNK_BYTES` (3,840). A source that runs out of
+  audio mid-chunk zero-pads the last one, so `AudioSink.onChunk` never sees a short buffer;
+  `onEnd(reason)` (`"complete" | "stopped"`) is the end signal. The RIFF reader is
+  `server/audio/wav.ts` — one parser, shared with `scripts/check-fixtures.ts`.
+- **Injected clock.** `server/clock.ts` is the `Clock` (`now()` on a monotonic timeline plus
+  `setTimeout(fn, ms)` returning a cancel function) that the "never `Date.now()`" convention refers
+  to; `systemClock` is the real one. Pass it in as a constructor argument, as `WavReplaySource` does,
+  and a fake clock replays a two-minute fixture in a test instantly. **Drift correction** means
+  computing each delay from the *start of the stream* (`(sent + 1) * CHUNK_MS - elapsed`), never from
+  the previous tick, and catching up on several chunks when a timer overslept — measured 2001 ms for
+  a 2.0 s WAV and an 80.02 ms average interval over 10 s.

@@ -76,8 +76,8 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done; all 7 criteria met (npm run typecheck, npm test: 29 tests, npm run fixtures:check). AudioSource/AudioSink interfaces + chunk constants in server/audio/AudioSource.ts (AUDIO_CHUNK_BYTES=3840, AUDIO_CHUNK_MS=80, AUDIO_SAMPLE_RATE=24000); onEnd(reason) is the end signal ('complete' | 'stopped'). WavReplaySource validates format in its constructor and paces with a drift-corrected timer (delay measured from stream start, catch-up on a late tick); measured 25 chunks in 2001 ms for a 2.0 s WAV and avg interval 80.02 ms over 10 s. Introduced server/clock.ts (Clock = now() + setTimeout -> cancel, systemClock on performance.now()) because the project convention forbids Date.now(); US-006 should extend this file rather than add a second clock. The RIFF reader now lives in server/audio/wav.ts and scripts/check-fixtures.ts imports it. No UI work here: the source selector and Start/Stop from PRD US-003 belong to US-012."
     },
     {
       "id": "US-005",

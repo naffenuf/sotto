@@ -46,3 +46,19 @@
   the 3.8 words/s estimate under-predicted by 16s (actual ~3.4 words/s) — see CLAUDE.md.
   Next story is US-004 (AudioSource interface and WAV replay, PRD US-003 part 1). All nine fixture
   WAVs it needs are now committed; fixtures/events/ still does not exist (US-005 creates it).
+
+[2026-10-27 07:45] US-004 — completed — AudioSource/AudioSink interface, WavReplaySource with a drift-corrected timer, and server/clock.ts.
+  Working tree was clean at the start; nothing to recover.
+  Audio contract (use these everywhere downstream): PCM16 mono 24 kHz, 80 ms chunks of exactly 3,840 bytes.
+  Constants and types in server/audio/AudioSource.ts: AUDIO_SAMPLE_RATE, AUDIO_CHUNK_MS, AUDIO_CHUNK_SAMPLES,
+  AUDIO_CHUNK_BYTES, AudioSource { sampleRate, start(sink), stop() }, AudioSink { onChunk(buf), onEnd(reason) },
+  AudioEndReason = "complete" | "stopped". A source that runs out of audio mid-chunk zero-pads the last chunk,
+  so onChunk never sees a short buffer — US-005's realtime client can send every chunk as-is and then endStream.
+  WavReplaySource: `new WavReplaySource(path, clock?)` or `WavReplaySource.forFixture("brainstorm", clock?)`;
+  throws UnsupportedWavFormatError from the constructor unless the file is mono 16-bit 24 kHz.
+  server/clock.ts is new: Clock { now(): number; setTimeout(fn, ms): () => void }, plus `systemClock`
+  (performance.now(), so only differences are meaningful). US-006 should EXTEND this file for simulated time
+  instead of adding a second clock abstraction — WavReplaySource already takes it as its second argument, so a
+  fake clock replays a 2-minute fixture instantly (see the manualClock helper in WavReplaySource.test.ts).
+  scripts/check-fixtures.ts no longer has its own RIFF parser; it imports readWavFile from server/audio/wav.ts.
+  Not in this story (deliberately): PRD US-003's mic source, UI source selector and Start/Stop — that is US-012.
