@@ -123,3 +123,17 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   show a pause of `threshold`. Changing one `pauseAfterMs` costs a re-render (~4.5x real time)
   plus a re-capture, and `npm run fixtures:check` fails until both are done, since it compares the
   capture's `audioProcessedMs` against the WAV's length.
+- **Replaying a capture is one timeline at two speeds.** `server/asr/EventReplaySource.ts`
+  always *sets* the pipeline clock to each frame's recorded `atMs`, so the turns, pauses and
+  timestamps a replay produces are identical at `1x` and at `max`; the speed only decides
+  whether real wall-clock time is spent in between (`1x` paces against an injected
+  `wallClock`, drift-corrected from the start of the run). That is why the source takes a
+  `ControllableClock` — `Clock` plus `advanceTo`/`nextDueAt`/`settle`, implemented only by
+  `SimulatedClock`.
+- **Wrap every awaited model call in `clock.track`.** `Clock.track(label, work)` returns
+  `work` unchanged, so `await clock.track("board", callModel())` reads like the bare call;
+  `systemClock`'s is the identity, and `SimulatedClock.settle()` waits for what is in flight.
+  `max`-speed replay settles before every advance, so time never skips past a call and the
+  call reads back `now()` as the moment it was made. An untracked call gets raced past. The
+  one rule: a tracked task must not await one of the same clock's timers — nothing moves time
+  while `settle` waits, so that deadlocks.

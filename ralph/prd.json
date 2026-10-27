@@ -143,8 +143,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "EventReplaySource in server/asr/EventReplaySource.ts; Clock.track/SimulatedClock.settle in server/clock.ts. 1x paces against an injected wallClock (systemClock by default), max spends no real time; both set the pipeline clock to each frame's recorded atMs, so the final turns are identical. The UI source selector for 'Replay events: <fixture>' is US-009's criterion, not this one."
     },
     {
       "id": "US-009",

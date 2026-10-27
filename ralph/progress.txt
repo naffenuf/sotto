@@ -173,3 +173,38 @@
   (turnId restarts at 0, labels restart at A) and says it is the note to correct if a long
   live session ever disagrees.
   Nothing human-only is pending for this story.
+
+[2026-10-27 12:40] US-008 — completed — Captures replay through the assembler on a controllable clock, and the clock waits for in-flight work.
+  Working tree was clean on arrival; nothing to recover.
+  server/asr/EventReplaySource.ts is the new source. `EventReplaySource.forFixture(name,
+  { clock, speed, wallClock? })`, then `await source.run(sink)`; `assemblerSink(assembler,
+  onEnd?)` in the same file is the adapter that pours frames into a TurnAssembler, so the
+  pipeline stories can write `source.run(assemblerSink(assembler))`.
+  THE DESIGN POINT: 1x and max share one timeline. The *pipeline* clock is always SET to
+  each frame's recorded `atMs` (so turns, pauses and board timestamps are byte-identical at
+  both speeds); the speed only decides whether real wall-clock time is spent getting there.
+  That is why the source needs a `ControllableClock` (new interface in server/clock.ts:
+  Clock + advanceTo + nextDueAt + settle) and why "1x on the simulated clock with the
+  real-time ratio check skipped" is a sensible thing to ask for — it is the same code path
+  with an instant wall clock.
+  Pacing at 1x goes through an injected `wallClock: Clock` (defaults to systemClock), and
+  each delay is computed from the START of the run, like WavReplaySource. Tests pass an
+  `instantWallClock(delays)` that records every delay and adds it to its own `now()`, so the
+  exact drift-corrected schedule can be asserted ([100, 500, 800, 100, 60]) without waiting.
+  CLOCK CHANGE EVERY LATER STORY TOUCHES: `Clock` gained `track<T>(label, work): Promise<T>`.
+  It returns `work` unchanged — `const board = await clock.track("board", callModel())` reads
+  exactly like the bare call. systemClock's is the identity; SimulatedClock remembers the
+  task and `settle()` waits for it. `run()` settles before every clock advance, so simulated
+  time never skips over an in-flight model call and the call reads back `now()` as the moment
+  it was made. WRAP EVERY AWAITED MODEL CALL IN `clock.track` or the eval harness will race
+  past it. Caveat documented on the method: a tracked task must not await one of the same
+  clock's timers — nothing moves time while settle waits, so that deadlocks.
+  Two pre-existing hand-rolled Clocks in server/asr/realtimeClient.test.ts (heldRetryClock,
+  fastRetryClock) needed `track: systemClock.track` added; that is the pattern for any other
+  partial Clock.
+  NOT IN THIS STORY, deliberately: PRD US-006 also lists the UI source selector's "Replay
+  events: <fixture>" entries. That is US-009's fourth criterion and lands with the session
+  pipeline; this story's acceptance list does not include it.
+  Checked: npm run typecheck, npm test (87 tests, 10 files — 11 new in
+  server/asr/EventReplaySource.test.ts, 4 new clock tests), npm run fixtures:check (9 OK).
+  No network calls added; nothing human-only is pending.
