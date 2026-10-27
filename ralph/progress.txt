@@ -134,3 +134,42 @@
   favour of SimulatedClock — one clock abstraction, as US-004's note asked for.
   Checked: npm run typecheck, npm test (67 tests, 9 files), npm run fixtures:check (9 fixtures OK).
   Nothing human-only is pending for this story.
+
+[2026-10-27 12:35] US-007 — completed — 60-minute-limit reconnect split from the retry path, and speaker labels mapped across sessions.
+  Working tree was clean on arrival; nothing to recover.
+  THE KEY DISTINCTION: the 60-minute session limit and a backend failure are BOTH close
+  1011. The only difference is the reason text, `Max session duration reached`. So
+  `isMaxSessionDuration(code, reason)` (exported from server/asr/realtimeClient.ts) matches
+  case-insensitively and allows trailing detail, and `run()` now counts `retry` separately
+  from `this.session`: a max-duration close increments the session, resets `retry` to 0 and
+  reconnects with NO backoff (queued audio is waiting), while 1011/1013 failures still get
+  1 s / 2 s / 4 s and the three-retry cap. Without this split a 4-hour session would die on
+  its fourth reconnect having never actually failed.
+  TurnUpdate gained `speakerMappingUncertain: boolean`. It is set at speechStart time, so a
+  partial carries it before any label arrives, and it is true for every turn from a session
+  other than the first one the assembler saw. All nine captures are single-session, so it is
+  false everywhere in replay — the capture-replay test asserts that.
+  TurnAssembler's mapping: `speakerOrder` is the speakers in order of first appearance;
+  `labelMaps` is per-session label -> speaker. A later session's n-th NEW label resolves to
+  `speakerOrder[n]`; if it runs past the end, `addSpeaker` invents one (keeping the raw label
+  when it is still free, else the first unused letter via `unusedLabel()`). New accessor
+  `speakers()` returns `speakerOrder`. Session 0 therefore maps A->A, B->B and costs nothing.
+  NOTE FOR THE UI STORIES (US-011, US-015): `speakerMappingUncertain` is a real design
+  requirement, not debug info — show those labels with less confidence rather than silently
+  merging two people.
+  TEST INFRASTRUCTURE the next stories can reuse: FakeAsr in server/asr/realtimeClient.test.ts
+  takes an optional second argument `admit(index) => Promise<void>` that holds the n-th
+  WebSocket upgrade open via ws's async `verifyClient`. That is how the new test proves audio
+  queues while the client has no socket at all (it asserts `connections.length === 1` at the
+  moment it pushes). Much more controllable than racing a real reconnect.
+  Changed one pre-existing test deliberately: "holds audio produced during backoff" used to
+  close with CLOSE_INTERNAL + MAX_SESSION_DURATION_REASON, which now takes the no-backoff
+  path and would have hung. Its reason is now "backend went away", so it still covers the
+  backoff-buffering path, and the new test covers the limit path.
+  Checked: npm run typecheck, npm test (72 tests, 9 files), npm run fixtures:check (9 OK).
+  No integration test for this story: no capture is 60 minutes long and renting an hour of
+  real-time audio to see one 1011 is not worth it. fixtures/events/NOTES.md's "Close codes"
+  section now spells out exactly which assumptions are untested against the live API
+  (turnId restarts at 0, labels restart at A) and says it is the note to correct if a long
+  live session ever disagrees.
+  Nothing human-only is pending for this story.

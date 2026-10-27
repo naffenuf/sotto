@@ -99,6 +99,24 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `malformedFrames() > 0` is the signal that the API drifted from `fixtures/events/NOTES.md`:
   frames are narrowed with zod (`asAsrEvent` in `shared/asr.ts`) and a known type that fails its
   shape is counted and logged rather than guessed at.
+- **Two kinds of 1011.** The realtime API's 60-minute session limit and a backend failure
+  arrive as the *same* close code; only the reason text (`Max session duration reached`)
+  separates them, so `isMaxSessionDuration()` in `server/asr/realtimeClient.ts` matches it
+  case-insensitively and tolerates trailing detail. The limit is not a failure: it reconnects
+  with **no backoff** (audio is queueing meanwhile) and spends none of the three-retry error
+  budget, which a multi-hour session would otherwise burn through on reconnects that never
+  failed. Retry count and session number are therefore separate counters in `run()`.
+- **A reconnect restarts the diarization labels, not just the turn numbering.** Nothing in the
+  API ties one session's `speaker` labels to the next one's, so `TurnAssembler` maps a later
+  session's n-th new label to the n-th speaker met so far (order of first appearance) and sets
+  `speakerMappingUncertain` on every turn from that session — at `speechStart`, so partials
+  carry it too. That flag is a UI requirement: show the label with less confidence rather than
+  silently merging two people. A voice beyond the ones already heard becomes a new speaker.
+- **Holding a WebSocket upgrade open is how you test queueing.** `FakeAsr` in
+  `server/asr/realtimeClient.test.ts` takes an optional `admit(index)` that defers the n-th
+  upgrade through ws's async `verifyClient`, so a test can push audio while the client has no
+  socket at all and then assert it all arrived on the next session. Far steadier than racing a
+  real reconnect.
 - **The endpointer's bite is a constant, not a ratio.** The same `brainstorm` line measured at
   `pauseAfterMs` 1,600 and 2,400 gave visible `speechEnd → speechStart` gaps of 1,084 and
   1,944 ms — 456 and 516 ms eaten. So a fixture needs `threshold + ~550 ms` of scripted pause to
