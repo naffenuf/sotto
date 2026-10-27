@@ -1,0 +1,1790 @@
+{"atMs":510.637459,"session":0,"frame":{"sessionId":"voyager/duplex/19912E9538F34C94AD370B72D912AA60"}}
+{"atMs":561.7928750000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80}}
+{"atMs":596.902625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":160}}
+{"atMs":597.257292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":240}}
+{"atMs":598.119625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":320}}
+{"atMs":598.4344169999999,"session":0,"frame":{"type":"speechStart","audioProcessedMs":0,"turnId":0}}
+{"atMs":625.7824170000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":400}}
+{"atMs":626.396,"session":0,"frame":{"type":"transcript","transcript":" Can","final":false,"audioProcessedMs":400}}
+{"atMs":646.1409590000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":480}}
+{"atMs":664.219292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":560}}
+{"atMs":725.3944589999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":640}}
+{"atMs":806.124667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":720}}
+{"atMs":953.4265419999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":800}}
+{"atMs":953.56225,"session":0,"frame":{"type":"transcript","transcript":" Can we","final":false,"audioProcessedMs":800}}
+{"atMs":1027.655417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":880}}
+{"atMs":1047.766292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":960}}
+{"atMs":1126.633625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1040}}
+{"atMs":1210.4346249999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1120}}
+{"atMs":1210.537625,"session":0,"frame":{"type":"transcript","transcript":" Can we talk","final":false,"audioProcessedMs":1120}}
+{"atMs":1282.454,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1200}}
+{"atMs":1370.342459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1280}}
+{"atMs":1370.465,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about","final":false,"audioProcessedMs":1280}}
+{"atMs":1476.37625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1360}}
+{"atMs":1555.853417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1440}}
+{"atMs":1604.955584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1520}}
+{"atMs":1679.121125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1600}}
+{"atMs":1785.0984999999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1680}}
+{"atMs":1785.2267089999998,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for","final":false,"audioProcessedMs":1680}}
+{"atMs":1844.17725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1760}}
+{"atMs":2002.6494169999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1840}}
+{"atMs":2002.8095419999997,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a","final":false,"audioProcessedMs":1840}}
+{"atMs":2104.791209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1920}}
+{"atMs":2105.131417,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute?","final":false,"audioProcessedMs":1920}}
+{"atMs":2120.7525840000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2000}}
+{"atMs":2155.1104170000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2080}}
+{"atMs":2240.66075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2160}}
+{"atMs":2321.327584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2240}}
+{"atMs":2423.9085840000002,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2320}}
+{"atMs":2424.043709,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I","final":false,"audioProcessedMs":2320}}
+{"atMs":2525.6220000000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2400}}
+{"atMs":2606.879667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2480}}
+{"atMs":2642.9227920000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2560}}
+{"atMs":2722.9747500000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2640}}
+{"atMs":2814.075709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2720}}
+{"atMs":2814.406792,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep","final":false,"audioProcessedMs":2720}}
+{"atMs":2880.3375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2800}}
+{"atMs":3048.6079170000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2880}}
+{"atMs":3156.858084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2960}}
+{"atMs":3157.0101670000004,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a","final":false,"audioProcessedMs":2960}}
+{"atMs":3175.651167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3040}}
+{"atMs":3204.936834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3120}}
+{"atMs":3296.474834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3200}}
+{"atMs":3296.803917,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a slow","final":false,"audioProcessedMs":3200}}
+{"atMs":3364.9790420000004,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3280}}
+{"atMs":3443.710167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3360}}
+{"atMs":3574.2478340000002,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3440}}
+{"atMs":3574.361917,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a slow burn","final":false,"audioProcessedMs":3440}}
+{"atMs":3654.5816670000004,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3520}}
+{"atMs":3683.0945420000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3600}}
+{"atMs":3762.0815420000004,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3680}}
+{"atMs":3840.8720840000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3760}}
+{"atMs":3922.507125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3840}}
+{"atMs":4099.654292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3920}}
+{"atMs":4100.0355,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4000}}
+{"atMs":4200.554625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4080}}
+{"atMs":4200.702792,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a slow burn and I'm","final":false,"audioProcessedMs":4080}}
+{"atMs":4244.6356670000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4160}}
+{"atMs":4334.997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4240}}
+{"atMs":4335.04625,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a slow burn and I'm not","final":false,"audioProcessedMs":4240}}
+{"atMs":4404.583875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4320}}
+{"atMs":4505.703167000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4400}}
+{"atMs":4505.747917000001,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a slow burn and I'm not sure that's","final":false,"audioProcessedMs":4400}}
+{"atMs":4621.253834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4480}}
+{"atMs":4707.4665,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4560}}
+{"atMs":4747.076625000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4640}}
+{"atMs":4747.12275,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a slow burn and I'm not sure that's right.","final":false,"audioProcessedMs":4640}}
+{"atMs":4808.75375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4720}}
+{"atMs":4883.136709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4800}}
+{"atMs":4966.104792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4880}}
+{"atMs":5041.726292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4960}}
+{"atMs":5174.696792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5040}}
+{"atMs":5174.851917,"session":0,"frame":{"type":"transcript","transcript":" Can we talk about growth for a minute? Because I keep planning for a slow burn and I'm not sure that's right. ","final":false,"audioProcessedMs":5040}}
+{"atMs":5174.925209,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":5040}}
+{"atMs":5174.995584,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":4540,"turnId":0}}
+{"atMs":5175.0620420000005,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":4540,"turnId":0,"transcript":" Can we talk about growth for a minute? Because I keep planning for a slow burn and I'm not sure that's right. "}}
+{"atMs":5235.501,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5120}}
+{"atMs":5279.327709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5200}}
+{"atMs":5367.789875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5280}}
+{"atMs":5448.874917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5360}}
+{"atMs":5527.808792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5440}}
+{"atMs":5671.703917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5520}}
+{"atMs":5752.702542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5600}}
+{"atMs":5771.519209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5680}}
+{"atMs":5879.274959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5760}}
+{"atMs":5879.368834,"session":0,"frame":{"type":"speechStart","audioProcessedMs":5260,"turnId":1}}
+{"atMs":5879.391584,"session":0,"frame":{"type":"transcript","transcript":" I don't","final":false,"audioProcessedMs":5760}}
+{"atMs":5920.0645,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5840}}
+{"atMs":6002.337667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5920}}
+{"atMs":6092.489125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6000}}
+{"atMs":6092.617875,"session":0,"frame":{"type":"transcript","transcript":" I don't think","final":false,"audioProcessedMs":6000}}
+{"atMs":6196.301334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6080}}
+{"atMs":6270.910709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6160}}
+{"atMs":6322.758917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6240}}
+{"atMs":6411.390792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6320}}
+{"atMs":6411.5995,"session":0,"frame":{"type":"transcript","transcript":" I don't think it","final":false,"audioProcessedMs":6320}}
+{"atMs":6485.872875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6400}}
+{"atMs":6559.664042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6480}}
+{"atMs":6719.606542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6560}}
+{"atMs":6719.705959,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be","final":false,"audioProcessedMs":6560}}
+{"atMs":6792.0863340000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6640}}
+{"atMs":6811.39275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6720}}
+{"atMs":6886.072334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6800}}
+{"atMs":6957.329834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6880}}
+{"atMs":7041.955125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6960}}
+{"atMs":7150.366792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7040}}
+{"atMs":7150.465292,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow.","final":false,"audioProcessedMs":7040}}
+{"atMs":7249.91575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7120}}
+{"atMs":7324.0527090000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7200}}
+{"atMs":7362.666959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7280}}
+{"atMs":7449.346084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7360}}
+{"atMs":7526.173375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7440}}
+{"atMs":7526.261667,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A","final":false,"audioProcessedMs":7440}}
+{"atMs":7602.450709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7520}}
+{"atMs":7770.489542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7600}}
+{"atMs":7855.960542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7680}}
+{"atMs":7856.664834,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo","final":false,"audioProcessedMs":7680}}
+{"atMs":7876.651834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7760}}
+{"atMs":7925.01875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7840}}
+{"atMs":8019.008917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7920}}
+{"atMs":8084.763250000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8000}}
+{"atMs":8177.397834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8080}}
+{"atMs":8177.513875,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product","final":false,"audioProcessedMs":8080}}
+{"atMs":8297.181708999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8160}}
+{"atMs":8297.396708999999,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can","final":false,"audioProcessedMs":8160}}
+{"atMs":8381.713667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8240}}
+{"atMs":8381.965499999998,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move","final":false,"audioProcessedMs":8240}}
+{"atMs":8404.296917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8320}}
+{"atMs":8489.139749999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8400}}
+{"atMs":8566.235166999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8480}}
+{"atMs":8649.546792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8560}}
+{"atMs":8823.363167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8640}}
+{"atMs":8823.734959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8720}}
+{"atMs":8913.636999999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8800}}
+{"atMs":8913.952374999999,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast","final":false,"audioProcessedMs":8800}}
+{"atMs":8964.168584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8880}}
+{"atMs":9042.9815,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8960}}
+{"atMs":9126.323375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9040}}
+{"atMs":9126.441292,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast if","final":false,"audioProcessedMs":9040}}
+{"atMs":9207.157167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9120}}
+{"atMs":9343.016291999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9200}}
+{"atMs":9427.429875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9280}}
+{"atMs":9427.587958999999,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast if the","final":false,"audioProcessedMs":9280}}
+{"atMs":9454.1695,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9360}}
+{"atMs":9535.048959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9440}}
+{"atMs":9597.173208999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9520}}
+{"atMs":9701.7845,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9600}}
+{"atMs":9701.928291999999,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast if the first","final":false,"audioProcessedMs":9600}}
+{"atMs":9768.599584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9680}}
+{"atMs":9865.240124999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9760}}
+{"atMs":9941.254041999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9840}}
+{"atMs":10004.237792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9920}}
+{"atMs":10084.866291999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10000}}
+{"atMs":10163.695624999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10080}}
+{"atMs":10263.16375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10160}}
+{"atMs":10263.310542,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast if the first screenshot is","final":false,"audioProcessedMs":10160}}
+{"atMs":10390.008042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10240}}
+{"atMs":10390.175959,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast if the first screenshot is good","final":false,"audioProcessedMs":10240}}
+{"atMs":10484.558541999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10320}}
+{"atMs":10484.740084,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast if the first screenshot is good enough.","final":false,"audioProcessedMs":10320}}
+{"atMs":10504.004417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10400}}
+{"atMs":10569.419458999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10480}}
+{"atMs":10640.082917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10560}}
+{"atMs":10727.357833999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10640}}
+{"atMs":10795.845792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10720}}
+{"atMs":10913.779875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10800}}
+{"atMs":10996.451792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10880}}
+{"atMs":11047.884999999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10960}}
+{"atMs":11128.811416999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11040}}
+{"atMs":11197.719541999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11120}}
+{"atMs":11330.027666999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11200}}
+{"atMs":11330.239375,"session":0,"frame":{"type":"transcript","transcript":" I don't think it has to be slow. A photo product can move fast if the first screenshot is good enough. ","final":false,"audioProcessedMs":11200}}
+{"atMs":11330.330958999999,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":11200}}
+{"atMs":11330.395125,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":10700,"turnId":1}}
+{"atMs":11330.432917,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":10700,"turnId":1,"transcript":" I don't think it has to be slow. A photo product can move fast if the first screenshot is good enough. "}}
+{"atMs":11439.030499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11280}}
+{"atMs":11538.109042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11360}}
+{"atMs":11538.599833999999,"session":0,"frame":{"type":"speechStart","audioProcessedMs":10860,"turnId":2}}
+{"atMs":11563.435458999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11440}}
+{"atMs":11622.60975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11520}}
+{"atMs":11622.789999999999,"session":0,"frame":{"type":"transcript","transcript":" The","final":false,"audioProcessedMs":11520}}
+{"atMs":11687.064499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11600}}
+{"atMs":11760.045084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11680}}
+{"atMs":11868.299208999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11760}}
+{"atMs":11868.530125,"session":0,"frame":{"type":"transcript","transcript":" The sharing loop","final":false,"audioProcessedMs":11760}}
+{"atMs":11963.995208999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11840}}
+{"atMs":12048.587834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11920}}
+{"atMs":12101.500833999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12000}}
+{"atMs":12162.376291999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12080}}
+{"atMs":12275.673459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12160}}
+{"atMs":12275.908916999999,"session":0,"frame":{"type":"transcript","transcript":" The sharing loop does a lot","final":false,"audioProcessedMs":12160}}
+{"atMs":12320.803791999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12240}}
+{"atMs":12489.503125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12320}}
+{"atMs":12572.9905,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12400}}
+{"atMs":12588.856624999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12480}}
+{"atMs":12646.728374999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12560}}
+{"atMs":12772.814459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12640}}
+{"atMs":12772.878041999998,"session":0,"frame":{"type":"transcript","transcript":" The sharing loop does a lot of the work,","final":false,"audioProcessedMs":12640}}
+{"atMs":12796.135499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12720}}
+{"atMs":12878.241791999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12800}}
+{"atMs":13011.886625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12880}}
+{"atMs":13098.204749999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12960}}
+{"atMs":13127.827834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13040}}
+{"atMs":13201.216542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13120}}
+{"atMs":13305.60025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13200}}
+{"atMs":13305.672874999998,"session":0,"frame":{"type":"transcript","transcript":" The sharing loop does a lot of the work, that's true.","final":false,"audioProcessedMs":13200}}
+{"atMs":13364.64575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13280}}
+{"atMs":13440.066459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13360}}
+{"atMs":13536.259791999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13440}}
+{"atMs":13615.294667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13520}}
+{"atMs":13679.558708999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13600}}
+{"atMs":13771.849959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13680}}
+{"atMs":13846.702749999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13760}}
+{"atMs":13927.593459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13840}}
+{"atMs":14068.034709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13920}}
+{"atMs":14135.529708999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14000}}
+{"atMs":14167.563166999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14080}}
+{"atMs":14295.545584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14160}}
+{"atMs":14295.729249999999,"session":0,"frame":{"type":"transcript","transcript":" The sharing loop does a lot of the work, that's true. ","final":false,"audioProcessedMs":14160}}
+{"atMs":14295.87125,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":14160}}
+{"atMs":14295.912999999999,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":13660,"turnId":2}}
+{"atMs":14295.946209,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":13660,"turnId":2,"transcript":" The sharing loop does a lot of the work, that's true. "}}
+{"atMs":14330.866167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14240}}
+{"atMs":14431.145792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14320}}
+{"atMs":14431.290874999999,"session":0,"frame":{"type":"speechStart","audioProcessedMs":13820,"turnId":3}}
+{"atMs":14482.449625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14400}}
+{"atMs":14584.289999999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14480}}
+{"atMs":14584.411084,"session":0,"frame":{"type":"transcript","transcript":" It","final":false,"audioProcessedMs":14480}}
+{"atMs":14666.696124999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14560}}
+{"atMs":14724.249209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14640}}
+{"atMs":14802.88725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14720}}
+{"atMs":14882.962625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14800}}
+{"atMs":14971.793916999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14880}}
+{"atMs":15106.782167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14960}}
+{"atMs":15107.097375,"session":0,"frame":{"type":"transcript","transcript":" It does","final":false,"audioProcessedMs":14960}}
+{"atMs":15189.173334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15040}}
+{"atMs":15208.11125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15120}}
+{"atMs":15282.860374999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15200}}
+{"atMs":15399.479874999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15280}}
+{"atMs":15399.597249999999,"session":0,"frame":{"type":"transcript","transcript":" It does all of the","final":false,"audioProcessedMs":15280}}
+{"atMs":15439.561125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15360}}
+{"atMs":15536.152666999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15440}}
+{"atMs":15536.296084,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work","final":false,"audioProcessedMs":15440}}
+{"atMs":15632.362667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15520}}
+{"atMs":15711.602459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15600}}
+{"atMs":15757.527166999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15680}}
+{"atMs":15844.15325,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15760}}
+{"atMs":15844.251459,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early","final":false,"audioProcessedMs":15760}}
+{"atMs":15921.901542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15840}}
+{"atMs":15998.941541999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15920}}
+{"atMs":16155.826084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16000}}
+{"atMs":16227.309666999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16080}}
+{"atMs":16245.561374999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16160}}
+{"atMs":16322.343417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16240}}
+{"atMs":16417.251874999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16320}}
+{"atMs":16417.407459,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early on.","final":false,"audioProcessedMs":16320}}
+{"atMs":16477.103709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16400}}
+{"atMs":16556.608541999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16480}}
+{"atMs":16680.985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16560}}
+{"atMs":16681.191458999998,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early on. Look at","final":false,"audioProcessedMs":16560}}
+{"atMs":16764.601416999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16640}}
+{"atMs":16764.777584,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early on. Look at what","final":false,"audioProcessedMs":16640}}
+{"atMs":16801.319584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16720}}
+{"atMs":16884.095459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16800}}
+{"atMs":16961.074624999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16880}}
+{"atMs":17033.939749999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16960}}
+{"atMs":17204.505,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17040}}
+{"atMs":17204.582625,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early on. Look at what happened","final":false,"audioProcessedMs":17040}}
+{"atMs":17296.089125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17120}}
+{"atMs":17296.42325,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early on. Look at what happened with","final":false,"audioProcessedMs":17120}}
+{"atMs":17317.453084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17200}}
+{"atMs":17364.707625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17280}}
+{"atMs":17444.982625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17360}}
+{"atMs":17519.434834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17440}}
+{"atMs":17596.3675,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17520}}
+{"atMs":17729.261917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17600}}
+{"atMs":17806.867959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17680}}
+{"atMs":17854.760125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17760}}
+{"atMs":17854.855667,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early on. Look at what happened with Instagram.","final":false,"audioProcessedMs":17760}}
+{"atMs":17925.283667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17840}}
+{"atMs":18004.49575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17920}}
+{"atMs":18079.425625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18000}}
+{"atMs":18259.998334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18080}}
+{"atMs":18260.647624999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18160}}
+{"atMs":18343.085709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18240}}
+{"atMs":18401.149959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18320}}
+{"atMs":18478.574709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18400}}
+{"atMs":18559.387542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18480}}
+{"atMs":18640.419792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18560}}
+{"atMs":18777.788084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18640}}
+{"atMs":18905.737084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18720}}
+{"atMs":18905.855417,"session":0,"frame":{"type":"transcript","transcript":" It does all of the work early on. Look at what happened with Instagram. ","final":false,"audioProcessedMs":18720}}
+{"atMs":18905.872917,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":18720}}
+{"atMs":18905.884542,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":18220,"turnId":3}}
+{"atMs":18905.893042,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":18220,"turnId":3,"transcript":" It does all of the work early on. Look at what happened with Instagram. "}}
+{"atMs":18923.871209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18800}}
+{"atMs":18964.369209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18880}}
+{"atMs":19043.557792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18960}}
+{"atMs":19147.588,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19040}}
+{"atMs":19147.865917,"session":0,"frame":{"type":"speechStart","audioProcessedMs":18540,"turnId":4}}
+{"atMs":19202.877459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19120}}
+{"atMs":19302.717125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19200}}
+{"atMs":19302.871209,"session":0,"frame":{"type":"transcript","transcript":" Go","final":false,"audioProcessedMs":19200}}
+{"atMs":19382.241542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19280}}
+{"atMs":19441.292042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19360}}
+{"atMs":19527.385292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19440}}
+{"atMs":19607.173917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19520}}
+{"atMs":19683.611291999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19600}}
+{"atMs":19827.481584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19680}}
+{"atMs":19827.708709,"session":0,"frame":{"type":"transcript","transcript":" Go on.","final":false,"audioProcessedMs":19680}}
+{"atMs":19909.468375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19760}}
+{"atMs":19928.553167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19840}}
+{"atMs":20011.075875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19920}}
+{"atMs":20082.747334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20000}}
+{"atMs":20165.492125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20080}}
+{"atMs":20353.888709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20160}}
+{"atMs":20354.324334,"session":0,"frame":{"type":"transcript","transcript":" Go on. ","final":false,"audioProcessedMs":20160}}
+{"atMs":20354.404625,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":20160}}
+{"atMs":20354.447125,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":19660,"turnId":4}}
+{"atMs":20354.477167,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":19660,"turnId":4,"transcript":" Go on. "}}
+{"atMs":20354.870791999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20240}}
+{"atMs":20354.906,"session":0,"frame":{"type":"speechStart","audioProcessedMs":19740,"turnId":5}}
+{"atMs":20436.321916999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20320}}
+{"atMs":20484.225209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20400}}
+{"atMs":20563.125084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20480}}
+{"atMs":20646.149209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20560}}
+{"atMs":20718.8665,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20640}}
+{"atMs":20875.532459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20720}}
+{"atMs":20953.739417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20800}}
+{"atMs":20972.739875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20880}}
+{"atMs":21058.813667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20960}}
+{"atMs":21058.979209,"session":0,"frame":{"type":"transcript","transcript":" Instagram","final":false,"audioProcessedMs":20960}}
+{"atMs":21125.602917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21040}}
+{"atMs":21201.944417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21120}}
+{"atMs":21282.804125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21200}}
+{"atMs":21401.194375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21280}}
+{"atMs":21477.256792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21360}}
+{"atMs":21550.2975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21440}}
+{"atMs":21550.443625,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in","final":false,"audioProcessedMs":21440}}
+{"atMs":21600.260709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21520}}
+{"atMs":21679.571874999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21600}}
+{"atMs":21765.4145,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21680}}
+{"atMs":21927.192209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21760}}
+{"atMs":22037.877542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21840}}
+{"atMs":22038.033875,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014","final":false,"audioProcessedMs":21840}}
+{"atMs":22057.467417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21920}}
+{"atMs":22086.035084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22000}}
+{"atMs":22163.219084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22080}}
+{"atMs":22258.828584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22160}}
+{"atMs":22259.163292,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and","final":false,"audioProcessedMs":22160}}
+{"atMs":22329.624084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22240}}
+{"atMs":22448.587959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22320}}
+{"atMs":22527.321583999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22400}}
+{"atMs":22560.424,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22480}}
+{"atMs":22646.285834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22560}}
+{"atMs":22730.626709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22640}}
+{"atMs":22823.641541999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22720}}
+{"atMs":22823.810125,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about","final":false,"audioProcessedMs":22720}}
+{"atMs":22980.8285,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22800}}
+{"atMs":22981.052417,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two","final":false,"audioProcessedMs":22800}}
+{"atMs":23053.220167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22880}}
+{"atMs":23070.966417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22960}}
+{"atMs":23122.755834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23040}}
+{"atMs":23201.744083999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23120}}
+{"atMs":23286.486459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23200}}
+{"atMs":23380.073,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23280}}
+{"atMs":23380.3865,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years","final":false,"audioProcessedMs":23280}}
+{"atMs":23497.954875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23360}}
+{"atMs":23587.980541999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23440}}
+{"atMs":23588.250375,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they","final":false,"audioProcessedMs":23440}}
+{"atMs":23610.466834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23520}}
+{"atMs":23681.227124999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23600}}
+{"atMs":23786.505959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23680}}
+{"atMs":23786.663292,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were","final":false,"audioProcessedMs":23680}}
+{"atMs":23852.356125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23760}}
+{"atMs":24021.074375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23840}}
+{"atMs":24021.387667,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past","final":false,"audioProcessedMs":23840}}
+{"atMs":24023.632084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23920}}
+{"atMs":24023.800417,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100","final":false,"audioProcessedMs":23920}}
+{"atMs":24099.805792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24000}}
+{"atMs":24161.879,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24080}}
+{"atMs":24242.7335,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24160}}
+{"atMs":24321.757542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24240}}
+{"atMs":24402.70375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24320}}
+{"atMs":24544.100374999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24400}}
+{"atMs":24544.35725,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million","final":false,"audioProcessedMs":24400}}
+{"atMs":24625.760041999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24480}}
+{"atMs":24642.619749999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24560}}
+{"atMs":24725.025084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24640}}
+{"atMs":24806.076958999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24720}}
+{"atMs":24885.214334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24800}}
+{"atMs":24966.764917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24880}}
+{"atMs":25071.131292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24960}}
+{"atMs":25071.675042,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users.","final":false,"audioProcessedMs":24960}}
+{"atMs":25146.616374999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25040}}
+{"atMs":25205.278167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25120}}
+{"atMs":25293.1875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25200}}
+{"atMs":25365.752709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25280}}
+{"atMs":25447.967,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25360}}
+{"atMs":25596.556375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25440}}
+{"atMs":25692.275708999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25520}}
+{"atMs":25731.095999999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25600}}
+{"atMs":25731.458125,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One","final":false,"audioProcessedMs":25600}}
+{"atMs":25796.829167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25680}}
+{"atMs":25796.986875,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap,","final":false,"audioProcessedMs":25680}}
+{"atMs":25860.46125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25760}}
+{"atMs":25941.951375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25840}}
+{"atMs":26021.259083999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25920}}
+{"atMs":26123.774666999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26000}}
+{"atMs":26216.308291999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26080}}
+{"atMs":26264.470624999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26160}}
+{"atMs":26264.600959,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one","final":false,"audioProcessedMs":26160}}
+{"atMs":26356.653749999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26240}}
+{"atMs":26356.812667,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image,","final":false,"audioProcessedMs":26240}}
+{"atMs":26420.141042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26320}}
+{"atMs":26515.146709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26400}}
+{"atMs":26515.281209,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something","final":false,"audioProcessedMs":26400}}
+{"atMs":26641.116334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26480}}
+{"atMs":26740.993917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26560}}
+{"atMs":26774.945584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26640}}
+{"atMs":26775.104625,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice","final":false,"audioProcessedMs":26640}}
+{"atMs":26823.72525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26720}}
+{"atMs":26904.775167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26800}}
+{"atMs":26976.797625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26880}}
+{"atMs":27072.288958999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26960}}
+{"atMs":27072.479042,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes","final":false,"audioProcessedMs":26960}}
+{"atMs":27167.40825,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27040}}
+{"atMs":27256.478667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27120}}
+{"atMs":27298.158042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27200}}
+{"atMs":27380.524459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27280}}
+{"atMs":27460.211625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27360}}
+{"atMs":27556.475458999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27440}}
+{"atMs":27556.660167,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes back.","final":false,"audioProcessedMs":27440}}
+{"atMs":27691.728709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27520}}
+{"atMs":27790.398333999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27600}}
+{"atMs":27805.009834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27680}}
+{"atMs":27859.120833999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27760}}
+{"atMs":27940.012416999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27840}}
+{"atMs":28040.347084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27920}}
+{"atMs":28041.439416999998,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes back. That's the","final":false,"audioProcessedMs":27920}}
+{"atMs":28103.080292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28000}}
+{"atMs":28215.114792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28080}}
+{"atMs":28326.165084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28160}}
+{"atMs":28326.315458999998,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes back. That's the same","final":false,"audioProcessedMs":28160}}
+{"atMs":28348.954209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28240}}
+{"atMs":28428.088459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28320}}
+{"atMs":28498.334833999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28400}}
+{"atMs":28574.682792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28480}}
+{"atMs":28739.814125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28560}}
+{"atMs":28739.909792,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes back. That's the same shape","final":false,"audioProcessedMs":28560}}
+{"atMs":28740.014499999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28640}}
+{"atMs":28874.054625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28720}}
+{"atMs":28874.280584,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes back. That's the same shape as ours.","final":false,"audioProcessedMs":28720}}
+{"atMs":28893.697709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28800}}
+{"atMs":29039.932917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28880}}
+{"atMs":29040.07875,"session":0,"frame":{"type":"transcript","transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes back. That's the same shape as ours. ","final":false,"audioProcessedMs":28880}}
+{"atMs":29040.121209,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":28880}}
+{"atMs":29040.144,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":28380,"turnId":5}}
+{"atMs":29040.16275,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":28380,"turnId":5,"transcript":" Instagram launched in 2014 and inside about two years they were past 100 million users. One tap, one image, something nice comes back. That's the same shape as ours. "}}
+{"atMs":29056.186999999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28960}}
+{"atMs":29147.889584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29040}}
+{"atMs":29264.706292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29120}}
+{"atMs":29358.557125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29200}}
+{"atMs":29382.972125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29280}}
+{"atMs":29457.145542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29360}}
+{"atMs":29541.468584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29440}}
+{"atMs":29623.664,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29520}}
+{"atMs":29788.583292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29600}}
+{"atMs":29790.647834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29680}}
+{"atMs":29886.517417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29760}}
+{"atMs":29940.40825,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29840}}
+{"atMs":30016.677,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29920}}
+{"atMs":30101.763334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30000}}
+{"atMs":30182.62475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30080}}
+{"atMs":30311.667999999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30160}}
+{"atMs":30414.000459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30240}}
+{"atMs":30432.823916999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30320}}
+{"atMs":30493.384625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30400}}
+{"atMs":30581.986459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30480}}
+{"atMs":30658.655083999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30560}}
+{"atMs":30742.582,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30640}}
+{"atMs":30838.114542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30720}}
+{"atMs":30933.649542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30800}}
+{"atMs":30979.606042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30880}}
+{"atMs":31054.643541999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30960}}
+{"atMs":31145.894792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31040}}
+{"atMs":31234.080417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31120}}
+{"atMs":31234.342583999998,"session":0,"frame":{"type":"speechStart","audioProcessedMs":30620,"turnId":6}}
+{"atMs":31369.063875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31200}}
+{"atMs":31471.195375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31280}}
+{"atMs":31471.357959,"session":0,"frame":{"type":"transcript","transcript":" That's","final":false,"audioProcessedMs":31280}}
+{"atMs":31487.695084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31360}}
+{"atMs":31539.181792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31440}}
+{"atMs":31625.283667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31520}}
+{"atMs":31694.953959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31600}}
+{"atMs":31781.628917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31680}}
+{"atMs":31885.248833999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31760}}
+{"atMs":31886.572583999998,"session":0,"frame":{"type":"transcript","transcript":" That's a","final":false,"audioProcessedMs":31760}}
+{"atMs":31981.006042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31840}}
+{"atMs":32028.856334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31920}}
+{"atMs":32101.641334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32000}}
+{"atMs":32182.8765,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32080}}
+{"atMs":32271.888417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32160}}
+{"atMs":32272.01625,"session":0,"frame":{"type":"transcript","transcript":" That's a pretty","final":false,"audioProcessedMs":32160}}
+{"atMs":32410.48675,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32240}}
+{"atMs":32502.307500000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32320}}
+{"atMs":32533.472334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32400}}
+{"atMs":32533.521709,"session":0,"frame":{"type":"transcript","transcript":" That's a pretty extreme","final":false,"audioProcessedMs":32400}}
+{"atMs":32579.198542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32480}}
+{"atMs":32661.173583999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32560}}
+{"atMs":32742.522292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32640}}
+{"atMs":32814.421292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32720}}
+{"atMs":32932.834125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32800}}
+{"atMs":32932.996167,"session":0,"frame":{"type":"transcript","transcript":" That's a pretty extreme comparison","final":false,"audioProcessedMs":32800}}
+{"atMs":33023.302292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32880}}
+{"atMs":33055.829709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32960}}
+{"atMs":33141.954584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33040}}
+{"atMs":33235.368125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33120}}
+{"atMs":33235.664749999996,"session":0,"frame":{"type":"transcript","transcript":" That's a pretty extreme comparison to","final":false,"audioProcessedMs":33120}}
+{"atMs":33299.796125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33200}}
+{"atMs":33468.738375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33280}}
+{"atMs":33469.158334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33360}}
+{"atMs":33585.542667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33440}}
+{"atMs":33585.663917,"session":0,"frame":{"type":"transcript","transcript":" That's a pretty extreme comparison to hang our","final":false,"audioProcessedMs":33440}}
+{"atMs":33621.104042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33520}}
+{"atMs":33703.464374999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33600}}
+{"atMs":33787.761542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33680}}
+{"atMs":33982.288292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33760}}
+{"atMs":33982.540792,"session":0,"frame":{"type":"transcript","transcript":" That's a pretty extreme comparison to hang our roadmap on.","final":false,"audioProcessedMs":33760}}
+{"atMs":33982.727084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33840}}
+{"atMs":34079.595334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33920}}
+{"atMs":34098.432042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34000}}
+{"atMs":34188.105042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34080}}
+{"atMs":34264.753917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34160}}
+{"atMs":34343.475916999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34240}}
+{"atMs":34506.900292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34320}}
+{"atMs":34507.116125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34400}}
+{"atMs":34604.949125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34480}}
+{"atMs":34658.964167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34560}}
+{"atMs":34784.625875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34640}}
+{"atMs":34785.007084,"session":0,"frame":{"type":"transcript","transcript":" That's a pretty extreme comparison to hang our roadmap on. ","final":false,"audioProcessedMs":34640}}
+{"atMs":34785.072459,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":34640}}
+{"atMs":34785.111375,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":34140,"turnId":6}}
+{"atMs":34785.14525,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":34140,"turnId":6,"transcript":" That's a pretty extreme comparison to hang our roadmap on. "}}
+{"atMs":34820.090041999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34720}}
+{"atMs":34896.308209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34800}}
+{"atMs":35032.267125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34880}}
+{"atMs":35146.702959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34960}}
+{"atMs":35146.878083999996,"session":0,"frame":{"type":"speechStart","audioProcessedMs":34460,"turnId":7}}
+{"atMs":35185.399542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35040}}
+{"atMs":35185.583291999996,"session":0,"frame":{"type":"transcript","transcript":" Sure,","final":false,"audioProcessedMs":35040}}
+{"atMs":35225.758292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35120}}
+{"atMs":35307.150959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35200}}
+{"atMs":35307.281792,"session":0,"frame":{"type":"transcript","transcript":" Sure, but","final":false,"audioProcessedMs":35200}}
+{"atMs":35381.97925,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35280}}
+{"atMs":35462.787417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35360}}
+{"atMs":35554.074084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35440}}
+{"atMs":35647.334792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35520}}
+{"atMs":35695.270417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35600}}
+{"atMs":35790.48725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35680}}
+{"atMs":35869.709667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35760}}
+{"atMs":35869.849042,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the","final":false,"audioProcessedMs":35760}}
+{"atMs":35945.786167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35840}}
+{"atMs":36079.271292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35920}}
+{"atMs":36192.635917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36000}}
+{"atMs":36192.909167,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism","final":false,"audioProcessedMs":36000}}
+{"atMs":36216.810124999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36080}}
+{"atMs":36273.102709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36160}}
+{"atMs":36273.260583999996,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is","final":false,"audioProcessedMs":36160}}
+{"atMs":36335.684959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36240}}
+{"atMs":36423.851834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36320}}
+{"atMs":36510.244417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36400}}
+{"atMs":36510.506,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the","final":false,"audioProcessedMs":36400}}
+{"atMs":36603.179209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36480}}
+{"atMs":36701.00625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36560}}
+{"atMs":36734.818084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36640}}
+{"atMs":36819.178125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36720}}
+{"atMs":36895.647084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36800}}
+{"atMs":36986.329334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36880}}
+{"atMs":37134.98425,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36960}}
+{"atMs":37242.934959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37040}}
+{"atMs":37243.052917,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the mechanism.","final":false,"audioProcessedMs":37040}}
+{"atMs":37259.675709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37120}}
+{"atMs":37300.514709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37200}}
+{"atMs":37390.092834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37280}}
+{"atMs":37390.298,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the mechanism. I'm","final":false,"audioProcessedMs":37280}}
+{"atMs":37456.79775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37360}}
+{"atMs":37540.899959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37440}}
+{"atMs":37654.708792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37520}}
+{"atMs":37752.630709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37600}}
+{"atMs":37787.123917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37680}}
+{"atMs":37876.632375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37760}}
+{"atMs":37876.76825,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the mechanism. I'm not","final":false,"audioProcessedMs":37760}}
+{"atMs":37944.783084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37840}}
+{"atMs":38025.834334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37920}}
+{"atMs":38180.122875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38000}}
+{"atMs":38183.126417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38080}}
+{"atMs":38276.866709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38160}}
+{"atMs":38363.38775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38240}}
+{"atMs":38363.511709,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the mechanism. I'm not claiming we","final":false,"audioProcessedMs":38240}}
+{"atMs":38441.461084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38320}}
+{"atMs":38441.545417,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the mechanism. I'm not claiming we get their","final":false,"audioProcessedMs":38320}}
+{"atMs":38503.964917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38400}}
+{"atMs":38577.706375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38480}}
+{"atMs":38698.764,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38560}}
+{"atMs":38800.73025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38640}}
+{"atMs":38815.950667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38720}}
+{"atMs":38925.283209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38800}}
+{"atMs":38925.349084,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the mechanism. I'm not claiming we get their numbers.","final":false,"audioProcessedMs":38800}}
+{"atMs":38990.874292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38880}}
+{"atMs":39094.84575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38960}}
+{"atMs":39224.71875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39040}}
+{"atMs":39224.917959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39120}}
+{"atMs":39315.508709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39200}}
+{"atMs":39382.030667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39280}}
+{"atMs":39461.161084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39360}}
+{"atMs":39546.3945,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39440}}
+{"atMs":39624.205917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39520}}
+{"atMs":39747.332,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39600}}
+{"atMs":39845.2195,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39680}}
+{"atMs":39862.887834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39760}}
+{"atMs":39990.677625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39840}}
+{"atMs":39990.962625,"session":0,"frame":{"type":"transcript","transcript":" Sure, but the mechanism is the mechanism. I'm not claiming we get their numbers. ","final":false,"audioProcessedMs":39840}}
+{"atMs":39991.01925,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":39840}}
+{"atMs":39991.044167,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":39340,"turnId":7}}
+{"atMs":39991.074667,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":39340,"turnId":7,"transcript":" Sure, but the mechanism is the mechanism. I'm not claiming we get their numbers. "}}
+{"atMs":40031.01075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39920}}
+{"atMs":40130.078667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40000}}
+{"atMs":40130.167167,"session":0,"frame":{"type":"speechStart","audioProcessedMs":39500,"turnId":8}}
+{"atMs":40130.189334,"session":0,"frame":{"type":"transcript","transcript":" I'll","final":false,"audioProcessedMs":40000}}
+{"atMs":40273.427209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40080}}
+{"atMs":40274.644584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40160}}
+{"atMs":40274.729375,"session":0,"frame":{"type":"transcript","transcript":" I'll give","final":false,"audioProcessedMs":40160}}
+{"atMs":40365.792625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40240}}
+{"atMs":40430.889209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40320}}
+{"atMs":40430.983959,"session":0,"frame":{"type":"transcript","transcript":" I'll give you","final":false,"audioProcessedMs":40320}}
+{"atMs":40509.937292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40400}}
+{"atMs":40510.037875,"session":0,"frame":{"type":"transcript","transcript":" I'll give you the","final":false,"audioProcessedMs":40400}}
+{"atMs":40587.104584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40480}}
+{"atMs":40661.36825,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40560}}
+{"atMs":40796.769917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40640}}
+{"atMs":40896.634959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40720}}
+{"atMs":40923.074917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40800}}
+{"atMs":40981.821167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40880}}
+{"atMs":41062.16525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40960}}
+{"atMs":41141.423624999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41040}}
+{"atMs":41320.542584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41120}}
+{"atMs":41320.784375,"session":0,"frame":{"type":"transcript","transcript":" I'll give you the mechanism.","final":false,"audioProcessedMs":41120}}
+{"atMs":41321.006125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41200}}
+{"atMs":41420.798792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41280}}
+{"atMs":41461.335417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41360}}
+{"atMs":41544.453667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41440}}
+{"atMs":41633.459792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41520}}
+{"atMs":41633.683042,"session":0,"frame":{"type":"transcript","transcript":" I'll give you the mechanism. I","final":false,"audioProcessedMs":41520}}
+{"atMs":41711.080583999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41600}}
+{"atMs":41845.822959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41680}}
+{"atMs":41944.220667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41760}}
+{"atMs":41963.588167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41840}}
+{"atMs":42019.653874999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41920}}
+{"atMs":42104.906417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42000}}
+{"atMs":42182.144584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42080}}
+{"atMs":42370.4295,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42160}}
+{"atMs":42370.7085,"session":0,"frame":{"type":"transcript","transcript":" I'll give you the mechanism. I won't give you the","final":false,"audioProcessedMs":42160}}
+{"atMs":42371.037542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42240}}
+{"atMs":42466.548834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42320}}
+{"atMs":42509.629375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42400}}
+{"atMs":42584.235209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42480}}
+{"atMs":42658.206042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42560}}
+{"atMs":42741.308584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42640}}
+{"atMs":42893.783959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42720}}
+{"atMs":42894.008125,"session":0,"frame":{"type":"transcript","transcript":" I'll give you the mechanism. I won't give you the curve.","final":false,"audioProcessedMs":42720}}
+{"atMs":42907.946125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42800}}
+{"atMs":42995.012167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42880}}
+{"atMs":43067.258834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42960}}
+{"atMs":43146.696292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43040}}
+{"atMs":43217.430584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43120}}
+{"atMs":43308.083417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43200}}
+{"atMs":43418.238625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43280}}
+{"atMs":43556.19225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43360}}
+{"atMs":43556.456667,"session":0,"frame":{"type":"transcript","transcript":" I'll give you the mechanism. I won't give you the curve. ","final":false,"audioProcessedMs":43360}}
+{"atMs":43556.507,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":43360}}
+{"atMs":43556.544,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":42860,"turnId":8}}
+{"atMs":43556.574209,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":42860,"turnId":8,"transcript":" I'll give you the mechanism. I won't give you the curve. "}}
+{"atMs":43574.001792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43440}}
+{"atMs":43616.028249999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43520}}
+{"atMs":43721.439042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43600}}
+{"atMs":43721.537959,"session":0,"frame":{"type":"speechStart","audioProcessedMs":43100,"turnId":9}}
+{"atMs":43779.983292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43680}}
+{"atMs":43942.086959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43760}}
+{"atMs":43942.404417,"session":0,"frame":{"type":"transcript","transcript":" Fine.","final":false,"audioProcessedMs":43760}}
+{"atMs":43942.679292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43840}}
+{"atMs":44036.891834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43920}}
+{"atMs":44101.76525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44000}}
+{"atMs":44180.126334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44080}}
+{"atMs":44260.316291999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44160}}
+{"atMs":44342.249708999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44240}}
+{"atMs":44466.905917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44320}}
+{"atMs":44561.414749999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44400}}
+{"atMs":44580.797249999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44480}}
+{"atMs":44655.038792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44560}}
+{"atMs":44743.693667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44640}}
+{"atMs":44840.891334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44720}}
+{"atMs":44841.149959,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's","final":false,"audioProcessedMs":44720}}
+{"atMs":44992.736917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44800}}
+{"atMs":44994.364417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44880}}
+{"atMs":44994.543959,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan","final":false,"audioProcessedMs":44880}}
+{"atMs":45089.058917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44960}}
+{"atMs":45143.240459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45040}}
+{"atMs":45237.677708999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45120}}
+{"atMs":45237.975417,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan for the","final":false,"audioProcessedMs":45120}}
+{"atMs":45297.596792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45200}}
+{"atMs":45378.025792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45280}}
+{"atMs":45517.204084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45360}}
+{"atMs":45618.174375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45440}}
+{"atMs":45638.897625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45520}}
+{"atMs":45696.594334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45600}}
+{"atMs":45785.498999999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45680}}
+{"atMs":45858.833667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45760}}
+{"atMs":45940.928,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45840}}
+{"atMs":46042.053167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45920}}
+{"atMs":46142.313209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46000}}
+{"atMs":46142.574584,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan for the mechanism","final":false,"audioProcessedMs":46000}}
+{"atMs":46176.8315,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46080}}
+{"atMs":46272.822625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46160}}
+{"atMs":46272.941125,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan for the mechanism and","final":false,"audioProcessedMs":46160}}
+{"atMs":46336.983917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46240}}
+{"atMs":46416.604875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46320}}
+{"atMs":46562.760334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46400}}
+{"atMs":46660.926709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46480}}
+{"atMs":46685.804083999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46560}}
+{"atMs":46685.9155,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan for the mechanism and be","final":false,"audioProcessedMs":46560}}
+{"atMs":46740.722709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46640}}
+{"atMs":46839.564459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46720}}
+{"atMs":46839.827334,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan for the mechanism and be pleasantly","final":false,"audioProcessedMs":46720}}
+{"atMs":46900.414124999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46800}}
+{"atMs":46978.19525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46880}}
+{"atMs":47089.256875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46960}}
+{"atMs":47186.014834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47040}}
+{"atMs":47226.834209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47120}}
+{"atMs":47304.236959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47200}}
+{"atMs":47384.2465,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47280}}
+{"atMs":47457.855917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47360}}
+{"atMs":47611.995917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47440}}
+{"atMs":47710.584959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47520}}
+{"atMs":47727.411625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47600}}
+{"atMs":47784.817917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47680}}
+{"atMs":47883.667499999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47760}}
+{"atMs":47883.834624999996,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan for the mechanism and be pleasantly surprised.","final":false,"audioProcessedMs":47760}}
+{"atMs":48002.063583999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47840}}
+{"atMs":48002.343209,"session":0,"frame":{"type":"transcript","transcript":" Fine. Then let's plan for the mechanism and be pleasantly surprised. ","final":false,"audioProcessedMs":47840}}
+{"atMs":48002.393667,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":47840}}
+{"atMs":48002.427917,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":47340,"turnId":9}}
+{"atMs":48002.454459,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":47340,"turnId":9,"transcript":" Fine. Then let's plan for the mechanism and be pleasantly surprised. "}}
+{"atMs":48024.527667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47920}}
+{"atMs":48138.360792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48000}}
+{"atMs":48238.417459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48080}}
+{"atMs":48259.128834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48160}}
+{"atMs":48343.998125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48240}}
+{"atMs":48423.157209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48320}}
+{"atMs":48501.99675,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48400}}
+{"atMs":48662.66975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48480}}
+{"atMs":48663.047209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48560}}
+{"atMs":48762.246042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48640}}
+{"atMs":48817.912334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48720}}
+{"atMs":48904.629417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48800}}
+{"atMs":48988.396959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48880}}
+{"atMs":49057.766542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48960}}
+{"atMs":49187.405125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49040}}
+{"atMs":49314.289709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49120}}
+{"atMs":49314.566375,"session":0,"frame":{"type":"speechStart","audioProcessedMs":48620,"turnId":10}}
+{"atMs":49334.1945,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49200}}
+{"atMs":49396.776709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49280}}
+{"atMs":49473.853459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49360}}
+{"atMs":49568.83375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49440}}
+{"atMs":49568.969625,"session":0,"frame":{"type":"transcript","transcript":" What would","final":false,"audioProcessedMs":49440}}
+{"atMs":49710.142792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49520}}
+{"atMs":49710.47425,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49600}}
+{"atMs":49820.278417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49680}}
+{"atMs":49860.468834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49760}}
+{"atMs":49955.817417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49840}}
+{"atMs":49955.935875,"session":0,"frame":{"type":"transcript","transcript":" What would we","final":false,"audioProcessedMs":49840}}
+{"atMs":50031.789084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49920}}
+{"atMs":50031.952334,"session":0,"frame":{"type":"transcript","transcript":" What would we even","final":false,"audioProcessedMs":49920}}
+{"atMs":50135.095,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50000}}
+{"atMs":50236.584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50080}}
+{"atMs":50335.091625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50160}}
+{"atMs":50352.41225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50240}}
+{"atMs":50449.890875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50320}}
+{"atMs":50450.04475,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though?","final":false,"audioProcessedMs":50320}}
+{"atMs":50504.08775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50400}}
+{"atMs":50580.936334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50480}}
+{"atMs":50666.1295,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50560}}
+{"atMs":50761.991375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50640}}
+{"atMs":50850.968584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50720}}
+{"atMs":50896.616459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50800}}
+{"atMs":50986.971959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50880}}
+{"atMs":51054.677666999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50960}}
+{"atMs":51160.05625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51040}}
+{"atMs":51160.234125,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A","final":false,"audioProcessedMs":51040}}
+{"atMs":51283.465917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51120}}
+{"atMs":51383.198834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51200}}
+{"atMs":51404.9075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51280}}
+{"atMs":51460.665125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51360}}
+{"atMs":51535.223625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51440}}
+{"atMs":51627.145749999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51520}}
+{"atMs":51807.655249999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51600}}
+{"atMs":51807.923875,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A photo of","final":false,"audioProcessedMs":51600}}
+{"atMs":51808.268959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51680}}
+{"atMs":51928.628209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51760}}
+{"atMs":51928.686167,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A photo of my","final":false,"audioProcessedMs":51760}}
+{"atMs":51967.000625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51840}}
+{"atMs":51967.061834,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A photo of my fridge","final":false,"audioProcessedMs":51840}}
+{"atMs":52024.222834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51920}}
+{"atMs":52094.865792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52000}}
+{"atMs":52193.873542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52080}}
+{"atMs":52193.969625,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A photo of my fridge is","final":false,"audioProcessedMs":52080}}
+{"atMs":52330.998417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52160}}
+{"atMs":52424.352042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52240}}
+{"atMs":52451.18775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52320}}
+{"atMs":52498.988959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52400}}
+{"atMs":52590.67775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52480}}
+{"atMs":52590.836792,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A photo of my fridge is not","final":false,"audioProcessedMs":52480}}
+{"atMs":52659.133292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52560}}
+{"atMs":52737.267792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52640}}
+{"atMs":52854.284625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52720}}
+{"atMs":52949.732584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52800}}
+{"atMs":52982.440417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52880}}
+{"atMs":53062.151125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52960}}
+{"atMs":53140.711959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53040}}
+{"atMs":53218.224625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53120}}
+{"atMs":53382.290084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53200}}
+{"atMs":53386.408459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53280}}
+{"atMs":53521.574084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53360}}
+{"atMs":53521.761958999996,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A photo of my fridge is not aspirational.","final":false,"audioProcessedMs":53360}}
+{"atMs":53543.081542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53440}}
+{"atMs":53617.04425,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53520}}
+{"atMs":53705.949542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53600}}
+{"atMs":53780.190459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53680}}
+{"atMs":53904.665292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53760}}
+{"atMs":54005.7235,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53840}}
+{"atMs":54025.515875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53920}}
+{"atMs":54100.487084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54000}}
+{"atMs":54252.691459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54080}}
+{"atMs":54253.224125,"session":0,"frame":{"type":"transcript","transcript":" What would we even share though? A photo of my fridge is not aspirational. ","final":false,"audioProcessedMs":54080}}
+{"atMs":54253.286459,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":54080}}
+{"atMs":54253.323459,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":53580,"turnId":10}}
+{"atMs":54253.782834,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":53580,"turnId":10,"transcript":" What would we even share though? A photo of my fridge is not aspirational. "}}
+{"atMs":54274.335167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54160}}
+{"atMs":54426.87725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54240}}
+{"atMs":54427.456,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54320}}
+{"atMs":54524.625084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54400}}
+{"atMs":54633.495459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54480}}
+{"atMs":54633.640959,"session":0,"frame":{"type":"speechStart","audioProcessedMs":53980,"turnId":11}}
+{"atMs":54633.712917,"session":0,"frame":{"type":"transcript","transcript":" No,","final":false,"audioProcessedMs":54480}}
+{"atMs":54659.723208999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54560}}
+{"atMs":54741.933959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54640}}
+{"atMs":54826.320374999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54720}}
+{"atMs":54952.598375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54800}}
+{"atMs":55046.50725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54880}}
+{"atMs":55070.471334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54960}}
+{"atMs":55160.602042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55040}}
+{"atMs":55160.844833999996,"session":0,"frame":{"type":"transcript","transcript":" No, you'd","final":false,"audioProcessedMs":55040}}
+{"atMs":55222.063709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55120}}
+{"atMs":55324.868292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55200}}
+{"atMs":55325.04025,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the","final":false,"audioProcessedMs":55200}}
+{"atMs":55476.315042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55280}}
+{"atMs":55476.634625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55360}}
+{"atMs":55571.112084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55440}}
+{"atMs":55620.063459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55520}}
+{"atMs":55704.504625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55600}}
+{"atMs":55779.395584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55680}}
+{"atMs":55886.963125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55760}}
+{"atMs":55887.120834,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result.","final":false,"audioProcessedMs":55760}}
+{"atMs":56002.848459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55840}}
+{"atMs":56104.178709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55920}}
+{"atMs":56138.963167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56000}}
+{"atMs":56139.093584,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's","final":false,"audioProcessedMs":56000}}
+{"atMs":56183.949709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56080}}
+{"atMs":56278.032834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56160}}
+{"atMs":56278.343584,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the","final":false,"audioProcessedMs":56160}}
+{"atMs":56359.084459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56240}}
+{"atMs":56359.2825,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the three","final":false,"audioProcessedMs":56240}}
+{"atMs":56427.104542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56320}}
+{"atMs":56526.414167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56400}}
+{"atMs":56620.565667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56480}}
+{"atMs":56657.179917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56560}}
+{"atMs":56740.249375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56640}}
+{"atMs":56826.844124999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56720}}
+{"atMs":56905.0055,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56800}}
+{"atMs":57052.261709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56880}}
+{"atMs":57052.572959,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the three things I could","final":false,"audioProcessedMs":56880}}
+{"atMs":57150.645125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56960}}
+{"atMs":57172.79925,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57040}}
+{"atMs":57221.088959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57120}}
+{"atMs":57300.662041999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57200}}
+{"atMs":57404.552792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57280}}
+{"atMs":57404.708958999996,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the three things I could make out","final":false,"audioProcessedMs":57280}}
+{"atMs":57466.92625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57360}}
+{"atMs":57574.3255,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57440}}
+{"atMs":57712.642,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57520}}
+{"atMs":57712.762125,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the three things I could make out of what looked","final":false,"audioProcessedMs":57520}}
+{"atMs":57736.690792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57600}}
+{"atMs":57782.332084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57680}}
+{"atMs":57882.338708999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57760}}
+{"atMs":57882.494417,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the three things I could make out of what looked like","final":false,"audioProcessedMs":57760}}
+{"atMs":57947.444625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57840}}
+{"atMs":58098.35525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57920}}
+{"atMs":58103.168208999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58000}}
+{"atMs":58198.484917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58080}}
+{"atMs":58260.835667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58160}}
+{"atMs":58351.409167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58240}}
+{"atMs":58420.979084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58320}}
+{"atMs":58531.023709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58400}}
+{"atMs":58531.17325,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the three things I could make out of what looked like nothing.","final":false,"audioProcessedMs":58400}}
+{"atMs":58625.709292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58480}}
+{"atMs":58732.693667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58560}}
+{"atMs":58756.024417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58640}}
+{"atMs":58823.378584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58720}}
+{"atMs":58900.396084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58800}}
+{"atMs":58987.476584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58880}}
+{"atMs":59148.806042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58960}}
+{"atMs":59149.140209,"session":0,"frame":{"type":"transcript","transcript":" No, you'd share the result. Here's the three things I could make out of what looked like nothing. ","final":false,"audioProcessedMs":58960}}
+{"atMs":59149.202584,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":58960}}
+{"atMs":59149.241042,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":58460,"turnId":11}}
+{"atMs":59149.273209,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":58460,"turnId":11,"transcript":" No, you'd share the result. Here's the three things I could make out of what looked like nothing. "}}
+{"atMs":59215.963625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59040}}
+{"atMs":59216.135292,"session":0,"frame":{"type":"speechStart","audioProcessedMs":58540,"turnId":12}}
+{"atMs":59216.178667,"session":0,"frame":{"type":"transcript","transcript":" Oh,","final":false,"audioProcessedMs":59040}}
+{"atMs":59248.995917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59120}}
+{"atMs":59314.990834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59200}}
+{"atMs":59399.882334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59280}}
+{"atMs":59400.003542,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's","final":false,"audioProcessedMs":59280}}
+{"atMs":59488.329125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59360}}
+{"atMs":59488.478584,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's better.","final":false,"audioProcessedMs":59360}}
+{"atMs":59554.085959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59440}}
+{"atMs":59670.712209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59520}}
+{"atMs":59777.223667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59600}}
+{"atMs":59803.31125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59680}}
+{"atMs":59861.645625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59760}}
+{"atMs":59951.290667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59840}}
+{"atMs":60042.255209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59920}}
+{"atMs":60042.5635,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's better. The","final":false,"audioProcessedMs":59920}}
+{"atMs":60197.277209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60000}}
+{"atMs":60197.811084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60080}}
+{"atMs":60197.837709,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's better. The before","final":false,"audioProcessedMs":60080}}
+{"atMs":60296.768167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60160}}
+{"atMs":60352.817834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60240}}
+{"atMs":60432.231,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60320}}
+{"atMs":60500.679,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60400}}
+{"atMs":60584.373375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60480}}
+{"atMs":60718.325124999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60560}}
+{"atMs":60718.463084,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's better. The before and","final":false,"audioProcessedMs":60560}}
+{"atMs":60824.662792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60640}}
+{"atMs":60852.474209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60720}}
+{"atMs":60916.840917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60800}}
+{"atMs":60916.996709,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's better. The before and after","final":false,"audioProcessedMs":60800}}
+{"atMs":60979.623999999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60880}}
+{"atMs":61059.529125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60960}}
+{"atMs":61244.288375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61040}}
+{"atMs":61244.636417,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's better. The before and after framing.","final":false,"audioProcessedMs":61040}}
+{"atMs":61245.071417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61120}}
+{"atMs":61341.978542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61200}}
+{"atMs":61383.186459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61280}}
+{"atMs":61469.226209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61360}}
+{"atMs":61547.754625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61440}}
+{"atMs":61623.380584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61520}}
+{"atMs":61767.799917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61600}}
+{"atMs":61941.422958999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61680}}
+{"atMs":61941.565667,"session":0,"frame":{"type":"transcript","transcript":" Oh, that's better. The before and after framing. ","final":false,"audioProcessedMs":61680}}
+{"atMs":61941.624459,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":61680}}
+{"atMs":61941.659625,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":61180,"turnId":12}}
+{"atMs":61941.68825,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":61180,"turnId":12,"transcript":" Oh, that's better. The before and after framing. "}}
+{"atMs":61992.701584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61760}}
+{"atMs":61992.841875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61840}}
+{"atMs":61992.8795,"session":0,"frame":{"type":"speechStart","audioProcessedMs":61340,"turnId":13}}
+{"atMs":62017.606292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61920}}
+{"atMs":62094.173624999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62000}}
+{"atMs":62203.109875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62080}}
+{"atMs":62203.30325,"session":0,"frame":{"type":"transcript","transcript":" Right.","final":false,"audioProcessedMs":62080}}
+{"atMs":62292.491084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62160}}
+{"atMs":62387.074959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62240}}
+{"atMs":62430.098,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62320}}
+{"atMs":62510.378417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62400}}
+{"atMs":62589.206542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62480}}
+{"atMs":62663.21825,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62560}}
+{"atMs":62817.863084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62640}}
+{"atMs":62834.5765,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62720}}
+{"atMs":62916.260834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62800}}
+{"atMs":62981.300666999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62880}}
+{"atMs":63066.920625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62960}}
+{"atMs":63156.725875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63040}}
+{"atMs":63156.901874999996,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty","final":false,"audioProcessedMs":63040}}
+{"atMs":63224.96425,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63120}}
+{"atMs":63339.767667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63200}}
+{"atMs":63339.910417,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge,","final":false,"audioProcessedMs":63200}}
+{"atMs":63439.307334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63280}}
+{"atMs":63463.0695,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63360}}
+{"atMs":63550.216125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63440}}
+{"atMs":63627.045417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63520}}
+{"atMs":63706.721667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63600}}
+{"atMs":63864.811375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63680}}
+{"atMs":63865.010667,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge, decent","final":false,"audioProcessedMs":63680}}
+{"atMs":63865.473292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63760}}
+{"atMs":63971.939167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63840}}
+{"atMs":64030.616875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63920}}
+{"atMs":64099.659834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64000}}
+{"atMs":64183.459375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64080}}
+{"atMs":64300.278084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64160}}
+{"atMs":64300.571625,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge, decent dinner.","final":false,"audioProcessedMs":64160}}
+{"atMs":64388.977584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64240}}
+{"atMs":64491.902167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64320}}
+{"atMs":64517.574834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64400}}
+{"atMs":64579.804459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64480}}
+{"atMs":64664.803667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64560}}
+{"atMs":64746.321542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64640}}
+{"atMs":64913.125459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64720}}
+{"atMs":64932.65025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64800}}
+{"atMs":64932.767667,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge, decent dinner. That's a","final":false,"audioProcessedMs":64800}}
+{"atMs":65013.677875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64880}}
+{"atMs":65061.746542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64960}}
+{"atMs":65151.830167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65040}}
+{"atMs":65242.781459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65120}}
+{"atMs":65243.072125,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge, decent dinner. That's a format","final":false,"audioProcessedMs":65120}}
+{"atMs":65303.136917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65200}}
+{"atMs":65438.144542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65280}}
+{"atMs":65438.28875,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge, decent dinner. That's a format people","final":false,"audioProcessedMs":65280}}
+{"atMs":65534.234917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65360}}
+{"atMs":65560.22425,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65440}}
+{"atMs":65625.593792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65520}}
+{"atMs":65702.57529200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65600}}
+{"atMs":65818.44287500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65680}}
+{"atMs":65818.740625,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge, decent dinner. That's a format people repeat.","final":false,"audioProcessedMs":65680}}
+{"atMs":65860.56616700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65760}}
+{"atMs":65960.43166700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65840}}
+{"atMs":66053.44025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65920}}
+{"atMs":66105.289292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66000}}
+{"atMs":66188.29100000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66080}}
+{"atMs":66269.11608400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66160}}
+{"atMs":66340.607375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66240}}
+{"atMs":66486.371459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66320}}
+{"atMs":66584.93675000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66400}}
+{"atMs":66615.461125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66480}}
+{"atMs":66667.87700000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66560}}
+{"atMs":66750.156334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66640}}
+{"atMs":66830.58604200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66720}}
+{"atMs":66911.47575000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66800}}
+{"atMs":67011.59762500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66880}}
+{"atMs":67110.55175000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66960}}
+{"atMs":67139.707209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67040}}
+{"atMs":67233.94329200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67120}}
+{"atMs":67304.626084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67200}}
+{"atMs":67536.49537500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67280}}
+{"atMs":67536.742125,"session":0,"frame":{"type":"transcript","transcript":" Right. Empty fridge, decent dinner. That's a format people repeat. ","final":false,"audioProcessedMs":67280}}
+{"atMs":67536.881959,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":67280}}
+{"atMs":67536.92616700001,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":66780,"turnId":13}}
+{"atMs":67536.95950000001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":66780,"turnId":13,"transcript":" Right. Empty fridge, decent dinner. That's a format people repeat. "}}
+{"atMs":67537.167125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67360}}
+{"atMs":67537.194917,"session":0,"frame":{"type":"speechStart","audioProcessedMs":66860,"turnId":14}}
+{"atMs":67552.38654200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67440}}
+{"atMs":67634.482459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67520}}
+{"atMs":67708.537209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67600}}
+{"atMs":67782.553,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67680}}
+{"atMs":67858.458834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67760}}
+{"atMs":68059.870167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67840}}
+{"atMs":68060.089,"session":0,"frame":{"type":"transcript","transcript":" Okay,","final":false,"audioProcessedMs":67840}}
+{"atMs":68060.30837500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67920}}
+{"atMs":68154.20916700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68000}}
+{"atMs":68182.15316700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68080}}
+{"atMs":68265.462375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68160}}
+{"atMs":68342.41725000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68240}}
+{"atMs":68458.76475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68320}}
+{"atMs":68459.042125,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that","final":false,"audioProcessedMs":68320}}
+{"atMs":68583.515625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68400}}
+{"atMs":68586.004792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68480}}
+{"atMs":68691.832292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68560}}
+{"atMs":68768.66162500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68640}}
+{"atMs":68768.923334,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than","final":false,"audioProcessedMs":68640}}
+{"atMs":68827.768834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68720}}
+{"atMs":68897.41387500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68800}}
+{"atMs":68976.38970900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68880}}
+{"atMs":69107.79625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68960}}
+{"atMs":69243.15400000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69040}}
+{"atMs":69243.472334,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected","final":false,"audioProcessedMs":69040}}
+{"atMs":69264.347875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69120}}
+{"atMs":69319.289667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69200}}
+{"atMs":69319.45895900001,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to.","final":false,"audioProcessedMs":69200}}
+{"atMs":69424.52562500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69280}}
+{"atMs":69470.182084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69360}}
+{"atMs":69631.20341700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69440}}
+{"atMs":69631.482625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69520}}
+{"atMs":69725.138292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69600}}
+{"atMs":69777.74504200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69680}}
+{"atMs":69889.998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69760}}
+{"atMs":69890.149042,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to. Put","final":false,"audioProcessedMs":69760}}
+{"atMs":69946.23091700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69840}}
+{"atMs":70060.10675,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69920}}
+{"atMs":70060.28025000001,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to. Put it on","final":false,"audioProcessedMs":69920}}
+{"atMs":70158.34095900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70000}}
+{"atMs":70283.935584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70080}}
+{"atMs":70310.971917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70160}}
+{"atMs":70351.342,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70240}}
+{"atMs":70436.449334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70320}}
+{"atMs":70524.047709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70400}}
+{"atMs":70524.242542,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to. Put it on the","final":false,"audioProcessedMs":70400}}
+{"atMs":70680.899917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70480}}
+{"atMs":70681.26716700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70560}}
+{"atMs":70793.310459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70640}}
+{"atMs":70842.95616700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70720}}
+{"atMs":70843.10420900001,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to. Put it on the list","final":false,"audioProcessedMs":70720}}
+{"atMs":70901.92387500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70800}}
+{"atMs":70986.547084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70880}}
+{"atMs":71058.505959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70960}}
+{"atMs":71205.62712500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71040}}
+{"atMs":71319.254834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71120}}
+{"atMs":71319.50583400001,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to. Put it on the list as","final":false,"audioProcessedMs":71120}}
+{"atMs":71346.59345900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71200}}
+{"atMs":71387.903625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71280}}
+{"atMs":71498.017959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71360}}
+{"atMs":71498.13441700001,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to. Put it on the list as a maybe.","final":false,"audioProcessedMs":71360}}
+{"atMs":71540.89029200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71440}}
+{"atMs":71620.11237500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71520}}
+{"atMs":71729.29675000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71600}}
+{"atMs":71835.832792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71680}}
+{"atMs":71866.92875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71760}}
+{"atMs":71945.90504200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71840}}
+{"atMs":72030.125459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71920}}
+{"atMs":72160.717042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72000}}
+{"atMs":72160.898834,"session":0,"frame":{"type":"transcript","transcript":" Okay, I like that more than I expected to. Put it on the list as a maybe. ","final":false,"audioProcessedMs":72000}}
+{"atMs":72160.95745900001,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":72000}}
+{"atMs":72160.9915,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":71500,"turnId":14}}
+{"atMs":72161.02079200001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":71500,"turnId":14,"transcript":" Okay, I like that more than I expected to. Put it on the list as a maybe. "}}
+{"atMs":72252.78370900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72080}}
+{"atMs":72353.175875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72160}}
+{"atMs":72380.246667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72240}}
+{"atMs":72431.72816700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72320}}
+{"atMs":72505.01675000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72400}}
+{"atMs":72616.34258400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72480}}
+{"atMs":72616.491542,"session":0,"frame":{"type":"speechStart","audioProcessedMs":71980,"turnId":15}}
+{"atMs":72657.12775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72560}}
+{"atMs":72777.05020900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72640}}
+{"atMs":72880.832959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72720}}
+{"atMs":72915.29445900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72800}}
+{"atMs":72915.430584,"session":0,"frame":{"type":"transcript","transcript":" Not","final":false,"audioProcessedMs":72800}}
+{"atMs":72999.167709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72880}}
+{"atMs":72999.30904200001,"session":0,"frame":{"type":"transcript","transcript":" Not for","final":false,"audioProcessedMs":72880}}
+{"atMs":73063.19112500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72960}}
+{"atMs":73150.955084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73040}}
+{"atMs":73306.115709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73120}}
+{"atMs":73314.798834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73200}}
+{"atMs":73413.86,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73280}}
+{"atMs":73413.91566700001,"session":0,"frame":{"type":"transcript","transcript":" Not for version","final":false,"audioProcessedMs":73280}}
+{"atMs":73466.85229200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73360}}
+{"atMs":73543.576042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73440}}
+{"atMs":73627.30125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73520}}
+{"atMs":73825.55570900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73600}}
+{"atMs":73825.80412500001,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though.","final":false,"audioProcessedMs":73600}}
+{"atMs":73826.23075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73680}}
+{"atMs":73929.620792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73760}}
+{"atMs":73953.06220900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73840}}
+{"atMs":74023.77875000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73920}}
+{"atMs":74096.39283400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74000}}
+{"atMs":74195.06112500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74080}}
+{"atMs":74195.213667,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version","final":false,"audioProcessedMs":74080}}
+{"atMs":74349.55208400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74160}}
+{"atMs":74349.731209,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one","final":false,"audioProcessedMs":74160}}
+{"atMs":74360.00283400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74240}}
+{"atMs":74360.144125,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is","final":false,"audioProcessedMs":74240}}
+{"atMs":74460.600625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74320}}
+{"atMs":74505.108584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74400}}
+{"atMs":74583.939459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74480}}
+{"atMs":74677.94333400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74560}}
+{"atMs":74678.08541700001,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is still","final":false,"audioProcessedMs":74560}}
+{"atMs":74760.05725000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74640}}
+{"atMs":74760.384542,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is still photo","final":false,"audioProcessedMs":74640}}
+{"atMs":74873.13312500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74720}}
+{"atMs":74972.55841700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74800}}
+{"atMs":74996.869625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74880}}
+{"atMs":75065.519625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74960}}
+{"atMs":75148.1995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75040}}
+{"atMs":75227.391334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75120}}
+{"atMs":75398.12808400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75200}}
+{"atMs":75398.319709,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is still photo in,","final":false,"audioProcessedMs":75200}}
+{"atMs":75398.51025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75280}}
+{"atMs":75499.00604200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75360}}
+{"atMs":75555.28637500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75440}}
+{"atMs":75636.15316700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75520}}
+{"atMs":75636.333625,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is still photo in, three","final":false,"audioProcessedMs":75520}}
+{"atMs":75705.331292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75600}}
+{"atMs":75788.66416700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75680}}
+{"atMs":75921.550292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75760}}
+{"atMs":76021.09808400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75840}}
+{"atMs":76067.0555,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75920}}
+{"atMs":76067.197375,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is still photo in, three suggestions","final":false,"audioProcessedMs":75920}}
+{"atMs":76104.618959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76000}}
+{"atMs":76215.97545900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76080}}
+{"atMs":76216.256917,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is still photo in, three suggestions out.","final":false,"audioProcessedMs":76080}}
+{"atMs":76274.14225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76160}}
+{"atMs":76337.487917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76240}}
+{"atMs":76445.581875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76320}}
+{"atMs":76541.598584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76400}}
+{"atMs":76583.099875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76480}}
+{"atMs":76663.674167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76560}}
+{"atMs":76744.09070900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76640}}
+{"atMs":76825.00220900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76720}}
+{"atMs":76970.46325,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76800}}
+{"atMs":77075.07287500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76880}}
+{"atMs":77107.03004200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76960}}
+{"atMs":77148.83204200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77040}}
+{"atMs":77320.63141700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77120}}
+{"atMs":77320.889542,"session":0,"frame":{"type":"transcript","transcript":" Not for version one though. Version one is still photo in, three suggestions out. ","final":false,"audioProcessedMs":77120}}
+{"atMs":77320.93612500001,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":77120}}
+{"atMs":77320.96529200001,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":76620,"turnId":15}}
+{"atMs":77320.989,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":76620,"turnId":15,"transcript":" Not for version one though. Version one is still photo in, three suggestions out. "}}
+{"atMs":77372.09866700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77200}}
+{"atMs":77372.216417,"session":0,"frame":{"type":"speechStart","audioProcessedMs":76700,"turnId":16}}
+{"atMs":77394.29437500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77280}}
+{"atMs":77495.829542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77360}}
+{"atMs":77588.610667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77440}}
+{"atMs":77630.385167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77520}}
+{"atMs":77719.48870900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77600}}
+{"atMs":77719.61850000001,"session":0,"frame":{"type":"transcript","transcript":" No","final":false,"audioProcessedMs":77600}}
+{"atMs":77780.45075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77680}}
+{"atMs":77863.18975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77760}}
+{"atMs":78019.368959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77840}}
+{"atMs":78028.50729200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77920}}
+{"atMs":78139.05416700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78000}}
+{"atMs":78139.37158400001,"session":0,"frame":{"type":"transcript","transcript":" No agreed","final":false,"audioProcessedMs":78000}}
+{"atMs":78185.334292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78080}}
+{"atMs":78261.18420900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78160}}
+{"atMs":78340.935209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78240}}
+{"atMs":78423.881917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78320}}
+{"atMs":78543.65475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78400}}
+{"atMs":78654.14095900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78480}}
+{"atMs":78654.27825,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're","final":false,"audioProcessedMs":78480}}
+{"atMs":78683.87625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78560}}
+{"atMs":78767.20129200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78640}}
+{"atMs":78767.460875,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not","final":false,"audioProcessedMs":78640}}
+{"atMs":78825.53733400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78720}}
+{"atMs":78918.21254200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78800}}
+{"atMs":78918.407334,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building","final":false,"audioProcessedMs":78800}}
+{"atMs":79069.457125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78880}}
+{"atMs":79069.804625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78960}}
+{"atMs":79170.05575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79040}}
+{"atMs":79220.053459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79120}}
+{"atMs":79330.314584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79200}}
+{"atMs":79330.44370900001,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed","final":false,"audioProcessedMs":79200}}
+{"atMs":79381.01462500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79280}}
+{"atMs":79464.582834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79360}}
+{"atMs":79593.790292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79440}}
+{"atMs":79688.27170900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79520}}
+{"atMs":79717.87987500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79600}}
+{"atMs":79784.352125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79680}}
+{"atMs":79883.372042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79760}}
+{"atMs":79883.53858400001,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed I","final":false,"audioProcessedMs":79760}}
+{"atMs":79962.442834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79840}}
+{"atMs":79962.54279200001,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed I just","final":false,"audioProcessedMs":79840}}
+{"atMs":80026.10137500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79920}}
+{"atMs":80124.59066700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80000}}
+{"atMs":80124.686042,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed I just want","final":false,"audioProcessedMs":80000}}
+{"atMs":80236.208792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80080}}
+{"atMs":80236.53745900001,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed I just want to","final":false,"audioProcessedMs":80080}}
+{"atMs":80263.373542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80160}}
+{"atMs":80348.82691700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80240}}
+{"atMs":80430.224917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80320}}
+{"atMs":80502.70579200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80400}}
+{"atMs":80643.05812500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80480}}
+{"atMs":80793.90925000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80560}}
+{"atMs":80794.218917,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed I just want to know the door","final":false,"audioProcessedMs":80560}}
+{"atMs":80828.61512500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80640}}
+{"atMs":80855.258375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80720}}
+{"atMs":80898.868459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80800}}
+{"atMs":80986.59091700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80880}}
+{"atMs":81063.58116700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80960}}
+{"atMs":81166.338292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81040}}
+{"atMs":81295.284042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81120}}
+{"atMs":81295.558709,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed I just want to know the door exists.","final":false,"audioProcessedMs":81120}}
+{"atMs":81316.71141700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81200}}
+{"atMs":81388.338459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81280}}
+{"atMs":81466.047292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81360}}
+{"atMs":81549.519834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81440}}
+{"atMs":81691.332542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81520}}
+{"atMs":81796.66937500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81600}}
+{"atMs":81822.71904200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81680}}
+{"atMs":81863.356709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81760}}
+{"atMs":81942.02841700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81840}}
+{"atMs":82019.728084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81920}}
+{"atMs":82099.66116700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82000}}
+{"atMs":82215.31066700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82080}}
+{"atMs":82387.266417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82160}}
+{"atMs":82387.52966700001,"session":0,"frame":{"type":"transcript","transcript":" No agreed we're not building a feed I just want to know the door exists. ","final":false,"audioProcessedMs":82160}}
+{"atMs":82387.567209,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":82160}}
+{"atMs":82387.59462500001,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":81660,"turnId":16}}
+{"atMs":82387.61858400001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":81660,"turnId":16,"transcript":" No agreed we're not building a feed I just want to know the door exists. "}}
+{"atMs":82413.013959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82240}}
+{"atMs":82439.73708400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82320}}
+{"atMs":82505.70337500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82400}}
+{"atMs":82591.630042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82480}}
+{"atMs":82739.376917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82560}}
+{"atMs":82739.63483400001,"session":0,"frame":{"type":"speechStart","audioProcessedMs":82060,"turnId":17}}
+{"atMs":82739.686625,"session":0,"frame":{"type":"transcript","transcript":" The","final":false,"audioProcessedMs":82560}}
+{"atMs":82745.052542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82640}}
+{"atMs":82839.46995900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82720}}
+{"atMs":82906.54195900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82800}}
+{"atMs":83004.04825,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82880}}
+{"atMs":83004.22237500001,"session":0,"frame":{"type":"transcript","transcript":" The door","final":false,"audioProcessedMs":82880}}
+{"atMs":83089.595209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82960}}
+{"atMs":83089.84950000001,"session":0,"frame":{"type":"transcript","transcript":" The door exists.","final":false,"audioProcessedMs":82960}}
+{"atMs":83144.75450000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83040}}
+{"atMs":83264.290584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83120}}
+{"atMs":83365.132375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83200}}
+{"atMs":83390.35175,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83280}}
+{"atMs":83471.179459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83360}}
+{"atMs":83537.59175,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83440}}
+{"atMs":83657.314584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83520}}
+{"atMs":83657.46758400001,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd","final":false,"audioProcessedMs":83520}}
+{"atMs":83786.89708400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83600}}
+{"atMs":83787.519,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83680}}
+{"atMs":83883.575417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83760}}
+{"atMs":83949.82629200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83840}}
+{"atMs":84040.293334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83920}}
+{"atMs":84040.487542,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd need maybe","final":false,"audioProcessedMs":83920}}
+{"atMs":84097.12683400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84000}}
+{"atMs":84187.8165,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84080}}
+{"atMs":84310.95154200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84160}}
+{"atMs":84311.208584,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd need maybe two","final":false,"audioProcessedMs":84160}}
+{"atMs":84421.21075000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84240}}
+{"atMs":84446.61725000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84320}}
+{"atMs":84504.49141700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84400}}
+{"atMs":84579.27633400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84480}}
+{"atMs":84663.72275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84560}}
+{"atMs":84739.922709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84640}}
+{"atMs":84846.66112500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84720}}
+{"atMs":84846.837417,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd need maybe two days to","final":false,"audioProcessedMs":84720}}
+{"atMs":84932.697709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84800}}
+{"atMs":84981.032625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84880}}
+{"atMs":85083.663709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84960}}
+{"atMs":85083.79633400001,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd need maybe two days to make a","final":false,"audioProcessedMs":84960}}
+{"atMs":85166.88600000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85040}}
+{"atMs":85167.14616700001,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd need maybe two days to make a shareable","final":false,"audioProcessedMs":85040}}
+{"atMs":85224.56095900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85120}}
+{"atMs":85359.157584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85200}}
+{"atMs":85452.760834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85280}}
+{"atMs":85471.978459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85360}}
+{"atMs":85546.423209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85440}}
+{"atMs":85621.653875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85520}}
+{"atMs":85738.644,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85600}}
+{"atMs":85739.14495900001,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd need maybe two days to make a shareable card.","final":false,"audioProcessedMs":85600}}
+{"atMs":85783.62375000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85680}}
+{"atMs":85885.11237500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85760}}
+{"atMs":85977.09066700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85840}}
+{"atMs":86024.07012500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85920}}
+{"atMs":86102.61875000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86000}}
+{"atMs":86181.21987500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86080}}
+{"atMs":86269.462167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86160}}
+{"atMs":86407.754459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86240}}
+{"atMs":86501.692834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86320}}
+{"atMs":86524.19395900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86400}}
+{"atMs":86637.322209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86480}}
+{"atMs":86637.54287500001,"session":0,"frame":{"type":"transcript","transcript":" The door exists. We'd need maybe two days to make a shareable card. ","final":false,"audioProcessedMs":86480}}
+{"atMs":86637.59154200001,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":86480}}
+{"atMs":86637.620209,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":85980,"turnId":17}}
+{"atMs":86637.64491700001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":85980,"turnId":17,"transcript":" The door exists. We'd need maybe two days to make a shareable card. "}}
+{"atMs":86657.3505,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86560}}
+{"atMs":86736.70366700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86640}}
+{"atMs":86821.32295900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86720}}
+{"atMs":86931.98745900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86800}}
+{"atMs":87032.07500000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86880}}
+{"atMs":87080.807,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86960}}
+{"atMs":87080.930334,"session":0,"frame":{"type":"speechStart","audioProcessedMs":86460,"turnId":18}}
+{"atMs":87137.78616700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87040}}
+{"atMs":87234.868417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87120}}
+{"atMs":87234.98770900001,"session":0,"frame":{"type":"transcript","transcript":" Two","final":false,"audioProcessedMs":87120}}
+{"atMs":87304.604709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87200}}
+{"atMs":87458.43383400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87280}}
+{"atMs":87486.68533400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87360}}
+{"atMs":87486.81854200001,"session":0,"frame":{"type":"transcript","transcript":" Two days is","final":false,"audioProcessedMs":87360}}
+{"atMs":87555.69483400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87440}}
+{"atMs":87620.99275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87520}}
+{"atMs":87708.39433400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87600}}
+{"atMs":87806.486042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87680}}
+{"atMs":87806.716209,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap.","final":false,"audioProcessedMs":87680}}
+{"atMs":87861.713709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87760}}
+{"atMs":87979.72225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87840}}
+{"atMs":88078.40000000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87920}}
+{"atMs":88102.336292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88000}}
+{"atMs":88184.10254200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88080}}
+{"atMs":88267.99108400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88160}}
+{"atMs":88340.098167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88240}}
+{"atMs":88503.982625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88320}}
+{"atMs":88504.18108400001,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright","final":false,"audioProcessedMs":88320}}
+{"atMs":88518.12495900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88400}}
+{"atMs":88518.19545900001,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright let's","final":false,"audioProcessedMs":88400}}
+{"atMs":88606.260167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88480}}
+{"atMs":88661.42150000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88560}}
+{"atMs":88740.90404200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88640}}
+{"atMs":88849.49750000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88720}}
+{"atMs":88849.6245,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright let's write it","final":false,"audioProcessedMs":88720}}
+{"atMs":88908.90250000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88800}}
+{"atMs":89030.39704200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88880}}
+{"atMs":89156.810459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88960}}
+{"atMs":89156.99658400001,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright let's write it down and","final":false,"audioProcessedMs":88960}}
+{"atMs":89179.663042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89040}}
+{"atMs":89221.119292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89120}}
+{"atMs":89308.56745900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89200}}
+{"atMs":89387.210542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89280}}
+{"atMs":89555.08137500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89360}}
+{"atMs":89555.33637500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89440}}
+{"atMs":89653.12404200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89520}}
+{"atMs":89708.98741700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89600}}
+{"atMs":89709.12133400001,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright let's write it down and move","final":false,"audioProcessedMs":89600}}
+{"atMs":89780.407917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89680}}
+{"atMs":89867.534709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89760}}
+{"atMs":89968.48158400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89840}}
+{"atMs":89968.60504200001,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright let's write it down and move on to","final":false,"audioProcessedMs":89840}}
+{"atMs":90080.00200000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89920}}
+{"atMs":90208.340209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90000}}
+{"atMs":90208.550917,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright let's write it down and move on to onboarding.","final":false,"audioProcessedMs":90000}}
+{"atMs":90235.525334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90080}}
+{"atMs":90267.105125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90160}}
+{"atMs":90346.080084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90240}}
+{"atMs":90418.813959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90320}}
+{"atMs":90509.569375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90400}}
+{"atMs":90601.847792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90480}}
+{"atMs":90697.856417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90560}}
+{"atMs":90752.83304200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90640}}
+{"atMs":90827.87825000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90720}}
+{"atMs":90908.035959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90800}}
+{"atMs":90989.80579200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90880}}
+{"atMs":91133.75941700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90960}}
+{"atMs":91133.90808400001,"session":0,"frame":{"type":"transcript","transcript":" Two days is cheap. Alright let's write it down and move on to onboarding. ","final":false,"audioProcessedMs":90960}}
+{"atMs":91133.94458400001,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":90960}}
+{"atMs":91133.96866700001,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":90460,"turnId":18}}
+{"atMs":91133.98862500001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":90460,"turnId":18,"transcript":" Two days is cheap. Alright let's write it down and move on to onboarding. "}}
+{"atMs":91219.723542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91040}}
+{"atMs":91241.739042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91120}}
+{"atMs":91324.2565,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91200}}
+{"atMs":91324.527917,"session":0,"frame":{"type":"speechStart","audioProcessedMs":90700,"turnId":19}}
+{"atMs":91383.21229200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91280}}
+{"atMs":91467.13012500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91360}}
+{"atMs":91548.424667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91440}}
+{"atMs":91650.43587500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91520}}
+{"atMs":91753.336292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91600}}
+{"atMs":91781.42920900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91680}}
+{"atMs":91860.448334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91760}}
+{"atMs":91984.970042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91840}}
+{"atMs":91985.25520900001,"session":0,"frame":{"type":"transcript","transcript":" Onboarding.","final":false,"audioProcessedMs":91840}}
+{"atMs":92026.963709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91920}}
+{"atMs":92174.91750000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92000}}
+{"atMs":92188.46691700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92080}}
+{"atMs":92277.371834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92160}}
+{"atMs":92354.376334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92240}}
+{"atMs":92354.51133400001,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My","final":false,"audioProcessedMs":92240}}
+{"atMs":92424.19204200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92320}}
+{"atMs":92518.027209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92400}}
+{"atMs":92518.1465,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion","final":false,"audioProcessedMs":92400}}
+{"atMs":92578.26066700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92480}}
+{"atMs":92698.357625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92560}}
+{"atMs":92804.38575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92640}}
+{"atMs":92828.773,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92720}}
+{"atMs":92911.61854200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92800}}
+{"atMs":92911.754375,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is","final":false,"audioProcessedMs":92800}}
+{"atMs":92990.78450000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92880}}
+{"atMs":92990.91112500001,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there","final":false,"audioProcessedMs":92880}}
+{"atMs":93081.017084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92960}}
+{"atMs":93081.144792,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't","final":false,"audioProcessedMs":92960}}
+{"atMs":93223.409417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93040}}
+{"atMs":93226.636834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93120}}
+{"atMs":93400.448375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93200}}
+{"atMs":93400.60295900001,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't be","final":false,"audioProcessedMs":93200}}
+{"atMs":93423.5555,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93280}}
+{"atMs":93461.79995900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93360}}
+{"atMs":93551.885917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93440}}
+{"atMs":93623.04175,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93520}}
+{"atMs":93748.244084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93600}}
+{"atMs":93748.532584,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't be any.","final":false,"audioProcessedMs":93600}}
+{"atMs":93842.738792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93680}}
+{"atMs":93870.425917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93760}}
+{"atMs":93938.24100000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93840}}
+{"atMs":94026.883667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93920}}
+{"atMs":94098.30483400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94000}}
+{"atMs":94178.69358400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94080}}
+{"atMs":94272.97820900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94160}}
+{"atMs":94364.08883400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94240}}
+{"atMs":94450.26383400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94320}}
+{"atMs":94450.42220900001,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't be any. Camera opens","final":false,"audioProcessedMs":94320}}
+{"atMs":94511.256167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94400}}
+{"atMs":94511.363167,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't be any. Camera opens on","final":false,"audioProcessedMs":94400}}
+{"atMs":94573.62475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94480}}
+{"atMs":94668.35079200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94560}}
+{"atMs":94796.834459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94640}}
+{"atMs":94892.494,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94720}}
+{"atMs":94919.78408400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94800}}
+{"atMs":94982.90295900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94880}}
+{"atMs":95075.74075000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94960}}
+{"atMs":95075.882584,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't be any. Camera opens on first","final":false,"audioProcessedMs":94960}}
+{"atMs":95144.34250000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95040}}
+{"atMs":95320.63287500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95120}}
+{"atMs":95320.88758400001,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't be any. Camera opens on first launch.","final":false,"audioProcessedMs":95120}}
+{"atMs":95321.40062500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95200}}
+{"atMs":95421.1505,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95280}}
+{"atMs":95459.00366700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95360}}
+{"atMs":95538.231209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95440}}
+{"atMs":95623.255459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95520}}
+{"atMs":95705.293,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95600}}
+{"atMs":95844.28920900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95680}}
+{"atMs":95948.94775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95760}}
+{"atMs":95968.73550000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95840}}
+{"atMs":96027.63733400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95920}}
+{"atMs":96094.531417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96000}}
+{"atMs":96177.08579200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96080}}
+{"atMs":96372.64941700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96160}}
+{"atMs":96373.67950000001,"session":0,"frame":{"type":"transcript","transcript":" Onboarding. My opinion is there shouldn't be any. Camera opens on first launch. ","final":false,"audioProcessedMs":96160}}
+{"atMs":96373.91604200001,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":96160}}
+{"atMs":96373.951375,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":95660,"turnId":19}}
+{"atMs":96373.976542,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":95660,"turnId":19,"transcript":" Onboarding. My opinion is there shouldn't be any. Camera opens on first launch. "}}
+{"atMs":96374.695334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96240}}
+{"atMs":96468.17458400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96320}}
+{"atMs":96523.288375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96400}}
+{"atMs":96523.414709,"session":0,"frame":{"type":"speechStart","audioProcessedMs":95900,"turnId":20}}
+{"atMs":96523.451709,"session":0,"frame":{"type":"transcript","transcript":" No","final":false,"audioProcessedMs":96400}}
+{"atMs":96582.29954200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96480}}
+{"atMs":96657.30791700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96560}}
+{"atMs":96739.288,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96640}}
+{"atMs":96892.67704200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96720}}
+{"atMs":96905.625834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96800}}
+{"atMs":96987.2265,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96880}}
+{"atMs":97052.360417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96960}}
+{"atMs":97140.39,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97040}}
+{"atMs":97249.95337500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97120}}
+{"atMs":97250.072459,"session":0,"frame":{"type":"transcript","transcript":" No account, no","final":false,"audioProcessedMs":97120}}
+{"atMs":97300.46816700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97200}}
+{"atMs":97423.89308400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97280}}
+{"atMs":97510.001875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97360}}
+{"atMs":97540.35229200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97440}}
+{"atMs":97614.144375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97520}}
+{"atMs":97704.83704200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97600}}
+{"atMs":97794.26508400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97680}}
+{"atMs":97794.448459,"session":0,"frame":{"type":"transcript","transcript":" No account, no tour,","final":false,"audioProcessedMs":97680}}
+{"atMs":97941.778584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97760}}
+{"atMs":97945.69270900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97840}}
+{"atMs":98036.276417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97920}}
+{"atMs":98098.87675000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98000}}
+{"atMs":98194.68325,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98080}}
+{"atMs":98194.82079200001,"session":0,"frame":{"type":"transcript","transcript":" No account, no tour, no","final":false,"audioProcessedMs":98080}}
+{"atMs":98270.296917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98160}}
+{"atMs":98270.561625,"session":0,"frame":{"type":"transcript","transcript":" No account, no tour, no permissions","final":false,"audioProcessedMs":98160}}
+{"atMs":98339.403,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98240}}
+{"atMs":98479.007542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98320}}
+{"atMs":98577.62987500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98400}}
+{"atMs":98616.46137500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98480}}
+{"atMs":98616.56345900001,"session":0,"frame":{"type":"transcript","transcript":" No account, no tour, no permissions wall.","final":false,"audioProcessedMs":98480}}
+{"atMs":98663.125084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98560}}
+{"atMs":98731.402,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98640}}
+{"atMs":98817.198625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98720}}
+{"atMs":98895.688959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98800}}
+{"atMs":98991.70983400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98880}}
+{"atMs":99082.04575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98960}}
+{"atMs":99134.98066700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99040}}
+{"atMs":99218.78325000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99120}}
+{"atMs":99298.013334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99200}}
+{"atMs":99380.56241700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99280}}
+{"atMs":99526.9265,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99360}}
+{"atMs":99678.664084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99440}}
+{"atMs":99678.81854200001,"session":0,"frame":{"type":"transcript","transcript":" No account, no tour, no permissions wall. ","final":false,"audioProcessedMs":99440}}
+{"atMs":99678.851834,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":99440}}
+{"atMs":99678.87225,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":98940,"turnId":20}}
+{"atMs":99678.884,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":98940,"turnId":20,"transcript":" No account, no tour, no permissions wall. "}}
+{"atMs":99729.40529200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99520}}
+{"atMs":99729.52079200001,"session":0,"frame":{"type":"speechStart","audioProcessedMs":99020,"turnId":21}}
+{"atMs":99729.551334,"session":0,"frame":{"type":"transcript","transcript":" Camera","final":false,"audioProcessedMs":99520}}
+{"atMs":99744.983584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99600}}
+{"atMs":99771.319292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99680}}
+{"atMs":99866.21083400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99760}}
+{"atMs":99933.577667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99840}}
+{"atMs":100037.56762500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99920}}
+{"atMs":100135.60779200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100000}}
+{"atMs":100172.13566700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100080}}
+{"atMs":100256.58920900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100160}}
+{"atMs":100354.98225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100240}}
+{"atMs":100355.104292,"session":0,"frame":{"type":"transcript","transcript":" Camera permission,","final":false,"audioProcessedMs":100240}}
+{"atMs":100418.34025000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100320}}
+{"atMs":100574.224084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100400}}
+{"atMs":100672.60383400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100480}}
+{"atMs":100707.25945900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100560}}
+{"atMs":100707.384625,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously.","final":false,"audioProcessedMs":100560}}
+{"atMs":100743.784042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100640}}
+{"atMs":100815.375167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100720}}
+{"atMs":100901.372625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100800}}
+{"atMs":100975.158834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100880}}
+{"atMs":101086.712667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100960}}
+{"atMs":101178.41137500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101040}}
+{"atMs":101216.169584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101120}}
+{"atMs":101296.02445900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101200}}
+{"atMs":101376.30125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101280}}
+{"atMs":101459.32175,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101360}}
+{"atMs":101611.692959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101440}}
+{"atMs":101612.006875,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond","final":false,"audioProcessedMs":101440}}
+{"atMs":101720.664667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101520}}
+{"atMs":101720.77233400001,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that,","final":false,"audioProcessedMs":101520}}
+{"atMs":101737.610417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101600}}
+{"atMs":101772.998542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101680}}
+{"atMs":101864.81341700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101760}}
+{"atMs":101935.119875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101840}}
+{"atMs":102016.56766700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101920}}
+{"atMs":102135.188959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102000}}
+{"atMs":102229.331875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102080}}
+{"atMs":102282.0755,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102160}}
+{"atMs":102282.221084,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing.","final":false,"audioProcessedMs":102160}}
+{"atMs":102339.492584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102240}}
+{"atMs":102422.354584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102320}}
+{"atMs":102505.359167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102400}}
+{"atMs":102659.906875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102480}}
+{"atMs":102660.044792,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing. Take","final":false,"audioProcessedMs":102480}}
+{"atMs":102661.178,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102560}}
+{"atMs":102764.48220900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102640}}
+{"atMs":102826.04162500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102720}}
+{"atMs":102912.015667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102800}}
+{"atMs":102912.20462500001,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing. Take a","final":false,"audioProcessedMs":102800}}
+{"atMs":102975.68233400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102880}}
+{"atMs":103062.814375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102960}}
+{"atMs":103190.08262500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103040}}
+{"atMs":103283.18312500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103120}}
+{"atMs":103304.125209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103200}}
+{"atMs":103398.32500000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103280}}
+{"atMs":103398.48212500001,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing. Take a photo,","final":false,"audioProcessedMs":103280}}
+{"atMs":103464.862167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103360}}
+{"atMs":103550.170792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103440}}
+{"atMs":103708.403667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103520}}
+{"atMs":103708.53583400001,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing. Take a photo, get","final":false,"audioProcessedMs":103520}}
+{"atMs":103711.209667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103600}}
+{"atMs":103711.30358400001,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing. Take a photo, get a","final":false,"audioProcessedMs":103600}}
+{"atMs":103803.47137500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103680}}
+{"atMs":103891.129084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103760}}
+{"atMs":103891.27,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing. Take a photo, get a result.","final":false,"audioProcessedMs":103760}}
+{"atMs":103941.31366700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103840}}
+{"atMs":104013.640125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103920}}
+{"atMs":104099.353959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104000}}
+{"atMs":104233.050875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104080}}
+{"atMs":104326.908542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104160}}
+{"atMs":104343.30308400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104240}}
+{"atMs":104417.67029200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104320}}
+{"atMs":104492.27845900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104400}}
+{"atMs":104577.09929200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104480}}
+{"atMs":104665.248709,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104560}}
+{"atMs":104758.12987500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104640}}
+{"atMs":104850.319292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104720}}
+{"atMs":104960.06245900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104800}}
+{"atMs":104960.35475000001,"session":0,"frame":{"type":"transcript","transcript":" Camera permission, obviously. Beyond that, nothing. Take a photo, get a result. ","final":false,"audioProcessedMs":104800}}
+{"atMs":104960.39795900001,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":104800}}
+{"atMs":104960.416209,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":104300,"turnId":21}}
+{"atMs":104960.43783400001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":104300,"turnId":21,"transcript":" Camera permission, obviously. Beyond that, nothing. Take a photo, get a result. "}}
+{"atMs":104981.92212500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104880}}
+{"atMs":105068.27566700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104960}}
+{"atMs":105146.79866700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105040}}
+{"atMs":105283.45279200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105120}}
+{"atMs":105416.17179200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105200}}
+{"atMs":105416.308875,"session":0,"frame":{"type":"speechStart","audioProcessedMs":104700,"turnId":22}}
+{"atMs":105416.348459,"session":0,"frame":{"type":"transcript","transcript":" That I'm","final":false,"audioProcessedMs":105200}}
+{"atMs":105431.82575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105280}}
+{"atMs":105453.03745900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105360}}
+{"atMs":105540.527667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105440}}
+{"atMs":105617.13820900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105520}}
+{"atMs":105706.798959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105600}}
+{"atMs":105706.926,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully","final":false,"audioProcessedMs":105600}}
+{"atMs":105806.235084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105680}}
+{"atMs":105903.07862500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105760}}
+{"atMs":105949.147459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105840}}
+{"atMs":105949.31525,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on","final":false,"audioProcessedMs":105840}}
+{"atMs":106020.010209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":105920}}
+{"atMs":106098.37800000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106000}}
+{"atMs":106184.436875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106080}}
+{"atMs":106330.838084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106160}}
+{"atMs":106429.111459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106240}}
+{"atMs":106442.862875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106320}}
+{"atMs":106499.64525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106400}}
+{"atMs":106605.011459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106480}}
+{"atMs":106605.143125,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with.","final":false,"audioProcessedMs":106480}}
+{"atMs":106662.71691700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106560}}
+{"atMs":106734.32108400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106640}}
+{"atMs":106855.65066700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106720}}
+{"atMs":106952.13975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106800}}
+{"atMs":106979.78891700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106880}}
+{"atMs":107057.21375000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":106960}}
+{"atMs":107139.833459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107040}}
+{"atMs":107236.562084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107120}}
+{"atMs":107236.828792,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the","final":false,"audioProcessedMs":107120}}
+{"atMs":107378.899334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107200}}
+{"atMs":107393.379459,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107280}}
+{"atMs":107393.52116700001,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest","final":false,"audioProcessedMs":107280}}
+{"atMs":107480.19333400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107360}}
+{"atMs":107540.668875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107440}}
+{"atMs":107616.241334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107520}}
+{"atMs":107702.76133400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107600}}
+{"atMs":107807.86795900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107680}}
+{"atMs":107808.11495900001,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest way to","final":false,"audioProcessedMs":107680}}
+{"atMs":107904.626667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107760}}
+{"atMs":108001.80058400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107840}}
+{"atMs":108001.843875,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest way to the","final":false,"audioProcessedMs":107840}}
+{"atMs":108022.758625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":107920}}
+{"atMs":108126.70241700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108000}}
+{"atMs":108178.750834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108080}}
+{"atMs":108256.90995900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108160}}
+{"atMs":108428.581959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108240}}
+{"atMs":108428.83975000001,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest way to the thing","final":false,"audioProcessedMs":108240}}
+{"atMs":108429.09075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108320}}
+{"atMs":108523.44058400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108400}}
+{"atMs":108589.05512500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108480}}
+{"atMs":108589.30266700001,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest way to the thing that's","final":false,"audioProcessedMs":108480}}
+{"atMs":108657.835875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108560}}
+{"atMs":108746.90062500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108640}}
+{"atMs":108822.114084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108720}}
+{"atMs":108951.023042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108800}}
+{"atMs":109060.80354200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108880}}
+{"atMs":109060.940084,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest way to the thing that's actually","final":false,"audioProcessedMs":108880}}
+{"atMs":109087.29500000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":108960}}
+{"atMs":109139.985125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109040}}
+{"atMs":109219.535875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109120}}
+{"atMs":109300.691875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109200}}
+{"atMs":109474.644084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109280}}
+{"atMs":109475.00120900001,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest way to the thing that's actually good.","final":false,"audioProcessedMs":109280}}
+{"atMs":109475.232334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109360}}
+{"atMs":109573.881875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109440}}
+{"atMs":109620.77537500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109520}}
+{"atMs":109701.49587500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109600}}
+{"atMs":109776.419125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109680}}
+{"atMs":109867.558959,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109760}}
+{"atMs":109999.13545900001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109840}}
+{"atMs":110091.35841700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":109920}}
+{"atMs":110107.74108400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110000}}
+{"atMs":110177.211292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110080}}
+{"atMs":110264.974875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110160}}
+{"atMs":110341.76125000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110240}}
+{"atMs":110523.923834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110320}}
+{"atMs":110524.10716700001,"session":0,"frame":{"type":"transcript","transcript":" That I'm fully on board with. It's the fastest way to the thing that's actually good. ","final":false,"audioProcessedMs":110320}}
+{"atMs":110524.14458400001,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":110320}}
+{"atMs":110524.172084,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":109820,"turnId":22}}
+{"atMs":110524.195084,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":109820,"turnId":22,"transcript":" That I'm fully on board with. It's the fastest way to the thing that's actually good. "}}
+{"atMs":110524.4345,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110400}}
+{"atMs":110524.463334,"session":0,"frame":{"type":"speechStart","audioProcessedMs":109900,"turnId":23}}
+{"atMs":110645.351584,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110480}}
+{"atMs":110645.46675,"session":0,"frame":{"type":"transcript","transcript":" Good.","final":false,"audioProcessedMs":110480}}
+{"atMs":110667.98912500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110560}}
+{"atMs":110735.670792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110640}}
+{"atMs":110818.38879200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110720}}
+{"atMs":110899.828125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110800}}
+{"atMs":111048.062084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110880}}
+{"atMs":111048.200209,"session":0,"frame":{"type":"transcript","transcript":" Good. Then","final":false,"audioProcessedMs":110880}}
+{"atMs":111143.04929200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":110960}}
+{"atMs":111167.519,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111040}}
+{"atMs":111216.226334,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111120}}
+{"atMs":111303.08433400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111200}}
+{"atMs":111377.73216700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111280}}
+{"atMs":111460.37587500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111360}}
+{"atMs":111572.57758400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111440}}
+{"atMs":111675.041209,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111520}}
+{"atMs":111675.16537500001,"session":0,"frame":{"type":"transcript","transcript":" Good. Then let's","final":false,"audioProcessedMs":111520}}
+{"atMs":111694.51154200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111600}}
+{"atMs":111783.845125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111680}}
+{"atMs":111784.088042,"session":0,"frame":{"type":"transcript","transcript":" Good. Then let's leave","final":false,"audioProcessedMs":111680}}
+{"atMs":111853.59304200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111760}}
+{"atMs":111962.292125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111840}}
+{"atMs":111962.42679200001,"session":0,"frame":{"type":"transcript","transcript":" Good. Then let's leave it there","final":false,"audioProcessedMs":111840}}
+{"atMs":112098.93779200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":111920}}
+{"atMs":112099.201375,"session":0,"frame":{"type":"transcript","transcript":" Good. Then let's leave it there for","final":false,"audioProcessedMs":111920}}
+{"atMs":112099.379084,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112000}}
+{"atMs":112192.675625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112080}}
+{"atMs":112278.16329200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112160}}
+{"atMs":112278.31808400001,"session":0,"frame":{"type":"transcript","transcript":" Good. Then let's leave it there for today.","final":false,"audioProcessedMs":112160}}
+{"atMs":112345.287834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112240}}
+{"atMs":112415.910625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112320}}
+{"atMs":112501.607875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112400}}
+{"atMs":112621.419542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112480}}
+{"atMs":112715.95833400001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112560}}
+{"atMs":112740.406,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112640}}
+{"atMs":112819.949875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112720}}
+{"atMs":112893.946792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":112800}}
+{"atMs":112964.225667,"session":0,"frame":{"type":"transcript","transcript":" Good. Then let's leave it there for today. ","final":false,"audioProcessedMs":112800}}
+{"atMs":112964.391375,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":112800}}
+{"atMs":112964.420459,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":112300,"turnId":23}}
+{"atMs":112964.438875,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":112300,"turnId":23,"transcript":" Good. Then let's leave it there for today. "}}
+{"atMs":112984.53345900001,"session":0,"frame":{"type":"transcript","transcript":"","final":true,"audioProcessedMs":112800}}

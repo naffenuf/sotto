@@ -9,6 +9,8 @@ fixtures/
   scripts/<name>.json          the script: lines, wake questions, planted moments
   audio/<name>.wav             mono, 16-bit PCM, 24 kHz
   audio/<name>.timing.json     startMs / endMs of every line
+  events/<name>.jsonl          every frame the transcription API sent back
+  events/NOTES.md              what those frames actually look like
   make_fixture.py              script -> wav + timings
 ```
 
@@ -58,6 +60,20 @@ somewhere other than `~/Developer/Chatterbox`.
 
 Commit both outputs.
 
+## Capturing transcription events
+
+```bash
+npm run capture -- brainstorm     # one fixture
+npm run capture -- --all          # every fixture, about 15 minutes of audio
+```
+
+This replays the WAV through Meta's realtime transcription at real-time pace and
+writes every server frame, with its arrival time, to `fixtures/events/<name>.jsonl`.
+It calls the real API and costs about $0.18 per hour of audio. The committed
+captures mean the turn assembler, fast replay and the eval harness never have to.
+What the frames look like, and the quirks worth knowing, are in
+[`events/NOTES.md`](events/NOTES.md).
+
 ## Checking
 
 ```bash
@@ -65,8 +81,12 @@ npm run fixtures:check
 ```
 
 Validates every script against the schema, checks the moment line references,
-and confirms each script has a matching WAV (mono/16-bit/24 kHz) and timing
-file with one entry per line.
+and confirms each script has a matching WAV (mono/16-bit/24 kHz), a timing file
+with one entry per line, and an event capture that ran to the end of the audio.
+(A capture killed part-way through leaves a file that parses fine and silently
+stops mid-conversation, so the check compares `audioProcessedMs` against the
+WAV and insists on the `final: true` frame the server only sends after
+`endStream`.)
 
 ## The fixtures
 

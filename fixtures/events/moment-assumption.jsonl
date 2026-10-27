@@ -1,0 +1,1652 @@
+{"atMs":344.7252499999886,"session":0,"frame":{"sessionId":"voyager/duplex/0A4D8EAD6A57499C8EF526E134FC39C7"}}
+{"atMs":345.021791999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80}}
+{"atMs":345.2579999999725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":160}}
+{"atMs":345.2789169999887,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":240}}
+{"atMs":401.8031669999764,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":320}}
+{"atMs":456.17512499997974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":400}}
+{"atMs":553.1318749999919,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":480}}
+{"atMs":630.5471249999828,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":560}}
+{"atMs":630.6447499999776,"session":0,"frame":{"type":"speechStart","audioProcessedMs":60,"turnId":0}}
+{"atMs":707.5724579999805,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":640}}
+{"atMs":707.6641249999811,"session":0,"frame":{"type":"transcript","transcript":" Let's","final":false,"audioProcessedMs":640}}
+{"atMs":867.6766669999924,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":720}}
+{"atMs":867.7765829999989,"session":0,"frame":{"type":"transcript","transcript":" Let's do","final":false,"audioProcessedMs":720}}
+{"atMs":920.1696669999801,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":800}}
+{"atMs":942.7160829999775,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":880}}
+{"atMs":1015.1105419999803,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":960}}
+{"atMs":1098.1024579999794,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1040}}
+{"atMs":1179.196707999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1120}}
+{"atMs":1266.1984169999778,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1200}}
+{"atMs":1392.443249999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1280}}
+{"atMs":1449.7481669999834,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1360}}
+{"atMs":1504.3894169999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1440}}
+{"atMs":1580.5318329999864,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1520}}
+{"atMs":1666.6007499999832,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1600}}
+{"atMs":1666.6995419999876,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing","final":false,"audioProcessedMs":1600}}
+{"atMs":1738.993124999979,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1680}}
+{"atMs":1822.7067919999827,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1760}}
+{"atMs":1990.4949999999953,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1840}}
+{"atMs":1990.5832079999964,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today.","final":false,"audioProcessedMs":1840}}
+{"atMs":2006.4204999999783,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1920}}
+{"atMs":2056.442791999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2000}}
+{"atMs":2157.0304999999935,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2080}}
+{"atMs":2157.133041999972,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want","final":false,"audioProcessedMs":2080}}
+{"atMs":2215.431749999989,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2160}}
+{"atMs":2299.940957999992,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2240}}
+{"atMs":2440.954874999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2320}}
+{"atMs":2504.5364169999957,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2400}}
+{"atMs":2504.632041999983,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want a","final":false,"audioProcessedMs":2400}}
+{"atMs":2537.6963749999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2480}}
+{"atMs":2623.5751669999736,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2560}}
+{"atMs":2697.077499999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2640}}
+{"atMs":2783.8616249999905,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2720}}
+{"atMs":2967.1259579999896,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2800}}
+{"atMs":2967.199082999985,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want a number we","final":false,"audioProcessedMs":2800}}
+{"atMs":3022.5036669999827,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2880}}
+{"atMs":3042.070874999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2960}}
+{"atMs":3107.2167499999923,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3040}}
+{"atMs":3107.4663329999894,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want a number we can","final":false,"audioProcessedMs":3040}}
+{"atMs":3175.991874999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3120}}
+{"atMs":3260.844791999989,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3200}}
+{"atMs":3351.009374999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3280}}
+{"atMs":3351.2392079999845,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want a number we can actually","final":false,"audioProcessedMs":3280}}
+{"atMs":3490.3369999999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3360}}
+{"atMs":3542.486499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3440}}
+{"atMs":3580.6725829999777,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3520}}
+{"atMs":3662.602332999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3600}}
+{"atMs":3737.7886249999865,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3680}}
+{"atMs":3816.678082999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3760}}
+{"atMs":3900.0242499999877,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3840}}
+{"atMs":4015.493999999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3920}}
+{"atMs":4090.193041999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4000}}
+{"atMs":4090.2899579999794,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want a number we can actually defend to","final":false,"audioProcessedMs":4000}}
+{"atMs":4144.055874999991,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4080}}
+{"atMs":4216.103249999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4160}}
+{"atMs":4326.0929999999935,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4240}}
+{"atMs":4326.188582999981,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want a number we can actually defend to somebody.","final":false,"audioProcessedMs":4240}}
+{"atMs":4377.981832999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4320}}
+{"atMs":4541.849749999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4400}}
+{"atMs":4591.864291999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4480}}
+{"atMs":4622.887291999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4560}}
+{"atMs":4701.856041999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4640}}
+{"atMs":4780.766291999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4720}}
+{"atMs":4863.798791999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4800}}
+{"atMs":4937.890082999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4880}}
+{"atMs":5071.223499999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4960}}
+{"atMs":5071.333374999987,"session":0,"frame":{"type":"transcript","transcript":" Let's do pricing today. I want a number we can actually defend to somebody. ","final":false,"audioProcessedMs":4960}}
+{"atMs":5071.496332999988,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":4960}}
+{"atMs":5071.514957999985,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":4460,"turnId":0}}
+{"atMs":5071.5497499999765,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":4460,"turnId":0,"transcript":" Let's do pricing today. I want a number we can actually defend to somebody. "}}
+{"atMs":5113.379624999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5040}}
+{"atMs":5177.162041999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5120}}
+{"atMs":5278.301541999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5200}}
+{"atMs":5278.493457999983,"session":0,"frame":{"type":"speechStart","audioProcessedMs":4700,"turnId":1}}
+{"atMs":5340.3849579999805,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5280}}
+{"atMs":5418.831999999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5360}}
+{"atMs":5495.365082999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5440}}
+{"atMs":5642.717957999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5520}}
+{"atMs":5660.735499999981,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5600}}
+{"atMs":5735.461374999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5680}}
+{"atMs":5818.774624999991,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5760}}
+{"atMs":5818.925916999986,"session":0,"frame":{"type":"transcript","transcript":" Five","final":false,"audioProcessedMs":5760}}
+{"atMs":5910.670374999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5840}}
+{"atMs":5910.7618749999965,"session":0,"frame":{"type":"transcript","transcript":" Five dollars","final":false,"audioProcessedMs":5840}}
+{"atMs":5979.159707999992,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5920}}
+{"atMs":6116.257791999989,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6000}}
+{"atMs":6116.385416999983,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a","final":false,"audioProcessedMs":6000}}
+{"atMs":6185.025332999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6080}}
+{"atMs":6185.128624999983,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month?","final":false,"audioProcessedMs":6080}}
+{"atMs":6220.474374999991,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6160}}
+{"atMs":6294.2261249999865,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6240}}
+{"atMs":6373.836624999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6320}}
+{"atMs":6465.475957999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6400}}
+{"atMs":6465.572749999992,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month? I've","final":false,"audioProcessedMs":6400}}
+{"atMs":6538.853624999989,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6480}}
+{"atMs":6691.770499999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6560}}
+{"atMs":6717.921374999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6640}}
+{"atMs":6718.015207999997,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month? I've thought","final":false,"audioProcessedMs":6640}}
+{"atMs":6772.733999999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6720}}
+{"atMs":6858.981874999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6800}}
+{"atMs":6938.122874999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6880}}
+{"atMs":7019.013582999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6960}}
+{"atMs":7161.117332999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7040}}
+{"atMs":7209.997416999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7120}}
+{"atMs":7258.385207999992,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7200}}
+{"atMs":7363.320666999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7280}}
+{"atMs":7363.504124999978,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month? I've thought about it and","final":false,"audioProcessedMs":7280}}
+{"atMs":7420.346832999989,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7360}}
+{"atMs":7495.342332999979,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7440}}
+{"atMs":7577.343874999991,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7520}}
+{"atMs":7739.73870799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7600}}
+{"atMs":7755.930624999979,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7680}}
+{"atMs":7869.876999999979,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7760}}
+{"atMs":7869.96762499999,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month? I've thought about it and I","final":false,"audioProcessedMs":7760}}
+{"atMs":7894.890249999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7840}}
+{"atMs":8018.867332999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7920}}
+{"atMs":8018.950374999986,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month? I've thought about it and I don't think we should","final":false,"audioProcessedMs":7920}}
+{"atMs":8061.8903329999885,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8000}}
+{"atMs":8208.209166999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8080}}
+{"atMs":8267.106124999991,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8160}}
+{"atMs":8306.426957999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8240}}
+{"atMs":8378.277166999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8320}}
+{"atMs":8458.401166999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8400}}
+{"atMs":8535.084582999989,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8480}}
+{"atMs":8612.534124999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8560}}
+{"atMs":8739.954541999992,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8640}}
+{"atMs":8740.08249999999,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month? I've thought about it and I don't think we should overthink it.","final":false,"audioProcessedMs":8640}}
+{"atMs":8790.130916999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8720}}
+{"atMs":8859.827874999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8800}}
+{"atMs":8941.086791999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8880}}
+{"atMs":9015.969499999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8960}}
+{"atMs":9101.791916999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9040}}
+{"atMs":9257.040374999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9120}}
+{"atMs":9314.79466699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9200}}
+{"atMs":9338.462749999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9280}}
+{"atMs":9415.687582999992,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9360}}
+{"atMs":9502.81137499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9440}}
+{"atMs":9572.573499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9520}}
+{"atMs":9781.278791999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9600}}
+{"atMs":9781.32249999998,"session":0,"frame":{"type":"transcript","transcript":" Five dollars a month? I've thought about it and I don't think we should overthink it. ","final":false,"audioProcessedMs":9600}}
+{"atMs":9781.329332999972,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":9600}}
+{"atMs":9781.332999999984,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":9100,"turnId":1}}
+{"atMs":9781.337916999997,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":9100,"turnId":1,"transcript":" Five dollars a month? I've thought about it and I don't think we should overthink it. "}}
+{"atMs":9781.381374999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9680}}
+{"atMs":9866.854582999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9760}}
+{"atMs":9893.137292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9840}}
+{"atMs":9990.179332999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9920}}
+{"atMs":9990.278541999985,"session":0,"frame":{"type":"speechStart","audioProcessedMs":9420,"turnId":2}}
+{"atMs":10064.460249999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10000}}
+{"atMs":10135.151374999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10080}}
+{"atMs":10214.683916999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10160}}
+{"atMs":10361.374041999981,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10240}}
+{"atMs":10387.286416999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10320}}
+{"atMs":10387.364957999991,"session":0,"frame":{"type":"transcript","transcript":" Five","final":false,"audioProcessedMs":10320}}
+{"atMs":10464.496583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10400}}
+{"atMs":10464.59908299998,"session":0,"frame":{"type":"transcript","transcript":" Five a","final":false,"audioProcessedMs":10400}}
+{"atMs":10534.369832999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10480}}
+{"atMs":10611.569541999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10560}}
+{"atMs":10713.641957999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10640}}
+{"atMs":10713.730624999997,"session":0,"frame":{"type":"transcript","transcript":" Five a month.","final":false,"audioProcessedMs":10640}}
+{"atMs":10831.395916999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10720}}
+{"atMs":10882.715957999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10800}}
+{"atMs":10931.11499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10880}}
+{"atMs":11028.121749999991,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10960}}
+{"atMs":11028.212374999974,"session":0,"frame":{"type":"transcript","transcript":" Five a month. Why","final":false,"audioProcessedMs":10960}}
+{"atMs":11098.213916999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11040}}
+{"atMs":11182.759291999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11120}}
+{"atMs":11261.693624999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11200}}
+{"atMs":11416.420124999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11280}}
+{"atMs":11416.511416999972,"session":0,"frame":{"type":"transcript","transcript":" Five a month. Why five","final":false,"audioProcessedMs":11280}}
+{"atMs":11431.369541999971,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11360}}
+{"atMs":11497.459041999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11440}}
+{"atMs":11578.713624999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11520}}
+{"atMs":11659.633124999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11600}}
+{"atMs":11783.287207999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11680}}
+{"atMs":11877.312832999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11760}}
+{"atMs":11940.904541999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11840}}
+{"atMs":11977.939541999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11920}}
+{"atMs":12061.370124999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12000}}
+{"atMs":12138.04916699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12080}}
+{"atMs":12211.036249999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12160}}
+{"atMs":12409.147582999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12240}}
+{"atMs":12409.24095799998,"session":0,"frame":{"type":"transcript","transcript":" Five a month. Why five specifically?","final":false,"audioProcessedMs":12240}}
+{"atMs":12461.451833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12320}}
+{"atMs":12478.41737499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12400}}
+{"atMs":12535.698457999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12480}}
+{"atMs":12616.723707999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12560}}
+{"atMs":12700.838749999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12640}}
+{"atMs":12768.412624999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12720}}
+{"atMs":12926.572666999971,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12800}}
+{"atMs":13043.577416999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12880}}
+{"atMs":13043.660999999993,"session":0,"frame":{"type":"transcript","transcript":" Five a month. Why five specifically? ","final":false,"audioProcessedMs":12880}}
+{"atMs":13043.687707999983,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":12880}}
+{"atMs":13043.700291999994,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":12380,"turnId":2}}
+{"atMs":13043.711749999988,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":12380,"turnId":2,"transcript":" Five a month. Why five specifically? "}}
+{"atMs":13091.616957999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12960}}
+{"atMs":13091.702124999982,"session":0,"frame":{"type":"speechStart","audioProcessedMs":12460,"turnId":3}}
+{"atMs":13106.980666999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13040}}
+{"atMs":13181.436624999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13120}}
+{"atMs":13181.529582999996,"session":0,"frame":{"type":"transcript","transcript":" It's","final":false,"audioProcessedMs":13120}}
+{"atMs":13253.330082999979,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13200}}
+{"atMs":13338.380082999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13280}}
+{"atMs":13525.15854199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13360}}
+{"atMs":13525.267666999978,"session":0,"frame":{"type":"transcript","transcript":" It's under","final":false,"audioProcessedMs":13360}}
+{"atMs":13545.996832999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13440}}
+{"atMs":13582.535957999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13520}}
+{"atMs":13669.827624999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13600}}
+{"atMs":13669.940832999971,"session":0,"frame":{"type":"transcript","transcript":" It's under the","final":false,"audioProcessedMs":13600}}
+{"atMs":13734.338624999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13680}}
+{"atMs":13819.478416999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13760}}
+{"atMs":13976.483832999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13840}}
+{"atMs":14035.851832999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13920}}
+{"atMs":14035.918124999997,"session":0,"frame":{"type":"transcript","transcript":" It's under the line","final":false,"audioProcessedMs":13920}}
+{"atMs":14063.106582999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14000}}
+{"atMs":14063.19408299998,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where","final":false,"audioProcessedMs":14000}}
+{"atMs":14132.944624999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14080}}
+{"atMs":14216.565249999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14160}}
+{"atMs":14293.376624999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14240}}
+{"atMs":14378.35924999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14320}}
+{"atMs":14500.12383299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14400}}
+{"atMs":14556.539499999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14480}}
+{"atMs":14615.667791999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14560}}
+{"atMs":14707.944249999971,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14640}}
+{"atMs":14708.038166999992,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone","final":false,"audioProcessedMs":14640}}
+{"atMs":14780.783791999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14720}}
+{"atMs":14780.889124999987,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone stops","final":false,"audioProcessedMs":14720}}
+{"atMs":14859.493166999979,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14800}}
+{"atMs":15024.271916999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14880}}
+{"atMs":15024.359999999986,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone stops to think","final":false,"audioProcessedMs":14880}}
+{"atMs":15076.351582999981,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14960}}
+{"atMs":15094.107582999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15040}}
+{"atMs":15178.381166999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15120}}
+{"atMs":15290.027041999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15200}}
+{"atMs":15290.128791999974,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone stops to think about it.","final":false,"audioProcessedMs":15200}}
+{"atMs":15340.361249999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15280}}
+{"atMs":15414.462416999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15360}}
+{"atMs":15548.56812499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15440}}
+{"atMs":15599.501874999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15520}}
+{"atMs":15667.290167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15600}}
+{"atMs":15667.390582999971,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone stops to think about it. It's","final":false,"audioProcessedMs":15600}}
+{"atMs":15740.883875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15680}}
+{"atMs":15818.058582999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15760}}
+{"atMs":15899.426916999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15840}}
+{"atMs":16072.372207999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15920}}
+{"atMs":16072.806791999988,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone stops to think about it. It's coffee","final":false,"audioProcessedMs":15920}}
+{"atMs":16125.190666999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16000}}
+{"atMs":16141.216916999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16080}}
+{"atMs":16213.407707999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16160}}
+{"atMs":16301.027499999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16240}}
+{"atMs":16398.069624999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16320}}
+{"atMs":16398.1495,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone stops to think about it. It's coffee money.","final":false,"audioProcessedMs":16320}}
+{"atMs":16454.591124999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16400}}
+{"atMs":16597.479166999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16480}}
+{"atMs":16647.500624999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16560}}
+{"atMs":16700.110957999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16640}}
+{"atMs":16775.760374999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16720}}
+{"atMs":16857.809791999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16800}}
+{"atMs":16937.472416999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16880}}
+{"atMs":17120.25995799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16960}}
+{"atMs":17120.44058299999,"session":0,"frame":{"type":"transcript","transcript":" It's under the line where anyone stops to think about it. It's coffee money. ","final":false,"audioProcessedMs":16960}}
+{"atMs":17120.480499999976,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":16960}}
+{"atMs":17120.497457999998,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":16460,"turnId":3}}
+{"atMs":17120.526207999996,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":16460,"turnId":3,"transcript":" It's under the line where anyone stops to think about it. It's coffee money. "}}
+{"atMs":17176.041457999992,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17040}}
+{"atMs":17195.253417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17120}}
+{"atMs":17258.167124999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17200}}
+{"atMs":17361.113249999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17280}}
+{"atMs":17361.178124999977,"session":0,"frame":{"type":"speechStart","audioProcessedMs":16780,"turnId":4}}
+{"atMs":17417.700207999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17360}}
+{"atMs":17511.265957999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17440}}
+{"atMs":17511.344624999998,"session":0,"frame":{"type":"transcript","transcript":" People","final":false,"audioProcessedMs":17440}}
+{"atMs":17652.465041999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17520}}
+{"atMs":17652.64291699999,"session":0,"frame":{"type":"transcript","transcript":" People will","final":false,"audioProcessedMs":17520}}
+{"atMs":17703.29995799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17600}}
+{"atMs":17740.845082999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17680}}
+{"atMs":17810.735707999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17760}}
+{"atMs":17906.115082999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17840}}
+{"atMs":17906.207957999985,"session":0,"frame":{"type":"transcript","transcript":" People will obviously","final":false,"audioProcessedMs":17840}}
+{"atMs":17972.565875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17920}}
+{"atMs":18056.272874999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18000}}
+{"atMs":18234.23554199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18080}}
+{"atMs":18234.33012499998,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay","final":false,"audioProcessedMs":18080}}
+{"atMs":18252.293082999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18160}}
+{"atMs":18305.583957999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18240}}
+{"atMs":18378.993208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18320}}
+{"atMs":18470.458291999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18400}}
+{"atMs":18470.526332999987,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly","final":false,"audioProcessedMs":18400}}
+{"atMs":18530.65483299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18480}}
+{"atMs":18693.254749999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18560}}
+{"atMs":18747.74337499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18640}}
+{"atMs":18778.121249999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18720}}
+{"atMs":18861.837874999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18800}}
+{"atMs":18943.238499999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18880}}
+{"atMs":19017.580832999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18960}}
+{"atMs":19108.158707999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19040}}
+{"atMs":19108.25095799999,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for","final":false,"audioProcessedMs":19040}}
+{"atMs":19218.824374999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19120}}
+{"atMs":19218.938874999993,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they","final":false,"audioProcessedMs":19120}}
+{"atMs":19275.461958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19200}}
+{"atMs":19335.513124999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19280}}
+{"atMs":19427.877791999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19360}}
+{"atMs":19497.610832999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19440}}
+{"atMs":19577.560666999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19520}}
+{"atMs":19742.098749999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19600}}
+{"atMs":19742.205457999982,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every","final":false,"audioProcessedMs":19600}}
+{"atMs":19791.07041699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19680}}
+{"atMs":19818.943,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19760}}
+{"atMs":19898.484707999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19840}}
+{"atMs":19977.01449999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19920}}
+{"atMs":20062.783582999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20000}}
+{"atMs":20062.883374999976,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single","final":false,"audioProcessedMs":20000}}
+{"atMs":20139.964083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20080}}
+{"atMs":20267.346666999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20160}}
+{"atMs":20323.102332999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20240}}
+{"atMs":20378.010874999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20320}}
+{"atMs":20455.727332999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20400}}
+{"atMs":20554.09029199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20480}}
+{"atMs":20554.193541999994,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day.","final":false,"audioProcessedMs":20480}}
+{"atMs":20620.611916999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20560}}
+{"atMs":20697.176749999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20640}}
+{"atMs":20847.887582999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20720}}
+{"atMs":20864.98541699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20800}}
+{"atMs":20947.669291999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20880}}
+{"atMs":20947.74429199999,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So","final":false,"audioProcessedMs":20880}}
+{"atMs":21017.031999999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20960}}
+{"atMs":21095.670541999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21040}}
+{"atMs":21175.094957999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21120}}
+{"atMs":21314.524832999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21200}}
+{"atMs":21384.969082999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21280}}
+{"atMs":21385.07929199998,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is","final":false,"audioProcessedMs":21280}}
+{"atMs":21427.49645799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21360}}
+{"atMs":21427.601957999985,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine","final":false,"audioProcessedMs":21360}}
+{"atMs":21499.71554199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21440}}
+{"atMs":21577.589041999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21520}}
+{"atMs":21660.174791999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21600}}
+{"atMs":21741.910249999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21680}}
+{"atMs":21742.01466699998,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and","final":false,"audioProcessedMs":21680}}
+{"atMs":21893.187082999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21760}}
+{"atMs":21914.959082999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21840}}
+{"atMs":21978.126207999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21920}}
+{"atMs":22057.440249999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22000}}
+{"atMs":22140.04479199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22080}}
+{"atMs":22140.092041999975,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we","final":false,"audioProcessedMs":22080}}
+{"atMs":22223.09824999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22160}}
+{"atMs":22364.336291999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22240}}
+{"atMs":22417.34020799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22320}}
+{"atMs":22472.840375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22400}}
+{"atMs":22473.247374999977,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we build the","final":false,"audioProcessedMs":22400}}
+{"atMs":22534.726916999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22480}}
+{"atMs":22614.708332999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22560}}
+{"atMs":22697.99883299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22640}}
+{"atMs":22779.90383299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22720}}
+{"atMs":22962.469583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22800}}
+{"atMs":22962.57233299999,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we build the whole thing","final":false,"audioProcessedMs":22800}}
+{"atMs":22984.40062499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22880}}
+{"atMs":23026.966832999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":22960}}
+{"atMs":23027.053874999983,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we build the whole thing around","final":false,"audioProcessedMs":22960}}
+{"atMs":23110.168999999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23040}}
+{"atMs":23194.28574999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23120}}
+{"atMs":23194.390416999988,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we build the whole thing around the","final":false,"audioProcessedMs":23120}}
+{"atMs":23263.948249999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23200}}
+{"atMs":23412.22074999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23280}}
+{"atMs":23464.513499999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23360}}
+{"atMs":23510.47874999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23440}}
+{"atMs":23510.55562499998,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we build the whole thing around the subscription.","final":false,"audioProcessedMs":23440}}
+{"atMs":23575.677333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23520}}
+{"atMs":23667.84599999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23600}}
+{"atMs":23740.17520799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23680}}
+{"atMs":23820.109832999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23760}}
+{"atMs":23937.395624999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23840}}
+{"atMs":23991.453916999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":23920}}
+{"atMs":24057.831082999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24000}}
+{"atMs":24184.375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24080}}
+{"atMs":24184.48195799999,"session":0,"frame":{"type":"transcript","transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we build the whole thing around the subscription. ","final":false,"audioProcessedMs":24080}}
+{"atMs":24184.504041999986,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":24080}}
+{"atMs":24184.51662499999,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":23580,"turnId":4}}
+{"atMs":24184.532457999972,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":23580,"turnId":4,"transcript":" People will obviously pay monthly for something they open every single day. So five is fine and we build the whole thing around the subscription. "}}
+{"atMs":24212.248457999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24160}}
+{"atMs":24297.190957999992,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24240}}
+{"atMs":24460.960207999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24320}}
+{"atMs":24509.746916999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24400}}
+{"atMs":24538.859832999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24480}}
+{"atMs":24613.290083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24560}}
+{"atMs":24699.890374999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24640}}
+{"atMs":24779.315917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24720}}
+{"atMs":24857.985832999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24800}}
+{"atMs":24986.00562499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24880}}
+{"atMs":25049.884541999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":24960}}
+{"atMs":25099.13708299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25040}}
+{"atMs":25176.42508299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25120}}
+{"atMs":25261.265916999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25200}}
+{"atMs":25345.51016699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25280}}
+{"atMs":25508.982332999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25360}}
+{"atMs":25561.706957999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25440}}
+{"atMs":25577.473374999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25520}}
+{"atMs":25662.907124999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25600}}
+{"atMs":25740.108582999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25680}}
+{"atMs":25819.341207999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25760}}
+{"atMs":25895.737291999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25840}}
+{"atMs":26034.854124999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":25920}}
+{"atMs":26034.94441699999,"session":0,"frame":{"type":"speechStart","audioProcessedMs":25420,"turnId":5}}
+{"atMs":26085.888999999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26000}}
+{"atMs":26142.201582999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26080}}
+{"atMs":26214.548541999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26160}}
+{"atMs":26300.986542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26240}}
+{"atMs":26395.02212499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26320}}
+{"atMs":26395.097541999974,"session":0,"frame":{"type":"transcript","transcript":" Right?","final":false,"audioProcessedMs":26320}}
+{"atMs":26458.059457999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26400}}
+{"atMs":26603.658999999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26480}}
+{"atMs":26621.479708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26560}}
+{"atMs":26703.380207999988,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26640}}
+{"atMs":26785.976791999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26720}}
+{"atMs":26786.07916699999,"session":0,"frame":{"type":"transcript","transcript":" Right? So","final":false,"audioProcessedMs":26720}}
+{"atMs":26860.03229199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26800}}
+{"atMs":26941.80345799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26880}}
+{"atMs":27082.854457999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":26960}}
+{"atMs":27133.789541999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27040}}
+{"atMs":27179.212582999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27120}}
+{"atMs":27258.586291999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27200}}
+{"atMs":27339.666916999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27280}}
+{"atMs":27431.318624999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27360}}
+{"atMs":27431.415749999986,"session":0,"frame":{"type":"transcript","transcript":" Right? So then","final":false,"audioProcessedMs":27360}}
+{"atMs":27501.80379199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27440}}
+{"atMs":27657.901999999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27520}}
+{"atMs":27686.600957999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27600}}
+{"atMs":27686.678082999977,"session":0,"frame":{"type":"transcript","transcript":" Right? So then the","final":false,"audioProcessedMs":27600}}
+{"atMs":27742.86470799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27680}}
+{"atMs":27821.951833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27760}}
+{"atMs":27895.331832999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27840}}
+{"atMs":28006.844166999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":27920}}
+{"atMs":28006.913749999978,"session":0,"frame":{"type":"transcript","transcript":" Right? So then the only question","final":false,"audioProcessedMs":27920}}
+{"atMs":28129.832791999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28000}}
+{"atMs":28129.934374999983,"session":0,"frame":{"type":"transcript","transcript":" Right? So then the only question is","final":false,"audioProcessedMs":28000}}
+{"atMs":28186.187874999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28080}}
+{"atMs":28221.228832999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28160}}
+{"atMs":28305.035124999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28240}}
+{"atMs":28384.094499999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28320}}
+{"atMs":28473.882541999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28400}}
+{"atMs":28474.039249999973,"session":0,"frame":{"type":"transcript","transcript":" Right? So then the only question is how","final":false,"audioProcessedMs":28400}}
+{"atMs":28560.398166999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28480}}
+{"atMs":28560.577791999996,"session":0,"frame":{"type":"transcript","transcript":" Right? So then the only question is how many we","final":false,"audioProcessedMs":28480}}
+{"atMs":28656.744457999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28560}}
+{"atMs":28735.578499999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28640}}
+{"atMs":28735.77804199999,"session":0,"frame":{"type":"transcript","transcript":" Right? So then the only question is how many we need?","final":false,"audioProcessedMs":28640}}
+{"atMs":28781.614875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28720}}
+{"atMs":28859.198249999987,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28800}}
+{"atMs":28939.81266699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28880}}
+{"atMs":29014.55245799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":28960}}
+{"atMs":29178.844249999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29040}}
+{"atMs":29239.994124999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29120}}
+{"atMs":29260.046499999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29200}}
+{"atMs":29336.43974999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29280}}
+{"atMs":29413.914249999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29360}}
+{"atMs":29492.149791999982,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29440}}
+{"atMs":29580.32237499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29520}}
+{"atMs":29705.353499999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29600}}
+{"atMs":29806.219332999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29680}}
+{"atMs":29806.345082999993,"session":0,"frame":{"type":"transcript","transcript":" Right? So then the only question is how many we need? ","final":false,"audioProcessedMs":29680}}
+{"atMs":29806.386457999994,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":29680}}
+{"atMs":29806.407124999998,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":29180,"turnId":5}}
+{"atMs":29806.42520799997,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":29180,"turnId":5,"transcript":" Right? So then the only question is how many we need? "}}
+{"atMs":29835.976916999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29760}}
+{"atMs":29894.271624999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29840}}
+{"atMs":29999.147874999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":29920}}
+{"atMs":29999.292999999976,"session":0,"frame":{"type":"speechStart","audioProcessedMs":29420,"turnId":6}}
+{"atMs":30053.172416999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30000}}
+{"atMs":30137.631249999977,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30080}}
+{"atMs":30281.066207999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30160}}
+{"atMs":30325.029499999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30240}}
+{"atMs":30325.103041999973,"session":0,"frame":{"type":"transcript","transcript":" 2000","final":false,"audioProcessedMs":30240}}
+{"atMs":30376.817166999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30320}}
+{"atMs":30467.123166999983,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30400}}
+{"atMs":30544.26237499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30480}}
+{"atMs":30615.643124999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30560}}
+{"atMs":30752.24212499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30640}}
+{"atMs":30806.810457999993,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30720}}
+{"atMs":30865.949082999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30800}}
+{"atMs":30866.04795799998,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers","final":false,"audioProcessedMs":30800}}
+{"atMs":30935.979082999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30880}}
+{"atMs":31019.290749999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":30960}}
+{"atMs":31096.85024999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31040}}
+{"atMs":31178.576875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31120}}
+{"atMs":31328.469957999972,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31200}}
+{"atMs":31349.171249999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31280}}
+{"atMs":31416.326917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31360}}
+{"atMs":31499.521707999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31440}}
+{"atMs":31585.171082999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31520}}
+{"atMs":31661.631792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31600}}
+{"atMs":31800.40741699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31680}}
+{"atMs":31800.510332999984,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're","final":false,"audioProcessedMs":31680}}
+{"atMs":31864.776499999978,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31760}}
+{"atMs":31899.64079199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31840}}
+{"atMs":31985.009291999973,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":31920}}
+{"atMs":32064.093082999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32000}}
+{"atMs":32064.166832999996,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both","final":false,"audioProcessedMs":32000}}
+{"atMs":32141.75308299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32080}}
+{"atMs":32323.401124999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32160}}
+{"atMs":32323.49333299999,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered.","final":false,"audioProcessedMs":32160}}
+{"atMs":32376.11275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32240}}
+{"atMs":32396.827707999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32320}}
+{"atMs":32459.44495799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32400}}
+{"atMs":32539.376624999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32480}}
+{"atMs":32620.75991699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32560}}
+{"atMs":32698.133332999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32640}}
+{"atMs":32849.30575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32720}}
+{"atMs":32849.40154199998,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's","final":false,"audioProcessedMs":32720}}
+{"atMs":32911.22562499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32800}}
+{"atMs":32911.32945799999,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the","final":false,"audioProcessedMs":32800}}
+{"atMs":32938.806667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32880}}
+{"atMs":33018.382207999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":32960}}
+{"atMs":33104.046249999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33040}}
+{"atMs":33174.81699999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33120}}
+{"atMs":33264.75008299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33200}}
+{"atMs":33265.084249999985,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the whole","final":false,"audioProcessedMs":33200}}
+{"atMs":33375.146083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33280}}
+{"atMs":33429.794082999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33360}}
+{"atMs":33501.689166999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33440}}
+{"atMs":33575.80558299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33520}}
+{"atMs":33671.53220799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33600}}
+{"atMs":33671.743791999994,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the whole business","final":false,"audioProcessedMs":33600}}
+{"atMs":33737.77904199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33680}}
+{"atMs":33899.583166999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33760}}
+{"atMs":33965.72058299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33840}}
+{"atMs":33965.810791999975,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the whole business plan","final":false,"audioProcessedMs":33840}}
+{"atMs":33995.12383299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":33920}}
+{"atMs":33995.14137499998,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the whole business plan on","final":false,"audioProcessedMs":33920}}
+{"atMs":34059.75774999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34000}}
+{"atMs":34145.030833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34080}}
+{"atMs":34218.86283299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34160}}
+{"atMs":34295.39754199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34240}}
+{"atMs":34422.19975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34320}}
+{"atMs":34483.222167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34400}}
+{"atMs":34483.47116699998,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the whole business plan on one","final":false,"audioProcessedMs":34400}}
+{"atMs":34563.829749999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34480}}
+{"atMs":34563.942583,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the whole business plan on one line.","final":false,"audioProcessedMs":34480}}
+{"atMs":34622.723833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34560}}
+{"atMs":34697.28862499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34640}}
+{"atMs":34778.66612499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34720}}
+{"atMs":34853.844207999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34800}}
+{"atMs":34998.00020799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34880}}
+{"atMs":35016.20904199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":34960}}
+{"atMs":35097.08670799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35040}}
+{"atMs":35175.66537499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35120}}
+{"atMs":35267.64762499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35200}}
+{"atMs":35346.92883299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35280}}
+{"atMs":35471.604792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35360}}
+{"atMs":35522.30437499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35440}}
+{"atMs":35623.58904199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35520}}
+{"atMs":35623.665083,"session":0,"frame":{"type":"transcript","transcript":" 2000 subscribers and we're both covered. That's the whole business plan on one line. ","final":false,"audioProcessedMs":35520}}
+{"atMs":35623.681332999986,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":35520}}
+{"atMs":35623.689082999976,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":35020,"turnId":6}}
+{"atMs":35623.69820799999,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":35020,"turnId":6,"transcript":" 2000 subscribers and we're both covered. That's the whole business plan on one line. "}}
+{"atMs":35654.55004199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35600}}
+{"atMs":35744.238667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35680}}
+{"atMs":35838.811874999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35760}}
+{"atMs":35838.85187499999,"session":0,"frame":{"type":"speechStart","audioProcessedMs":35260,"turnId":7}}
+{"atMs":35895.91637499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35840}}
+{"atMs":36052.65441699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":35920}}
+{"atMs":36067.06583299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36000}}
+{"atMs":36143.388167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36080}}
+{"atMs":36214.90295799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36160}}
+{"atMs":36304.834082999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36240}}
+{"atMs":36408.448542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36320}}
+{"atMs":36408.665125,"session":0,"frame":{"type":"transcript","transcript":" 2000","final":false,"audioProcessedMs":36320}}
+{"atMs":36518.51491699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36400}}
+{"atMs":36573.52683299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36480}}
+{"atMs":36621.58687499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36560}}
+{"atMs":36700.07937499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36640}}
+{"atMs":36782.07329199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36720}}
+{"atMs":36878.733791999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36800}}
+{"atMs":36878.868707999995,"session":0,"frame":{"type":"transcript","transcript":" 2000 out of","final":false,"audioProcessedMs":36800}}
+{"atMs":36942.021791999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36880}}
+{"atMs":37103.841957999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":36960}}
+{"atMs":37151.511624999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37040}}
+{"atMs":37151.67174999998,"session":0,"frame":{"type":"transcript","transcript":" 2000 out of how many","final":false,"audioProcessedMs":37040}}
+{"atMs":37179.63799999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37120}}
+{"atMs":37258.512791999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37200}}
+{"atMs":37337.87416699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37280}}
+{"atMs":37419.59116699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37360}}
+{"atMs":37567.568,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37440}}
+{"atMs":37567.737124999985,"session":0,"frame":{"type":"transcript","transcript":" 2000 out of how many people who","final":false,"audioProcessedMs":37440}}
+{"atMs":37620.546458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37520}}
+{"atMs":37653.731624999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37600}}
+{"atMs":37737.660041999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37680}}
+{"atMs":37859.824207999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37760}}
+{"atMs":37860.09812499999,"session":0,"frame":{"type":"transcript","transcript":" 2000 out of how many people who try it though?","final":false,"audioProcessedMs":37760}}
+{"atMs":37898.67420799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37840}}
+{"atMs":37974.377916999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":37920}}
+{"atMs":38147.57241699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38000}}
+{"atMs":38164.08066699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38080}}
+{"atMs":38215.43341699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38160}}
+{"atMs":38298.316249999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38240}}
+{"atMs":38381.56724999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38320}}
+{"atMs":38509.32266699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38400}}
+{"atMs":38509.41408299998,"session":0,"frame":{"type":"transcript","transcript":" 2000 out of how many people who try it though? ","final":false,"audioProcessedMs":38400}}
+{"atMs":38509.44524999999,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":38400}}
+{"atMs":38509.464874999976,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":37900,"turnId":7}}
+{"atMs":38509.479207999975,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":37900,"turnId":7,"transcript":" 2000 out of how many people who try it though? "}}
+{"atMs":38614.63916699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38480}}
+{"atMs":38614.737291999976,"session":0,"frame":{"type":"speechStart","audioProcessedMs":37980,"turnId":8}}
+{"atMs":38669.725874999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38560}}
+{"atMs":38705.081957999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38640}}
+{"atMs":38705.195999999996,"session":0,"frame":{"type":"transcript","transcript":" Call","final":false,"audioProcessedMs":38640}}
+{"atMs":38778.7555,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38720}}
+{"atMs":38871.326416999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38800}}
+{"atMs":38871.424042,"session":0,"frame":{"type":"transcript","transcript":" Call it","final":false,"audioProcessedMs":38800}}
+{"atMs":38938.730541999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38880}}
+{"atMs":39014.095541999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":38960}}
+{"atMs":39141.04108299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39040}}
+{"atMs":39191.16145799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39120}}
+{"atMs":39255.52566699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39200}}
+{"atMs":39362.805124999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39280}}
+{"atMs":39362.91866699999,"session":0,"frame":{"type":"transcript","transcript":" Call it 3%","final":false,"audioProcessedMs":39280}}
+{"atMs":39421.38237499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39360}}
+{"atMs":39499.085374999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39440}}
+{"atMs":39664.67712499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39520}}
+{"atMs":39723.82054199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39600}}
+{"atMs":39743.572999999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39680}}
+{"atMs":39821.514957999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39760}}
+{"atMs":39898.32379199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39840}}
+{"atMs":39980.050582999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":39920}}
+{"atMs":40080.482499999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40000}}
+{"atMs":40080.590375,"session":0,"frame":{"type":"transcript","transcript":" Call it 3% converting.","final":false,"audioProcessedMs":40000}}
+{"atMs":40188.297416999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40080}}
+{"atMs":40242.20841699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40160}}
+{"atMs":40307.316249999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40240}}
+{"atMs":40397.121082999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40320}}
+{"atMs":40397.345416999975,"session":0,"frame":{"type":"transcript","transcript":" Call it 3% converting. So","final":false,"audioProcessedMs":40320}}
+{"atMs":40460.379832999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40400}}
+{"atMs":40536.98979199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40480}}
+{"atMs":40713.965333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40560}}
+{"atMs":40714.18983299998,"session":0,"frame":{"type":"transcript","transcript":" Call it 3% converting. So we need","final":false,"audioProcessedMs":40560}}
+{"atMs":40768.08691699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40640}}
+{"atMs":40789.964832999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40720}}
+{"atMs":40858.57379199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40800}}
+{"atMs":40936.64283299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40880}}
+{"atMs":41019.77812499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":40960}}
+{"atMs":41101.53012499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41040}}
+{"atMs":41237.110208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41120}}
+{"atMs":41295.86583299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41200}}
+{"atMs":41356.11924999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41280}}
+{"atMs":41356.24208299999,"session":0,"frame":{"type":"transcript","transcript":" Call it 3% converting. So we need something like","final":false,"audioProcessedMs":41280}}
+{"atMs":41421.290791999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41360}}
+{"atMs":41500.556374999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41440}}
+{"atMs":41576.88020799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41520}}
+{"atMs":41662.364332999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41600}}
+{"atMs":41818.193624999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41680}}
+{"atMs":41844.08808299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41760}}
+{"atMs":41906.57154199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41840}}
+{"atMs":42018.44541699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":41920}}
+{"atMs":42018.582957999985,"session":0,"frame":{"type":"transcript","transcript":" Call it 3% converting. So we need something like 70,000","final":false,"audioProcessedMs":41920}}
+{"atMs":42057.80083299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42000}}
+{"atMs":42139.296542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42080}}
+{"atMs":42285.80679199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42160}}
+{"atMs":42342.07920799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42240}}
+{"atMs":42384.61837499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42320}}
+{"atMs":42476.93375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42400}}
+{"atMs":42477.07499999998,"session":0,"frame":{"type":"transcript","transcript":" Call it 3% converting. So we need something like 70,000 installs.","final":false,"audioProcessedMs":42400}}
+{"atMs":42538.940207999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42480}}
+{"atMs":42626.20291699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42560}}
+{"atMs":42695.94308299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42640}}
+{"atMs":42861.47662499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42720}}
+{"atMs":42880.15729199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42800}}
+{"atMs":42940.95899999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42880}}
+{"atMs":43028.471708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":42960}}
+{"atMs":43099.201332999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43040}}
+{"atMs":43179.047708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43120}}
+{"atMs":43333.488207999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43200}}
+{"atMs":43389.48762499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43280}}
+{"atMs":43418.30149999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43360}}
+{"atMs":43497.61799999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43440}}
+{"atMs":43576.863374999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43520}}
+{"atMs":43660.57029199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43600}}
+{"atMs":43734.75870799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43680}}
+{"atMs":43858.31579199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43760}}
+{"atMs":43922.05374999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43840}}
+{"atMs":43978.53924999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":43920}}
+{"atMs":44056.442624999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44000}}
+{"atMs":44144.34154199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44080}}
+{"atMs":44269.65424999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44160}}
+{"atMs":44269.94554199997,"session":0,"frame":{"type":"transcript","transcript":" Call it 3% converting. So we need something like 70,000 installs. ","final":false,"audioProcessedMs":44160}}
+{"atMs":44269.988416999986,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":44160}}
+{"atMs":44270.00916699998,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":43660,"turnId":8}}
+{"atMs":44270.02795799999,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":43660,"turnId":8,"transcript":" Call it 3% converting. So we need something like 70,000 installs. "}}
+{"atMs":44382.438417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44240}}
+{"atMs":44440.750833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44320}}
+{"atMs":44464.626582999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44400}}
+{"atMs":44555.204874999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44480}}
+{"atMs":44555.39866699997,"session":0,"frame":{"type":"speechStart","audioProcessedMs":43980,"turnId":9}}
+{"atMs":44625.113416999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44560}}
+{"atMs":44703.69324999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44640}}
+{"atMs":44775.59820799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44720}}
+{"atMs":44907.078457999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44800}}
+{"atMs":44960.75899999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44880}}
+{"atMs":45016.69779199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":44960}}
+{"atMs":45095.82824999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45040}}
+{"atMs":45175.117624999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45120}}
+{"atMs":45253.97412499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45200}}
+{"atMs":45431.546542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45280}}
+{"atMs":45431.64187499997,"session":0,"frame":{"type":"transcript","transcript":" 70,000.","final":false,"audioProcessedMs":45280}}
+{"atMs":45487.547291999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45360}}
+{"atMs":45507.45883299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45440}}
+{"atMs":45579.81687499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45520}}
+{"atMs":45655.786207999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45600}}
+{"atMs":45745.842957999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45680}}
+{"atMs":45814.93375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45760}}
+{"atMs":45955.29574999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45840}}
+{"atMs":45955.43095799998,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay,","final":false,"audioProcessedMs":45840}}
+{"atMs":46010.10158299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":45920}}
+{"atMs":46060.34391699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46000}}
+{"atMs":46137.65079199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46080}}
+{"atMs":46229.32829199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46160}}
+{"atMs":46229.40925,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's","final":false,"audioProcessedMs":46160}}
+{"atMs":46305.69829199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46240}}
+{"atMs":46384.84529199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46320}}
+{"atMs":46532.31933299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46400}}
+{"atMs":46567.628749999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46480}}
+{"atMs":46567.71779199998,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real","final":false,"audioProcessedMs":46480}}
+{"atMs":46613.61954199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46560}}
+{"atMs":46703.46649999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46640}}
+{"atMs":46779.99549999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46720}}
+{"atMs":46857.137832999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46800}}
+{"atMs":47003.184749999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46880}}
+{"atMs":47064.28599999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":46960}}
+{"atMs":47107.33124999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47040}}
+{"atMs":47107.53787499998,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real marketing","final":false,"audioProcessedMs":47040}}
+{"atMs":47177.414791999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47120}}
+{"atMs":47255.40699999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47200}}
+{"atMs":47337.25312499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47280}}
+{"atMs":47409.84945799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47360}}
+{"atMs":47598.78570799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47440}}
+{"atMs":47598.86191699997,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real marketing problem,","final":false,"audioProcessedMs":47440}}
+{"atMs":47618.41379199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47520}}
+{"atMs":47668.71045799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47600}}
+{"atMs":47669.02491699997,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real marketing problem, not","final":false,"audioProcessedMs":47600}}
+{"atMs":47736.983874999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47680}}
+{"atMs":47821.946832999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47760}}
+{"atMs":47910.07387499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47840}}
+{"atMs":47910.18762499999,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real marketing problem, not a","final":false,"audioProcessedMs":47840}}
+{"atMs":48053.125541999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":47920}}
+{"atMs":48108.836457999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48000}}
+{"atMs":48109.49866699998,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real marketing problem, not a pricing","final":false,"audioProcessedMs":48000}}
+{"atMs":48148.891082999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48080}}
+{"atMs":48215.22837499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48160}}
+{"atMs":48298.50929199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48240}}
+{"atMs":48375.227124999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48320}}
+{"atMs":48455.896958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48400}}
+{"atMs":48578.29933299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48480}}
+{"atMs":48578.568833,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real marketing problem, not a pricing problem.","final":false,"audioProcessedMs":48480}}
+{"atMs":48634.20070799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48560}}
+{"atMs":48697.970457999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48640}}
+{"atMs":48772.94758299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48720}}
+{"atMs":48865.920124999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48800}}
+{"atMs":48938.872124999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48880}}
+{"atMs":49103.177832999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":48960}}
+{"atMs":49158.72870799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49040}}
+{"atMs":49178.28687499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49120}}
+{"atMs":49251.27558299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49200}}
+{"atMs":49345.448124999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49280}}
+{"atMs":49418.25779199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49360}}
+{"atMs":49493.440458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49440}}
+{"atMs":49628.75645799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49520}}
+{"atMs":49629.14541699999,"session":0,"frame":{"type":"transcript","transcript":" 70,000. Okay, that's a real marketing problem, not a pricing problem. ","final":false,"audioProcessedMs":49520}}
+{"atMs":49629.17437499997,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":49520}}
+{"atMs":49629.190124999994,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":49020,"turnId":9}}
+{"atMs":49629.201499999996,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":49020,"turnId":9,"transcript":" 70,000. Okay, that's a real marketing problem, not a pricing problem. "}}
+{"atMs":49679.303208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49600}}
+{"atMs":49738.176874999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49680}}
+{"atMs":49819.59574999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49760}}
+{"atMs":49931.06691699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49840}}
+{"atMs":49931.211499999976,"session":0,"frame":{"type":"speechStart","audioProcessedMs":49340,"turnId":10}}
+{"atMs":49931.243582999974,"session":0,"frame":{"type":"transcript","transcript":" Which","final":false,"audioProcessedMs":49840}}
+{"atMs":49979.71004199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":49920}}
+{"atMs":50154.534041999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50000}}
+{"atMs":50154.71354199998,"session":0,"frame":{"type":"transcript","transcript":" Which is","final":false,"audioProcessedMs":50000}}
+{"atMs":50207.597499999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50080}}
+{"atMs":50224.829791999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50160}}
+{"atMs":50301.32704199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50240}}
+{"atMs":50393.610874999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50320}}
+{"atMs":50393.747249999986,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of","final":false,"audioProcessedMs":50320}}
+{"atMs":50468.382207999966,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50400}}
+{"atMs":50468.49012499998,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a","final":false,"audioProcessedMs":50400}}
+{"atMs":50549.634332999965,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50480}}
+{"atMs":50549.71708299997,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a relief","final":false,"audioProcessedMs":50480}}
+{"atMs":50673.863374999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50560}}
+{"atMs":50731.775082999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50640}}
+{"atMs":50778.00637499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50720}}
+{"atMs":50866.303583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50800}}
+{"atMs":50941.57454199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50880}}
+{"atMs":51024.185708000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":50960}}
+{"atMs":51201.28237499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51040}}
+{"atMs":51201.40049999996,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a relief honestly.","final":false,"audioProcessedMs":51040}}
+{"atMs":51252.531583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51120}}
+{"atMs":51274.77462499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51200}}
+{"atMs":51337.49870799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51280}}
+{"atMs":51420.48108299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51360}}
+{"atMs":51502.972958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51440}}
+{"atMs":51584.310749999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51520}}
+{"atMs":51724.369999999966,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51600}}
+{"atMs":51779.59933299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51680}}
+{"atMs":51829.83783299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51760}}
+{"atMs":51897.11283299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51840}}
+{"atMs":51979.116624999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":51920}}
+{"atMs":52066.22270799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52000}}
+{"atMs":52066.31766699997,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a relief honestly. Marketing","final":false,"audioProcessedMs":52000}}
+{"atMs":52141.26433299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52080}}
+{"atMs":52297.50745800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52160}}
+{"atMs":52318.94725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52240}}
+{"atMs":52373.45800000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52320}}
+{"atMs":52464.10012499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52400}}
+{"atMs":52464.21329199997,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a relief honestly. Marketing problems","final":false,"audioProcessedMs":52400}}
+{"atMs":52538.865542000014,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52480}}
+{"atMs":52619.644917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52560}}
+{"atMs":52772.00062499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52640}}
+{"atMs":52846.296082999994,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52720}}
+{"atMs":52846.408333,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a relief honestly. Marketing problems you can","final":false,"audioProcessedMs":52720}}
+{"atMs":52866.062000000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52800}}
+{"atMs":52938.038875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52880}}
+{"atMs":53021.854708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":52960}}
+{"atMs":53127.015999999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53040}}
+{"atMs":53127.29154199999,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a relief honestly. Marketing problems you can attack.","final":false,"audioProcessedMs":53040}}
+{"atMs":53182.07670800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53120}}
+{"atMs":53294.99016700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53200}}
+{"atMs":53351.623082999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53280}}
+{"atMs":53420.91287500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53360}}
+{"atMs":53499.690333000006,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53440}}
+{"atMs":53573.57258299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53520}}
+{"atMs":53657.33799999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53600}}
+{"atMs":53820.45562499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53680}}
+{"atMs":53875.22224999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53760}}
+{"atMs":53894.754707999964,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53840}}
+{"atMs":53976.59512499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":53920}}
+{"atMs":54061.132207999966,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54000}}
+{"atMs":54135.44649999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54080}}
+{"atMs":54348.91416700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54160}}
+{"atMs":54349.34066700001,"session":0,"frame":{"type":"transcript","transcript":" Which is kind of a relief honestly. Marketing problems you can attack. ","final":false,"audioProcessedMs":54160}}
+{"atMs":54349.37612499998,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":54160}}
+{"atMs":54349.38941699997,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":53660,"turnId":10}}
+{"atMs":54349.40191699998,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":53660,"turnId":10,"transcript":" Which is kind of a relief honestly. Marketing problems you can attack. "}}
+{"atMs":54349.48254199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54240}}
+{"atMs":54397.16133299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54320}}
+{"atMs":54483.73887500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54400}}
+{"atMs":54483.873082999984,"session":0,"frame":{"type":"speechStart","audioProcessedMs":53900,"turnId":11}}
+{"atMs":54540.09812499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54480}}
+{"atMs":54619.28474999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54560}}
+{"atMs":54701.66274999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54640}}
+{"atMs":54867.07758299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54720}}
+{"atMs":54867.245417,"session":0,"frame":{"type":"transcript","transcript":" Let's talk","final":false,"audioProcessedMs":54720}}
+{"atMs":54924.69320800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54800}}
+{"atMs":54941.25108300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54880}}
+{"atMs":55020.21729199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":54960}}
+{"atMs":55098.18766699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55040}}
+{"atMs":55189.785166999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55120}}
+{"atMs":55190.16624999998,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about","final":false,"audioProcessedMs":55120}}
+{"atMs":55253.792583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55200}}
+{"atMs":55391.65483300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55280}}
+{"atMs":55450.56450000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55360}}
+{"atMs":55504.66537500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55440}}
+{"atMs":55504.735957999976,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's","final":false,"audioProcessedMs":55440}}
+{"atMs":55570.60804200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55520}}
+{"atMs":55659.116624999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55600}}
+{"atMs":55762.72833300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55680}}
+{"atMs":55762.836333000014,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the","final":false,"audioProcessedMs":55680}}
+{"atMs":55819.278792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55760}}
+{"atMs":55968.07516699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55840}}
+{"atMs":55987.96270800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":55920}}
+{"atMs":56058.12429199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56000}}
+{"atMs":56133.723417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56080}}
+{"atMs":56220.290750000015,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56160}}
+{"atMs":56307.34137499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56240}}
+{"atMs":56307.466042000015,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the subscription","final":false,"audioProcessedMs":56240}}
+{"atMs":56441.38416699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56320}}
+{"atMs":56499.92049999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56400}}
+{"atMs":56555.42591699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56480}}
+{"atMs":56555.55883299999,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the subscription then.","final":false,"audioProcessedMs":56480}}
+{"atMs":56615.84783299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56560}}
+{"atMs":56701.05670799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56640}}
+{"atMs":56784.73970800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56720}}
+{"atMs":56784.778332999995,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the subscription then. What's","final":false,"audioProcessedMs":56720}}
+{"atMs":56864.185042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56800}}
+{"atMs":56864.225167,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the subscription then. What's free","final":false,"audioProcessedMs":56800}}
+{"atMs":57023.07058299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56880}}
+{"atMs":57043.897749999975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":56960}}
+{"atMs":57096.35954199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57040}}
+{"atMs":57175.13475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57120}}
+{"atMs":57258.886875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57200}}
+{"atMs":57334.04354199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57280}}
+{"atMs":57489.916832999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57360}}
+{"atMs":57567.95916699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57440}}
+{"atMs":57568.04020799996,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the subscription then. What's free and what","final":false,"audioProcessedMs":57440}}
+{"atMs":57613.71562499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57520}}
+{"atMs":57613.815166999964,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the subscription then. What's free and what isn't?","final":false,"audioProcessedMs":57520}}
+{"atMs":57662.92529199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57600}}
+{"atMs":57736.942416999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57680}}
+{"atMs":57813.516082999966,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57760}}
+{"atMs":57891.246041999984,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57840}}
+{"atMs":58014.39216700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":57920}}
+{"atMs":58067.441291999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58000}}
+{"atMs":58132.30479200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58080}}
+{"atMs":58221.19579200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58160}}
+{"atMs":58308.75058299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58240}}
+{"atMs":58376.937000000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58320}}
+{"atMs":58539.52379199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58400}}
+{"atMs":58600.784625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58480}}
+{"atMs":58619.078167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58560}}
+{"atMs":58744.13516699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58640}}
+{"atMs":58744.269457999995,"session":0,"frame":{"type":"transcript","transcript":" Let's talk about what's inside the subscription then. What's free and what isn't? ","final":false,"audioProcessedMs":58640}}
+{"atMs":58744.30566699998,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":58640}}
+{"atMs":58744.325958,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":58140,"turnId":11}}
+{"atMs":58744.343083000014,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":58140,"turnId":11,"transcript":" Let's talk about what's inside the subscription then. What's free and what isn't? "}}
+{"atMs":58781.597666999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58720}}
+{"atMs":58887.562917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58800}}
+{"atMs":58887.66512499997,"session":0,"frame":{"type":"speechStart","audioProcessedMs":58300,"turnId":12}}
+{"atMs":58887.694624999975,"session":0,"frame":{"type":"transcript","transcript":" My","final":false,"audioProcessedMs":58800}}
+{"atMs":58941.44454199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58880}}
+{"atMs":59062.262625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":58960}}
+{"atMs":59113.231332999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59040}}
+{"atMs":59176.561749999964,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59120}}
+{"atMs":59260.58249999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59200}}
+{"atMs":59341.96325,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59280}}
+{"atMs":59413.03216699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59360}}
+{"atMs":59586.41858299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59440}}
+{"atMs":59586.547332999966,"session":0,"frame":{"type":"transcript","transcript":" My instinct is","final":false,"audioProcessedMs":59440}}
+{"atMs":59641.69899999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59520}}
+{"atMs":59671.09608299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59600}}
+{"atMs":59671.185708000005,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the","final":false,"audioProcessedMs":59600}}
+{"atMs":59736.124374999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59680}}
+{"atMs":59817.76966699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59760}}
+{"atMs":59912.55004199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59840}}
+{"atMs":59912.761749999976,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first","final":false,"audioProcessedMs":59840}}
+{"atMs":59974.13754200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":59920}}
+{"atMs":60112.74799999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60000}}
+{"atMs":60172.41037500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60080}}
+{"atMs":60219.934958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60160}}
+{"atMs":60292.15604199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60240}}
+{"atMs":60378.225999999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60320}}
+{"atMs":60473.603875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60400}}
+{"atMs":60473.68945799998,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few","final":false,"audioProcessedMs":60400}}
+{"atMs":60540.27745799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60480}}
+{"atMs":60702.486917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60560}}
+{"atMs":60702.81129199997,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos","final":false,"audioProcessedMs":60560}}
+{"atMs":60722.068499999965,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60640}}
+{"atMs":60774.27829199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60720}}
+{"atMs":60855.36841699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60800}}
+{"atMs":60936.42495799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60880}}
+{"atMs":61015.34254199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":60960}}
+{"atMs":61158.92324999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61040}}
+{"atMs":61159.06012499999,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos are","final":false,"audioProcessedMs":61040}}
+{"atMs":61212.46595799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61120}}
+{"atMs":61264.550791999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61200}}
+{"atMs":61334.10037500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61280}}
+{"atMs":61423.94662500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61360}}
+{"atMs":61424.08320799997,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos are free","final":false,"audioProcessedMs":61360}}
+{"atMs":61497.18545799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61440}}
+{"atMs":61575.40054199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61520}}
+{"atMs":61741.36508300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61600}}
+{"atMs":61770.524874999974,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61680}}
+{"atMs":61770.660124999966,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos are free forever","final":false,"audioProcessedMs":61680}}
+{"atMs":61815.38875000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61760}}
+{"atMs":61906.54370800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61840}}
+{"atMs":61906.80649999998,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos are free forever no","final":false,"audioProcessedMs":61840}}
+{"atMs":61972.45179200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":61920}}
+{"atMs":62071.344291999965,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62000}}
+{"atMs":62207.962792000006,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62080}}
+{"atMs":62269.20145799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62160}}
+{"atMs":62305.954707999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62240}}
+{"atMs":62306.087666999985,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos are free forever no account","final":false,"audioProcessedMs":62240}}
+{"atMs":62379.00104199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62320}}
+{"atMs":62457.945832999976,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62400}}
+{"atMs":62541.11070799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62480}}
+{"atMs":62623.812917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62560}}
+{"atMs":62800.681416999985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62640}}
+{"atMs":62800.91704199996,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos are free forever no account needed.","final":false,"audioProcessedMs":62640}}
+{"atMs":62821.32995799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62720}}
+{"atMs":62857.25116700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62800}}
+{"atMs":62935.45545799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62880}}
+{"atMs":63015.198917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":62960}}
+{"atMs":63098.524957999965,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63040}}
+{"atMs":63255.965999999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63120}}
+{"atMs":63311.74029199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63200}}
+{"atMs":63337.90595799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63280}}
+{"atMs":63416.862208000006,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63360}}
+{"atMs":63495.93499999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63440}}
+{"atMs":63621.112375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63520}}
+{"atMs":63621.21274999998,"session":0,"frame":{"type":"transcript","transcript":" My instinct is the first few photos are free forever no account needed. ","final":false,"audioProcessedMs":63520}}
+{"atMs":63621.240708,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":63520}}
+{"atMs":63621.25424999997,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":63020,"turnId":12}}
+{"atMs":63621.269833,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":63020,"turnId":12,"transcript":" My instinct is the first few photos are free forever no account needed. "}}
+{"atMs":63663.835374999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63600}}
+{"atMs":63781.30262499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63680}}
+{"atMs":63781.39641700001,"session":0,"frame":{"type":"speechStart","audioProcessedMs":63180,"turnId":13}}
+{"atMs":63851.094083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63760}}
+{"atMs":63851.19070800001,"session":0,"frame":{"type":"transcript","transcript":" How","final":false,"audioProcessedMs":63760}}
+{"atMs":63894.08545799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63840}}
+{"atMs":63973.15154199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":63920}}
+{"atMs":64053.28912499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64000}}
+{"atMs":64136.62166699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64080}}
+{"atMs":64304.09679199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64160}}
+{"atMs":64304.16949999999,"session":0,"frame":{"type":"transcript","transcript":" How many is a","final":false,"audioProcessedMs":64160}}
+{"atMs":64358.497,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64240}}
+{"atMs":64399.126707999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64320}}
+{"atMs":64399.20125000001,"session":0,"frame":{"type":"transcript","transcript":" How many is a few?","final":false,"audioProcessedMs":64320}}
+{"atMs":64453.472582999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64400}}
+{"atMs":64542.71945800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64480}}
+{"atMs":64616.73383299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64560}}
+{"atMs":64700.62287499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64640}}
+{"atMs":64827.758541999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64720}}
+{"atMs":64878.71804199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64800}}
+{"atMs":64933.04833300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64880}}
+{"atMs":65022.162500000006,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":64960}}
+{"atMs":65101.17058299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65040}}
+{"atMs":65173.835332999966,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65120}}
+{"atMs":65353.18604199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65200}}
+{"atMs":65408.653792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65280}}
+{"atMs":65424.58849999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65360}}
+{"atMs":65494.594416999986,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65440}}
+{"atMs":65578.06916699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65520}}
+{"atMs":65740.40079199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65600}}
+{"atMs":65740.62954199998,"session":0,"frame":{"type":"transcript","transcript":" How many is a few? ","final":false,"audioProcessedMs":65600}}
+{"atMs":65740.66133299997,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":65600}}
+{"atMs":65740.67924999996,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":65100,"turnId":13}}
+{"atMs":65740.69020799999,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":65100,"turnId":13,"transcript":" How many is a few? "}}
+{"atMs":65740.70125000001,"session":0,"frame":{"type":"speechStart","audioProcessedMs":65100,"turnId":14}}
+{"atMs":65740.716667,"session":0,"frame":{"type":"transcript","transcript":" Three a","final":false,"audioProcessedMs":65600}}
+{"atMs":65755.98687499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65680}}
+{"atMs":65877.8535,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65760}}
+{"atMs":65927.95887499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65840}}
+{"atMs":65978.28524999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":65920}}
+{"atMs":66052.24908299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66000}}
+{"atMs":66139.58866699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66080}}
+{"atMs":66139.668875,"session":0,"frame":{"type":"transcript","transcript":" Three a week","final":false,"audioProcessedMs":66080}}
+{"atMs":66216.21608299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66160}}
+{"atMs":66303.592875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66240}}
+{"atMs":66459.86624999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66320}}
+{"atMs":66475.44849999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66400}}
+{"atMs":66542.73083300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66480}}
+{"atMs":66616.49445799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66560}}
+{"atMs":66704.71141700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66640}}
+{"atMs":66783.45866699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66720}}
+{"atMs":66783.56749999998,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough","final":false,"audioProcessedMs":66720}}
+{"atMs":66928.99908299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66800}}
+{"atMs":66988.98208299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66880}}
+{"atMs":66989.70191699997,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to","final":false,"audioProcessedMs":66880}}
+{"atMs":67019.88833299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":66960}}
+{"atMs":67098.90958299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67040}}
+{"atMs":67186.75533300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67120}}
+{"atMs":67186.87258299996,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get","final":false,"audioProcessedMs":67120}}
+{"atMs":67260.863208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67200}}
+{"atMs":67348.97145799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67280}}
+{"atMs":67349.08458299996,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the","final":false,"audioProcessedMs":67280}}
+{"atMs":67511.80337499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67360}}
+{"atMs":67528.91870800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67440}}
+{"atMs":67573.53004199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67520}}
+{"atMs":67660.08524999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67600}}
+{"atMs":67739.01070799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67680}}
+{"atMs":67822.33199999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67760}}
+{"atMs":67975.404083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67840}}
+{"atMs":67975.53745799998,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the feeling","final":false,"audioProcessedMs":67840}}
+{"atMs":68027.181458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":67920}}
+{"atMs":68058.61175000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68000}}
+{"atMs":68134.42887500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68080}}
+{"atMs":68222.978875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68160}}
+{"atMs":68223.07258299997,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the feeling not","final":false,"audioProcessedMs":68160}}
+{"atMs":68307.607667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68240}}
+{"atMs":68379.10854199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68320}}
+{"atMs":68499.02524999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68400}}
+{"atMs":68564.5925,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68480}}
+{"atMs":68564.68566699998,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the feeling not enough","final":false,"audioProcessedMs":68480}}
+{"atMs":68632.91829199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68560}}
+{"atMs":68633.03062499998,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the feeling not enough to","final":false,"audioProcessedMs":68560}}
+{"atMs":68693.95499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68640}}
+{"atMs":68776.82283300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68720}}
+{"atMs":68871.47533299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68800}}
+{"atMs":68871.58545799999,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the feeling not enough to live","final":false,"audioProcessedMs":68800}}
+{"atMs":69022.015667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68880}}
+{"atMs":69086.28716699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":68960}}
+{"atMs":69104.098417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69040}}
+{"atMs":69190.31899999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69120}}
+{"atMs":69190.430792,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the feeling not enough to live on.","final":false,"audioProcessedMs":69120}}
+{"atMs":69256.60329199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69200}}
+{"atMs":69332.58874999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69280}}
+{"atMs":69415.77941699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69360}}
+{"atMs":69548.312542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69440}}
+{"atMs":69604.007625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69520}}
+{"atMs":69658.230083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69600}}
+{"atMs":69735.47995799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69680}}
+{"atMs":69817.446875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69760}}
+{"atMs":69899.26637499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69840}}
+{"atMs":69975.393167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":69920}}
+{"atMs":70127.77995799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70000}}
+{"atMs":70190.62454199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70080}}
+{"atMs":70190.74354199998,"session":0,"frame":{"type":"transcript","transcript":" Three a week enough to get the feeling not enough to live on. ","final":false,"audioProcessedMs":70080}}
+{"atMs":70190.78291699997,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":70080}}
+{"atMs":70190.80187499998,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":69580,"turnId":14}}
+{"atMs":70190.81875,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":69580,"turnId":14,"transcript":" Three a week enough to get the feeling not enough to live on. "}}
+{"atMs":70218.49383299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70160}}
+{"atMs":70301.00983299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70240}}
+{"atMs":70380.14608299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70320}}
+{"atMs":70486.67074999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70400}}
+{"atMs":70486.7615,"session":0,"frame":{"type":"speechStart","audioProcessedMs":69900,"turnId":15}}
+{"atMs":70486.781667,"session":0,"frame":{"type":"transcript","transcript":" Three","final":false,"audioProcessedMs":70400}}
+{"atMs":70596.44491699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70480}}
+{"atMs":70657.49683300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70560}}
+{"atMs":70698.05637500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70640}}
+{"atMs":70784.87645800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70720}}
+{"atMs":70784.97320799998,"session":0,"frame":{"type":"transcript","transcript":" Three a","final":false,"audioProcessedMs":70720}}
+{"atMs":70855.07099999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70800}}
+{"atMs":70940.61483299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70880}}
+{"atMs":71020.74129199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":70960}}
+{"atMs":71020.91679199997,"session":0,"frame":{"type":"transcript","transcript":" Three a week","final":false,"audioProcessedMs":70960}}
+{"atMs":71178.47562499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71040}}
+{"atMs":71200.625042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71120}}
+{"atMs":71200.75945799999,"session":0,"frame":{"type":"transcript","transcript":" Three a week is","final":false,"audioProcessedMs":71120}}
+{"atMs":71258.84575000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71200}}
+{"atMs":71341.11454199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71280}}
+{"atMs":71418.67241699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71360}}
+{"atMs":71518.638833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71440}}
+{"atMs":71518.82266699997,"session":0,"frame":{"type":"transcript","transcript":" Three a week is generous.","final":false,"audioProcessedMs":71440}}
+{"atMs":71645.92850000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71520}}
+{"atMs":71705.84433299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71600}}
+{"atMs":71733.11766700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71680}}
+{"atMs":71819.26962499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71760}}
+{"atMs":71913.01337500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71840}}
+{"atMs":71976.53345799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":71920}}
+{"atMs":72075.51662499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72000}}
+{"atMs":72075.64583299999,"session":0,"frame":{"type":"transcript","transcript":" Three a week is generous. I'd have","final":false,"audioProcessedMs":72000}}
+{"atMs":72229.66504199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72080}}
+{"atMs":72229.78449999998,"session":0,"frame":{"type":"transcript","transcript":" Three a week is generous. I'd have said","final":false,"audioProcessedMs":72080}}
+{"atMs":72246.49104199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72160}}
+{"atMs":72315.91837499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72240}}
+{"atMs":72316.00404199996,"session":0,"frame":{"type":"transcript","transcript":" Three a week is generous. I'd have said three","final":false,"audioProcessedMs":72240}}
+{"atMs":72378.77670799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72320}}
+{"atMs":72461.898625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72400}}
+{"atMs":72538.79354199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72480}}
+{"atMs":72693.73333300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72560}}
+{"atMs":72751.16575000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72640}}
+{"atMs":72780.49941700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72720}}
+{"atMs":72878.23212500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72800}}
+{"atMs":72878.33033299996,"session":0,"frame":{"type":"transcript","transcript":" Three a week is generous. I'd have said three total.","final":false,"audioProcessedMs":72800}}
+{"atMs":72935.50349999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72880}}
+{"atMs":73015.36954199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":72960}}
+{"atMs":73098.156583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73040}}
+{"atMs":73224.660375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73120}}
+{"atMs":73280.65783299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73200}}
+{"atMs":73330.79620800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73280}}
+{"atMs":73420.80854199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73360}}
+{"atMs":73499.85512499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73440}}
+{"atMs":73620.30687499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73520}}
+{"atMs":73620.47154199998,"session":0,"frame":{"type":"transcript","transcript":" Three a week is generous. I'd have said three total. ","final":false,"audioProcessedMs":73520}}
+{"atMs":73620.50083299997,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":73520}}
+{"atMs":73620.51891700001,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":73020,"turnId":15}}
+{"atMs":73620.53533299998,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":73020,"turnId":15,"transcript":" Three a week is generous. I'd have said three total. "}}
+{"atMs":73741.967417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73600}}
+{"atMs":73742.05179199998,"session":0,"frame":{"type":"speechStart","audioProcessedMs":73100,"turnId":16}}
+{"atMs":73790.74987500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73680}}
+{"atMs":73820.19820799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73760}}
+{"atMs":73906.47754199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73840}}
+{"atMs":73906.654917,"session":0,"frame":{"type":"transcript","transcript":" Three","final":false,"audioProcessedMs":73840}}
+{"atMs":73974.54370800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":73920}}
+{"atMs":74061.77249999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74000}}
+{"atMs":74138.386042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74080}}
+{"atMs":74273.810792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74160}}
+{"atMs":74336.06654199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74240}}
+{"atMs":74336.185708,"session":0,"frame":{"type":"transcript","transcript":" Three total","final":false,"audioProcessedMs":74240}}
+{"atMs":74373.24420799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74320}}
+{"atMs":74452.87058299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74400}}
+{"atMs":74538.080292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74480}}
+{"atMs":74612.7125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74560}}
+{"atMs":74789.044417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74640}}
+{"atMs":74789.12787499998,"session":0,"frame":{"type":"transcript","transcript":" Three total and","final":false,"audioProcessedMs":74640}}
+{"atMs":74852.462875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74720}}
+{"atMs":74869.704917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74800}}
+{"atMs":74942.762708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74880}}
+{"atMs":75029.46670799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":74960}}
+{"atMs":75029.58804199999,"session":0,"frame":{"type":"transcript","transcript":" Three total and you","final":false,"audioProcessedMs":74960}}
+{"atMs":75104.848708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75040}}
+{"atMs":75195.843042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75120}}
+{"atMs":75196.01716700001,"session":0,"frame":{"type":"transcript","transcript":" Three total and you never","final":false,"audioProcessedMs":75120}}
+{"atMs":75313.83137499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75200}}
+{"atMs":75362.69599999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75280}}
+{"atMs":75419.93270799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75360}}
+{"atMs":75501.32404199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75440}}
+{"atMs":75580.38287499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75520}}
+{"atMs":75652.74120799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75600}}
+{"atMs":75745.53020800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75680}}
+{"atMs":75745.63333299998,"session":0,"frame":{"type":"transcript","transcript":" Three total and you never learn","final":false,"audioProcessedMs":75680}}
+{"atMs":75896.66829199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75760}}
+{"atMs":75929.64645799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75840}}
+{"atMs":75929.736083,"session":0,"frame":{"type":"transcript","transcript":" Three total and you never learn whether it","final":false,"audioProcessedMs":75840}}
+{"atMs":75975.691333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":75920}}
+{"atMs":76056.220542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76000}}
+{"atMs":76137.247542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76080}}
+{"atMs":76217.61729200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76160}}
+{"atMs":76364.67245799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76240}}
+{"atMs":76414.60808299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76320}}
+{"atMs":76469.00620799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76400}}
+{"atMs":76469.10920799998,"session":0,"frame":{"type":"transcript","transcript":" Three total and you never learn whether it works","final":false,"audioProcessedMs":76400}}
+{"atMs":76537.823,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76480}}
+{"atMs":76622.10762499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76560}}
+{"atMs":76696.60983299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76640}}
+{"atMs":76778.06195799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76720}}
+{"atMs":76943.75695799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76800}}
+{"atMs":76984.21520800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76880}}
+{"atMs":76984.264375,"session":0,"frame":{"type":"transcript","transcript":" Three total and you never learn whether it works on your actual","final":false,"audioProcessedMs":76880}}
+{"atMs":77014.958167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":76960}}
+{"atMs":77103.11104199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77040}}
+{"atMs":77177.73708299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77120}}
+{"atMs":77254.92045800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77200}}
+{"atMs":77412.528625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77280}}
+{"atMs":77467.631042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77360}}
+{"atMs":77500.32062499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77440}}
+{"atMs":77592.12870799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77520}}
+{"atMs":77592.25824999998,"session":0,"frame":{"type":"transcript","transcript":" Three total and you never learn whether it works on your actual fridge.","final":false,"audioProcessedMs":77520}}
+{"atMs":77661.22208299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77600}}
+{"atMs":77740.226,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77680}}
+{"atMs":77820.39158299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77760}}
+{"atMs":77936.13433299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77840}}
+{"atMs":77991.49999999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":77920}}
+{"atMs":78051.631042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78000}}
+{"atMs":78140.70291699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78080}}
+{"atMs":78213.41858299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78160}}
+{"atMs":78302.86304200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78240}}
+{"atMs":78464.19145799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78320}}
+{"atMs":78515.85404199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78400}}
+{"atMs":78534.13495800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78480}}
+{"atMs":78615.31683299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78560}}
+{"atMs":78700.34008299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78640}}
+{"atMs":78777.338625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78720}}
+{"atMs":78855.48574999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78800}}
+{"atMs":78983.29712500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78880}}
+{"atMs":79097.37979199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":78960}}
+{"atMs":79097.49129199996,"session":0,"frame":{"type":"transcript","transcript":" Three total and you never learn whether it works on your actual fridge. ","final":false,"audioProcessedMs":78960}}
+{"atMs":79097.51979199998,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":78960}}
+{"atMs":79097.53429199997,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":78460,"turnId":16}}
+{"atMs":79097.54962500001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":78460,"turnId":16,"transcript":" Three total and you never learn whether it works on your actual fridge. "}}
+{"atMs":79115.273625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79040}}
+{"atMs":79174.373292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79120}}
+{"atMs":79255.804042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79200}}
+{"atMs":79340.310042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79280}}
+{"atMs":79508.501708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79360}}
+{"atMs":79508.701042,"session":0,"frame":{"type":"speechStart","audioProcessedMs":78860,"turnId":17}}
+{"atMs":79556.91487499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79440}}
+{"atMs":79577.11583299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79520}}
+{"atMs":79660.10829199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79600}}
+{"atMs":79752.998208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79680}}
+{"atMs":79753.10141699997,"session":0,"frame":{"type":"transcript","transcript":" Fair.","final":false,"audioProcessedMs":79680}}
+{"atMs":79818.01570799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79760}}
+{"atMs":79899.35195800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79840}}
+{"atMs":80034.24025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":79920}}
+{"atMs":80098.37704199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80000}}
+{"atMs":80098.46245799997,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's","final":false,"audioProcessedMs":80000}}
+{"atMs":80135.51941699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80080}}
+{"atMs":80215.241542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80160}}
+{"atMs":80298.17499999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80240}}
+{"atMs":80373.42991699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80320}}
+{"atMs":80559.08562499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80400}}
+{"atMs":80559.15662499997,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start","final":false,"audioProcessedMs":80400}}
+{"atMs":80615.672208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80480}}
+{"atMs":80615.72908300001,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous","final":false,"audioProcessedMs":80480}}
+{"atMs":80637.894375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80560}}
+{"atMs":80691.30354199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80640}}
+{"atMs":80781.02245799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80720}}
+{"atMs":80871.38091699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80800}}
+{"atMs":80871.47645799999,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous and","final":false,"audioProcessedMs":80800}}
+{"atMs":80933.68758299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80880}}
+{"atMs":81081.99149999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80960}}
+{"atMs":81139.86141699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81040}}
+{"atMs":81139.960375,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous and tighten","final":false,"audioProcessedMs":81040}}
+{"atMs":81177.10899999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81120}}
+{"atMs":81265.93395800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81200}}
+{"atMs":81266.26891700001,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous and tighten it","final":false,"audioProcessedMs":81200}}
+{"atMs":81336.10329199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81280}}
+{"atMs":81416.807458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81360}}
+{"atMs":81500.84599999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81440}}
+{"atMs":81661.208083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81520}}
+{"atMs":81682.70120799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81600}}
+{"atMs":81755.36204199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81680}}
+{"atMs":81755.42974999998,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous and tighten it if the","final":false,"audioProcessedMs":81680}}
+{"atMs":81821.622917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81760}}
+{"atMs":81896.50224999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81840}}
+{"atMs":81990.48250000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":81920}}
+{"atMs":81990.600542,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous and tighten it if the costs","final":false,"audioProcessedMs":81920}}
+{"atMs":82131.1145,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82000}}
+{"atMs":82191.67249999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82080}}
+{"atMs":82220.81824999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82160}}
+{"atMs":82306.04829199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82240}}
+{"atMs":82380.65091699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82320}}
+{"atMs":82455.70637499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82400}}
+{"atMs":82536.57866699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82480}}
+{"atMs":82654.68554199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82560}}
+{"atMs":82705.84729199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82640}}
+{"atMs":82775.91866699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82720}}
+{"atMs":82874.07579199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82800}}
+{"atMs":82874.16408300001,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous and tighten it if the costs bite.","final":false,"audioProcessedMs":82800}}
+{"atMs":82939.63491699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82880}}
+{"atMs":83072.77424999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":82960}}
+{"atMs":83072.927375,"session":0,"frame":{"type":"transcript","transcript":" Fair. Let's start generous and tighten it if the costs bite. ","final":false,"audioProcessedMs":82960}}
+{"atMs":83073.09762499997,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":82960}}
+{"atMs":83073.12191700001,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":82460,"turnId":17}}
+{"atMs":83073.14050000001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":82460,"turnId":17,"transcript":" Fair. Let's start generous and tighten it if the costs bite. "}}
+{"atMs":83178.02441699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83040}}
+{"atMs":83230.93229200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83120}}
+{"atMs":83261.32225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83200}}
+{"atMs":83341.90516699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83280}}
+{"atMs":83424.08099999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83360}}
+{"atMs":83503.85033299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83440}}
+{"atMs":83582.48974999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83520}}
+{"atMs":83700.68558299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83600}}
+{"atMs":83757.08895799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83680}}
+{"atMs":83813.256333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83760}}
+{"atMs":83945.49416699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83840}}
+{"atMs":83945.60145799999,"session":0,"frame":{"type":"speechStart","audioProcessedMs":83340,"turnId":18}}
+{"atMs":83945.62616700001,"session":0,"frame":{"type":"transcript","transcript":" Agreed.","final":false,"audioProcessedMs":83840}}
+{"atMs":83978.359333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":83920}}
+{"atMs":84055.014833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84000}}
+{"atMs":84135.45575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84080}}
+{"atMs":84282.43749999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84160}}
+{"atMs":84302.519542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84240}}
+{"atMs":84373.91308299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84320}}
+{"atMs":84469.47058299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84400}}
+{"atMs":84558.20470799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84480}}
+{"atMs":84558.53991699996,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And","final":false,"audioProcessedMs":84480}}
+{"atMs":84618.75408299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84560}}
+{"atMs":84753.94158299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84640}}
+{"atMs":84829.553667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84720}}
+{"atMs":84829.72779199996,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid","final":false,"audioProcessedMs":84720}}
+{"atMs":84863.26020799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84800}}
+{"atMs":84939.29170799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84880}}
+{"atMs":85023.40087499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":84960}}
+{"atMs":85023.513,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier","final":false,"audioProcessedMs":84960}}
+{"atMs":85091.03616699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85040}}
+{"atMs":85179.11850000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85120}}
+{"atMs":85334.18187499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85200}}
+{"atMs":85357.518458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85280}}
+{"atMs":85421.20154199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85360}}
+{"atMs":85504.32137499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85440}}
+{"atMs":85504.55804199996,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is","final":false,"audioProcessedMs":85440}}
+{"atMs":85576.57008299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85520}}
+{"atMs":85656.88858299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85600}}
+{"atMs":85801.13445799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85680}}
+{"atMs":85856.11724999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85760}}
+{"atMs":85907.942458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85840}}
+{"atMs":85908.054042,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is unlimited","final":false,"audioProcessedMs":85840}}
+{"atMs":85977.83045799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":85920}}
+{"atMs":86060.34820799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86000}}
+{"atMs":86133.55429199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86080}}
+{"atMs":86218.750333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86160}}
+{"atMs":86374.95524999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86240}}
+{"atMs":86386.74520799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86320}}
+{"atMs":86465.183667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86400}}
+{"atMs":86465.383375,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is unlimited photos","final":false,"audioProcessedMs":86400}}
+{"atMs":86537.201042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86480}}
+{"atMs":86624.872458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86560}}
+{"atMs":86702.15745799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86640}}
+{"atMs":86847.48974999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86720}}
+{"atMs":86897.07629199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86800}}
+{"atMs":86950.434875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86880}}
+{"atMs":86950.71770800001,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is unlimited photos plus","final":false,"audioProcessedMs":86880}}
+{"atMs":87029.17887500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":86960}}
+{"atMs":87029.26866699997,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is unlimited photos plus the","final":false,"audioProcessedMs":86960}}
+{"atMs":87092.3695,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87040}}
+{"atMs":87178.56808299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87120}}
+{"atMs":87260.89295799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87200}}
+{"atMs":87432.64970799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87280}}
+{"atMs":87432.80012499998,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is unlimited photos plus the leftover","final":false,"audioProcessedMs":87280}}
+{"atMs":87461.154625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87360}}
+{"atMs":87496.23583300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87440}}
+{"atMs":87579.732583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87520}}
+{"atMs":87658.39408299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87600}}
+{"atMs":87740.92516700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87680}}
+{"atMs":87896.68845799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87760}}
+{"atMs":87969.57449999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87840}}
+{"atMs":87969.69745800001,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is unlimited photos plus the leftover tracking.","final":false,"audioProcessedMs":87840}}
+{"atMs":87985.633,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":87920}}
+{"atMs":88060.69770799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88000}}
+{"atMs":88136.90016699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88080}}
+{"atMs":88216.279167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88160}}
+{"atMs":88298.769917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88240}}
+{"atMs":88426.356542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88320}}
+{"atMs":88519.42304200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88400}}
+{"atMs":88519.54379200001,"session":0,"frame":{"type":"transcript","transcript":" Agreed. And the paid tier is unlimited photos plus the leftover tracking. ","final":false,"audioProcessedMs":88400}}
+{"atMs":88519.58795799999,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":88400}}
+{"atMs":88519.60983299997,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":87900,"turnId":18}}
+{"atMs":88519.62950000001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":87900,"turnId":18,"transcript":" Agreed. And the paid tier is unlimited photos plus the leftover tracking. "}}
+{"atMs":88538.50866699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88480}}
+{"atMs":88617.05208299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88560}}
+{"atMs":88720.53066700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88640}}
+{"atMs":88720.68129199996,"session":0,"frame":{"type":"speechStart","audioProcessedMs":88140,"turnId":19}}
+{"atMs":88773.11049999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88720}}
+{"atMs":88946.29445799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88800}}
+{"atMs":89008.30437499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88880}}
+{"atMs":89023.74545799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":88960}}
+{"atMs":89097.7985,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89040}}
+{"atMs":89177.499667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89120}}
+{"atMs":89282.13849999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89200}}
+{"atMs":89282.268167,"session":0,"frame":{"type":"transcript","transcript":" Leftover","final":false,"audioProcessedMs":89200}}
+{"atMs":89339.89499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89280}}
+{"atMs":89468.63920800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89360}}
+{"atMs":89469.05595799998,"session":0,"frame":{"type":"transcript","transcript":" Leftover tracking","final":false,"audioProcessedMs":89360}}
+{"atMs":89520.306167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89440}}
+{"atMs":89576.865417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89520}}
+{"atMs":89665.978125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89600}}
+{"atMs":89739.03737499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89680}}
+{"atMs":89818.44479199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89760}}
+{"atMs":89896.38516699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89840}}
+{"atMs":90069.01704199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":89920}}
+{"atMs":90069.31887499997,"session":0,"frame":{"type":"transcript","transcript":" Leftover tracking being the thing","final":false,"audioProcessedMs":89920}}
+{"atMs":90092.38454199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90000}}
+{"atMs":90092.46895799998,"session":0,"frame":{"type":"transcript","transcript":" Leftover tracking being the thing nobody","final":false,"audioProcessedMs":90000}}
+{"atMs":90146.47474999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90080}}
+{"atMs":90146.58154199997,"session":0,"frame":{"type":"transcript","transcript":" Leftover tracking being the thing nobody else","final":false,"audioProcessedMs":90080}}
+{"atMs":90216.35591700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90160}}
+{"atMs":90300.8695,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90240}}
+{"atMs":90380.41925,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90320}}
+{"atMs":90517.94954199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90400}}
+{"atMs":90518.12970799996,"session":0,"frame":{"type":"transcript","transcript":" Leftover tracking being the thing nobody else does","final":false,"audioProcessedMs":90400}}
+{"atMs":90572.77145799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90480}}
+{"atMs":90620.981833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90560}}
+{"atMs":90696.10995799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90640}}
+{"atMs":90779.39608299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90720}}
+{"atMs":90858.44116700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90800}}
+{"atMs":91050.57970799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90880}}
+{"atMs":91050.85762499998,"session":0,"frame":{"type":"transcript","transcript":" Leftover tracking being the thing nobody else does well.","final":false,"audioProcessedMs":90880}}
+{"atMs":91097.96641699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":90960}}
+{"atMs":91121.82149999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91040}}
+{"atMs":91175.45745799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91120}}
+{"atMs":91257.91279199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91200}}
+{"atMs":91349.717125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91280}}
+{"atMs":91412.98995799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91360}}
+{"atMs":91565.32599999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91440}}
+{"atMs":91625.98316699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91520}}
+{"atMs":91716.60966699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91600}}
+{"atMs":91716.73237499999,"session":0,"frame":{"type":"transcript","transcript":" Leftover tracking being the thing nobody else does well. ","final":false,"audioProcessedMs":91600}}
+{"atMs":91716.77545799999,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":91600}}
+{"atMs":91716.796917,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":91100,"turnId":19}}
+{"atMs":91716.81562499996,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":91100,"turnId":19,"transcript":" Leftover tracking being the thing nobody else does well. "}}
+{"atMs":91746.44399999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91680}}
+{"atMs":91818.780917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91760}}
+{"atMs":91922.43849999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91840}}
+{"atMs":91922.53495799997,"session":0,"frame":{"type":"speechStart","audioProcessedMs":91340,"turnId":20}}
+{"atMs":91986.62841699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":91920}}
+{"atMs":91986.73195799996,"session":0,"frame":{"type":"transcript","transcript":" That's","final":false,"audioProcessedMs":91920}}
+{"atMs":92146.65691699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92000}}
+{"atMs":92169.80691700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92080}}
+{"atMs":92220.89904199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92160}}
+{"atMs":92306.956958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92240}}
+{"atMs":92307.164333,"session":0,"frame":{"type":"transcript","transcript":" That's the","final":false,"audioProcessedMs":92240}}
+{"atMs":92380.683292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92320}}
+{"atMs":92453.36025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92400}}
+{"atMs":92613.69879199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92480}}
+{"atMs":92613.92158299996,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I","final":false,"audioProcessedMs":92480}}
+{"atMs":92665.99695799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92560}}
+{"atMs":92700.29558299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92640}}
+{"atMs":92793.625042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92720}}
+{"atMs":92793.736917,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for","final":false,"audioProcessedMs":92720}}
+{"atMs":92859.38537499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92800}}
+{"atMs":92940.588625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92880}}
+{"atMs":93016.234417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":92960}}
+{"atMs":93140.67799999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93040}}
+{"atMs":93192.30812500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93120}}
+{"atMs":93260.56616700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93200}}
+{"atMs":93343.70099999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93280}}
+{"atMs":93343.79449999999,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for myself","final":false,"audioProcessedMs":93280}}
+{"atMs":93419.02825,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93360}}
+{"atMs":93499.304875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93440}}
+{"atMs":93664.607667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93520}}
+{"atMs":93664.691333,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for myself which","final":false,"audioProcessedMs":93520}}
+{"atMs":93721.63020799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93600}}
+{"atMs":93737.70929200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93680}}
+{"atMs":93816.13145799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93760}}
+{"atMs":93893.95366699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93840}}
+{"atMs":93978.68991699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":93920}}
+{"atMs":94071.79275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94000}}
+{"atMs":94072.01537499999,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for myself which is","final":false,"audioProcessedMs":94000}}
+{"atMs":94188.35004199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94080}}
+{"atMs":94243.61754199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94160}}
+{"atMs":94303.84729199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94240}}
+{"atMs":94303.91745799998,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for myself which is usually","final":false,"audioProcessedMs":94240}}
+{"atMs":94383.30275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94320}}
+{"atMs":94475.75787499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94400}}
+{"atMs":94476.976375,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for myself which is usually a decent","final":false,"audioProcessedMs":94400}}
+{"atMs":94568.436708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94480}}
+{"atMs":94615.64358299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94560}}
+{"atMs":94768.61979200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94640}}
+{"atMs":94803.192625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94720}}
+{"atMs":94803.306625,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for myself which is usually a decent sign.","final":false,"audioProcessedMs":94720}}
+{"atMs":94855.55091699996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94800}}
+{"atMs":94935.79216699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94880}}
+{"atMs":95019.71729199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":94960}}
+{"atMs":95099.73287499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95040}}
+{"atMs":95236.72099999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95120}}
+{"atMs":95289.94204199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95200}}
+{"atMs":95342.25454199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95280}}
+{"atMs":95414.41416700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95360}}
+{"atMs":95499.13599999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95440}}
+{"atMs":95583.05433300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95520}}
+{"atMs":95653.26199999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95600}}
+{"atMs":95815.07449999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95680}}
+{"atMs":95833.932458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95760}}
+{"atMs":95907.40366699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95840}}
+{"atMs":95984.274917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":95920}}
+{"atMs":96062.47612499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96000}}
+{"atMs":96142.28929199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96080}}
+{"atMs":96285.0925,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96160}}
+{"atMs":96343.86845799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96240}}
+{"atMs":96379.466583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96320}}
+{"atMs":96508.79829199999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96400}}
+{"atMs":96509.09645799999,"session":0,"frame":{"type":"transcript","transcript":" That's the bit I pay for myself which is usually a decent sign. ","final":false,"audioProcessedMs":96400}}
+{"atMs":96509.12795799997,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":96400}}
+{"atMs":96509.14595800001,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":95900,"turnId":20}}
+{"atMs":96509.16049999997,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":95900,"turnId":20,"transcript":" That's the bit I pay for myself which is usually a decent sign. "}}
+{"atMs":96538.94454199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96480}}
+{"atMs":96633.46116699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96560}}
+{"atMs":96633.56391699999,"session":0,"frame":{"type":"speechStart","audioProcessedMs":96060,"turnId":21}}
+{"atMs":96695.328542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96640}}
+{"atMs":96860.81141699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96720}}
+{"atMs":96901.62025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96800}}
+{"atMs":96901.73824999997,"session":0,"frame":{"type":"transcript","transcript":" Alright","final":false,"audioProcessedMs":96800}}
+{"atMs":96936.41108299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96880}}
+{"atMs":97021.52645799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":96960}}
+{"atMs":97098.52829199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97040}}
+{"atMs":97178.31566699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97120}}
+{"atMs":97335.43574999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97200}}
+{"atMs":97395.53666700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97280}}
+{"atMs":97395.65187500001,"session":0,"frame":{"type":"transcript","transcript":" Alright five","final":false,"audioProcessedMs":97280}}
+{"atMs":97414.92604199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97360}}
+{"atMs":97498.07162500001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97440}}
+{"atMs":97590.36012499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97520}}
+{"atMs":97592.18979199996,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars","final":false,"audioProcessedMs":97520}}
+{"atMs":97658.84400000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97600}}
+{"atMs":97744.18758299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97680}}
+{"atMs":97857.32241699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97760}}
+{"atMs":97911.83225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97840}}
+{"atMs":97981.81766699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":97920}}
+{"atMs":98057.72541699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98000}}
+{"atMs":98135.24299999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98080}}
+{"atMs":98220.82949999996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98160}}
+{"atMs":98382.76929200001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98240}}
+{"atMs":98382.8535,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free","final":false,"audioProcessedMs":98240}}
+{"atMs":98439.76774999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98320}}
+{"atMs":98459.42216699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98400}}
+{"atMs":98548.85162499998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98480}}
+{"atMs":98548.94908299998,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos","final":false,"audioProcessedMs":98480}}
+{"atMs":98618.83995799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98560}}
+{"atMs":98702.69174999997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98640}}
+{"atMs":98788.64037499999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98720}}
+{"atMs":98788.75916699998,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos a","final":false,"audioProcessedMs":98720}}
+{"atMs":98905.65,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98800}}
+{"atMs":98905.75099999996,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos a week","final":false,"audioProcessedMs":98800}}
+{"atMs":98962.44958300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98880}}
+{"atMs":99023.79612499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":98960}}
+{"atMs":99094.71716699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99040}}
+{"atMs":99178.302833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99120}}
+{"atMs":99275.73491699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99200}}
+{"atMs":99275.84316700001,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos a week leftovers","final":false,"audioProcessedMs":99200}}
+{"atMs":99336.614042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99280}}
+{"atMs":99482.562167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99360}}
+{"atMs":99508.59891699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99440}}
+{"atMs":99575.379583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99520}}
+{"atMs":99670.43733299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99600}}
+{"atMs":99670.604625,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos a week leftovers behind","final":false,"audioProcessedMs":99600}}
+{"atMs":99747.78883299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99680}}
+{"atMs":99747.903708,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos a week leftovers behind the","final":false,"audioProcessedMs":99680}}
+{"atMs":99812.891333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99760}}
+{"atMs":99953.97624999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99840}}
+{"atMs":99954.082417,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos a week leftovers behind the wall.","final":false,"audioProcessedMs":99840}}
+{"atMs":100014.437167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":99920}}
+{"atMs":100055.28329199998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100000}}
+{"atMs":100139.72708299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100080}}
+{"atMs":100216.54437499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100160}}
+{"atMs":100298.06562499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100240}}
+{"atMs":100380.40295799999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100320}}
+{"atMs":100531.99183300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100400}}
+{"atMs":100547.62695799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100480}}
+{"atMs":100625.58508299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100560}}
+{"atMs":100696.00125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100640}}
+{"atMs":100774.00625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100720}}
+{"atMs":100857.85595799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100800}}
+{"atMs":101002.64829199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100880}}
+{"atMs":101103.305708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":100960}}
+{"atMs":101103.412208,"session":0,"frame":{"type":"transcript","transcript":" Alright five dollars three free photos a week leftovers behind the wall. ","final":false,"audioProcessedMs":100960}}
+{"atMs":101103.43941699996,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":100960}}
+{"atMs":101103.45287499999,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":100460,"turnId":21}}
+{"atMs":101103.46887499999,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":100460,"turnId":21,"transcript":" Alright five dollars three free photos a week leftovers behind the wall. "}}
+{"atMs":101117.35799999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101040}}
+{"atMs":101198.31445799998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101120}}
+{"atMs":101198.405,"session":0,"frame":{"type":"speechStart","audioProcessedMs":100620,"turnId":22}}
+{"atMs":101255.939208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101200}}
+{"atMs":101347.589833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101280}}
+{"atMs":101347.65945800001,"session":0,"frame":{"type":"transcript","transcript":" Write","final":false,"audioProcessedMs":101280}}
+{"atMs":101417.80287499996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101360}}
+{"atMs":101581.830958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101440}}
+{"atMs":101613.34316700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101520}}
+{"atMs":101613.43520799998,"session":0,"frame":{"type":"transcript","transcript":" Write it","final":false,"audioProcessedMs":101520}}
+{"atMs":101662.98012499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101600}}
+{"atMs":101663.14166699999,"session":0,"frame":{"type":"transcript","transcript":" Write it down","final":false,"audioProcessedMs":101600}}
+{"atMs":101733.48108299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101680}}
+{"atMs":101817.43316699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101760}}
+{"atMs":101897.86133299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101840}}
+{"atMs":102053.22358299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":101920}}
+{"atMs":102107.93054199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102000}}
+{"atMs":102134.76320799996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102080}}
+{"atMs":102229.731542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102160}}
+{"atMs":102229.82537499999,"session":0,"frame":{"type":"transcript","transcript":" Write it down and","final":false,"audioProcessedMs":102160}}
+{"atMs":102304.98945799997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102240}}
+{"atMs":102305.13658299998,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's","final":false,"audioProcessedMs":102240}}
+{"atMs":102387.56333299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102320}}
+{"atMs":102387.65404199998,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's look","final":false,"audioProcessedMs":102320}}
+{"atMs":102455.70841699999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102400}}
+{"atMs":102575.98295800001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102480}}
+{"atMs":102634.170625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102560}}
+{"atMs":102723.227208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102640}}
+{"atMs":102723.31037499997,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's look at it","final":false,"audioProcessedMs":102640}}
+{"atMs":102776.15108299998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102720}}
+{"atMs":102872.17204199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102800}}
+{"atMs":102872.27495799997,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's look at it again","final":false,"audioProcessedMs":102800}}
+{"atMs":102953.522042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102880}}
+{"atMs":102953.59325,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's look at it again after","final":false,"audioProcessedMs":102880}}
+{"atMs":103099.75433299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":102960}}
+{"atMs":103158.90258299999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103040}}
+{"atMs":103177.60558299997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103120}}
+{"atMs":103255.012625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103200}}
+{"atMs":103339.63358299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103280}}
+{"atMs":103427.89633300001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103360}}
+{"atMs":103428.00154200001,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's look at it again after the","final":false,"audioProcessedMs":103360}}
+{"atMs":103499.469167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103440}}
+{"atMs":103624.38941699997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103520}}
+{"atMs":103624.626708,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's look at it again after the prototype.","final":false,"audioProcessedMs":103520}}
+{"atMs":103679.936792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103600}}
+{"atMs":103739.11279199997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103680}}
+{"atMs":103812.287667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103760}}
+{"atMs":103895.327417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103840}}
+{"atMs":103975.94829199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":103920}}
+{"atMs":104054.00258299996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104000}}
+{"atMs":104211.70766699998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104080}}
+{"atMs":104230.65316700001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104160}}
+{"atMs":104316.22587499997,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104240}}
+{"atMs":104379.79879199996,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":104320}}
+{"atMs":104450.84779199996,"session":0,"frame":{"type":"transcript","transcript":" Write it down and let's look at it again after the prototype. ","final":false,"audioProcessedMs":104320}}
+{"atMs":104450.99683300001,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":104320}}
+{"atMs":104451.01887499998,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":103820,"turnId":22}}
+{"atMs":104451.04158300001,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":103820,"turnId":22,"transcript":" Write it down and let's look at it again after the prototype. "}}
+{"atMs":104472.27016699998,"session":0,"frame":{"type":"transcript","transcript":"","final":true,"audioProcessedMs":104320}}

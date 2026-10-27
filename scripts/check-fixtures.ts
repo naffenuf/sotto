@@ -1,6 +1,7 @@
 /**
- * Validates every fixture script in `fixtures/scripts/` and the audio rendered
- * from it. Run with `npm run fixtures:check`.
+ * Validates every fixture script in `fixtures/scripts/`, the audio rendered
+ * from it and the transcription events captured from it.
+ * Run with `npm run fixtures:check`.
  *
  * Checks, per script:
  *   - it parses against {@link FixtureScriptSchema}, which also enforces that
@@ -8,11 +9,14 @@
  *   - `fixtures/audio/<name>.wav` exists and is mono 16-bit PCM at 24 kHz
  *   - `fixtures/audio/<name>.timing.json` exists, parses, and has one entry per
  *     line, in order, within the WAV
+ *   - `fixtures/events/<name>.jsonl` exists, parses, and covers the whole WAV
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readWavFile } from "../server/audio/wav.js";
+import { AUDIO_CHUNK_MS } from "../server/audio/AudioSource.js";
+import { parseAsrFrameRecords, type AsrFrameRecord } from "../shared/asr.js";
 import {
   FIXTURE_SAMPLE_RATE,
   FixtureScriptSchema,
@@ -24,6 +28,52 @@ import {
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const scriptsDir = join(repoRoot, "fixtures/scripts");
 const audioDir = join(repoRoot, "fixtures/audio");
+const eventsDir = join(repoRoot, "fixtures/events");
+
+/**
+ * A capture is only useful to the turn assembler and fast replay if it ran to
+ * the end of the audio. A run killed part-way leaves a file that parses
+ * perfectly and silently stops mid-conversation, so check the two things that
+ * prove it finished: the server consumed the whole WAV, and it sent the empty
+ * `final: true` transcript it only sends after `endStream`.
+ */
+function checkEvents(name: string, durationMs: number | undefined, problems: string[]): void {
+  const fail = (message: string) => problems.push(`${name}: ${message}`);
+  const eventsPath = join(eventsDir, `${name}.jsonl`);
+
+  let records: AsrFrameRecord[];
+  try {
+    records = parseAsrFrameRecords(readFileSync(eventsPath, "utf8"));
+  } catch (error) {
+    fail(`${name}.jsonl: ${(error as Error).message} — recapture with \`npm run capture -- ${name}\``);
+    return;
+  }
+
+  if (records.length === 0) {
+    fail(`${name}.jsonl is empty — recapture with \`npm run capture -- ${name}\``);
+    return;
+  }
+
+  const last = records[records.length - 1]?.frame;
+  if (last?.["type"] !== "transcript" || last["final"] !== true) {
+    fail(
+      `${name}.jsonl does not end with the post-endStream \`final: true\` transcript, ` +
+        "so the capture was cut off — recapture it",
+    );
+  }
+
+  if (durationMs === undefined) return;
+  const processedMs = records.reduce((most, { frame }) => {
+    const at = frame["audioProcessedMs"];
+    return typeof at === "number" && at > most ? at : most;
+  }, 0);
+  if (processedMs < durationMs - AUDIO_CHUNK_MS) {
+    fail(
+      `${name}.jsonl stops ${Math.round(durationMs - processedMs)} ms short of ` +
+        `${name}.wav (${processedMs} of ${durationMs} ms) — recapture it`,
+    );
+  }
+}
 
 function checkScript(name: string, problems: string[]): void {
   const fail = (message: string) => problems.push(`${name}: ${message}`);
@@ -59,6 +109,8 @@ function checkScript(name: string, problems: string[]): void {
   } catch (error) {
     fail(`${name}.wav: ${(error as Error).message} — regenerate with make_fixture.py`);
   }
+
+  checkEvents(name, durationMs, problems);
 
   let timing: FixtureTiming | undefined;
   try {

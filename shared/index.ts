@@ -1,4 +1,6 @@
 export type { HealthResponse } from "./types.js";
+export { AsrFrameRecordSchema, asrModes, parseAsrFrameRecords } from "./asr.js";
+export type { AsrFrameRecord, AsrMode } from "./asr.js";
 export {
   FIXTURE_SAMPLE_RATE,
   FixtureLineSchema,
