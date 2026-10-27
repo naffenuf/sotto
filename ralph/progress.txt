@@ -29,3 +29,20 @@
   Speech rate for script-length planning is ~3.8 words/s, so (words / 3.8) + sum(pauseAfterMs)
   lands within a second or two of the real duration. Use it to hit the 1–3 min targets in US-003.
   fixtures/events/ does not exist yet; US-005 creates it (including fixtures/events/NOTES.md).
+
+[2026-10-27 07:40] US-003 — completed — Five planted-moment fixtures scripted, rendered and committed.
+  Tree was DIRTY on arrival again: a previous iteration had written all five moment scripts, the
+  README table rows, and the WAV + timing for moment-contradiction, moment-fact, moment-assumption
+  and moment-dropped, then was cut off before rendering moment-mixed. All of it was sound and met
+  the criteria, so this iteration continued from it: rendered moment-mixed only (809s wall clock)
+  and committed everything as one story commit.
+  Durations: moment-assumption 104.3s, moment-fact 112.8s, moment-contradiction 121.9s,
+  moment-dropped 127.8s, moment-mixed 194.7s. moment-mixed carries two moments of different types
+  (contradiction at lines 3/5 -> 16, deadline 20; untested_assumption at 30 -> 31, deadline 34) with
+  quiet stretches of 67.5s (lines 0-15), 43.3s (lines 21-30) and 30.5s (lines 35-40) — those are the
+  windows the eval harness should see zero interjections in.
+  Checked: npm run fixtures:check (9 fixtures OK), npm run typecheck, npm test (13 tests).
+  Chatterbox throughput on this longer script was 4.15x real time, not the 2.5x seen in US-002, and
+  the 3.8 words/s estimate under-predicted by 16s (actual ~3.4 words/s) — see CLAUDE.md.
+  Next story is US-004 (AudioSource interface and WAV replay, PRD US-003 part 1). All nine fixture
+  WAVs it needs are now committed; fixtures/events/ still does not exist (US-005 creates it).

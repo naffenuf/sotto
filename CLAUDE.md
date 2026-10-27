@@ -37,11 +37,14 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   (`server/test/integrationSetup.ts`), which runs outside that capture.
 - **Generating fixture audio.** `~/Developer/Chatterbox/venv/bin/python fixtures/make_fixture.py
   fixtures/scripts/<name>.json --device mps`. Without `--device mps` it falls back per
-  `pick_device`, which already prefers MPS, so the flag is just explicit. It runs at roughly
-  **2.5x real time** (a 2-minute fixture takes ~13 min wall clock), so start the render early and
-  do other checks while it works — and don't pipe it through `tail`, which buffers the whole run
-  and hides progress. For script length, speech runs at **~3.8 words/second**:
-  `words / 3.8 + sum(pauseAfterMs) / 1000` predicts the rendered duration within a second or two.
+  `pick_device`, which already prefers MPS, so the flag is just explicit. Throughput has ranged from
+  **2.5x to 4.15x real time** (a 3-minute fixture took 809s wall clock), so budget ~4x, start the
+  render early and do other checks while it works — and don't pipe it through `tail`, which buffers
+  the whole run and hides progress. The script prints a `[n/total]` line per rendered line; read
+  progress with `tr '\r' '\n' < log | grep -v '^Sampling' | tail`, since the Sampling progress bars
+  use carriage returns. For script length, speech runs at **~3.4–3.8 words/second**:
+  `words / 3.8 + sum(pauseAfterMs) / 1000` is a floor (it under-predicted a 3-minute fixture by 16s),
+  so treat it as the low end of the range when aiming at a duration target.
 - **Fixture invariants live in the schema, not the checker.** `FixtureScriptSchema` in
   `shared/fixtures.ts` carries the cross-field rules (`setupLines` < `triggerLine` <=
   `deadlineLine`, line indexes in range, unique moment ids) in a `superRefine`, so every reader
