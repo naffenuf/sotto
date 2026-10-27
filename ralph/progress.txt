@@ -62,3 +62,37 @@
   fake clock replays a 2-minute fixture instantly (see the manualClock helper in WavReplaySource.test.ts).
   scripts/check-fixtures.ts no longer has its own RIFF parser; it imports readWavFile from server/audio/wav.ts.
   Not in this story (deliberately): PRD US-003's mic source, UI source selector and Start/Stop — that is US-012.
+
+[2026-10-27 08:20] US-005 — completed — Realtime transcription client, `npm run capture`, and all nine event captures committed with NOTES.md written from the real frames.
+  Tree was DIRTY on arrival again. A previous iteration had already written shared/asr.ts (+test),
+  server/asr/realtimeClient.ts (+test), scripts/capture-events.ts, the README section and the
+  package.json `capture` script / `ws` deps, and had captured 7 of 9 fixtures. All of it was sound,
+  so this iteration continued from it. What was broken: moment-dropped.jsonl stopped at 111.6s of
+  127.8s, moment-mixed.jsonl at 13.0s of 194.7s, and no-wake.jsonl did not exist. Re-captured those
+  three (6.5 min of audio, ~$0.02) and the whole set now passes.
+  Guard added so this can't hide again: `npm run fixtures:check` now requires every capture to end
+  with the post-endStream `{"transcript":"","final":true}` frame AND for its max audioProcessedMs to
+  reach the WAV's end. A killed capture parses perfectly and just stops mid-conversation otherwise.
+  Captures: 14,574 frames / 198 turns total. Frame order is identical in 198 of 198 turns:
+  speechStart -> transcript partials (2-31, cumulative, no turnId) -> speaker (exactly one, no
+  turnId) -> speechEnd -> speechComplete. The last partial always equals speechComplete.transcript.
+  Processing lag (speechEnd.audioProcessedMs -> arrival) 601-762 ms, median 641 ms. audioProgress is
+  78.7% of all frames. Only close code 1000 was ever seen; the retry paths are unit-test-only.
+  TWO THINGS THE NEXT STORIES MUST KNOW (both written up in fixtures/events/NOTES.md):
+  1) US-006's criterion "pauseState reports a pause of >= 1.5 s somewhere in brainstorm" CANNOT PASS
+     on the current audio: brainstorm's longest visible speechEnd->speechStart gap is 1,084 ms. The
+     endpointer eats ~0.5 s of every pause, so the 1,600 ms scripted pause surfaces as ~1.1 s. Fix
+     is to lengthen one pauseAfterMs in fixtures/scripts/brainstorm.json to >= 2,100 ms, re-render
+     (~8 min) and re-capture (2 min); otherwise leave the criterion failing with this note.
+     Fixtures that already clear 1.5 s: moment-fact 2,194 / ask-search 2,191 / ask-diagram 2,094 /
+     moment-assumption 1,850 / moment-mixed 1,646 ms.
+  2) The wake word transcribes as `Sotto` but the PUNCTUATION IS NOT RELIABLE. ask-search's trigger
+     line came back as " Sotto what do the main competitors charge per month. " — no comma, no
+     question mark. So US-024 must NOT require "followed by a comma or a question". Worse, "sotto
+     voce" in no-wake transcribes as `Sotto voce` — the same spelling as the wake word — so the
+     matcher has to use position plus the following word. `sota` never appeared in any capture.
+  Checked: npm run typecheck, npm test (35 tests), npm run fixtures:check (9 fixtures OK).
+  Verified against the docs (not guessed): handshake fields and the close-code table at
+  https://dev.meta.ai/docs/api-reference/voice/realtime, and modes / keywords / event list /
+  emitAudioProgress default / 60-minute session limit at https://dev.meta.ai/docs/speech-to-text.
+  Nothing human-only is pending for this story.

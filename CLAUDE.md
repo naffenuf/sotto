@@ -62,3 +62,25 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   computing each delay from the *start of the stream* (`(sent + 1) * CHUNK_MS - elapsed`), never from
   the previous tick, and catching up on several chunks when a timer overslept — measured 2001 ms for
   a 2.0 s WAV and an 80.02 ms average interval over 10 s.
+- **Realtime transcription event shapes.** `fixtures/events/NOTES.md` is the record of what
+  `wss://api.meta.ai/v1/asr/realtime` actually sends (198 turns, nine captures), and it beats the
+  docs where they disagree. The load-bearing facts: a turn is always
+  `speechStart` → cumulative `transcript` partials → exactly one `speaker` → `speechEnd` →
+  `speechComplete`, in that order, with **no `turnId` on `transcript` or `speaker` frames** — they
+  belong to the most recent `speechStart` that has no `speechEnd`. So a partial has no speaker label
+  yet. Frames report `audioProcessedMs` (a position in the audio), not wall-clock, and arrive
+  **601–762 ms** after it. The endpointer eats ~0.5 s of every pause, so a scripted 1,600 ms pause
+  shows up as a ~1.1 s `speechEnd → speechStart` gap: **always size pause thresholds against the
+  captures, not against `pauseAfterMs`.**
+- **Capturing events.** `npm run capture -- <fixture>` / `-- --all` replays WAVs through the real API
+  at real-time pace (~$0.18/hour of audio; the full set is ~15 min). Because it is real-time it is
+  exactly the kind of job an iteration gets killed in the middle of, and a half-written `.jsonl`
+  parses perfectly and just stops mid-conversation. `npm run fixtures:check` therefore requires each
+  capture to reach the end of its WAV and to end with the empty `final: true` transcript the server
+  only sends after `endStream`. Run it before trusting any capture.
+- **The wake word is spelled `Sotto` but its punctuation is not.** `keywords: ["Sotto"]` biasing
+  works on spelling, yet `ask-search`'s trigger line came back as
+  `" Sotto what do the main competitors charge per month. "` — no comma, no question mark — while
+  `ask-diagram`'s kept both. Matching on punctuation would miss half the fixtures. And "sotto voce"
+  transcribes as `Sotto voce`, i.e. identical to the wake word, so position and the following word
+  are the only things that separate them.
