@@ -84,3 +84,24 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `ask-diagram`'s kept both. Matching on punctuation would miss half the fixtures. And "sotto voce"
   transcribes as `Sotto voce`, i.e. identical to the wake word, so position and the following word
   are the only things that separate them.
+- **The clock has a simulated twin.** `SimulatedClock` in `server/clock.ts` is the `Clock` for
+  tests: `advanceBy`/`advanceTo` fire due timers in order and leave `now()` exactly on each one's
+  due time, `runAll()` drains the queue however far ahead it reaches, and nothing moves on its own.
+  Use it instead of writing another fake clock — `WavReplaySource.test.ts` used to have one and
+  no longer does. Replaying a capture is `clock.advanceTo(record.atMs)` before each
+  `assembler.accept(record)`, which is also the shape US-008's `1x` replay wants.
+- **Turn assembly.** `server/asr/turns.ts` is the only thing that reads raw ASR frames.
+  `TurnAssembler.accept(record)` takes an `AsrFrameRecord` — the capture format *and* what
+  `realtimeClient`'s `onFrame` hands over — so live and replay feed the same object. `turnId` on
+  a `TurnUpdate` is a string, `"<session>:<apiTurnId>"`, because the API renumbers turns from 0
+  in every session; `turnKey()` builds one. Untagged `transcript`/`speaker` frames go to the most
+  recent `speechStart` without a `speechEnd`, so overlapping turns work without the API's help.
+  `malformedFrames() > 0` is the signal that the API drifted from `fixtures/events/NOTES.md`:
+  frames are narrowed with zod (`asAsrEvent` in `shared/asr.ts`) and a known type that fails its
+  shape is counted and logged rather than guessed at.
+- **The endpointer's bite is a constant, not a ratio.** The same `brainstorm` line measured at
+  `pauseAfterMs` 1,600 and 2,400 gave visible `speechEnd → speechStart` gaps of 1,084 and
+  1,944 ms — 456 and 516 ms eaten. So a fixture needs `threshold + ~550 ms` of scripted pause to
+  show a pause of `threshold`. Changing one `pauseAfterMs` costs a re-render (~4.5x real time)
+  plus a re-capture, and `npm run fixtures:check` fails until both are done, since it compares the
+  capture's `audioProcessedMs` against the WAV's length.

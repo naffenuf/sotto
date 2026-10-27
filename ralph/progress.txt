@@ -96,3 +96,41 @@
   https://dev.meta.ai/docs/api-reference/voice/realtime, and modes / keywords / event list /
   emitAudioProgress default / 60-minute session limit at https://dev.meta.ai/docs/speech-to-text.
   Nothing human-only is pending for this story.
+
+[2026-10-27 08:40] US-006 — completed — Turn assembler, SimulatedClock, and the brainstorm fixture re-rendered so a >= 1.5 s pause actually exists.
+  Working tree was clean on arrival; nothing to recover.
+  New code: shared/turns.ts (TurnUpdate, PauseState), zod schemas + asAsrEvent() appended to
+  shared/asr.ts, server/asr/turns.ts (TurnAssembler), server/clock.ts gains SimulatedClock,
+  plus server/clock.test.ts and server/asr/turns.test.ts. Both new shared modules are re-exported
+  from shared/index.ts.
+  TurnAssembler API the rest of the pipeline should use:
+    new TurnAssembler({ clock, onUpdate, startedAtMs?, logger? })
+    accept(record: AsrFrameRecord): TurnUpdate | null   // same record shape as the captures AND
+                                                        //   realtimeClient's onFrame — feed either
+    finalTurns(): readonly TurnUpdate[]   openTurns(): TurnUpdate[]
+    pauseState(nowMs = clock.now()): { speaking, silentForMs }
+    malformedFrames(): number             // > 0 means the API drifted from NOTES.md
+  turnId is a STRING, "<session>:<apiTurnId>", because the API renumbers turns from 0 in each
+  session — US-007's reconnect would otherwise collide. turnKey(session, n) builds one.
+  Snapshots are Object.freeze'd, so consumers can keep them without copying.
+  US-007 is the natural next story and lands in these same two files: it needs a
+  speakerMappingUncertain field on TurnUpdate plus a session-to-session label map in the
+  assembler (map new labels to existing speakers by order of first appearance). The assembler
+  already sees `record.session`, so it can tell when a reconnect happened without being told.
+  US-008 should drive replay with SimulatedClock (advanceTo(record.atMs) per frame, as
+  server/asr/turns.test.ts's `replay()` helper already does) — that is the '1x on a simulated
+  clock' shape its criteria ask for. The "don't advance past an in-flight model call" part is
+  NOT built; SimulatedClock has no async-task registration yet. Add it there.
+  FIXTURE CHANGE, flagged deliberately: the criterion "pauseState reports a pause of >= 1.5 s
+  somewhere in brainstorm" was impossible on the old audio (US-005 left this note). Changed
+  exactly one number — fixtures/scripts/brainstorm.json line 18's pauseAfterMs, 1,600 -> 2,400 ms,
+  a beat after "Decided then." — then re-rendered (539s, 4.46x real time) and re-captured
+  ($0.006). Visible gap is now 1,944 ms. No line text, no speaker, no moment annotation touched;
+  brainstorm has no moments and is not scored by the eval, so nothing was tuned to make a score.
+  New brainstorm numbers: 120.9 s audio, 1,916 frames, 24 turns. NOTES.md per-fixture table and
+  the processing-lag section updated with both measurements of the same line (1,600 -> 1,084 and
+  2,400 -> 1,944), which pins the endpointer's bite at ~456-516 ms rather than a ratio.
+  Also removed the duplicate manualClock helper from server/audio/WavReplaySource.test.ts in
+  favour of SimulatedClock — one clock abstraction, as US-004's note asked for.
+  Checked: npm run typecheck, npm test (67 tests, 9 files), npm run fixtures:check (9 fixtures OK).
+  Nothing human-only is pending for this story.

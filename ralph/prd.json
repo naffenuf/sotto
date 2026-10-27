@@ -113,8 +113,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Assembler is server/asr/turns.ts (TurnAssembler.accept(AsrFrameRecord) -> TurnUpdate | null, finalTurns(), openTurns(), pauseState(nowMs), malformedFrames()); types in shared/turns.ts; frame narrowing is asAsrEvent() in shared/asr.ts. SimulatedClock added to server/clock.ts. The >= 1.5 s pause criterion needed fixture work: brainstorm's longest scripted pause (1,600 ms) surfaced as only 1,084 ms, so line 18's pauseAfterMs went to 2,400 ms and the fixture was re-rendered and re-captured (gap now 1,944 ms). No line text, speaker or moment changed."
     },
     {
       "id": "US-007",
