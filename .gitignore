@@ -6,3 +6,4 @@ ralph/loop.log
 ralph/STOP
 .DS_Store
 ralph/iterations/
+*.tmp.mjs

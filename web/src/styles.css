@@ -1,0 +1,81 @@
+:root {
+  --bg: #11100e;
+  --surface: #1b1a17;
+  --ink: #f2efe9;
+  --ink-dim: #9b968c;
+  --accent: #d8a657;
+  --ok: #7fb069;
+  --bad: #d16a5a;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 ui-sans-serif, -apple-system, "Helvetica Neue", sans-serif;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #2a2824;
+}
+
+.brand {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.status__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ink-dim);
+}
+
+.status--connected .status__dot {
+  background: var(--ok);
+}
+
+.status--disconnected .status__dot {
+  background: var(--bad);
+}
+
+.stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.stage__hint {
+  margin: 0;
+  max-width: 32rem;
+  text-align: center;
+  color: var(--ink-dim);
+}
