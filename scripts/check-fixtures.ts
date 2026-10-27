@@ -12,6 +12,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readWavFile } from "../server/audio/wav.js";
 import {
   FIXTURE_SAMPLE_RATE,
   FixtureScriptSchema,
@@ -23,41 +24,6 @@ import {
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const scriptsDir = join(repoRoot, "fixtures/scripts");
 const audioDir = join(repoRoot, "fixtures/audio");
-
-interface WavFormat {
-  channels: number;
-  sampleRate: number;
-  bitsPerSample: number;
-  dataBytes: number;
-}
-
-/** Reads just enough of a RIFF header to confirm the format. */
-function readWavFormat(path: string): WavFormat {
-  const buf = readFileSync(path);
-  if (buf.length < 44 || buf.toString("ascii", 0, 4) !== "RIFF" || buf.toString("ascii", 8, 12) !== "WAVE") {
-    throw new Error("not a RIFF/WAVE file");
-  }
-  let format: Omit<WavFormat, "dataBytes"> | undefined;
-  let dataBytes: number | undefined;
-  let offset = 12;
-  while (offset + 8 <= buf.length) {
-    const id = buf.toString("ascii", offset, offset + 4);
-    const size = buf.readUInt32LE(offset + 4);
-    const body = offset + 8;
-    if (id === "fmt ") {
-      format = {
-        channels: buf.readUInt16LE(body + 2),
-        sampleRate: buf.readUInt32LE(body + 4),
-        bitsPerSample: buf.readUInt16LE(body + 14),
-      };
-    } else if (id === "data") {
-      dataBytes = Math.min(size, buf.length - body);
-    }
-    offset = body + size + (size % 2);
-  }
-  if (!format || dataBytes === undefined) throw new Error("missing fmt or data chunk");
-  return { ...format, dataBytes };
-}
 
 function checkScript(name: string, problems: string[]): void {
   const fail = (message: string) => problems.push(`${name}: ${message}`);
@@ -84,12 +50,12 @@ function checkScript(name: string, problems: string[]): void {
   let durationMs: number | undefined;
 
   try {
-    const wav = readWavFormat(wavPath);
+    const wav = readWavFile(wavPath);
     if (wav.channels !== 1) fail(`${name}.wav has ${wav.channels} channels, expected mono`);
     if (wav.sampleRate !== FIXTURE_SAMPLE_RATE)
       fail(`${name}.wav is ${wav.sampleRate} Hz, expected ${FIXTURE_SAMPLE_RATE} Hz`);
     if (wav.bitsPerSample !== 16) fail(`${name}.wav is ${wav.bitsPerSample}-bit, expected 16-bit`);
-    durationMs = Math.round((wav.dataBytes / 2) * (1000 / FIXTURE_SAMPLE_RATE));
+    durationMs = Math.round((wav.data.length / 2) * (1000 / FIXTURE_SAMPLE_RATE));
   } catch (error) {
     fail(`${name}.wav: ${(error as Error).message} — regenerate with make_fixture.py`);
   }
