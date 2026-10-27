@@ -35,3 +35,15 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
 - **Integration-test skip message.** Per-file `console.log` is swallowed when Vitest skips the file.
   The "MODEL_API_KEY is missing" notice is printed from a `globalSetup`
   (`server/test/integrationSetup.ts`), which runs outside that capture.
+- **Generating fixture audio.** `~/Developer/Chatterbox/venv/bin/python fixtures/make_fixture.py
+  fixtures/scripts/<name>.json --device mps`. Without `--device mps` it falls back per
+  `pick_device`, which already prefers MPS, so the flag is just explicit. It runs at roughly
+  **2.5x real time** (a 2-minute fixture takes ~13 min wall clock), so start the render early and
+  do other checks while it works — and don't pipe it through `tail`, which buffers the whole run
+  and hides progress. For script length, speech runs at **~3.8 words/second**:
+  `words / 3.8 + sum(pauseAfterMs) / 1000` predicts the rendered duration within a second or two.
+- **Fixture invariants live in the schema, not the checker.** `FixtureScriptSchema` in
+  `shared/fixtures.ts` carries the cross-field rules (`setupLines` < `triggerLine` <=
+  `deadlineLine`, line indexes in range, unique moment ids) in a `superRefine`, so every reader
+  gets them. `scripts/check-fixtures.ts` (`npm run fixtures:check`) adds only what needs the
+  filesystem: WAV format and timing/script agreement. Add new script rules to the schema.

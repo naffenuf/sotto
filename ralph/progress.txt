@@ -19,3 +19,13 @@
   Real-API gotcha found while writing the integration test: muse-spark-1.3 is a REASONING model.
   See CLAUDE.md Learnings — max_tokens must cover reasoning_tokens or content comes back null.
   fixtures/ does not exist yet; US-002 creates it (including fixtures/events/NOTES.md).
+
+[2026-10-27 01:00] US-002 — completed — Fixture script schema, make_fixture.py, and the 4 non-moment fixtures (brainstorm, ask-search, ask-diagram, no-wake) generated and committed.
+  Tree was DIRTY on arrival: a previous iteration had already written shared/fixtures.ts,
+  shared/fixtures.test.ts, scripts/check-fixtures.ts, fixtures/README.md, fixtures/make_fixture.py,
+  all four scripts, and the no-wake WAV — then was cut off before rendering the other three WAVs.
+  All of it was sound, so this iteration continued from it: rendered the 3 missing WAVs and committed.
+  Durations after rendering: brainstorm 120.1s, ask-search 48.5s, ask-diagram 42.0s, no-wake 45.0s.
+  Speech rate for script-length planning is ~3.8 words/s, so (words / 3.8) + sum(pauseAfterMs)
+  lands within a second or two of the real duration. Use it to hit the 1–3 min targets in US-003.
+  fixtures/events/ does not exist yet; US-005 creates it (including fixtures/events/NOTES.md).
