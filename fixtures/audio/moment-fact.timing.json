@@ -1,0 +1,151 @@
+{
+  "name": "moment-fact",
+  "sampleRate": 24000,
+  "durationMs": 112756,
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "A",
+      "startMs": 0,
+      "endMs": 4341
+    },
+    {
+      "index": 1,
+      "speaker": "B",
+      "startMs": 5041,
+      "endMs": 10045
+    },
+    {
+      "index": 2,
+      "speaker": "A",
+      "startMs": 10645,
+      "endMs": 13058
+    },
+    {
+      "index": 3,
+      "speaker": "B",
+      "startMs": 13858,
+      "endMs": 17573
+    },
+    {
+      "index": 4,
+      "speaker": "A",
+      "startMs": 18273,
+      "endMs": 19293
+    },
+    {
+      "index": 5,
+      "speaker": "B",
+      "startMs": 19793,
+      "endMs": 28520
+    },
+    {
+      "index": 6,
+      "speaker": "A",
+      "startMs": 30820,
+      "endMs": 33509
+    },
+    {
+      "index": 7,
+      "speaker": "B",
+      "startMs": 34209,
+      "endMs": 38564
+    },
+    {
+      "index": 8,
+      "speaker": "A",
+      "startMs": 39464,
+      "endMs": 42265
+    },
+    {
+      "index": 9,
+      "speaker": "B",
+      "startMs": 43065,
+      "endMs": 47018
+    },
+    {
+      "index": 10,
+      "speaker": "A",
+      "startMs": 48618,
+      "endMs": 53004
+    },
+    {
+      "index": 11,
+      "speaker": "B",
+      "startMs": 53704,
+      "endMs": 57711
+    },
+    {
+      "index": 12,
+      "speaker": "A",
+      "startMs": 58311,
+      "endMs": 60649
+    },
+    {
+      "index": 13,
+      "speaker": "B",
+      "startMs": 61449,
+      "endMs": 65547
+    },
+    {
+      "index": 14,
+      "speaker": "A",
+      "startMs": 66847,
+      "endMs": 71103
+    },
+    {
+      "index": 15,
+      "speaker": "B",
+      "startMs": 72003,
+      "endMs": 75603
+    },
+    {
+      "index": 16,
+      "speaker": "A",
+      "startMs": 76703,
+      "endMs": 80897
+    },
+    {
+      "index": 17,
+      "speaker": "B",
+      "startMs": 81697,
+      "endMs": 85195
+    },
+    {
+      "index": 18,
+      "speaker": "A",
+      "startMs": 86095,
+      "endMs": 89809
+    },
+    {
+      "index": 19,
+      "speaker": "B",
+      "startMs": 90509,
+      "endMs": 94941
+    },
+    {
+      "index": 20,
+      "speaker": "A",
+      "startMs": 95741,
+      "endMs": 98238
+    },
+    {
+      "index": 21,
+      "speaker": "B",
+      "startMs": 98838,
+      "endMs": 103539
+    },
+    {
+      "index": 22,
+      "speaker": "A",
+      "startMs": 104439,
+      "endMs": 108754
+    },
+    {
+      "index": 23,
+      "speaker": "B",
+      "startMs": 109754,
+      "endMs": 111956
+    }
+  ]
+}

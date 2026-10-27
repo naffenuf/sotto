@@ -73,6 +73,11 @@ file with one entry per line.
 | Fixture | Contents |
 |---|---|
 | `brainstorm` | Healthy discussion of a product idea: five points, one decision, one open question. No moments, no wake phrase — Sotto should stay quiet. |
+| `moment-contradiction` | A four thousand dollar budget set early, then a twenty thousand dollar design studio proposed for the same build (`interject`) |
+| `moment-fact` | A growth argument resting on "Instagram launched in 2014" — it launched in 2010 (`interject`) |
+| `moment-assumption` | Pricing built on "people will obviously pay monthly", never questioned (`glow`) |
+| `moment-dropped` | Grocery chains paying for the shopping nudge, raised, cut off, never returned to; later they get stuck on having one revenue line (`glow`) |
+| `moment-mixed` | Three minutes, two moments of different types (a demo-deadline contradiction and a nightly-photo assumption) with long stretches where Sotto should stay quiet |
 | `ask-search` | Pricing discussion containing "Sotto, what do the main competitors charge per month?" |
 | `ask-diagram` | User-flow walkthrough containing "Sotto, can you sketch the user flow we just described as a diagram?" |
 | `no-wake` | Wake-phrase look-alikes ("so to speak", "Soto's restaurant", "sotto voce"). No wake phrase, no moments. |

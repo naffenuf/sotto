@@ -1,0 +1,235 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "Alright, planning session. I've got the whiteboard and about an hour.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Hour's plenty. Do you want to start with scope or with the calendar?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Calendar, because the calendar isn't negotiable.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Okay. Demo day is the fifteenth, three weeks from Thursday. Whatever isn't working by then doesn't get shown. It's a hard wall.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "Three weeks. And there's no version where we get an extension?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "None. The room is booked, the judges are booked, and we're on at eleven.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "A",
+      "text": "Then let's work backwards from the fifteenth and see what fits.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Working backwards. So the last two days are rehearsal and nothing else.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Agreed, plus a day of slack, because something always breaks.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "So realistically we have about two and a half weeks of building.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "What's in the demo itself? Walk me through what the judges see.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "You photograph a real fridge we've stocked backstage, and three suggestions come up on the big screen.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "That's it? No settings, no history?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "That's it. One gesture, one result. Anything more is noise in a four minute slot.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "A",
+      "text": "I buy that. Okay, so here's how I want to sequence the work.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Go ahead.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "A",
+      "text": "We start with a two week user testing round, get twenty people photographing their own fridges, then we take four weeks to rebuild the suggestion engine around what we learn, and that's the version we demo.",
+      "pauseAfterMs": 2100
+    },
+    {
+      "speaker": "B",
+      "text": "And the testing round would be properly run, not just us asking friends?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Properly run. Recruited strangers, a script, actual notes.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "That would tell us more than anything we'd guess in this room.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "It's the only way I know to find out whether partial recognition is good enough.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "Let's park the sequencing and talk about suggestion quality.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Sure. My worry is it suggests things that are technically possible and nobody wants.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Rice and mustard and half an onion. Yes, I've had that output.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "So we need some notion of, would a human actually eat this.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Which is a ranking problem more than a recognition problem.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Right, and ranking we can fake with a decent prompt and a short list of blessed dishes.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "For a demo, absolutely. For a product, no.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "For the demo is all I'm claiming. Write it down as a cheat we pay back later.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "Noted. Now, retention. What makes somebody open this twice?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Honestly, the answer is dinner happens every night.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "People will take the photo every single night, it's five seconds, so daily use is just the baseline. We can plan all the streaks and the weekly summary on top of that.",
+      "pauseAfterMs": 2100
+    },
+    {
+      "speaker": "A",
+      "text": "And the weekly summary is where the leftover tracking finally pays off.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Exactly. You saved eleven dollars of food this week, that kind of thing.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "That's a nice number to see on a Sunday.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "Alright, back to the calendar. What are the three things that have to work on stage?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Camera to photo, photo to recognized items, items to three suggestions. Nothing else exists.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "And each one has a fallback if the venue wifi dies.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "A cached run of the exact fridge we're using. Feels like cheating, but everybody does it.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Everybody does it because venue wifi always dies. Let's build the fallback first.",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "A",
+      "text": "Deal. I'll take the camera path, you take recognition, and we sync Friday.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": [
+    {
+      "id": "demo-deadline-contradiction",
+      "type": "contradiction",
+      "setupLines": [
+        3,
+        5
+      ],
+      "triggerLine": 16,
+      "deadlineLine": 20,
+      "expectedLevel": "interject",
+      "description": "B fixes demo day at three weeks out and calls it a hard wall (lines 3 and 5). At line 16 A proposes a two week testing round followed by four weeks of rebuilding, six weeks of work, as the plan for the version they demo."
+    },
+    {
+      "id": "nightly-photo-assumption",
+      "type": "untested_assumption",
+      "setupLines": [
+        30
+      ],
+      "triggerLine": 31,
+      "deadlineLine": 34,
+      "expectedLevel": "glow",
+      "description": "At line 31 B treats photographing the fridge every single night as the baseline and plans streaks and a weekly summary on top of it. Nobody checks whether people will actually take a nightly photo, and the whole retention plan depends on it."
+    }
+  ]
+}

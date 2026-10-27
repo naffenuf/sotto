@@ -1,0 +1,136 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "Can we talk about growth for a minute? Because I keep planning for a slow burn and I'm not sure that's right.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "I don't think it has to be slow. A photo product can move fast if the first screenshot is good enough.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "The sharing loop does a lot of the work, that's true.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "It does all of the work, early on. Look at what happened with Instagram.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Go on.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "Instagram launched in 2014, and inside about two years they were past a hundred million users. One tap, one image, something nice comes back. That's the same shape as ours.",
+      "pauseAfterMs": 2300
+    },
+    {
+      "speaker": "A",
+      "text": "That's a pretty extreme comparison to hang our roadmap on.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Sure, but the mechanism is the mechanism. I'm not claiming we get their numbers.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "I'll give you the mechanism. I won't give you the curve.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Fine. Then let's plan for the mechanism and be pleasantly surprised.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "What would we even share, though? A photo of my fridge is not aspirational.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "No, you'd share the result. Here's the three things I could make out of what looked like nothing.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Oh, that's better. The before and after framing.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Right, empty fridge, decent dinner. That's a format people repeat.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "A",
+      "text": "Okay, I like that more than I expected to. Put it on the list as a maybe.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Not for version one though. Version one is still photo in, three suggestions out.",
+      "pauseAfterMs": 1100
+    },
+    {
+      "speaker": "A",
+      "text": "No, agreed, we're not building a feed. I just want to know the door exists.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "The door exists. We'd need maybe two days to make a shareable card.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "Two days is cheap. Alright, let's write it down and move on to onboarding.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Onboarding. My opinion is there shouldn't be any. Camera opens on first launch.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "No account, no tour, no permissions wall?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Camera permission, obviously. Beyond that, nothing. Take a photo, get a result.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "That I'm fully on board with. It's the fastest way to the thing that's actually good.",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "B",
+      "text": "Good. Then let's leave it there for today.",
+      "pauseAfterMs": 800
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": [
+    {
+      "id": "instagram-launch-year",
+      "type": "factual_error",
+      "setupLines": [1, 3],
+      "triggerLine": 5,
+      "deadlineLine": 9,
+      "expectedLevel": "interject",
+      "description": "B builds a growth argument on Instagram as the comparison (line 3) and at line 5 states confidently that Instagram launched in 2014. It launched in October 2010, which also undercuts the two-year curve B is quoting."
+    }
+  ]
+}

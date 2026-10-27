@@ -1,0 +1,146 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "Okay, before we design anything else, let's be honest with each other about money.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Agreed. I pulled the numbers last night and it's tighter than I was telling people.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "How tight?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "We have four thousand dollars for the whole first version. That's the entire budget. Design, build, hosting, all of it.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Four thousand. Okay. That's not nothing, but it isn't much either.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "It's what's left after the hardware. And there's nothing more coming until we can show somebody a working thing.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "So every decision from here has to fit inside four thousand dollars. Let's just say that out loud and mean it.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "That's how I'd frame it, yeah.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "Alright. What actually eats money? My guess is the recognition model.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Maybe eventually. But we could start with an off the shelf vision API and pay per call.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Which at our volume is basically free, because our volume is basically zero.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Ten users costs us pennies. Honestly, the API isn't the problem this year.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Good. So where does it actually hurt?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "The look of it, I think. It has to feel trustworthy, or nobody is going to photograph the inside of their fridge.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "That's fair. A sloppy interface reads as, this thing is probably going to get it wrong.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "And we are both engineers, so.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "So neither of us is going to make it beautiful. Yeah, I've accepted that.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "B",
+      "text": "So what do you want to do about it?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Here's my actual idea. There's that design studio my old coworker used. They'd do the whole thing, brand, every screen, a proper design system.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "And how much are we talking for that?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Twenty thousand, roughly. Maybe twenty-two with the brand work. I think we should just book them for the first version.",
+      "pauseAfterMs": 2200
+    },
+    {
+      "speaker": "B",
+      "text": "And we'd get the full set of screens out of that, not just a logo?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "The full set, plus a style guide we keep building against for years.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "That is a real option. I'd want to see their last two projects.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "I'd rather spend once and have it right than redo it three times badly.",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "B",
+      "text": "Let's sit with it for a day and pick it up tomorrow.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": [
+    {
+      "id": "budget-contradiction",
+      "type": "contradiction",
+      "setupLines": [3, 6],
+      "triggerLine": 20,
+      "deadlineLine": 24,
+      "expectedLevel": "interject",
+      "description": "B sets the entire first-version budget at four thousand dollars (line 3) and A agrees every decision has to fit inside it (line 6). At line 20 A proposes booking a twenty thousand dollar design studio for that same first version."
+    }
+  ]
+}

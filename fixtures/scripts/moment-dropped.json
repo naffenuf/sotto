@@ -1,0 +1,146 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "So the shopping nudge is the part I can't stop thinking about.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "The one ingredient away thing? Yeah, that's the line everyone repeats back to us.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Because it's useful at exactly the moment you're deciding what to do about dinner.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Right, you're standing there with the door open and we hand you a reason to go to the store.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Which, actually, hold on. A grocery chain would pay us for that. We are telling someone exactly what to buy and when. That's worth real money to them.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "Sorry, can I jump back? Before we go anywhere near that, I've got a problem with the photos that I think is bigger.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Go ahead.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "Half my fridge is behind a door shelf. You physically cannot see it in one photo. So what does the app think I have?",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "Hm. Mine's the same. There's a whole back row that's invisible.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "So either we ask for two photos, which is worse, or we accept that we only know part of it.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "A",
+      "text": "I'd accept partial. Partial is still better than a blank recipe search.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "It is, as long as we never pretend we saw everything.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "So the copy matters. Based on what I can see, here are three things.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Yes. That one word, see, does an enormous amount of work.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Okay, and then there's the lighting, which I suspect is worse than the occlusion.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Fridge light is horrible, yeah. Everything's slightly blue and there's a glare on every jar.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "We should collect a hundred real fridge photos before we trust any accuracy number.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "That I'll volunteer for. I'll ask around at the climbing gym.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "Good. So that's recognition. What's left on the list?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Money. And I'll be honest, this is the part where I get stuck every time.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Stuck how?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "We have exactly one way to make money, which is charging the user five dollars a month, and I don't think that covers the vision API at scale. I can't find a second source anywhere.",
+      "pauseAfterMs": 2300
+    },
+    {
+      "speaker": "A",
+      "text": "Yeah, it's thin. Everything else I think of is either ads, which would ruin it, or some enterprise thing that isn't us.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Ads inside someone's kitchen is genuinely grim. I'd rather charge more.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "So we're back to one revenue line and a cost that grows with usage.",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "B",
+      "text": "Which is not a great shape. Let's come back to it with fresh heads.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": [
+    {
+      "id": "grocery-partnership-dropped",
+      "type": "dropped_thread",
+      "setupLines": [4],
+      "triggerLine": 21,
+      "deadlineLine": 25,
+      "expectedLevel": "glow",
+      "description": "At line 4 A raises grocery chains paying for the shopping nudge, and B cuts in about photo occlusion before anyone responds; it never comes up again. At line 21 B says they are stuck with only one revenue line, which is exactly where the dropped idea applies."
+    }
+  ]
+}

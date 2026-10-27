@@ -1,0 +1,131 @@
+{
+  "lines": [
+    {
+      "speaker": "A",
+      "text": "Let's do pricing today. I want a number we can actually defend to somebody.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Five dollars a month. I've thought about it and I don't think we should overthink it.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Five a month. Why five specifically?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "It's under the line where anyone stops to think about it. It's coffee money.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "People will obviously pay monthly for something they open every single day. So five is fine, and we build the whole thing around the subscription.",
+      "pauseAfterMs": 2400
+    },
+    {
+      "speaker": "B",
+      "text": "Right. So then the only question is how many we need.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Two thousand subscribers and we're both covered. That's the whole business plan on one line.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Two thousand out of how many people who try it, though?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Call it three percent converting. So we need something like seventy thousand installs.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "B",
+      "text": "Seventy thousand. Okay. That's a real marketing problem, not a pricing problem.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "Which is kind of a relief, honestly. Marketing problems you can attack.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "B",
+      "text": "Let's talk about what's inside the subscription then. What's free and what isn't?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "My instinct is the first few photos are free, forever, no account needed.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "How many is a few?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "A",
+      "text": "Three a week? Enough to get the feeling, not enough to live on.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Three a week is generous. I'd have said three total.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Three total and you never learn whether it works on your actual fridge.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "Fair. Let's start generous and tighten it if the costs bite.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "Agreed. And the paid tier is unlimited photos plus the leftover tracking.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Leftover tracking being the thing nobody else does well.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "That's the bit I'd pay for myself, which is usually a decent sign.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "Alright. Five dollars, three free photos a week, leftovers behind the wall.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Write it down and let's look at it again after the prototype.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": [
+    {
+      "id": "monthly-willingness-assumption",
+      "type": "untested_assumption",
+      "setupLines": [1, 3],
+      "triggerLine": 4,
+      "deadlineLine": 8,
+      "expectedLevel": "glow",
+      "description": "B picks five dollars a month (line 1) and at line 4 A asserts that people will obviously pay monthly for a daily app, then builds the whole revenue plan on that. Nobody asks whether a cooking utility is a subscription people keep, and the plan is never tested."
+    }
+  ]
+}
