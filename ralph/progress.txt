@@ -208,3 +208,52 @@
   Checked: npm run typecheck, npm test (87 tests, 10 files — 11 new in
   server/asr/EventReplaySource.test.ts, 4 new clock tests), npm run fixtures:check (9 OK).
   No network calls added; nothing human-only is pending.
+
+[2026-10-27 12:58] US-009 — completed — Start/Stop a session from the header; one bus feeds /ws/events.
+  Working tree was clean on arrival; nothing to recover.
+  THE SHAPE EVERY LATER STORY PLUGS INTO:
+  - `server/events/bus.ts` — EventBus. `publish(ServerEvent)`, `subscribe(fn) => off`,
+    plus `setStatus(channel, state, detail?)` and `setSession(info|null)`. It REMEMBERS the
+    three statuses and the running session, so `snapshot()` is what a newly attached socket
+    gets; turns are deliberately not remembered (US-011's panel keeps its own list, US-010's
+    session folder writes them to disk). A listener that throws is logged and skipped.
+  - `server/session/SessionManager.ts` — owns the one running session. `start(source)` returns
+    SessionInfo or throws `SessionStartError` with the HTTP status the route should answer
+    (409 already running, 400 bad/missing fixture, 501 mic, 503 no MODEL_API_KEY); `stop()`
+    resolves true/false; `state()` is the current SessionInfo. Later stories hang off the bus,
+    not off this class.
+  - `shared/events.ts` is the server->browser union (`status` | `turn` | `session`), and
+    `shared/session.ts` the source union + zod schema + `describeSource`/`sourceSlug`.
+    `sourceSlug` is there for US-010's session folder names.
+  REPLAY VS LIVE: an `events` source gets its own `SimulatedClock(0)` (replay sets it to each
+  frame's recorded atMs) and needs no API key and no socket; `wav`/`mic` share the live path
+  through RealtimeTranscriptionClient on `liveClock`. SessionManager takes `replaySpeed`
+  ("1x" in the app, "max" in tests), `liveClock`, `wallClock` and `createAsrClient` so tests
+  stay off the network — FakeAsrClient in SessionManager.test.ts is the pattern.
+  DOT SEMANTICS (they are a UI contract now): server = the events socket is attached;
+  transcription = turns are arriving (connecting while the ASR socket opens, active on the
+  first frame, error with the reason on failure); model = a model client is CONFIGURED for
+  the running session, i.e. "ready", not "a call is in flight". US-014+ should push
+  "connecting" around real calls rather than redefining active.
+  MIC IS NOT WIRED (US-012): the schema accepts `{ kind: "mic" }`, the manager throws 501 and
+  the selector shows the option disabled, which is what US-009's criterion 4 asks for.
+  BUG FIXED ON THE WAY: `EventReplaySource.stop()` cancelled the 1x pacing timer without
+  resolving the promise `run()` was awaiting, so stopping a paced replay mid-wait hung
+  forever — POST /api/session/stop never returned. `endPace()` now cancels AND resolves;
+  regression test is "stops a paced replay that is already waiting out the next frame"
+  (the pre-existing stop test called stop() before any timer was armed, so it missed this).
+  TEST GOTCHA, COSTLY TO REDISCOVER: `app.injectWS()` silently delivers nothing unless
+  `await app.ready()` ran first, and the handler's snapshot goes out before the promise
+  resolves — so attach the message listener through `injectWS(path, undefined, { onInit })`,
+  not afterwards. An injected socket also never completes the closing handshake, so the
+  "unsubscribes on close" test uses a real ws client against `listen({ port: 0 })`.
+  Also: a `max`-speed replay finishes during the very `inject()` that started it, so the
+  409/stop route tests have to run at 1x.
+  Browser check: `npm run verify:ui` now drives the whole flow (select brainstorm replay ->
+  Start -> dots active and turns arriving -> Stop -> idle) and writes two screenshots,
+  `<path>.png` and `<path>-idle.png`. Run it through
+  `python3 ~/.claude/skills/webapp-testing/scripts/with_server.py --server "npm run dev"
+  --port 5173 -- node scripts/verify-ui.mjs /tmp/sotto-shots/us009.png`.
+  Checked: npm run typecheck, npm test (116 tests, 12 files), npm run fixtures:check (9 OK),
+  browser verification. No network calls added to the unit tests.
+  Nothing human-only is pending for this story.

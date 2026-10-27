@@ -160,8 +160,8 @@
         "Verify in browser using webapp-testing skill (Playwright screenshot)"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Source -> (realtime client for wav) -> TurnAssembler -> EventBus, in server/session/SessionManager.ts. Microphone is accepted by the schema and answers 501 ('not wired up yet (US-012)'); the selector shows it disabled, as criterion 4 asks. Verified in the browser with scripts/verify-ui.mjs: dots idle -> active on Start (and turns arriving over /ws/events) -> idle on Stop; screenshots /tmp/sotto-shots/us009*.png. Checked: typecheck, npm test (116), fixtures:check."
     },
     {
       "id": "US-010",

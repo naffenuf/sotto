@@ -137,3 +137,27 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   call reads back `now()` as the moment it was made. An untracked call gets raced past. The
   one rule: a tracked task must not await one of the same clock's timers — nothing moves time
   while `settle` waits, so that deadlocks.
+- **One bus, and it remembers.** `server/events/bus.ts` is the only thing the pipeline
+  publishes to; `/ws/events` sockets and (later) the session-folder writer subscribe. It folds
+  `status` and `session` events into remembered state so `snapshot()` catches a socket that
+  attached mid-session up, and deliberately does *not* remember turns. The status dots are a
+  UI contract, not debug output: `server` = the events socket is attached, `transcription` =
+  turns are arriving, `model` = a model client is **configured** for the running session
+  ("ready"), not "a call is in flight" — push `connecting` around real calls instead of
+  redefining `active`.
+- **`SessionManager` is where a source becomes a session**, and it takes its collaborators as
+  options (`replaySpeed`, `liveClock`, `wallClock`, `createAsrClient`) so unit tests never
+  reach the network — `FakeAsrClient` in its test is the pattern. `start()` throws
+  `SessionStartError` carrying the HTTP status the route should answer, so routes stay thin.
+  An `events` source gets its own `SimulatedClock(0)` and needs no API key; `wav` and `mic`
+  share the live path through `RealtimeTranscriptionClient`.
+- **Testing `/ws/events`.** `app.injectWS()` delivers nothing unless `await app.ready()` ran
+  first, and the handler's snapshot goes out *before* `injectWS` resolves — attach listeners
+  through `injectWS(path, undefined, { onInit })`, never afterwards. An injected socket never
+  completes the closing handshake either, so anything asserting on server-side `close` needs a
+  real `ws` client against `listen({ port: 0 })`. And a `max`-speed replay finishes inside the
+  very `inject()` that started it, so route tests about a *running* session must use `1x`.
+- **Cancelling a timer is not resolving a promise.** `EventReplaySource.stop()` used to clear
+  the 1x pacing timer and leave `run()` awaiting a promise nobody would ever resolve, so
+  `POST /api/session/stop` hung. Any `await new Promise(... setTimeout ...)` that something can
+  cancel must keep the `resolve` next to the cancel function and call both.
