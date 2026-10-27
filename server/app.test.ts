@@ -6,7 +6,8 @@ import type { FixtureListResponse } from "../shared/session.js";
 import { buildApp } from "./app.js";
 import { EventBus } from "./events/bus.js";
 import type { ReplaySpeed } from "./asr/EventReplaySource.js";
-import { SessionManager } from "./session/SessionManager.js";
+import { AUDIO_CHUNK_BYTES, type AudioEndReason, type AudioSource } from "./audio/AudioSource.js";
+import { SessionManager, type AsrClient } from "./session/SessionManager.js";
 
 let app: FastifyInstance | undefined;
 
@@ -24,8 +25,9 @@ const quiet = { log: () => {}, warn: () => {}, error: () => {} };
  */
 async function buildTestApp(
   options: { apiKey?: string; speed?: ReplaySpeed } = {},
-): Promise<{ app: FastifyInstance; bus: EventBus }> {
+): Promise<{ app: FastifyInstance; bus: EventBus; audio: FakeAsrClient }> {
   const bus = new EventBus(quiet);
+  const audio = new FakeAsrClient();
   const sessions = new SessionManager({
     bus,
     apiKey: options.apiKey ?? "test-key",
@@ -33,9 +35,35 @@ async function buildTestApp(
     // `npm test` writes no session folders; US-008 has its own tests for those.
     createStore: () => null,
     replaySpeed: options.speed ?? "max",
+    // A live source (`mic`, `wav`) must not reach the real API from here.
+    createAsrClient: () => audio,
   });
   app = await buildApp({ bus, sessions });
-  return { app, bus };
+  return { app, bus, audio };
+}
+
+/** Drains an audio source and counts its chunks, in place of the real client. */
+class FakeAsrClient implements AsrClient {
+  readonly chunks: Buffer[] = [];
+  endReason: AudioEndReason | undefined;
+  private source: AudioSource | undefined;
+
+  run(source: AudioSource): Promise<void> {
+    this.source = source;
+    return new Promise<void>((resolve) => {
+      source.start({
+        onChunk: (chunk) => this.chunks.push(Buffer.from(chunk)),
+        onEnd: (reason) => {
+          this.endReason = reason;
+          resolve();
+        },
+      });
+    });
+  }
+
+  stop(): void {
+    this.source?.stop();
+  }
 }
 
 describe("GET /api/health", () => {
@@ -114,14 +142,25 @@ describe("POST /api/session/start", () => {
     expect(second.statusCode).toBe(409);
   });
 
-  it("answers 501 for the microphone until US-012", async () => {
+  it("starts a microphone session", async () => {
     const { app: server } = await buildTestApp();
     const response = await server.inject({
       method: "POST",
       url: "/api/session/start",
       payload: { source: { kind: "mic" } },
     });
-    expect(response.statusCode).toBe(501);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ session: { source: { kind: "mic" } } });
+  });
+
+  it("answers 503 for a microphone with no API key configured", async () => {
+    const { app: server } = await buildTestApp({ apiKey: "" });
+    const response = await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "mic" } },
+    });
+    expect(response.statusCode).toBe(503);
   });
 });
 
@@ -185,6 +224,70 @@ describe("POST /api/session/speaker", () => {
       const response = await server.inject(rename(payload));
       expect(response.statusCode, JSON.stringify(payload)).toBe(400);
     }
+  });
+});
+
+describe("/ws/audio", () => {
+  /** Waits for something the socket causes on the other side of the server. */
+  async function waitFor(ready: () => boolean, what: string): Promise<void> {
+    for (let tries = 0; tries < 200; tries += 1) {
+      if (ready()) return;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    throw new Error(`timed out waiting for ${what}`);
+  }
+
+  it("feeds the running microphone session", async () => {
+    const { app: server, audio } = await buildTestApp();
+    await server.ready();
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "mic" } },
+    });
+
+    const socket = await server.injectWS("/ws/audio");
+    socket.send(Buffer.alloc(AUDIO_CHUNK_BYTES, 7));
+    await waitFor(() => audio.chunks.length === 1, "the chunk to reach the transcription client");
+    expect(audio.chunks[0]).toEqual(Buffer.alloc(AUDIO_CHUNK_BYTES, 7));
+    socket.close();
+  });
+
+  it("ends the session when the browser's socket closes", async () => {
+    // A real socket, because an injected one never completes the closing
+    // handshake and the server would never hear about it.
+    const { app: server, audio } = await buildTestApp();
+    const address = await server.listen({ host: "127.0.0.1", port: 0 });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "mic" } },
+    });
+
+    const client = new WebSocket(`${address.replace("http", "ws")}/ws/audio`);
+    await new Promise((resolve, reject) => {
+      client.on("open", resolve);
+      client.on("error", reject);
+    });
+    client.send(Buffer.alloc(AUDIO_CHUNK_BYTES, 3));
+    client.close();
+
+    await waitFor(() => audio.endReason !== undefined, "the input to end");
+    expect(audio.endReason).toBe("complete");
+    expect(audio.chunks).toHaveLength(1);
+  });
+
+  it("turns a socket away when no microphone session is running", async () => {
+    const { app: server } = await buildTestApp();
+    const address = await server.listen({ host: "127.0.0.1", port: 0 });
+    const client = new WebSocket(`${address.replace("http", "ws")}/ws/audio`);
+    const closed = await new Promise<{ code: number; reason: string }>((resolve) => {
+      client.on("close", (code: number, reason: Buffer) =>
+        resolve({ code, reason: reason.toString("utf8") }),
+      );
+    });
+    expect(closed.code).toBe(1008);
+    expect(closed.reason).toMatch(/start a microphone session first/);
   });
 });
 

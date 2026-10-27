@@ -14,6 +14,9 @@ import { EventBus } from "./events/bus.js";
 import { listFixtures } from "./fixtures.js";
 import { SessionManager, SessionStartError } from "./session/SessionManager.js";
 
+/** Close code for a socket that asked for something it may not have. */
+const WS_POLICY_VIOLATION = 1008;
+
 export interface AppOptions {
   /** Fastify logger setting; off by default so tests stay quiet. */
   logger?: boolean;
@@ -78,6 +81,30 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       } satisfies ApiError);
     }
     return { renamed: true, speakers: bus.speakerNames() } satisfies SpeakerRenameResponse;
+  });
+
+  // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,
+  // already converted by the browser. The session is started over HTTP first,
+  // so by the time this opens there is a `MicSource` waiting for it.
+  app.get("/ws/audio", { websocket: true }, (socket) => {
+    const mic = sessions.micInput();
+    if (mic === null) {
+      socket.close(WS_POLICY_VIOLATION, "start a microphone session first");
+      return;
+    }
+    if (!mic.attach()) {
+      socket.close(WS_POLICY_VIOLATION, "a microphone is already streaming into this session");
+      return;
+    }
+    socket.on("message", (data: Buffer, isBinary: boolean) => {
+      // Text on this socket is a bug in the client, not audio; ignore it
+      // rather than feeding JSON to the transcription API as samples.
+      if (isBinary) mic.write(data);
+    });
+    // A socket that drops ends the input, which flushes the last words out of
+    // the API and ends the session. Stopping from the UI closes it the same way.
+    socket.on("close", () => mic.endInput());
+    socket.on("error", () => mic.endInput());
   });
 
   // One socket per browser tab. Each one is caught up with the bus's

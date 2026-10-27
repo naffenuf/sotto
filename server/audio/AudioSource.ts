@@ -1,17 +1,18 @@
 /**
  * The one shape of audio that reaches the transcription client: PCM16 mono
- * 24 kHz, in 80 ms chunks. The mic (US-012) and WAV replay both produce it,
- * so everything downstream is written once.
+ * 24 kHz, in 80 ms chunks. The mic and WAV replay both produce it, so
+ * everything downstream is written once. The numbers themselves are in
+ * `shared/audio.ts`, because the browser's mic capture frames its messages by
+ * them too.
  */
+import type { AUDIO_SAMPLE_RATE } from "../../shared/audio.js";
 
-/** Meta's realtime transcription takes `PCM_24KHZ`; every source resamples to this. */
-export const AUDIO_SAMPLE_RATE = 24_000;
-/** Chunk length. Short enough to keep latency low, long enough to be cheap. */
-export const AUDIO_CHUNK_MS = 80;
-/** 80 ms at 24 kHz. */
-export const AUDIO_CHUNK_SAMPLES = (AUDIO_SAMPLE_RATE * AUDIO_CHUNK_MS) / 1000;
-/** 1,920 little-endian 16-bit samples. */
-export const AUDIO_CHUNK_BYTES = AUDIO_CHUNK_SAMPLES * 2;
+export {
+  AUDIO_CHUNK_BYTES,
+  AUDIO_CHUNK_MS,
+  AUDIO_CHUNK_SAMPLES,
+  AUDIO_SAMPLE_RATE,
+} from "../../shared/audio.js";
 
 /** Why a source stopped producing chunks. */
 export type AudioEndReason = "complete" | "stopped";

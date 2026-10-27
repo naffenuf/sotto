@@ -16,7 +16,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "capture": "tsx scripts/capture-events.ts",
     "fixtures:check": "tsx scripts/check-fixtures.ts",
-    "verify:ui": "node scripts/verify-ui.mjs"
+    "verify:ui": "node scripts/verify-ui.mjs",
+    "verify:mic": "node scripts/verify-mic.mjs"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",

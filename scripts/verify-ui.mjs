@@ -202,8 +202,8 @@ if (!options.some((o) => o.value === "wav:brainstorm")) problems.push("no WAV fi
 if (!options.some((o) => o.label?.includes("Replay events: brainstorm"))) {
   problems.push("no events replay option");
 }
-if (!options.some((o) => o.value === "mic" && o.disabled)) {
-  problems.push("microphone option is missing or not disabled");
+if (!options.some((o) => o.value === "mic" && !o.disabled)) {
+  problems.push("microphone option is missing or disabled");
 }
 if (idleDots.transcription !== "idle" || idleDots.model !== "idle") {
   problems.push(`dots were not idle before Start: ${JSON.stringify(idleDots)}`);

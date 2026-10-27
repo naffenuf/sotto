@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { ServerEvent, TurnEvent } from "../../shared/events.js";
-import type { AudioEndReason, AudioSink, AudioSource } from "../audio/AudioSource.js";
+import {
+  AUDIO_CHUNK_BYTES,
+  type AudioEndReason,
+  type AudioSink,
+  type AudioSource,
+} from "../audio/AudioSource.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
@@ -289,14 +294,72 @@ describe("SessionManager, live audio", () => {
     }
   });
 
-  it("does not pretend the microphone works yet", () => {
+  it("hands a microphone session a MicSource for /ws/audio to write into", async () => {
+    let client: FakeAsrClient | undefined;
+    const { sessions, events, ended } = harness({
+      apiKey: "test-key",
+      client: (made) => {
+        client = made;
+      },
+    });
+    const done = ended();
+
+    const info = sessions.start({ kind: "mic" });
+    expect(info.id).toBe("mic-1");
+    const mic = sessions.micInput();
+    expect(mic).not.toBeNull();
+    expect(events[1]).toEqual({
+      type: "status",
+      status: {
+        channel: "transcription",
+        state: "connecting",
+        detail: "waiting for the microphone",
+      },
+    });
+
+    // What the socket delivers reaches the transcription client as chunks.
+    mic?.attach();
+    mic?.write(Buffer.alloc(AUDIO_CHUNK_BYTES * 2));
+    expect(client?.chunks).toBe(2);
+
+    // The browser going away ends the input, and with it the session.
+    mic?.endInput();
+    await done;
+    expect(client?.endReason).toBe("complete");
+    expect(sessions.micInput()).toBeNull();
+  });
+
+  it("leaves the transcription dot down while a stopped session flushes", async () => {
+    let client: FakeAsrClient | undefined;
+    const { sessions, bus } = harness({
+      apiKey: "test-key",
+      client: (made) => {
+        client = made;
+      },
+    });
+    sessions.start({ kind: "mic" });
+    await sessions.stop();
+    expect(bus.status("transcription").state).toBe("idle");
+
+    // The API goes on sending for a moment after `endStream`.
+    client?.deliverTurn();
+    expect(bus.status("transcription").state).toBe("idle");
+  });
+
+  it("has no microphone to write into unless a mic session is running", () => {
     const { sessions } = harness({ apiKey: "test-key" });
+    expect(sessions.micInput()).toBeNull();
+    sessions.start({ kind: "events", fixture: "brainstorm" });
+    expect(sessions.micInput()).toBeNull();
+  });
+
+  it("will not start a microphone without an API key", () => {
+    const { sessions } = harness();
     try {
       sessions.start({ kind: "mic" });
-      expect.unreachable("mic should have thrown");
+      expect.unreachable("mic without a key should have thrown");
     } catch (error) {
-      expect((error as SessionStartError).status).toBe(501);
-      expect((error as Error).message).toContain("US-012");
+      expect((error as SessionStartError).status).toBe(503);
     }
   });
 

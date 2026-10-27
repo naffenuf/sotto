@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   FixtureListResponse,
   SessionSource,
@@ -13,6 +13,7 @@ import {
   startSession,
   stopSession,
 } from "./api.js";
+import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCapture.js";
 import { SessionControls, parseSourceValue, sourceValue } from "./SessionControls.js";
 import { StatusDots } from "./StatusDots.js";
 import { TranscriptPanel } from "./TranscriptPanel.js";
@@ -28,6 +29,13 @@ export function App() {
   const [selected, setSelected] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The microphone, while a `mic` session is running (US-012). */
+  const mic = useRef<MicCapture | null>(null);
+
+  const stopMic = useCallback(() => {
+    mic.current?.stop();
+    mic.current = null;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,21 +69,35 @@ export function App() {
     if (source === null) return;
     setProblem(null);
     setBusy(true);
-    void startSession(source)
-      .catch((error: unknown) =>
-        setProblem(error instanceof ApiCallError ? error.message : String(error)),
-      )
-      .finally(() => setBusy(false));
+    void (async () => {
+      // The permission prompt comes before the session: a microphone the user
+      // refuses should leave nothing running behind it.
+      let stream: MediaStream | null = null;
+      try {
+        if (source.kind === "mic") stream = await requestMicrophone();
+        await startSession(source);
+        // The server has its MicSource now, so `/ws/audio` has somewhere to land.
+        if (stream !== null) mic.current = await startMicCapture({ stream, onError: setProblem });
+      } catch (error) {
+        for (const track of stream?.getTracks() ?? []) track.stop();
+        setProblem(error instanceof Error ? error.message : String(error));
+      } finally {
+        setBusy(false);
+      }
+    })();
   }, [selected]);
 
   const onStop = useCallback(() => {
     setBusy(true);
+    // Let go of the microphone first, so the light goes out on the click
+    // rather than when the API has finished flushing.
+    stopMic();
     void stopSession()
       .catch((error: unknown) =>
         setProblem(error instanceof ApiCallError ? error.message : String(error)),
       )
       .finally(() => setBusy(false));
-  }, []);
+  }, [stopMic]);
 
   const onRenameSpeaker = useCallback((label: string, name: string | null) => {
     setProblem(null);
@@ -85,6 +107,15 @@ export function App() {
   }, []);
 
   const session = events.session;
+
+  // A session can also end on its own — the capture runs out, the stream
+  // fails — and the microphone must not stay on when it does.
+  useEffect(() => {
+    if (session === null) stopMic();
+  }, [session, stopMic]);
+
+  // And neither should navigating away.
+  useEffect(() => stopMic, [stopMic]);
 
   return (
     <div className="app">

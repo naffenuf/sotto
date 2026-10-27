@@ -1,5 +1,11 @@
 export type { ApiError, HealthResponse } from "./types.js";
 export {
+  AUDIO_CHUNK_BYTES,
+  AUDIO_CHUNK_MS,
+  AUDIO_CHUNK_SAMPLES,
+  AUDIO_SAMPLE_RATE,
+} from "./audio.js";
+export {
   AsrEventSchema,
   AsrFrameRecordSchema,
   SpeakerEventSchema,

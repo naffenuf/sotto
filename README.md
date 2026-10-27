@@ -44,3 +44,4 @@ cp .env.example .env    # then set MODEL_API_KEY to your Meta Model API key
 | `npm run test:integration` | Vitest tests that call the real Meta APIs. Skipped with a message if `MODEL_API_KEY` is missing |
 | `npm run fixtures:check` | Validates the fixture scripts in `fixtures/scripts/` against their rendered audio and timings |
 | `npm run verify:ui` | Playwright check of the running UI; writes a screenshot. Needs `npm run dev` already up |
+| `npm run verify:mic` | Playwright check of the microphone, with Chromium's fake capture device: a refused permission and a live session. Needs `npm run dev` already up |

@@ -38,7 +38,6 @@ export function SessionControls({
   onStart,
   onStop,
 }: SessionControlsProps) {
-  const micSelected = value === "mic";
   return (
     <div className="controls">
       <label className="controls__label" htmlFor="source">
@@ -58,10 +57,7 @@ export function SessionControls({
               {fixture}
             </option>
           ))}
-          {/* The mic lands in US-012; the option is here so the shape is visible. */}
-          <option value="mic" disabled>
-            Microphone (not yet)
-          </option>
+          <option value="mic">Microphone</option>
         </optgroup>
         <optgroup label="Captured events (replayed at 1x)">
           {fixtures.events.map((fixture) => (
@@ -75,7 +71,7 @@ export function SessionControls({
         type="button"
         className="controls__button"
         data-testid="start-session"
-        disabled={running || busy || micSelected || value === ""}
+        disabled={running || busy || value === ""}
         onClick={onStart}
       >
         Start

@@ -26,6 +26,7 @@ import {
 import { RealtimeTranscriptionClient } from "../asr/realtimeClient.js";
 import { TurnAssembler } from "../asr/turns.js";
 import type { AudioSource } from "../audio/AudioSource.js";
+import { MicSource } from "../audio/MicSource.js";
 import { WavReplaySource } from "../audio/WavReplaySource.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
@@ -94,7 +95,7 @@ export interface SessionManagerOptions {
  * Holds the session folder for the pipeline closures that write to it.
  *
  * It is a box rather than a plain value because the folder is only opened
- * once the source has been accepted — a start that answers 400 or 501 must
+ * once the source has been accepted — a start that answers 400 or 503 must
  * not leave an empty folder behind — while the closures that write to it are
  * built during that acceptance. Nothing writes before `start()` returns.
  */
@@ -106,6 +107,8 @@ interface RunningSession {
   info: SessionInfo;
   assembler: TurnAssembler;
   store: StoreSlot;
+  /** Where `/ws/audio` delivers, for a `mic` session; `undefined` otherwise. */
+  mic: MicSource | undefined;
   /** What the transcription dot shows once the session is published. */
   transcription: [state: StatusState, detail: string];
   /** Ends input: `endStream` for a live session, no more frames for a replay. */
@@ -146,6 +149,14 @@ export class SessionManager {
   /** The session that is running, or `null`. */
   state(): SessionInfo | null {
     return this.current?.info ?? null;
+  }
+
+  /**
+   * The running session's microphone input, for `/ws/audio` to write into.
+   * `null` unless a `mic` session is running.
+   */
+  micInput(): MicSource | null {
+    return this.current?.mic ?? null;
   }
 
   /**
@@ -232,6 +243,7 @@ export class SessionManager {
       info,
       assembler,
       store,
+      mic: undefined,
       transcription: ["active", `replaying ${fixture} events at ${this.replaySpeed}`],
       stop: () => source.stop(),
       // Not `assemblerSink`: a saved session records every raw frame first,
@@ -253,12 +265,6 @@ export class SessionManager {
     source: Extract<SessionSource, { kind: "wav" | "mic" }>,
     store: StoreSlot,
   ): RunningSession {
-    if (source.kind === "mic") {
-      throw new SessionStartError(
-        "microphone capture is not wired up yet (US-012); pick a fixture for now",
-        501,
-      );
-    }
     const apiKey = this.apiKey;
     if (apiKey === undefined || apiKey === "") {
       throw new SessionStartError(
@@ -267,14 +273,23 @@ export class SessionManager {
       );
     }
 
+    // The mic source exists before the browser dials `/ws/audio` — the page
+    // only opens that socket once this call has answered — so it buffers
+    // whatever arrives before the transcription socket is ready.
+    let mic: MicSource | undefined;
     let audio: AudioSource;
-    try {
-      audio = WavReplaySource.forFixture(source.fixture, this.liveClock);
-    } catch (error) {
-      throw new SessionStartError(
-        `cannot replay WAV fixture "${source.fixture}": ${message(error)}`,
-        400,
-      );
+    if (source.kind === "mic") {
+      mic = new MicSource();
+      audio = mic;
+    } else {
+      try {
+        audio = WavReplaySource.forFixture(source.fixture, this.liveClock);
+      } catch (error) {
+        throw new SessionStartError(
+          `cannot replay WAV fixture "${source.fixture}": ${message(error)}`,
+          400,
+        );
+      }
     }
 
     const assembler = this.assembler(this.liveClock, store);
@@ -282,12 +297,17 @@ export class SessionManager {
       apiKey,
       clock: this.liveClock,
       onFrame: (record) => {
-        // The first frame back is the proof the session is really up.
-        this.bus.setStatus(
-          "transcription",
-          "active",
-          `transcribing ${describeSource(info.source)}`,
-        );
+        // The first frame back is the proof the session is really up. A
+        // stopped session keeps receiving frames while the API flushes,
+        // though, and those must not light the dot again after the UI has
+        // been told the session is over.
+        if (this.current?.info.id === info.id) {
+          this.bus.setStatus(
+            "transcription",
+            "active",
+            `transcribing ${describeSource(info.source)}`,
+          );
+        }
         store.writer?.appendEvent(record);
         assembler.accept(record);
       },
@@ -298,7 +318,13 @@ export class SessionManager {
       info,
       assembler,
       store,
-      transcription: ["connecting", "opening transcription session"],
+      mic,
+      transcription: [
+        "connecting",
+        source.kind === "mic"
+          ? "waiting for the microphone"
+          : "opening transcription session",
+      ],
       stop: () => client.stop(),
       done: client.run(audio),
       stopRequested: false,
