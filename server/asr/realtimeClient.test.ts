@@ -156,6 +156,7 @@ function heldRetryClock(pending: Array<{ ms: number; fire: () => void }>): Clock
       pending.push({ ms, fire: fn });
       return () => {};
     },
+    track: systemClock.track,
   };
 }
 
@@ -167,6 +168,7 @@ function fastRetryClock(delays: number[]): Clock {
       delays.push(ms);
       return systemClock.setTimeout(fn, RETRY_BACKOFF_MS.includes(ms) ? 1 : ms);
     },
+    track: systemClock.track,
   };
 }
 

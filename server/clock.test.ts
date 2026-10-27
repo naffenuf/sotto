@@ -99,3 +99,69 @@ describe("SimulatedClock", () => {
     expect(() => clock.advanceTo(499)).toThrow(/backwards/);
   });
 });
+
+describe("tracked tasks", () => {
+  /** Resolves after the microtask queue has drained, so a pending `settle` can block. */
+  const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+  it("hands the work straight back on the system clock", async () => {
+    await expect(systemClock.track("noop", Promise.resolve(7))).resolves.toBe(7);
+  });
+
+  it("holds settle until in-flight work finishes, without moving time", async () => {
+    const clock = new SimulatedClock(1_000);
+    let release!: () => void;
+    const work = new Promise<string>((resolve) => {
+      release = () => resolve("done");
+    });
+
+    const tracked = clock.track("model", work);
+    expect(clock.inFlight()).toEqual(["model"]);
+
+    let settled = false;
+    const waiting = clock.settle().then(() => {
+      settled = true;
+    });
+    await flush();
+    expect(settled).toBe(false);
+    expect(clock.now()).toBe(1_000);
+
+    release();
+    await waiting;
+    expect(settled).toBe(true);
+    expect(clock.inFlight()).toEqual([]);
+    await expect(tracked).resolves.toBe("done");
+  });
+
+  it("waits for work that a tracked task starts", async () => {
+    const clock = new SimulatedClock();
+    const order: string[] = [];
+    clock.track(
+      "first",
+      Promise.resolve().then(() => {
+        order.push("first");
+        clock.track(
+          "second",
+          Promise.resolve().then(() => {
+            order.push("second");
+          }),
+        );
+      }),
+    );
+
+    await clock.settle();
+
+    expect(order).toEqual(["first", "second"]);
+    expect(clock.inFlight()).toEqual([]);
+  });
+
+  it("stops waiting for work that failed, and still reports the failure to its caller", async () => {
+    const clock = new SimulatedClock();
+    const tracked = clock.track("model", Promise.reject(new Error("API said no")));
+
+    await clock.settle();
+
+    expect(clock.inFlight()).toEqual([]);
+    await expect(tracked).rejects.toThrow("API said no");
+  });
+});
