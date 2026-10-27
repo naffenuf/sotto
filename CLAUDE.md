@@ -161,3 +161,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   the 1x pacing timer and leave `run()` awaiting a promise nobody would ever resolve, so
   `POST /api/session/stop` hung. Any `await new Promise(... setTimeout ...)` that something can
   cancel must keep the `resolve` next to the cancel function and call both.
+- **The session's timeline starts at 0, on both paths.** A frame's `atMs` is measured from the
+  start of the stream — `realtimeClient` subtracts its own `streamStartedAt`, and a replay sets
+  the clock to the capture's recorded `atMs` — so `TurnUpdate.startMs` is already an offset into
+  the session and the assembler is always built with `startedAtMs: 0`. `SessionInfo.startedAtMs`
+  is browser metadata, not that baseline; subtracting it from a turn is the bug this replaced.
+- **The session folder has one writer and a published contract.** `server/session/SessionStore.ts`
+  creates `sessions/<YYYY-MM-DD_HHMM>-<source>/` and its `SessionWriter` interface lists which
+  later story owns which file (`writeBoard` US-009, `appendCandidate` US-012–US-014,
+  `appendFeedback` US-015, `appendAnswer` US-018, `writeArtifact` US-020) — fill in your method
+  rather than adding a second writer, and spell file names through `SESSION_FILES`. Whole files
+  are temp-file-then-rename; the `.jsonl` logs keep an open fd. Every write is guarded and a
+  failure warns **once per file**: losing the recording beats losing the conversation.
+  `SessionManager` takes `createStore`, and unit tests pass `() => null` so `npm test` leaves no
+  folders behind.
+- **`now: () => Date` is the only calendar in the server.** The injected `Clock` is monotonic and
+  cannot name a date, so `SessionStore` takes a separate wall-clock function for folder names and
+  ISO stamps. Freeze it in tests with a Date built from **local** parts (`new Date(2026, 9, 27,
+  13, 4)`) — folder names are local time, so a UTC literal fails outside UTC.

@@ -180,8 +180,8 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done; all 10 criteria met (npm run typecheck, npm test: 134 tests / 13 files, npm run test:integration, npm run fixtures:check). server/session/SessionStore.ts implements the SessionWriter interface - that interface is the list of which later story owns which file. SessionManager takes a createStore factory so unit tests pass () => null and npm test leaves no folders behind; the integration test server/session/sessionFolder.integration.test.ts points it at a temp root. That test is in the integration suite because it runs the whole pipeline, not because it calls an API - an events replay needs no MODEL_API_KEY, so it runs either way. Fixed on the way: the assembler was given startedAtMs = liveClock.now() on the live path while frame atMs is measured from the start of the stream, so transcript offsets (and pauseState's silence origin, which US-012 needs) were off by the process uptime. Both paths now start at 0. Nothing human-only is pending."
     },
     {
       "id": "US-011",

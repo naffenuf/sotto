@@ -257,3 +257,48 @@
   Checked: npm run typecheck, npm test (116 tests, 12 files), npm run fixtures:check (9 OK),
   browser verification. No network calls added to the unit tests.
   Nothing human-only is pending for this story.
+
+[2026-10-27 17:30] US-010 — completed — Every session now writes sessions/<YYYY-MM-DD_HHMM>-<source>/.
+  ARRIVED DIRTY: a cut-off iteration had already written server/session/SessionStore.ts and the
+  SessionManager/bus/shared wiring for this exact story, and it typechecked and the suite was
+  green. Continued from it rather than restarting; what was missing was the tests (both suites)
+  and one timeline bug (below).
+  THE FOLDER, AND WHO OWNS WHAT:
+  - `server/session/SessionStore.ts`. `SessionStore.create(info, { root?, now?, logger? })` makes
+    `<root>/<YYYY-MM-DD_HHMM>-<slug>/` (`-2`, `-3`, … if that minute and source are taken) and
+    writes the first `session.json`. `SESSIONS_DIR` is the repo's `sessions/` (gitignored).
+  - The `SessionWriter` interface in that file is the contract: `appendEvent` (events.jsonl),
+    `appendTurn` (transcript.md, final turns only), `renameSpeaker`, `setSettings`, `writeBoard`
+    (US-009), `appendCandidate` (US-012–US-014), `appendFeedback` (US-015), `appendAnswer`
+    (US-018), `writeArtifact` (US-020), `end()`. A later story should fill in its method, not add
+    a second writer. `SESSION_FILES` spells every file name once.
+  - Whole files (session.json, transcript.md after a rename, the board) go temp-file-then-rename;
+    the append-only logs keep an open fd. Every write is guarded: a failure warns ONCE per file
+    and the session keeps going. Losing the recording beats losing the conversation.
+  - `now: () => Date` is the only place the server reads the calendar — the pipeline Clock is
+    monotonic and cannot name a date. Tests freeze it; build the frozen Date from LOCAL parts
+    (`new Date(2026, 9, 27, 13, 4)`), because folder names are local time and the suite has to
+    pass in any timezone.
+  WIRING: `SessionManager` takes `createStore?: (info) => SessionWriter | null`, defaulting to a
+  real `SessionStore`. Unit tests pass `() => null`, which is why `npm test` leaves no folders
+  behind — any new SessionManager test must do the same. The folder is opened AFTER the source is
+  accepted (a start that answers 400/501/503 leaves no empty folder) but before `start()` returns,
+  which is safe only because both `EventReplaySource.run` and the ASR client's `run` await before
+  delivering a frame. The `StoreSlot` box in SessionManager is what holds that order together.
+  `SessionManager.renameSpeaker(label, name)` exists and has no caller yet — US-011's chip is it.
+  BUG FIXED: the assembler was constructed with `startedAtMs: liveClock.now()` on the live path,
+  but frame `atMs` is measured from the START OF THE STREAM on both paths (realtimeClient
+  subtracts its own `streamStartedAt`; a replay sets the clock to the capture's `atMs`). So turn
+  `startMs` is already a session offset and the live baseline was off by the process uptime.
+  Both paths now pass `startedAtMs: 0`. US-012 depends on this: it is also what `pauseState`'s
+  silence origin was wrong by.
+  THE INTEGRATION TEST, AND WHY IT IS ONE: `server/session/sessionFolder.integration.test.ts`
+  replays brainstorm at `max` through SessionManager into a temp root and asserts transcript.md
+  has >= 10 well-formed lines in time order, session.json has `endedAt`, both speakers and one
+  asrSession, and events.jsonl matches the capture frame for frame. It is in the integration
+  suite because it runs the whole stack, NOT because it calls an API — it needs no MODEL_API_KEY
+  and runs with or without one. Real output eyeballed: 24 transcript lines, e.g.
+  `**[00:01] A:** Okay, so where do we want to start with this fridge app idea?`.
+  Checked: npm run typecheck, npm test (134 tests, 13 files), npm run test:integration (5 tests,
+  2 files — the Meta API reachability test ran too), npm run fixtures:check (9 OK).
+  No browser criterion in this story. Nothing human-only is pending.
