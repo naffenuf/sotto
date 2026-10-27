@@ -40,7 +40,7 @@ Every frame is a JSON text frame. No binary frames, and no `error` frames in any
 | `speaker` | `type`, `label`, `audioProcessedMs` | Diarization label (`A`, `B`). **No `turnId`.** |
 | `speechEnd` | `type`, `turnId`, `audioProcessedMs` | Closes the turn. |
 | `speechComplete` | `type`, `turnId`, `transcript`, `audioProcessedMs` | Final text for the turn. |
-| `audioProgress` | `type`, `audioProcessedMs` | One per 80 ms audio chunk, so ~12.5/s and 78.7% of the 14,574 frames captured here. The docs say `emitAudioProgress` is on by default and can be turned off at handshake; it is left on here so the captures show the stream exactly as it comes. |
+| `audioProgress` | `type`, `audioProcessedMs` | One per 80 ms audio chunk, so ~12.5/s and 78.7% of the 14,577 frames captured here. The docs say `emitAudioProgress` is on by default and can be turned off at handshake; it is left on here so the captures show the stream exactly as it comes. |
 
 `audioProcessedMs` is a position in the *audio*, not wall-clock: how much audio the
 server had consumed when it decided the thing the frame reports. `atMs` is when the
@@ -90,17 +90,20 @@ gap measured in audio time to within ~40 ms.
 
 The endpointer needs roughly half a second of silence before it emits `speechEnd`, and
 it reports the end of speech, not the start of the silence. The silence the API exposes
-between turns is therefore **~0.5 s shorter than the pause actually in the audio**:
-`brainstorm`'s longest scripted pause is 1,600 ms and the largest
-`speechEnd → speechStart` gap in its capture is **1,084 ms**.
+between turns is therefore **~0.5 s shorter than the pause actually in the audio**. Measured
+twice on the same `brainstorm` line, which makes the offset look like a constant rather than
+a ratio: a scripted `pauseAfterMs` of 1,600 ms surfaced as a 1,084 ms
+`speechEnd → speechStart` gap, and 2,400 ms on the same line surfaced as 1,944 ms — 456 ms
+and 516 ms of pause eaten. **Size pause thresholds against the captures, never against
+`pauseAfterMs`.**
 
-> **Heads-up for the turn assembler (US-006).** Its acceptance criterion wants
-> `pauseState` to report a pause of ≥ 1.5 s somewhere in `brainstorm`, and this capture
-> does not contain one — the longest silence is ~1.1 s. The fixtures that do
-> clear 1.5 s are listed in the table below. Fixing it on `brainstorm` means lengthening
-> one `pauseAfterMs` in `fixtures/scripts/brainstorm.json` to ≥ 2,100 ms, re-rendering
-> (`~/Developer/Chatterbox/venv/bin/python fixtures/make_fixture.py fixtures/scripts/brainstorm.json --device mps`,
-> ~8 min) and re-capturing (`npm run capture -- brainstorm`, 2 min).
+> **Why `brainstorm`'s last line pauses for 2,400 ms.** US-006's `pauseState` has to be
+> tested against a pause of ≥ 1.5 s, and the first cut of this fixture had none: its longest
+> scripted pause was 1,600 ms, which the endpointer shortened to 1,084 ms. US-006 lengthened
+> the `pauseAfterMs` after line 18 ("Decided then. Photo to three suggestions…") from 1,600 ms
+> to 2,400 ms — a beat after the decision, so the conversation reads the same — then
+> re-rendered and re-captured. The gap is now 1,944 ms. Nothing else about the fixture changed.
+> The other fixtures that clear 1.5 s on their own are marked in the table below.
 
 ## End of stream
 
@@ -120,7 +123,7 @@ mid-conversation.
 |---|---|---|---|---|---|---|
 | `ask-diagram` | 42.0 s | 684 | 11 | A/B | yes | 2,094 ms ✅ |
 | `ask-search` | 48.5 s | 772 | 11 | A/B | yes | 2,191 ms ✅ |
-| `brainstorm` | 120.1 s | 1913 | 24 | A/B | yes | 1,084 ms |
+| `brainstorm` | 120.9 s | 1916 | 24 | A/B | yes | 1,944 ms ✅ |
 | `moment-assumption` | 104.3 s | 1652 | 23 | A/B | yes | 1,850 ms ✅ |
 | `moment-contradiction` | 121.9 s | 1937 | 26 | A/B | yes | 934 ms |
 | `moment-dropped` | 127.8 s | 2034 | 26 | A/B | yes | 1,204 ms |

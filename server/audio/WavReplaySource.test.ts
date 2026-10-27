@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Clock } from "../clock.js";
+import { SimulatedClock } from "../clock.js";
 import {
   AUDIO_CHUNK_BYTES,
   AUDIO_CHUNK_MS,
@@ -60,29 +60,6 @@ function writeWav(name: string, sampleCount: number, options: WavOptions = {}): 
   const path = join(dir, `${name}.wav`);
   writeFileSync(path, Buffer.concat([header, data]));
   return path;
-}
-
-/** A clock whose time only moves when a scheduled timer is run. */
-function manualClock(): Clock & { runAll: () => void } {
-  let now = 0;
-  let next = 0;
-  const pending = new Map<number, { at: number; fn: () => void }>();
-  return {
-    now: () => now,
-    setTimeout(fn, ms) {
-      const id = next++;
-      pending.set(id, { at: now + ms, fn });
-      return () => pending.delete(id);
-    },
-    runAll() {
-      for (let guard = 0; pending.size > 0 && guard < 1_000_000; guard += 1) {
-        const [id, timer] = [...pending].sort((a, b) => a[1].at - b[1].at)[0]!;
-        pending.delete(id);
-        now = timer.at;
-        timer.fn();
-      }
-    },
-  };
 }
 
 interface Recording {
@@ -187,7 +164,7 @@ describe("WavReplaySource pacing", () => {
 describe("WavReplaySource chunks", () => {
   it("emits the file in order, in 3,840-byte chunks", () => {
     const path = writeWav("in-order", AUDIO_SAMPLE_RATE * 2);
-    const clock = manualClock();
+    const clock = new SimulatedClock();
     const source = new WavReplaySource(path, clock);
     const chunks: Buffer[] = [];
     source.start({ onChunk: (chunk) => chunks.push(chunk), onEnd: () => {} });
@@ -203,7 +180,7 @@ describe("WavReplaySource chunks", () => {
 
   it("pads a file that does not end on a chunk boundary with silence", () => {
     const path = writeWav("ragged", AUDIO_CHUNK_SAMPLES + 1);
-    const clock = manualClock();
+    const clock = new SimulatedClock();
     const source = new WavReplaySource(path, clock);
     const chunks: Buffer[] = [];
     let end: AudioEndReason | undefined;
@@ -221,7 +198,7 @@ describe("WavReplaySource chunks", () => {
 describe("WavReplaySource lifecycle", () => {
   it("ends with 'stopped' when stopped early", () => {
     const path = writeWav("stop-early", AUDIO_SAMPLE_RATE * 2);
-    const clock = manualClock();
+    const clock = new SimulatedClock();
     const source = new WavReplaySource(path, clock);
     const chunks: Buffer[] = [];
     const ends: AudioEndReason[] = [];
@@ -240,7 +217,7 @@ describe("WavReplaySource lifecycle", () => {
 
   it("ignores stop() after the stream has finished", () => {
     const path = writeWav("stop-late", AUDIO_SAMPLE_RATE);
-    const clock = manualClock();
+    const clock = new SimulatedClock();
     const source = new WavReplaySource(path, clock);
     const ends: AudioEndReason[] = [];
     source.start({ onChunk: () => {}, onEnd: (reason) => ends.push(reason) });
@@ -252,7 +229,7 @@ describe("WavReplaySource lifecycle", () => {
 
   it("refuses to start twice", () => {
     const path = writeWav("twice", AUDIO_SAMPLE_RATE);
-    const source = new WavReplaySource(path, manualClock());
+    const source = new WavReplaySource(path, new SimulatedClock());
     const sink = { onChunk: () => {}, onEnd: () => {} };
     source.start(sink);
     expect(() => source.start(sink)).toThrow(/already running/);
@@ -261,7 +238,7 @@ describe("WavReplaySource lifecycle", () => {
 
 describe("WavReplaySource.forFixture", () => {
   it("replays a rendered fixture from fixtures/audio/", () => {
-    const clock = manualClock();
+    const clock = new SimulatedClock();
     const source = WavReplaySource.forFixture("brainstorm", clock);
     let chunks = 0;
     let end: AudioEndReason | undefined;

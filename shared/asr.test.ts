@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAsrFrameRecords } from "./asr.js";
+import { asAsrEvent, parseAsrFrameRecords } from "./asr.js";
 
 const lines = [
   { atMs: 598.27, session: 0, frame: { sessionId: "voyager/duplex/ABC" } },
@@ -16,5 +16,32 @@ describe("parseAsrFrameRecords", () => {
   it("names the line that is not a frame record", () => {
     const jsonl = `${JSON.stringify(lines[0])}\n${JSON.stringify({ atMs: -1, session: 0, frame: {} })}\n`;
     expect(() => parseAsrFrameRecords(jsonl)).toThrow(/line 2/);
+  });
+});
+
+describe("asAsrEvent", () => {
+  it("narrows each of the five turn frames", () => {
+    const frames = [
+      { type: "speechStart", turnId: 3, audioProcessedMs: 60 },
+      { type: "transcript", transcript: " Okay, so", final: false, audioProcessedMs: 1440 },
+      { type: "speaker", label: "B", audioProcessedMs: 4160 },
+      { type: "speechEnd", turnId: 3, audioProcessedMs: 9820 },
+      { type: "speechComplete", turnId: 3, transcript: " Okay, so. ", audioProcessedMs: 9820 },
+    ];
+    for (const frame of frames) {
+      expect(asAsrEvent(frame)).toEqual({ event: frame });
+    }
+  });
+
+  it("returns null for frames that say nothing about turns", () => {
+    expect(asAsrEvent({ sessionId: "voyager/duplex/ABC" })).toBeNull();
+    expect(asAsrEvent({ type: "audioProgress", audioProcessedMs: 80 })).toBeNull();
+    expect(asAsrEvent({ raw: "<binary frame>" })).toBeNull();
+  });
+
+  it("reports a known frame type that does not match its shape", () => {
+    const narrowed = asAsrEvent({ type: "speechEnd", audioProcessedMs: 10 });
+    expect(narrowed).not.toBeNull();
+    expect(narrowed).toHaveProperty("error");
   });
 });

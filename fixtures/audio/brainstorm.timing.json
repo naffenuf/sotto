@@ -1,7 +1,7 @@
 {
   "name": "brainstorm",
   "sampleRate": 24000,
-  "durationMs": 120084,
+  "durationMs": 120884,
   "lines": [
     {
       "index": 0,
@@ -120,32 +120,32 @@
     {
       "index": 19,
       "speaker": "B",
-      "startMs": 96735,
-      "endMs": 101711
+      "startMs": 97535,
+      "endMs": 102511
     },
     {
       "index": 20,
       "speaker": "A",
-      "startMs": 102611,
-      "endMs": 109724
+      "startMs": 103411,
+      "endMs": 110524
     },
     {
       "index": 21,
       "speaker": "B",
-      "startMs": 110524,
-      "endMs": 114228
+      "startMs": 111324,
+      "endMs": 115028
     },
     {
       "index": 22,
       "speaker": "A",
-      "startMs": 114928,
-      "endMs": 118001
+      "startMs": 115728,
+      "endMs": 118801
     },
     {
       "index": 23,
       "speaker": "B",
-      "startMs": 118501,
-      "endMs": 119184
+      "startMs": 119301,
+      "endMs": 119984
     }
   ]
 }
