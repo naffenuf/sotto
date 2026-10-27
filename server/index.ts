@@ -3,8 +3,9 @@ import { HOST, loadConfig, MissingApiKeyError } from "./config.js";
 
 async function main(): Promise<void> {
   let port: number;
+  let modelApiKey: string;
   try {
-    ({ port } = loadConfig());
+    ({ port, modelApiKey } = loadConfig());
   } catch (error) {
     if (error instanceof MissingApiKeyError) {
       console.error(`sotto: ${error.message}`);
@@ -13,7 +14,7 @@ async function main(): Promise<void> {
     throw error;
   }
 
-  const app = await buildApp({ logger: true });
+  const app = await buildApp({ logger: true, apiKey: modelApiKey });
   await app.listen({ host: HOST, port });
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {

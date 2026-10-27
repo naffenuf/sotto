@@ -256,6 +256,24 @@ describe("EventReplaySource", () => {
     expect(source.sentFrames).toBeLessThan(source.frameCount);
   });
 
+  it("stops a paced replay that is already waiting out the next frame", async () => {
+    const clock = new SimulatedClock();
+    const source = EventReplaySource.forFixture("brainstorm", { clock, speed: "1x" });
+    const reasons: ReplayEndReason[] = [];
+    const run = source.run({
+      onFrame: () => {},
+      onEnd: (reason) => reasons.push(reason),
+    });
+    // Far enough in that the wait for the first frame is armed: cancelling
+    // that timer has to free the run as well, or `run()` never resolves.
+    await flush();
+    source.stop();
+    await run;
+
+    expect(reasons).toEqual(["stopped"]);
+    expect(source.sentFrames).toBeLessThan(source.frameCount);
+  });
+
   it("refuses to run twice at once", async () => {
     const source = new EventReplaySource(tinyCapture(), { clock: new SimulatedClock() });
     const sink: AsrFrameSink = { onFrame: () => {}, onEnd: () => {} };

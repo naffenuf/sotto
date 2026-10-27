@@ -1,4 +1,4 @@
-export type { HealthResponse } from "./types.js";
+export type { ApiError, HealthResponse } from "./types.js";
 export {
   AsrEventSchema,
   AsrFrameRecordSchema,
@@ -34,3 +34,28 @@ export type {
   WakeQuestion,
 } from "./fixtures.js";
 export type { PauseState, TurnUpdate } from "./turns.js";
+export { statusChannels, statusStates } from "./events.js";
+export type {
+  ServerEvent,
+  SessionEvent,
+  StatusChannel,
+  StatusEvent,
+  StatusState,
+  StatusUpdate,
+  TurnEvent,
+} from "./events.js";
+export {
+  SessionSourceSchema,
+  SessionStartRequestSchema,
+  describeSource,
+  sourceSlug,
+} from "./session.js";
+export type {
+  FixtureListResponse,
+  SessionInfo,
+  SessionSource,
+  SessionSourceKind,
+  SessionStartRequest,
+  SessionStartResponse,
+  SessionStopResponse,
+} from "./session.js";

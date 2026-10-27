@@ -91,7 +91,8 @@ export class EventReplaySource {
   private readonly wallClock: Clock;
   private running = false;
   private stopped = false;
-  private cancelPace: (() => void) | undefined;
+  /** The wait a `1x` replay is in the middle of: cancel its timer, free its promise. */
+  private pace: { cancel: () => void; resolve: () => void } | undefined;
   /** How many frames have been handed to the sink. */
   private sent = 0;
 
@@ -150,8 +151,9 @@ export class EventReplaySource {
    */
   stop(): void {
     this.stopped = true;
-    this.cancelPace?.();
-    this.cancelPace = undefined;
+    // Cancelling the timer is not enough: the run is awaiting that promise,
+    // so it has to be resolved or `run()` never returns.
+    this.endPace();
   }
 
   /**
@@ -166,23 +168,27 @@ export class EventReplaySource {
     const delay = atMs - (this.wallClock.now() - startedAt);
     if (delay <= 0) return;
     await new Promise<void>((resolve) => {
-      this.cancelPace = this.wallClock.setTimeout(() => {
-        this.cancelPace = undefined;
+      const cancel = this.wallClock.setTimeout(() => {
+        this.pace = undefined;
         resolve();
       }, delay);
+      this.pace = { cancel, resolve };
       // stop() landed between the check above and the timer being armed.
-      if (this.stopped) {
-        this.cancelPace?.();
-        this.cancelPace = undefined;
-        resolve();
-      }
+      if (this.stopped) this.endPace();
     });
+  }
+
+  /** Ends the current wait early, leaving no timer armed and nothing awaited. */
+  private endPace(): void {
+    const pace = this.pace;
+    this.pace = undefined;
+    pace?.cancel();
+    pace?.resolve();
   }
 
   private finish(sink: AsrFrameSink, reason: ReplayEndReason): void {
     this.running = false;
-    this.cancelPace?.();
-    this.cancelPace = undefined;
+    this.endPace();
     sink.onEnd(reason);
   }
 }
