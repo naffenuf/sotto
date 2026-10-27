@@ -377,3 +377,9 @@
   Chromium's fake device, which is a clean 48 kHz source; a real Mac mic may run the context at
   44.1 kHz (the resampler handles it, and there is a unit test for that ratio) and will be the
   first thing to produce actual speech through this path. Worth a human check at US-028.
+[2026-10-27 18:05] US-013 — completed — Board model, BoardOp union + strict JSON Schema (shared/board.ts), pure applyOps and board.md rendering (server/board/).
+  Working tree was clean at start; nothing to continue from.
+  For US-014: import { applyOps } from "../board/applyOps.js" and { renderBoardMarkdown } from "../board/markdown.js"; SessionStore.writeBoard(board, markdown) is already there and takes both.
+  The ops JSON Schema is boardOpsJsonSchema + BOARD_OPS_SCHEMA_NAME ("board_operations") in shared/board.ts; send it as response_format json_schema with strict: true, then validate the reply with BoardUpdateSchema.
+  No model client module exists yet (nothing outside server/api.integration.test.ts imports openai), so US-014 builds the first one; remember the reasoning-token budget note in CLAUDE.md and wrap the awaited call in clock.track.
+  applyOps reports ignored ops ({ op, reason, id? }) instead of throwing - US-014 should log those, which is the PRD's "unknown IDs are ignored and logged".

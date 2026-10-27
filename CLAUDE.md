@@ -230,3 +230,20 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
 - **`locator.textContent()` on a missing element waits out the whole 30 s default timeout.**
   Harmless in a replay check, thirty seconds of billed microphone in a live one — `await
   locator.count()` first when the element is *expected* to be absent.
+- **Zod cannot write a strict structured-output schema for you.** `z.toJSONSchema` emits `oneOf`
+  for a discriminated union and keeps `minItems`/`maxItems`/`maxLength` — all keywords strict
+  structured output rejects, which wants `anyOf`, every object `additionalProperties: false` with
+  *every* property in `required`, and no length constraints at all. So `boardOpsJsonSchema` in
+  `shared/board.ts` is written by hand next to `BoardOpSchema` (the zod union that validates the
+  reply), and `shared/board.test.ts` keeps the two honest: same op kinds in the same order, same
+  required fields per variant, closed objects, no unsupported keyword anywhere. Edit one and the
+  test tells you to edit the other. Limits the model should respect (12 words an item, two
+  sentences of summary) live in the schema's `description`s and in the prompt, never as keywords.
+- **The board changes by operation, and ids are forever.** `server/board/applyOps.ts` is pure —
+  it copies what it touches and returns `{ board, changedIds, summaryChanged, ignored }`. Each
+  section numbers from 1 behind its own prefix (`c`/`p`/`q`/`d`) and `nextId` counts past the
+  highest it ever handed out, so a dropped `p2` is never reborn as somebody else and a candidate
+  (US-012) can hold an item id across the session. Nothing is deleted; `status: "dropped"` is the
+  only way off the board, and `renderBoardMarkdown` leaves dropped items in `~~strikethrough~~`.
+  A bad operation never discards the good ones beside it: an unknown id, a blank text or a change
+  that changes nothing lands in `ignored` with a reason for the caller to log.
