@@ -5,6 +5,7 @@ import type { AudioEndReason, AudioSink, AudioSource } from "../audio/AudioSourc
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
+import type { SessionWriter } from "./SessionStore.js";
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
 
@@ -333,5 +334,60 @@ describe("SessionManager, live audio", () => {
     expect(bus.currentSession()).toBeNull();
     expect(sessions.state()).toBeNull();
     expect(failures).toHaveLength(1);
+  });
+});
+
+describe("SessionManager, speaker names", () => {
+  /** Records what reached the session folder, without touching the disk. */
+  function recordingWriter(): { renames: [string, string | null][]; writer: SessionWriter } {
+    const renames: [string, string | null][] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: (label: string, name: string | null) => renames.push([label, name]),
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      writeArtifact: () => "",
+      end: () => {},
+    } satisfies SessionWriter;
+    return { renames, writer };
+  }
+
+  it("sends a name to the bus and to the session folder", async () => {
+    const bus = new EventBus(quiet);
+    const { renames, writer } = recordingWriter();
+    const sessions = new SessionManager({
+      bus,
+      logger: quiet,
+      createStore: () => writer,
+      replaySpeed: "1x",
+      wallClock: instantWallClock(),
+    });
+
+    sessions.start({ kind: "events", fixture: "brainstorm" });
+    expect(sessions.renameSpeaker("A", " Craig ")).toBe(true);
+
+    expect(bus.speakerNames()).toEqual({ A: "Craig" });
+    expect(renames).toEqual([["A", " Craig "]]);
+    await sessions.stop();
+  });
+
+  it("still renames when the session has no folder", async () => {
+    const { sessions, bus } = harness();
+    sessions.start({ kind: "events", fixture: "brainstorm" });
+
+    expect(sessions.renameSpeaker("B", "Dana")).toBe(true);
+    expect(bus.speakerNames()).toEqual({ B: "Dana" });
+    await sessions.stop();
+  });
+
+  it("has nobody to name when no session is running", () => {
+    const { sessions, bus } = harness();
+    expect(sessions.renameSpeaker("A", "Craig")).toBe(false);
+    expect(bus.speakerNames()).toEqual({});
   });
 });

@@ -6,9 +6,16 @@ import type {
   StatusUpdate,
 } from "../../shared/index.js";
 import { describeSource } from "../../shared/index.js";
-import { ApiCallError, fetchFixtures, startSession, stopSession } from "./api.js";
+import {
+  ApiCallError,
+  fetchFixtures,
+  renameSpeaker,
+  startSession,
+  stopSession,
+} from "./api.js";
 import { SessionControls, parseSourceValue, sourceValue } from "./SessionControls.js";
 import { StatusDots } from "./StatusDots.js";
+import { TranscriptPanel } from "./TranscriptPanel.js";
 import { useServerStatus } from "./useServerStatus.js";
 import { useSessionEvents } from "./useSessionEvents.js";
 
@@ -70,6 +77,13 @@ export function App() {
       .finally(() => setBusy(false));
   }, []);
 
+  const onRenameSpeaker = useCallback((label: string, name: string | null) => {
+    setProblem(null);
+    void renameSpeaker(label, name).catch((error: unknown) =>
+      setProblem(error instanceof ApiCallError ? error.message : String(error)),
+    );
+  }, []);
+
   const session = events.session;
 
   return (
@@ -87,18 +101,28 @@ export function App() {
         />
         <StatusDots statuses={statuses} />
       </header>
-      <main className="stage">
-        {problem !== null && (
-          <p className="stage__problem" data-testid="session-problem" role="alert">
-            {problem}
+      <div className="layout">
+        {/* The board lands under the transcript in this column (US-009). */}
+        <aside className="sidebar">
+          <TranscriptPanel
+            turns={events.turns}
+            speakers={events.speakers}
+            onRename={onRenameSpeaker}
+          />
+        </aside>
+        <main className="stage">
+          {problem !== null && (
+            <p className="stage__problem" data-testid="session-problem" role="alert">
+              {problem}
+            </p>
+          )}
+          <p className="stage__hint" data-testid="session-state">
+            {session === null
+              ? "Sotto listens to a brainstorm and speaks up only when it matters."
+              : `Listening to ${describeSource(session.source)} — ${events.turnCount} turns so far.`}
           </p>
-        )}
-        <p className="stage__hint" data-testid="session-state">
-          {session === null
-            ? "Sotto listens to a brainstorm and speaks up only when it matters."
-            : `Listening to ${describeSource(session.source)} — ${events.turnCount} turns so far.`}
-        </p>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

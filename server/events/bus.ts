@@ -7,13 +7,16 @@
  * saves — every raw transcription frame, 78% of them `audioProgress` — is
  * exactly what the browser must not be sent.
  *
- * It remembers the state an event implies — the three status dots and the
- * running session — so a browser that attaches mid-session can be caught up
- * with {@link EventBus.snapshot} instead of asking.
+ * It remembers the state an event implies — the three status dots, the running
+ * session and the speaker names the user has given (US-007) — so a browser
+ * that attaches mid-session can be caught up with {@link EventBus.snapshot}
+ * instead of asking. Turns are deliberately not remembered: a transcript is
+ * the session folder's job, not the bus's.
  */
 import {
   statusChannels,
   type ServerEvent,
+  type SpeakerNames,
   type StatusChannel,
   type StatusState,
   type StatusUpdate,
@@ -38,6 +41,7 @@ export class EventBus {
   private readonly statuses = initialStatuses();
   private readonly logger: Logger;
   private session: SessionInfo | null = null;
+  private speakers: SpeakerNames = {};
 
   constructor(logger: Logger = console) {
     this.logger = logger;
@@ -50,7 +54,13 @@ export class EventBus {
    */
   publish(event: ServerEvent): void {
     if (event.type === "status") this.statuses[event.status.channel] = event.status;
-    if (event.type === "session") this.session = event.session;
+    if (event.type === "speakers") this.speakers = event.speakers;
+    if (event.type === "session") {
+      this.session = event.session;
+      // Diarization labels belong to one session, so the names do too; a
+      // listener clears its own on the same event.
+      this.speakers = {};
+    }
     for (const listener of [...this.listeners]) {
       try {
         listener(event);
@@ -75,6 +85,18 @@ export class EventBus {
     this.publish({ type: "session", session });
   }
 
+  /**
+   * Publishes the display name for one diarization label, or clears it with
+   * `null` or a blank name (US-007).
+   */
+  setSpeakerName(label: string, name: string | null): void {
+    const next = { ...this.speakers };
+    const display = name === null ? "" : name.trim();
+    if (display === "") delete next[label];
+    else next[label] = display;
+    this.publish({ type: "speakers", speakers: next });
+  }
+
   /** The events a newly attached listener needs to be up to date. */
   snapshot(): ServerEvent[] {
     return [
@@ -83,6 +105,7 @@ export class EventBus {
         status: this.statuses[channel],
       })),
       { type: "session", session: this.session },
+      { type: "speakers", speakers: this.speakers },
     ];
   }
 
@@ -94,6 +117,11 @@ export class EventBus {
   /** The running session, or `null`. */
   currentSession(): SessionInfo | null {
     return this.session;
+  }
+
+  /** The names given to diarization labels so far. */
+  speakerNames(): SpeakerNames {
+    return this.speakers;
   }
 
   /** Attaches a listener; call the returned function to detach it. */

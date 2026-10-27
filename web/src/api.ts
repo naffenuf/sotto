@@ -4,6 +4,7 @@ import type {
   SessionSource,
   SessionStartResponse,
   SessionStopResponse,
+  SpeakerRenameResponse,
 } from "../../shared/index.js";
 
 /** A route answered with a 4xx or 5xx; the message is meant to be shown. */
@@ -45,4 +46,9 @@ export function startSession(source: SessionSource): Promise<SessionStartRespons
 
 export function stopSession(): Promise<SessionStopResponse> {
   return call<SessionStopResponse>("/api/session/stop", {});
+}
+
+/** Names one diarization label for the running session; `null` clears it. */
+export function renameSpeaker(label: string, name: string | null): Promise<SpeakerRenameResponse> {
+  return call<SpeakerRenameResponse>("/api/session/speaker", { label, name });
 }

@@ -142,6 +142,52 @@ describe("POST /api/session/stop", () => {
   });
 });
 
+describe("POST /api/session/speaker", () => {
+  const rename = (payload: Record<string, unknown>) => ({
+    method: "POST" as const,
+    url: "/api/session/speaker",
+    payload,
+  });
+
+  it("names a label for the running session and pushes it to the bus", async () => {
+    const { app: server, bus } = await buildTestApp({ speed: "1x" });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "events", fixture: "brainstorm" } },
+    });
+
+    const named = await server.inject(rename({ label: "A", name: " Craig " }));
+    expect(named.statusCode).toBe(200);
+    expect(named.json()).toEqual({ renamed: true, speakers: { A: "Craig" } });
+    expect(bus.speakerNames()).toEqual({ A: "Craig" });
+
+    // `null` is how the UI goes back to the bare label.
+    const cleared = await server.inject(rename({ label: "A", name: null }));
+    expect(cleared.json()).toEqual({ renamed: true, speakers: {} });
+  });
+
+  it("answers 409 when no session is running", async () => {
+    const { app: server } = await buildTestApp();
+    const response = await server.inject(rename({ label: "A", name: "Craig" }));
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ error: string }>().error).toMatch(/no session is running/);
+  });
+
+  it("rejects a body that is not a name for a label", async () => {
+    const { app: server } = await buildTestApp({ speed: "1x" });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "events", fixture: "brainstorm" } },
+    });
+    for (const payload of [{}, { label: "" }, { label: "A" }, { label: "A", name: "x".repeat(41) }]) {
+      const response = await server.inject(rename(payload));
+      expect(response.statusCode, JSON.stringify(payload)).toBe(400);
+    }
+  });
+});
+
 describe("/ws/events", () => {
   /**
    * Opens a socket and starts reading before the server can speak. The
@@ -180,7 +226,7 @@ describe("/ws/events", () => {
     const { app: server, bus } = await buildTestApp();
     bus.setStatus("transcription", "active", "replaying brainstorm events at max");
 
-    const { socket, events } = await open(server, (seen) => seen.length === 4);
+    const { socket, events } = await open(server, (seen) => seen.length === 5);
     const snapshot = await events;
     socket.close();
 
@@ -197,15 +243,16 @@ describe("/ws/events", () => {
       // The model dot only claims to be ready while a session is running.
       { type: "status", status: { channel: "model", state: "idle" } },
       { type: "session", session: null },
+      { type: "speakers", speakers: {} },
     ]);
   });
 
   it("pushes turns and status changes while a session runs", async () => {
     const { app: server } = await buildTestApp();
-    // The four snapshot events, then the session's own, ending back at null.
+    // The five snapshot events, then the session's own, ending back at null.
     const { socket, events } = await open(server, (seen) => {
       const last = seen.at(-1);
-      return seen.length > 4 && last?.type === "session" && last.session === null;
+      return seen.length > 5 && last?.type === "session" && last.session === null;
     });
 
     await server.inject({

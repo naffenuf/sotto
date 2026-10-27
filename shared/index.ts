@@ -38,6 +38,8 @@ export { statusChannels, statusStates } from "./events.js";
 export type {
   ServerEvent,
   SessionEvent,
+  SpeakerNames,
+  SpeakersEvent,
   StatusChannel,
   StatusEvent,
   StatusState,
@@ -47,6 +49,7 @@ export type {
 export {
   SessionSourceSchema,
   SessionStartRequestSchema,
+  SpeakerRenameRequestSchema,
   describeSource,
   sourceSlug,
 } from "./session.js";
@@ -58,4 +61,6 @@ export type {
   SessionStartRequest,
   SessionStartResponse,
   SessionStopResponse,
+  SpeakerRenameRequest,
+  SpeakerRenameResponse,
 } from "./session.js";

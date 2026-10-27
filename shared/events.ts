@@ -49,6 +49,21 @@ export interface TurnEvent {
   turn: TurnUpdate;
 }
 
+/**
+ * The display names the user has given diarization labels (US-007).
+ *
+ * A label with no name is simply absent, so a reader falls back to the bare
+ * label. The whole map goes out on every change, which is also what a newly
+ * attached socket is caught up with.
+ */
+export type SpeakerNames = Readonly<Record<string, string>>;
+
+/** A speaker was named, or had its name cleared. */
+export interface SpeakersEvent {
+  type: "speakers";
+  speakers: SpeakerNames;
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -56,4 +71,4 @@ export interface SessionEvent {
 }
 
 /** Everything `/ws/events` sends. Narrow on `type`. */
-export type ServerEvent = StatusEvent | TurnEvent | SessionEvent;
+export type ServerEvent = StatusEvent | TurnEvent | SessionEvent | SpeakersEvent;

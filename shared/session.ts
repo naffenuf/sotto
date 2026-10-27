@@ -8,6 +8,7 @@
  * (`wav`, `mic`) or a capture replayed at 1x (`events`, US-006).
  */
 import { z } from "zod";
+import type { SpeakerNames } from "./events.js";
 
 /** Fixture names are file stems under `fixtures/`, never paths. */
 const FixtureNameSchema = z
@@ -57,6 +58,22 @@ export interface SessionInfo {
   source: SessionSource;
   /** Start time on the pipeline clock, which is 0 for a replay. */
   startedAtMs: number;
+}
+
+/**
+ * Body of `POST /api/session/speaker`: the display name for one diarization
+ * label (US-007). `null`, or anything blank, goes back to the bare label.
+ */
+export const SpeakerRenameRequestSchema = z.object({
+  label: z.string().trim().min(1).max(40),
+  name: z.string().max(40).nullable(),
+});
+export type SpeakerRenameRequest = z.infer<typeof SpeakerRenameRequestSchema>;
+
+/** Response to it: the names as they now stand for the running session. */
+export interface SpeakerRenameResponse {
+  renamed: boolean;
+  speakers: SpeakerNames;
 }
 
 /** Response to `POST /api/session/start`. */

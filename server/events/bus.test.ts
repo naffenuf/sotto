@@ -22,6 +22,7 @@ describe("EventBus", () => {
       { type: "status", status: { channel: "transcription", state: "idle" } },
       { type: "status", status: { channel: "model", state: "idle" } },
       { type: "session", session: null },
+      { type: "speakers", speakers: {} },
     ]);
   });
 
@@ -91,6 +92,7 @@ describe("EventBus", () => {
       },
       { type: "status", status: { channel: "model", state: "idle" } },
       { type: "session", session },
+      { type: "speakers", speakers: {} },
     ]);
     expect(bus.currentSession()).toEqual(session);
     expect(bus.status("transcription").state).toBe("active");
@@ -114,6 +116,32 @@ describe("EventBus", () => {
 
     expect(seen).toHaveLength(1);
     expect(bus.snapshot().some((event) => event.type === "turn")).toBe(false);
+  });
+
+  it("remembers speaker names, and forgets them with the session", () => {
+    const bus = new EventBus();
+    bus.setSession(session);
+    const seen = collect(bus);
+    bus.setSpeakerName("A", "  Craig  ");
+    bus.setSpeakerName("B", "Dana");
+
+    expect(seen).toEqual([
+      { type: "speakers", speakers: { A: "Craig" } },
+      { type: "speakers", speakers: { A: "Craig", B: "Dana" } },
+    ]);
+    expect(bus.speakerNames()).toEqual({ A: "Craig", B: "Dana" });
+    expect(bus.snapshot()).toContainEqual({
+      type: "speakers",
+      speakers: { A: "Craig", B: "Dana" },
+    });
+
+    // A blank name is how the UI goes back to the bare label.
+    bus.setSpeakerName("A", "   ");
+    expect(bus.speakerNames()).toEqual({ B: "Dana" });
+
+    // Labels belong to one session, so the next one starts nameless.
+    bus.setSession(null);
+    expect(bus.speakerNames()).toEqual({});
   });
 
   it("keeps going when a listener throws", () => {

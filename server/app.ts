@@ -4,9 +4,11 @@ import type { ApiError, HealthResponse } from "../shared/types.js";
 import type { ServerEvent } from "../shared/events.js";
 import {
   SessionStartRequestSchema,
+  SpeakerRenameRequestSchema,
   type FixtureListResponse,
   type SessionStartResponse,
   type SessionStopResponse,
+  type SpeakerRenameResponse,
 } from "../shared/session.js";
 import { EventBus } from "./events/bus.js";
 import { listFixtures } from "./fixtures.js";
@@ -59,6 +61,24 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.post("/api/session/stop", async (): Promise<SessionStopResponse> => ({
     stopped: await sessions.stop(),
   }));
+
+  // Naming a diarization label (US-007). The name is a property of the running
+  // session, so it goes to the bus (every attached browser) and to the session
+  // folder, which rewrites `transcript.md` with it.
+  app.post("/api/session/speaker", async (request, reply) => {
+    const parsed = SpeakerRenameRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: `not a speaker name: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
+      } satisfies ApiError);
+    }
+    if (!sessions.renameSpeaker(parsed.data.label, parsed.data.name)) {
+      return reply.code(409).send({
+        error: "no session is running; speakers can only be named while Sotto is listening",
+      } satisfies ApiError);
+    }
+    return { renamed: true, speakers: bus.speakerNames() } satisfies SpeakerRenameResponse;
+  });
 
   // One socket per browser tab. Each one is caught up with the bus's
   // remembered state first, then follows along.

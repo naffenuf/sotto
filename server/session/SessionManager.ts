@@ -337,15 +337,21 @@ export class SessionManager {
 
   /**
    * Gives one diarization label a display name for the running session, and
-   * `null` to go back to the bare label. Saved to the session folder, which
-   * rewrites `transcript.md` with it; false if no session is running.
+   * `null` to go back to the bare label. False if no session is running.
    *
-   * The transcript panel (US-007) is what calls this.
+   * The name goes two places: the bus, which is what the transcript panel
+   * (US-007) reads and what catches a reloaded browser up, and the session
+   * folder, which rewrites `transcript.md` with it. A session whose folder
+   * could not be opened still renames — the panel must not depend on the disk.
    */
   renameSpeaker(label: string, name: string | null): boolean {
-    const store = this.current?.store.writer;
-    if (store === undefined || store === null) return false;
-    store.renameSpeaker(label, name);
+    const running = this.current;
+    if (running === undefined) return false;
+    this.bus.setSpeakerName(label, name);
+    running.store.writer?.renameSpeaker(label, name);
+    this.logger.log(
+      `[session] ${running.info.id} speaker ${label} is now ${name === null || name.trim() === "" ? "unnamed" : name.trim()}`,
+    );
     return true;
   }
 
