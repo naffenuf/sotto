@@ -90,6 +90,7 @@ function harness(options: { apiKey?: string; client?: (c: FakeAsrClient) => void
     bus,
     apiKey: options.apiKey,
     logger: quiet,
+    createStore: () => null,
     replaySpeed: "max",
     wallClock: instantWallClock(),
     createAsrClient: ({ onFrame }) => {
@@ -233,6 +234,7 @@ describe("SessionManager, live audio", () => {
       bus,
       apiKey: "test-key",
       logger: quiet,
+      createStore: () => null,
       liveClock: clock,
       createAsrClient: ({ onFrame }) => {
         client = new FakeAsrClient(onFrame);
@@ -304,6 +306,7 @@ describe("SessionManager, live audio", () => {
       bus,
       apiKey: "test-key",
       logger: { ...quiet, error: (line: string) => failures.push(line) },
+      createStore: () => null,
       liveClock: new SimulatedClock(0),
       createAsrClient: () => ({
         run: () => Promise.reject(new Error("transcription closed with 1011")),

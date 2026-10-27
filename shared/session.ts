@@ -76,3 +76,37 @@ export interface FixtureListResponse {
   /** Fixtures with a captured event stream in `fixtures/events/`. */
   events: string[];
 }
+
+/**
+ * Whatever the user can change about a running session, saved to
+ * `session.json` so a replay of the folder can be read in context. Empty so
+ * far: `chattiness` (US-014) is the first setting that lands here.
+ */
+export type SessionSettings = Readonly<Record<string, string | number | boolean>>;
+
+/** One diarization label, and the display name the user gave it (US-007). */
+export interface SpeakerRecord {
+  name: string | null;
+}
+
+/**
+ * `session.json` in a session folder (US-008): the whole session as metadata,
+ * rewritten atomically on every change.
+ */
+export interface SessionRecord {
+  /** The {@link SessionInfo} id this folder belongs to. */
+  id: string;
+  /** Wall-clock ISO timestamp of the start. */
+  startedAt: string;
+  /** Wall-clock ISO timestamp of the end, or `null` while it runs. */
+  endedAt: string | null;
+  source: SessionSource;
+  /** Diarization labels met so far, in order of first appearance. */
+  speakers: Record<string, SpeakerRecord>;
+  /**
+   * `sessionId` of every realtime transcription session the conversation used
+   * — more than one only after a reconnect (`fixtures/events/NOTES.md`).
+   */
+  asrSessions: string[];
+  settings: SessionSettings;
+}

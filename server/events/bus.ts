@@ -1,7 +1,11 @@
 /**
- * The in-process event bus: one place the pipeline publishes to, and whatever
- * is listening (every `/ws/events` socket, and later the session folder
- * writer in US-008) reads from.
+ * The in-process event bus: one place the pipeline publishes to, and every
+ * `/ws/events` socket reads from.
+ *
+ * Only what the browser needs goes through here. The session folder (US-008)
+ * is fed by {@link SessionManager} directly instead, because most of what it
+ * saves — every raw transcription frame, 78% of them `audioProgress` — is
+ * exactly what the browser must not be sent.
  *
  * It remembers the state an event implies — the three status dots and the
  * running session — so a browser that attaches mid-session can be caught up

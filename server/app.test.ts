@@ -30,6 +30,8 @@ async function buildTestApp(
     bus,
     apiKey: options.apiKey ?? "test-key",
     logger: quiet,
+    // `npm test` writes no session folders; US-008 has its own tests for those.
+    createStore: () => null,
     replaySpeed: options.speed ?? "max",
   });
   app = await buildApp({ bus, sessions });
