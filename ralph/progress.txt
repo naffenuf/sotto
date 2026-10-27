@@ -339,3 +339,41 @@
   Checked: npm run typecheck, npm test (142 tests, 15 files), npm run fixtures:check (9 OK),
   browser verification (screenshots looked at). No network calls added to the unit tests.
   Nothing human-only is pending for this story.
+
+[2026-10-27 17:56] US-012 — completed — Browser microphone capture: worklet, resampler, /ws/audio, MicSource.
+  Arrived on a clean tree. Story is ralph US-012 = PRD US-003 part 2.
+  WHERE IT LIVES. Browser: `web/public/mic-worklet.js` (batches the audio thread's 128-sample
+  blocks into 80 ms frames and transfers them to the page — nothing else), `web/src/audio/
+  resample.ts` (pure: `Resampler` 48 kHz → 24 kHz and `toPcm16`/`pcm16ToBytes`) and
+  `web/src/audio/micCapture.ts` (getUserMedia, the graph, the socket). Server:
+  `server/audio/MicSource.ts` plus `SessionManager.micInput()` and the `/ws/audio` route in
+  `server/app.ts`. The audio constants moved to `shared/audio.ts`; `server/audio/AudioSource.ts`
+  re-exports them, so nothing else on the server changed.
+  THE WORKLET IS IN `web/public/` DELIBERATELY. `addModule` takes a URL, and a `?url` import of
+  a small `.js` gets inlined as a `data:` URL by Vite's `assetsInlineLimit` in a production
+  build, which worklets reject. `npm run build` was run to confirm `dist/web/mic-worklet.js`
+  ships. The worklet therefore has no imports, which is why the conversion is on the main thread.
+  ORDER OF OPERATIONS, AND WHY. The page asks for the microphone BEFORE `POST
+  /api/session/start`, so a refused prompt leaves no session running; the server builds the
+  `MicSource` during that POST, so by the time the page dials `/ws/audio` there is something to
+  write into (and it buffers up to a second anyway). Closing `/ws/audio` is `endInput()`: tail
+  zero-padded, source completes, `endStream` goes out. `attach()` keeps a second browser out.
+  BUG FOUND IN THE BROWSER, NOT IN THE TESTS: `startLive`'s `onFrame` pushed
+  `transcription: active` on every frame, and the API keeps sending for seconds after
+  `endStream` — so the dot came back up after Stop and the verify run hung. It now checks
+  `this.current?.info.id === info.id` first; `SessionManager.test.ts` has a test for it.
+  `npm test` NOW INCLUDES `web/src/**/*.test.ts` (one line in `vitest.config.ts`) so the
+  resampler is unit-tested in node: 48 kHz 1 kHz sine → exactly 24,000 samples, dominant
+  frequency within 15 Hz, identical in one block or in 128-sample blocks.
+  `npm run verify:mic` (new, documented in README) is the browser check: a refused-permission
+  context (`addInitScript` replacing `getUserMedia` with a `NotAllowedError`) and a live one on
+  Chromium's fake capture device, which is paced at real time — 6,400 ms of audio reached the
+  real API in 6.4 s of listening, proven by `audioProgress.audioProcessedMs` in the session
+  folder's `events.jsonl`. It costs a few seconds of live transcription per run.
+  Checked: npm run typecheck, npm test (163 tests, 16 files), npm run fixtures:check (9 OK),
+  npm run build, npm run verify:ui (still passes; the mic option is now enabled, 1,310 ms to
+  first text), npm run verify:mic (screenshots looked at).
+  PENDING, HUMAN ONLY: nobody has spoken into a real microphone. Everything was driven by
+  Chromium's fake device, which is a clean 48 kHz source; a real Mac mic may run the context at
+  44.1 kHz (the resampler handles it, and there is a unit test for that ratio) and will be the
+  first thing to produce actual speech through this path. Worth a human check at US-028.

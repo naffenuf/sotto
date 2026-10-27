@@ -214,8 +214,8 @@
         "Verify in browser using webapp-testing skill (Playwright with fake media stream flags --use-fake-device-for-media-stream --use-fake-ui-for-media-stream): starting a Microphone session shows the transcription status dot active"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Mic conversion lives in the page: web/public/mic-worklet.js batches raw blocks, web/src/audio/resample.ts (pure, unit-tested under npm test via the new web/src/**/*.test.ts include) resamples to 24 kHz PCM16, micCapture.ts sends AUDIO_CHUNK_BYTES messages over /ws/audio. Server: MicSource + SessionManager.micInput(). Checked: typecheck, npm test (163), fixtures:check (9), npm run build, npm run verify:ui, and npm run verify:mic against the real API \u2014 6,400 ms of browser audio reached it in 6.4 s, transcription dot active, refused permission shows the inline error and starts nothing. Verification uses Chromium's fake capture device; a real human microphone has not been tried."
     },
     {
       "id": "US-013",

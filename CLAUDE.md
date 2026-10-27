@@ -197,3 +197,36 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   fires no event and the button never appears. `npm run verify:ui` does this and now also
   measures US-007's three-second budget from the Start click (1,297 ms), the same number
   `server/session/transcriptLatency.test.ts` gets off the capture instantly (1.24 s).
+- **The microphone is three files and one rule: convert in the page, frame on the wire.**
+  `web/public/mic-worklet.js` only batches the raw Float32 blocks the audio thread hands it into
+  80 ms frames and transfers them to the page; `web/src/audio/resample.ts` (pure, unit-tested in
+  node — `npm test` now includes `web/src/**/*.test.ts`) does 48 kHz → 24 kHz and PCM16, and
+  `micCapture.ts` sends whole `AUDIO_CHUNK_BYTES` messages over `/ws/audio`. The worklet lives in
+  `web/public/` **on purpose**: `addModule` takes a URL, and a `?url` import of a small `.js`
+  would be inlined as a `data:` URL by Vite's `assetsInlineLimit` in a production build, which
+  worklets reject. It therefore has no imports of its own. The audio constants moved to
+  `shared/audio.ts` (re-exported by `server/audio/AudioSource.ts`) because both ends need them.
+  The resampler averages each output sample's slice of the input rather than decimating — exact
+  sample counts, no drift across blocks, and ~10 dB on what would otherwise alias into the voice.
+- **The mic session starts before the socket.** `POST /api/session/start {kind:"mic"}` builds the
+  `MicSource` (`SessionManager.micInput()`), and only then does the page dial `/ws/audio`, so the
+  source buffers up to a second of early audio and `attach()` keeps a second browser out. Closing
+  that socket is `endInput()`: the tail is zero-padded, the source completes, `endStream` goes out.
+  The page asks for the microphone **before** the session, so a refused prompt leaves nothing
+  running — `describeMicError` turns the `DOMException` *name* (never its message) into the line
+  the user reads.
+- **A stopped live session is still receiving frames.** The API flushes for up to 20 s after
+  `endStream`, and `startLive`'s `onFrame` used to push `transcription: active` on every one of
+  them — so the dot came back up seconds after Stop and never went down. Anything in a per-frame
+  callback that touches the bus has to check `this.current?.info.id === info.id` first.
+- **Chromium's fake capture device runs at real time.** Measured through the real worklet:
+  2,880 ms of audio in 3,000 ms of wall clock at a 48 kHz context, so `npm run verify:mic`
+  (`--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`) exercises the real pacing
+  and the real API. It proves the audio arrived by reading the session folder's `events.jsonl`:
+  `audioProgress.audioProcessedMs` is the API's own count of what it received. Its beep
+  transcribes as `" Sotto "`, which is funny and worth remembering before a wake-word test
+  believes it. Refused permission is tested in a separate context with an `addInitScript` that
+  replaces `getUserMedia` with a `NotAllowedError`.
+- **`locator.textContent()` on a missing element waits out the whole 30 s default timeout.**
+  Harmless in a replay check, thirty seconds of billed microphone in a live one — `await
+  locator.count()` first when the element is *expected* to be absent.
