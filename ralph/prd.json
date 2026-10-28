@@ -338,8 +338,8 @@
         "Typecheck passes"
       ],
       "priority": 19,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Pure rules in server/interject/policy.ts, the stateful half in InterjectionPolicy.ts. Decisions are a third kind in candidates.jsonl. Chattiness lives on the bus (snapshot is seven events now), is set by POST /api/session/settings and saved to session.json. Checked: typecheck, npm test (366), npm run test:integration (19), npm run build, and npm run verify:chattiness in a real browser."
     },
     {
       "id": "US-020",

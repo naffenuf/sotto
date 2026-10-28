@@ -573,3 +573,43 @@
   widening either.
   Checked: npm run typecheck, npm test (325 / 27 files), npm run test:integration (18 / 5 files),
   npm run build. Nothing human-only is pending.
+
+[2026-10-28 04:30] US-019 — completed — The interjection policy: what is worth saying, and when.
+  TWO FILES, AND THE SECOND ONE OWNS A TIMER. `server/interject/policy.ts` is pure — `decide()`
+  takes the moment, the `PauseState`, the chattiness and a `PolicyHistory` and answers
+  `silent | glow | interject | hold` with the reason, the score and the thresholds it used.
+  `server/interject/InterjectionPolicy.ts` holds the clock, the held candidates and the spent
+  interjects. The timer is the part that matters: after a `speechEnd` the only thing that makes
+  a pause deliverable is *time passing*, and the next turn snapshot is the next person starting
+  to talk — so a held candidate schedules `nextCheckDelay()` (the rest of the pause, the end of
+  the courtesy window, or its own 90-second expiry, whichever is soonest) and re-decides there.
+  Verified on a `SimulatedClock`: delivery lands at exactly silence + 1,500 ms.
+  EXPIRY COUNTS FROM THE POLICY, NOT THE OBSERVER. `seenAtMs` is when the policy first saw the
+  candidate, not `createdAtMs`: a `factual_error` spends 10–17 s being checked (US-018), and
+  that wait belongs to the verifier, not to the group.
+  THE LOG IS WRITTEN ON CHANGE. The policy re-decides on every turn snapshot, partials included,
+  so writing every verdict would put dozens of identical `hold` lines in `candidates.jsonl`.
+  `DecisionLogRecord` (the third `kind`, beside `candidate` and `verification`) is appended only
+  when decision+reason differ from the last one for that candidate. `flush()` at session end
+  takes the conversation's last pause (it really is one) and writes the rest down as
+  `silent`/`session_ended`, so nothing is unaccounted for. `cooldown` and `budget` deliver a
+  `glow` whose `level` is still `interject` — a downgrade, never a loss.
+  CHATTINESS IS THE SERVER'S. It lives on the `EventBus` — whose snapshot is now **seven**
+  events, so `app.test.ts` and `bus.test.ts` count to seven — is published as a `settings` event,
+  and is deliberately not cleared when a session starts. `POST /api/session/settings` works with
+  nothing running (the next session inherits it). `SessionSettings` is typed `{ chattiness }`
+  now, so `SessionStore` starts a folder at `defaultSettings()` and `SessionManager` overwrites
+  it with the live value as soon as the folder opens.
+  FOR US-020 (delivery, PRD US-015). `InterjectionPolicy.onDeliver` is the input: an
+  `Interjection` = `{ candidate, level, decision, atMs }`, where `level` is `glow` or
+  `interject` and the candidate already carries `evidence` quotes and (for a checked claim)
+  `citations`. `SessionManager.modelLoops()` passes `() => {}` for it. Feedback goes in
+  `feedback.jsonl` through `SessionWriter.appendFeedback`, which is still unused.
+  FOR US-024/US-025 (wake phrase, answers). The courtesy hooks are
+  `SessionManager.interjectionPolicy()?.wakePhraseDetected()` and `setAnswerThinking(true/false)`.
+  Both hold rather than drop, and whichever finishes releases what is waiting on the spot.
+  NEW CHECK: `npm run verify:chattiness` (scripts/verify-chattiness.mjs) drives the real page —
+  starts at `normal`, a reload after choosing `quiet` still reads `quiet` (so the server owns the
+  setting, not the tab), and `active` chosen mid-replay is in the folder's `session.json`.
+  Checked: npm run typecheck, npm test (366 / 29 files), npm run test:integration (19 / 5 files,
+  144 s), npm run build, npm run verify:chattiness. Nothing human-only is pending.

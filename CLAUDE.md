@@ -391,3 +391,36 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `verify` returns, so a `max`-speed replay still waits for all of them, and `flush()` loops
   until the set is empty (a check can start while it waits). `right`, `unclear` **and a check
   that failed** all stop: an unchecked claim must not be told to a group as an error.
+- **The policy is two files, and the second one owns a timer.** `server/interject/policy.ts` is
+  pure — `decide(input)` takes the moment, the `PauseState`, the chattiness and a `PolicyHistory`
+  and returns `silent | glow | interject | hold` with the reason, the score and the thresholds it
+  used — while `server/interject/InterjectionPolicy.ts` holds the clock, the held candidates and
+  the spent interjects. The timer is the load-bearing part: silence crossing the 1,500 ms
+  threshold and the five-second courtesy window after a wake phrase both change a decision with
+  *nothing arriving to say so*, and the next turn update after a `speechEnd` is the next person
+  starting to talk — exactly the moment Sotto must not speak. So a held candidate schedules
+  `nextCheckDelay()` (the soonest of: the rest of the pause, the end of the courtesy window, its
+  own 90-second expiry) and re-decides there. Expiry counts from when the **policy** first saw a
+  candidate, not from `createdAtMs`: a `factual_error` spends ten to fifteen seconds being
+  checked, and that wait is the verifier's, not the group's.
+- **A decision is logged when it changes, not when it is taken.** The policy re-decides on every
+  turn snapshot, partials included (a `speechEnd` arrives as one), so writing every verdict would
+  put forty identical `hold` lines in `candidates.jsonl` for one candidate. `DecisionLogRecord`
+  (the third `kind` in the file, beside `candidate` and `verification`) is only appended when
+  `decision`+`reason` differ from the last one written for that candidate: one `hold`, then
+  whatever became of it. `flush()` at the end of a session gives everything one last look — a
+  conversation ends in silence, so that last pause is real — and writes down whatever is still
+  waiting as `silent`/`session_ended`, so no candidate is unaccounted for. A downgrade is a
+  reason, not a loss: `cooldown` and `budget` both deliver a `glow` whose `level` is still
+  `interject`.
+- **Chattiness is the server's setting, not the tab's.** It lives on the `EventBus` (which now
+  snapshots **seven** events), is published as a `settings` event, and is deliberately *not*
+  cleared by a session starting — turning Sotto down is meant for the next conversation too.
+  `POST /api/session/settings` works with nothing running (the next session inherits it) and
+  answers with the settings as they stand; the header's `<select>` shows what came back rather
+  than what it clicked, so two tabs agree. `SessionSettings` is a typed `{ chattiness }` now, and
+  `SessionManager.setChattiness` pushes it to the running policy *and* to `session.json`.
+- **`SessionManager.interjectionPolicy()` is where the courtesy hooks attach.** Wake-phrase
+  detection (US-017) calls `wakePhraseDetected()` and the answer agent (US-018) brackets its work
+  with `setAnswerThinking(true/false)`; both make held candidates wait rather than dropping them,
+  and the one that finishes releases them on the spot.
