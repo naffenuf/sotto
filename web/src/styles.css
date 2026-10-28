@@ -296,6 +296,25 @@ body {
   color: var(--bad);
 }
 
+/* Somebody is mid-question to Sotto (US-017). Same three breathing dots as a
+   thinking card, because it is the same promise: an answer is coming. */
+.stage__listening {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 0.25rem;
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.9375rem;
+}
+
+.stage__listening-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.125rem;
+}
+
 /* ---- Board panel (US-010) ---- */
 
 .board {

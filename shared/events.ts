@@ -5,7 +5,8 @@
  * attached socket gets the events as JSON lines. A socket that attaches part
  * way through a session is caught up first with the bus's remembered state
  * (the three statuses, the running session, the speaker names, the board, the
- * settings and every card Sotto has put up), so the UI never has to poll.
+ * settings, whether somebody is addressing Sotto, and every card it has put
+ * up), so the UI never has to poll.
  */
 import type { TurnUpdate } from "./turns.js";
 import type { SessionInfo, SessionSettings } from "./session.js";
@@ -109,6 +110,20 @@ export interface CardEvent {
   card: StageCard;
 }
 
+/**
+ * Whether somebody is in the middle of addressing Sotto by name (US-017).
+ *
+ * It goes up on the *partial* turn that first matches the wake phrase — the
+ * question is still being asked — and down when that turn goes final, which
+ * is when the question itself is handed to the answer agent (US-018). A turn
+ * that stops matching as the speaker says more takes it down again, so
+ * "sotto voce" raises it for no longer than it takes to hear the next word.
+ */
+export interface WakeEvent {
+  type: "wake";
+  listening: boolean;
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -123,4 +138,5 @@ export type ServerEvent =
   | SpeakersEvent
   | BoardEvent
   | SettingsEvent
-  | CardEvent;
+  | CardEvent
+  | WakeEvent;

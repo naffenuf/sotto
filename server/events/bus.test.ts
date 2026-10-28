@@ -37,6 +37,7 @@ describe("EventBus", () => {
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
       { type: "settings", settings: { chattiness: "normal" } },
+      { type: "wake", listening: false },
     ]);
   });
 
@@ -127,6 +128,7 @@ describe("EventBus", () => {
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
       { type: "settings", settings: { chattiness: "normal" } },
+      { type: "wake", listening: false },
     ]);
     expect(bus.currentSession()).toEqual(session);
     expect(bus.status("transcription").state).toBe("active");
@@ -176,6 +178,23 @@ describe("EventBus", () => {
     // Labels belong to one session, so the next one starts nameless.
     bus.setSession(null);
     expect(bus.speakerNames()).toEqual({});
+  });
+
+  it("publishes the listening indicator only when it changes, and drops it with the session", () => {
+    const bus = new EventBus();
+    bus.setSession(session);
+    const seen = collect(bus);
+
+    bus.setListening(true);
+    bus.setListening(true);
+    expect(seen).toEqual([{ type: "wake", listening: true }]);
+    expect(bus.listeningState()).toBe(true);
+    expect(bus.snapshot()).toContainEqual({ type: "wake", listening: true });
+
+    // Nobody is mid-question across the end of a session.
+    bus.setSession(null);
+    expect(bus.listeningState()).toBe(false);
+    expect(bus.snapshot()).toContainEqual({ type: "wake", listening: false });
   });
 
   it("remembers the cards on the stage, one snapshot event each", () => {

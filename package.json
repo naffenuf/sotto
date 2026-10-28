@@ -21,6 +21,7 @@
     "verify:ui": "node scripts/verify-ui.mjs",
     "verify:cards": "node scripts/verify-cards.mjs",
     "verify:mic": "node scripts/verify-mic.mjs",
+    "verify:wake": "node scripts/verify-wake.mjs",
     "verify:chattiness": "node scripts/verify-chattiness.mjs",
     "verify:delivery": "node scripts/verify-delivery.mjs"
   },

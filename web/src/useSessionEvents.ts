@@ -71,6 +71,11 @@ export interface SessionEventsState {
   /** How many turns have gone final in this session. */
   turnCount: number;
   /**
+   * True while somebody is part way through addressing Sotto by name
+   * (US-017), which is what the "Sotto is listening…" indicator shows.
+   */
+  listening: boolean;
+  /**
    * The settings as the server holds them (US-014's chattiness). The header's
    * selector shows this rather than its own last click, so two tabs agree.
    */
@@ -93,12 +98,14 @@ const initial: SessionEventsState = {
   boardReceivedAtMs: 0,
   cards: [],
   turnCount: 0,
+  listening: false,
   settings: defaultSettings(),
 };
 
 /**
  * Follows `/ws/events`: the status dots, the running session, the turns, the
- * speaker names, the board, the settings and the cards on the stage.
+ * speaker names, the board, the settings, whether somebody is addressing
+ * Sotto by name, and the cards on the stage.
  *
  * The server sends its remembered state the moment the socket opens, so a
  * reload mid-session catches up without asking, and a dropped socket is
@@ -152,9 +159,11 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
       return { ...state, statuses: { ...state.statuses, [event.status.channel]: event.status } };
     case "session":
       // A new session starts over; the end of one leaves its transcript up to
-      // read. Diarization labels belong to a session, so the names go with it.
+      // read. Diarization labels belong to a session, so the names go with it,
+      // and nobody is mid-question across either boundary — which is also what
+      // takes the indicator down if a session ends while a turn is still open.
       return event.session === null
-        ? { ...state, session: null }
+        ? { ...state, session: null, listening: false }
         : {
             ...state,
             session: event.session,
@@ -166,9 +175,12 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
             boardReceivedAtMs: 0,
             cards: [],
             turnCount: 0,
+            listening: false,
           };
     case "speakers":
       return { ...state, speakers: event.speakers };
+    case "wake":
+      return { ...state, listening: event.listening };
     case "settings":
       return { ...state, settings: event.settings };
     case "turn":

@@ -190,11 +190,25 @@ export function App() {
           onQuoteClick={onQuoteClick}
           onFeedback={onFeedback}
           banner={
-            problem !== null ? (
-              <p className="stage__problem" data-testid="session-problem" role="alert">
-                {problem}
-              </p>
-            ) : undefined
+            <>
+              {/* Somebody has said Sotto's name and is still asking (US-017).
+                  It sits above the cards because the answer lands there. */}
+              {events.listening && (
+                <p className="stage__listening" data-testid="wake-listening" role="status">
+                  Sotto is listening
+                  <span className="stage__listening-dots" aria-hidden="true">
+                    <span className="card__dot" />
+                    <span className="card__dot" />
+                    <span className="card__dot" />
+                  </span>
+                </p>
+              )}
+              {problem !== null && (
+                <p className="stage__problem" data-testid="session-problem" role="alert">
+                  {problem}
+                </p>
+              )}
+            </>
           }
           placeholder={
             <p className="stage__hint" data-testid="session-state">

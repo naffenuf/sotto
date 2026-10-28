@@ -9,7 +9,8 @@
  *
  * It remembers the state an event implies — the three status dots, the running
  * session, the speaker names the user has given (US-007), the board (US-009),
- * the settings (US-014) and the cards Sotto has put on the stage (US-015) —
+ * the settings (US-014), whether somebody is addressing Sotto by name
+ * (US-017) and the cards Sotto has put on the stage (US-015) —
  * so a browser that attaches mid-session can be caught up with
  * {@link EventBus.snapshot} instead of asking. Turns are deliberately not
  * remembered: a transcript is the session folder's job, not the bus's. A card
@@ -63,6 +64,8 @@ export class EventBus {
   private board: BoardEvent = initialBoard();
   /** The cards put on the stage this session, oldest first (US-015). */
   private cards: StageCard[] = [];
+  /** True while a partial turn is addressing Sotto by name (US-017). */
+  private listening = false;
   /** Server-wide, not per session: the next session inherits what is set. */
   private settings: SessionSettings = defaultSettings();
 
@@ -81,8 +84,12 @@ export class EventBus {
     if (event.type === "board") this.board = event;
     if (event.type === "card") this.rememberCard(event.card);
     if (event.type === "settings") this.settings = event.settings;
+    if (event.type === "wake") this.listening = event.listening;
     if (event.type === "session") {
       this.session = event.session;
+      // Nobody is mid-question across the end of a session, whatever the
+      // last partial said.
+      this.listening = false;
       // Diarization labels belong to one session, so the names do too; a
       // listener clears its own on the same event.
       this.speakers = {};
@@ -128,6 +135,16 @@ export class EventBus {
     this.publish({ type: "settings", settings });
   }
 
+  /**
+   * Publishes whether somebody is in the middle of addressing Sotto by name
+   * (US-017), skipping it when nothing changed — the watcher only calls on a
+   * change, and this makes that a property of the bus rather than a promise.
+   */
+  setListening(listening: boolean): void {
+    if (listening === this.listening) return;
+    this.publish({ type: "wake", listening });
+  }
+
   /** Publishes the session that is now running, or `null` when it ends. */
   setSession(session: SessionInfo | null): void {
     this.publish({ type: "session", session });
@@ -156,6 +173,7 @@ export class EventBus {
       { type: "speakers", speakers: this.speakers },
       this.board,
       { type: "settings", settings: this.settings },
+      { type: "wake", listening: this.listening },
       // One event per card, in the order they went up, rather than a second
       // shape for "all of them": a browser folds each one in the same way it
       // folds a live arrival, and a session that has said nothing adds none.
@@ -181,6 +199,11 @@ export class EventBus {
   /** The settings as they now stand. */
   settingsState(): SessionSettings {
     return this.settings;
+  }
+
+  /** True while somebody is addressing Sotto by name. */
+  listeningState(): boolean {
+    return this.listening;
   }
 
   /** The cards on the stage, oldest first. */

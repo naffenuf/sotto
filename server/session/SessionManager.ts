@@ -50,6 +50,7 @@ import { InterjectionPolicy, type Interjection } from "../interject/Interjection
 import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
+import { WakeWatcher } from "../wakeWatcher.js";
 import { SessionStore, type SessionWriter } from "./SessionStore.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
@@ -396,7 +397,7 @@ export class SessionManager {
     // assembler is built from the loops, so the getter closes over the
     // `const` below. It is only ever called once `start()` has returned.
     const loops = this.modelLoops(info, clock, store, () => assembler.pauseState());
-    const assembler = this.assembler(clock, store, loops);
+    const assembler = this.assembler(info, clock, store, loops);
     let source: EventReplaySource;
     try {
       source = EventReplaySource.forFixture(fixture, {
@@ -476,7 +477,7 @@ export class SessionManager {
 
     // As in `startReplay`: the pause getter reads the assembler built below.
     const loops = this.modelLoops(info, this.liveClock, store, () => assembler.pauseState());
-    const assembler = this.assembler(this.liveClock, store, loops);
+    const assembler = this.assembler(info, this.liveClock, store, loops);
     const client = this.createAsrClient({
       apiKey,
       clock: this.liveClock,
@@ -518,7 +519,13 @@ export class SessionManager {
     };
   }
 
-  private assembler(clock: Clock, store: StoreSlot, loops: ModelLoops): TurnAssembler {
+  private assembler(
+    info: SessionInfo,
+    clock: Clock,
+    store: StoreSlot,
+    loops: ModelLoops,
+  ): TurnAssembler {
+    const wake = this.wakeWatcher(info, loops);
     return new TurnAssembler({
       clock,
       // Frame times are measured from the start of the stream on both paths —
@@ -536,6 +543,42 @@ export class SessionManager {
         // The policy is the one that wants the partials too: a `speechEnd`
         // arrives as one, and it is what opens a pause (US-014).
         loops.policy?.acceptTurn(turn);
+        // And so does the wake phrase: the indicator is the point of reading
+        // a partial at all (US-017).
+        wake.acceptTurn(turn);
+      },
+    });
+  }
+
+  /**
+   * Watches the turns for somebody addressing Sotto by name (US-017).
+   *
+   * It exists whether or not there is a model client, because the indicator
+   * and the courtesy hook are not model work: a session with no key still
+   * shows that it heard its name and still holds its (nonexistent)
+   * interjections out of the way. The question itself is what US-018 answers.
+   */
+  private wakeWatcher(info: SessionInfo, loops: ModelLoops): WakeWatcher {
+    const current = (): boolean => this.current?.info.id === info.id;
+    return new WakeWatcher({
+      onListening: (listening) => {
+        // As with the transcription dot: a frame that lands after Stop must
+        // not put the indicator back up. The bus takes it down on the
+        // `session` event either way.
+        if (!current()) return;
+        this.bus.setListening(listening);
+        // Whoever is talking to Sotto has the floor for the courtesy window,
+        // from the moment they start asking rather than when they finish.
+        if (listening) loops.policy?.wakePhraseDetected();
+      },
+      onQuestion: (trigger) => {
+        if (!current()) return;
+        // Asking again refreshes the window; the answer agent (US-018) takes
+        // it from here and brackets its own work with `setAnswerThinking`.
+        loops.policy?.wakePhraseDetected();
+        this.logger.log(
+          `[wake] ${info.id} ${trigger.turnId} asked: ${trigger.question}`,
+        );
       },
     });
   }

@@ -80,6 +80,7 @@ export type {
   StatusState,
   StatusUpdate,
   TurnEvent,
+  WakeEvent,
 } from "./events.js";
 export { FeedbackRequestSchema, feedbackVerdicts } from "./feedback.js";
 export type {

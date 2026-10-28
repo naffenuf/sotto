@@ -484,7 +484,7 @@ describe("/ws/events", () => {
     const { app: server, bus } = await buildTestApp();
     bus.setStatus("transcription", "active", "replaying brainstorm events at max");
 
-    const { socket, events } = await open(server, (seen) => seen.length === 7);
+    const { socket, events } = await open(server, (seen) => seen.length === 8);
     const snapshot = await events;
     socket.close();
 
@@ -506,6 +506,8 @@ describe("/ws/events", () => {
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
       // And Sotto is as talkative as it comes (US-014).
       { type: "settings", settings: { chattiness: "normal" } },
+      // Nobody has said its name (US-017).
+      { type: "wake", listening: false },
     ]);
   });
 
