@@ -423,3 +423,35 @@
   *starts*, not when one ends, so a finished board stays on screen. The spinner the panel wants
   is the `model` dot's `connecting` state.
   Nothing human-only is pending.
+
+[2026-10-27 22:52] US-015 — completed — Board panel under the transcript: sections, item states, dropped toggle, 3 s highlight fade, "updated Ns ago" plus spinner.
+  WHAT I BUILT. `web/src/BoardPanel.tsx` (the component), `web/src/boardView.ts` +
+  `boardView.test.ts` (the pure part — section titles, `visibleItems`, `droppedCount`,
+  `boardIsEmpty`, `formatAgo` — in node, the way `audio/resample.ts` is), board styles in
+  `styles.css`, and the panel wired into `App.tsx`'s sidebar. 226 unit tests pass.
+  THE FRESHNESS LINE NEEDED A NEW FIELD. `boardUpdatedAtMs` is on the session clock — an
+  offset into the conversation — so it cannot answer "12s ago"; a `max`-speed replay runs it
+  far ahead of the wall. `useSessionEvents` now also keeps `boardReceivedAtMs` (`Date.now()`
+  when the event landed). The catch: the bus opens *every* socket with a board event, empty
+  and `updatedAtMs: 0`, so the hook only stamps an arrival when `updatedAtMs !== 0` —
+  otherwise the panel read "updated just now" before anything had ever run. verify:ui caught
+  exactly that.
+  THE SPINNER IS THE MODEL DOT. `BoardUpdater.onModelState` pushes `connecting` for exactly
+  the duration of a board call, so `statuses.model.state === "connecting"` is the panel's
+  `updating` prop. No new event type.
+  HOW THE FADE IS DONE. `data-changed="true"` is applied instantly with `transition: none`
+  and removed 3 s later, falling back to `transition: background-color 3s` — so adding the
+  highlight is instant and taking it away is the fade. The ids come from a `useEffect` keyed
+  on `updatedAt`, not on `changedIds`, because two updates in a row can touch the same items
+  and the second must still light them.
+  VERIFYING WHAT THE MODEL WON'T RELIABLY PRODUCE. `npm run verify:ui` now has a second page
+  with `/ws/events` mocked through Playwright's `page.routeWebSocket`, fed a crafted board
+  with an open, a covered and a dropped item. That is what checks the ☐/☑ glyphs, the
+  strike-through, the "show dropped (1)" toggle, the exact set of highlighted ids and
+  `transitionDuration === "3s"`. The live brainstorm replay still checks the real path:
+  spinner seen, highlight seen, a filled board with a summary. Both pass; screenshots at
+  /tmp/sotto-shots/us015*.png and looked at.
+  Nothing human-only is pending.
+  FOR US-016 (stage layout and Card): the layout grid and the sidebar split already exist
+  (`.layout` 25%/75%, transcript `flex: 1 1 55%` / board `flex: 1 1 45%`); the stage is still
+  the one-line hint in `App.tsx`. The dark palette is in `:root` in `styles.css`.

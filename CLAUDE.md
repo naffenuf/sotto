@@ -277,3 +277,25 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   them. Give the window **~1,500 ms of slack each side**: the API reports a turn's position in
   the audio but its endpointer trims about half a second off each end of a line, so a turn never
   sits inside its scripted line exactly.
+- **React's StrictMode means a page has more than one `/ws/events` socket in dev.** The effect
+  mounts, cleans up (closing socket A), and mounts again (socket B); A's `close` then fires
+  *after* the second mount has reset `closed.current`, so it schedules a reconnect too. Harmless
+  for the app — every event is idempotent — but a Playwright `page.routeWebSocket` mock that
+  grabs the first routed socket is talking to a corpse. Collect the routed sockets, drop them on
+  `onClose`, give the churn ~3 s to settle, and send to all that are left. That mock is how
+  `npm run verify:ui` checks the UI states a model will not reliably produce (a dropped board
+  item, a covered one) without faking the component.
+- **The bus greets every socket with a board, and an empty one is not an update.** `snapshot()`
+  always includes a `board` event; before the first real update it carries `emptyBoard()` and
+  `updatedAtMs: 0`. Anything in the browser that reacts to "the board changed" — the panel's
+  "updated 12s ago" line keys off `boardReceivedAtMs` — has to treat `updatedAtMs === 0` as
+  "there has not been one" rather than as an arrival.
+- **The board panel's clock is the browser's, not the session's.** `TurnUpdate.startMs` and
+  `BoardEvent.updatedAtMs` are offsets into the conversation, so they cannot say how long ago
+  anything was; a `max`-speed replay runs them far ahead of the wall. `useSessionEvents` stamps
+  `boardReceivedAtMs` with `Date.now()` instead. The "never `Date.now()`" convention is about
+  the *server*'s injected `Clock`; the browser has no such clock and needs none.
+- **The spinner already exists — it is the `model` dot.** `BoardUpdater.onModelState` pushes
+  `connecting` for exactly the duration of a board call, so `statuses.model.state ===
+  "connecting"` is the board panel's in-flight state. Later queues (observer, answers) should
+  push the same channel rather than inventing a second one.
