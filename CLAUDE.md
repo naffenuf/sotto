@@ -247,3 +247,33 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   only way off the board, and `renderBoardMarkdown` leaves dropped items in `~~strikethrough~~`.
   A bad operation never discards the good ones beside it: an unknown id, a blank text or a change
   that changes nothing lands in `ignored` with a reason for the caller to log.
+- **Every model call goes through one seam, and the prompt is a file.** `ModelClient.structured`
+  in `server/model/client.ts` is the only way the server asks Muse Spark for anything: a system
+  prompt, a rendered user message, and a strict JSON Schema. `MuseClient` is the real one and
+  takes `{ completions }` so a unit test substitutes the endpoint and `npm test` stays offline.
+  It checks `finish_reason === "stop"` and parses the JSON, then the **caller** validates with
+  zod — a reply that doesn't fit has to be a handled failure, not a crash. Prompts are
+  `server/prompts/*.md`, loaded by `loadPrompt(PROMPTS.<name>)` and cached; add a key to
+  `PROMPTS` rather than a template literal. `tsconfig.server.json` sets `rootDir: "."`, so the
+  compiled loader lands in `dist/server/server/prompts/` and `npm run build` copies the `.md`
+  files *there* — the obvious `dist/server/prompts/` is a path tsc never creates.
+- **The board update loop is two triggers, one call at a time.** `server/board/BoardUpdater.ts`
+  fires on 4 new final turns **or** 45 s with at least one, and `kick()` sets `queued` instead
+  of starting a second call when one is out, so triggers during flight merge into the next run.
+  The whole cycle — not just the call — is wrapped in `clock.track`, so a `max`-speed replay
+  stops at the apply and the write too. A failed call puts its turns back at the front of
+  `pending` rather than losing them, and `flush()` on session end gets the last few turns onto
+  the board even though they never reached four. `SessionManager` takes a `createModel` factory
+  (unit tests pass `() => null`): a session with no model still transcribes and still saves,
+  it just has no board.
+- **Timing an integration test against a reasoning model: widen the hook, not the test.** Six
+  or seven sequential board calls per fixture blow past `vitest.integration.config.ts`'s 60 s
+  `testTimeout`, but if the replay runs in `beforeAll` then `beforeAll(fn, 10 * 60_000)` is the
+  only timeout that matters and the `it()` blocks stay instant. Also load `.env` with `dotenv`
+  in the test file itself: `globalSetup` runs in the main process, a test file runs in a worker.
+- **Assert on `sourceTurnIds`, not just on item text.** `server/board/board.integration.test.ts`
+  resolves a fixture's `moments[0].setupLines` through `<name>.timing.json` to a time window,
+  collects the final turns overlapping it, and requires the planted constraint to *cite* one of
+  them. Give the window **~1,500 ms of slack each side**: the API reports a turn's position in
+  the audio but its endpointer trims about half a second off each end of a line, so a turn never
+  sits inside its scripted line exactly.

@@ -383,3 +383,43 @@
   The ops JSON Schema is boardOpsJsonSchema + BOARD_OPS_SCHEMA_NAME ("board_operations") in shared/board.ts; send it as response_format json_schema with strict: true, then validate the reply with BoardUpdateSchema.
   No model client module exists yet (nothing outside server/api.integration.test.ts imports openai), so US-014 builds the first one; remember the reasoning-token budget note in CLAUDE.md and wrap the awaited call in clock.track.
   applyOps reports ignored ops ({ op, reason, id? }) instead of throwing - US-014 should log those, which is the PRD's "unknown IDs are ignored and logged".
+[2026-10-27 22:30] US-014 — completed — Board update loop: model client, prompts on disk, BoardUpdater, bus/SessionManager wiring, integration test against the real model.
+  WHAT I FOUND. The tree was dirty: a cut-off iteration had already written
+  `server/model/client.ts`, `server/prompts/{index.ts,board.md}`,
+  `server/board/BoardUpdater.ts` (+ its unit test) and the `BoardEvent` wiring through
+  `shared/events.ts`, `server/events/bus.ts`, `server/session/SessionManager.ts` and
+  `web/src/useSessionEvents.ts`. All of it typechecked and all 215 unit tests passed, so I
+  continued from it rather than starting over. Two things were missing: criterion 5's
+  integration test, and `npm run build` was broken.
+  WHAT I ADDED. `server/board/board.integration.test.ts` replays `brainstorm` and
+  `moment-contradiction` at `max` with a real `MuseClient` and reads the board back out of the
+  session folder's `board.json` (so one assertion covers "written via SessionStore" and the
+  `board` events are counted separately for "pushed over /ws/events"). It passed on the first
+  run, with no prompt tuning: 5 tests, 110 s, ~13 real calls for both fixtures.
+  THE CONTRADICTION ASSERTION IS THE INTERESTING ONE. It resolves `moments[0].setupLines`
+  through `fixtures/audio/moment-contradiction.timing.json` to a time window, collects the
+  final turns overlapping it (with 1,500 ms of slack each side, because the endpointer trims
+  ~0.5 s off every line — see CLAUDE.md), then requires a constraint matching
+  /\b(4,?000|four thousand)\b/ whose `sourceTurnIds` include one of those turns. That is the
+  `sourceTurnIds` half of the prompt working, which is what US-012's contradiction detection
+  will stand on, so it is worth more than a "there is a constraint" check.
+  BUILD FIX. `tsconfig.server.json` has `rootDir: "."`, so tsc emits
+  `dist/server/server/prompts/index.js`, not `dist/server/prompts/`. The in-progress `build`
+  script copied the `.md` files to the latter and `cp` failed on a missing directory, so
+  `npm run build` exited 1. Now `mkdir -p dist/server/server/prompts && cp
+  server/prompts/*.md dist/server/server/prompts/`; verified `board.md` ships next to its
+  `index.js`.
+  A HOOK TIMEOUT, NOT A TEST TIMEOUT. Six or seven sequential reasoning calls per fixture
+  outrun `vitest.integration.config.ts`'s 60 s `testTimeout`, but the replay happens in
+  `beforeAll`, so `beforeAll(fn, 10 * 60_000)` is enough and the `it()` blocks stay fast. No
+  config change was needed.
+  The test file loads `.env` itself with `dotenv`, the way `server/api.integration.test.ts`
+  does: `globalSetup` runs in the main process and a test file runs in a worker.
+  Checked: npm run typecheck, npm test (215 tests, 21 files), npm run test:integration
+  (10 tests, 3 files), npm run fixtures:check (9 OK), npm run build.
+  FOR US-015 (board panel): `useSessionEvents` already exposes `board`, `boardChangedIds` and
+  `boardUpdatedAtMs` (0 until the first update, which is how the panel knows there hasn't been
+  one); `App.tsx` does not render any of it yet. The bus clears the board when a session
+  *starts*, not when one ends, so a finished board stays on screen. The spinner the panel wants
+  is the `model` dot's `connecting` state.
+  Nothing human-only is pending.

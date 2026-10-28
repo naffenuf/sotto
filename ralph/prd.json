@@ -248,8 +248,8 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done; all 7 criteria met (npm run typecheck, npm test: 215 tests / 21 files, npm run test:integration: 10 tests / 3 files, npm run fixtures:check: 9 OK, npm run build). Arrived on a dirty tree: a cut-off iteration had already written server/model/client.ts, server/prompts/, server/board/BoardUpdater.ts and the bus/SessionManager/useSessionEvents wiring, all of it typechecking and passing. This iteration added the missing integration test (server/board/board.integration.test.ts) and fixed npm run build. The model seam is ModelClient in server/model/client.ts (MuseClient is the real one); pass { completions } to keep a unit test offline. Prompts are server/prompts/*.md via loadPrompt(PROMPTS.<name>) - add a key to PROMPTS for a new one. BoardUpdater drives the model status dot (connecting around each call, active after), and SessionManager guards that on the session still being current. SessionManager now takes createModel so unit tests pass () => null; a session with no model still transcribes and still saves, it just has no board. The integration test cost ~110 s and ~13 real calls for both fixtures; it passed first try, no prompt tuning needed."
     },
     {
       "id": "US-015",
