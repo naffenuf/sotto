@@ -64,6 +64,8 @@ export type {
   Item,
   ItemStatus,
 } from "./board.js";
+export { cardStates, cardVariants } from "./cards.js";
+export type { CardState, CardVariant, Citation, EvidenceQuote, StageCard } from "./cards.js";
 export { statusChannels, statusStates } from "./events.js";
 export type {
   BoardEvent,

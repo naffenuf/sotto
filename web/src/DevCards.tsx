@@ -1,0 +1,247 @@
+/**
+ * `/dev/cards`: every card variant and state, with sample data (US-011).
+ *
+ * The real stage only shows what a conversation happens to produce, and a
+ * model will not reliably produce an error, a thinking card or a two-minute-old
+ * glow on demand. This page is where those states are looked at — and what the
+ * Playwright check (`npm run verify:cards`) drives, so the layout is checked
+ * against the real component rather than a mock of it.
+ */
+import { Card } from "./Card.js";
+import { Stage } from "./Stage.js";
+import { QUIET_TRAY_MS, type StageCardView } from "./stageView.js";
+import type { StageCard } from "../../shared/index.js";
+
+const DETAIL_MD = `Three vendors publish a **per-seat** price, and all three bundle analytics
+into the top tier:
+
+- Notely charges $14 a month, with a 2-seat minimum
+- Huddleboard is $11, but analytics is a $4 add-on
+- Scratchpad is free for two people, then $18
+
+The cheapest *comparable* bundle is therefore about $15 a seat. See the
+[pricing comparison](https://example.com/pricing) for the full table, or run
+\`npm run pricing\` on the sheet we exported.`;
+
+/** The sample cards, built fresh so the glow's age is relative to this load. */
+function samples(now: number): { title: string; note: string; card: StageCard }[] {
+  return [
+    {
+      title: "answer — ready",
+      note: "Question and asker in small text, headline ≥ 28 px, details ▾, numbered sources.",
+      card: {
+        id: "a-ready",
+        variant: "answer",
+        state: "ready",
+        createdAtMs: now,
+        question: "Sotto, what do the main competitors charge per month?",
+        askedBy: "Craig",
+        headline: "Competitors sit between $11 and $18 a seat, bundling analytics at the top tier",
+        detailMd: DETAIL_MD,
+        citations: [
+          { url: "https://example.com/notely-pricing", title: "Notely — Pricing" },
+          { url: "https://example.com/huddleboard", title: "Huddleboard pricing and add-ons" },
+          { url: "https://example.com/scratchpad", title: "Scratchpad plans" },
+        ],
+      },
+    },
+    {
+      title: "answer — thinking",
+      note: "Pushed the moment the wake phrase lands, before the headline exists.",
+      card: {
+        id: "a-thinking",
+        variant: "answer",
+        state: "thinking",
+        createdAtMs: now,
+        question: "Sotto, how many teams churned last quarter?",
+        askedBy: "typed",
+        headline: "",
+      },
+    },
+    {
+      title: "answer — streaming headline",
+      note: "Line 1 has arrived; the detail and the sources have not.",
+      card: {
+        id: "a-streaming",
+        variant: "answer",
+        state: "thinking",
+        createdAtMs: now,
+        question: "Sotto, is a weekly digest enough for the trial users?",
+        askedBy: "Dana",
+        headline: "Weekly digests hold trial users about as well as daily ones",
+      },
+    },
+    {
+      title: "answer — error",
+      note: "A muted line in place of the answer. The session keeps running.",
+      card: {
+        id: "a-error",
+        variant: "answer",
+        state: "error",
+        createdAtMs: now,
+        question: "Sotto, what did the 2019 report say about retention?",
+        askedBy: "Craig",
+        headline: "",
+        message: "The search tool did not answer in time. Ask again and it will retry.",
+      },
+    },
+    {
+      title: "interject — ready",
+      note: "Accent border, “Sotto noticed…”, a why-now line and the evidence it rests on.",
+      card: {
+        id: "i-ready",
+        variant: "interject",
+        state: "ready",
+        createdAtMs: now,
+        headline: "A $12 solo tier does not fit the $4,000 a month floor you set",
+        whyNow: "the price is about to be written down",
+        detailMd:
+          "At $12 a seat you need **333 paying solos** to clear the floor, which is more than\nthe whole waitlist. The team tier gets there with 40 accounts.",
+        evidence: [
+          {
+            turnId: "s1:4",
+            quote: "We can't go below four thousand a month, that's the hosting bill.",
+            speaker: "Craig",
+          },
+          { turnId: "s1:11", quote: "So solo is twelve dollars, done.", speaker: "Dana" },
+        ],
+        citations: [{ url: "https://example.com/unit-economics", title: "Unit economics sheet" }],
+      },
+    },
+    {
+      title: "interject — thinking",
+      note: "The fact behind it is still being verified (US-013).",
+      card: {
+        id: "i-thinking",
+        variant: "interject",
+        state: "thinking",
+        createdAtMs: now,
+        headline: "That churn figure may be the 2019 one",
+        whyNow: "it is being used to size the discount",
+        evidence: [{ turnId: "s1:19", quote: "Churn was about nine percent.", speaker: "Dana" }],
+      },
+    },
+    {
+      title: "interject — error",
+      note: "Verification failed, so the claim is not made.",
+      card: {
+        id: "i-error",
+        variant: "interject",
+        state: "error",
+        createdAtMs: now,
+        headline: "Could not check the churn figure",
+        whyNow: "it is being used to size the discount",
+        message: "Web search was unavailable, so this one is left unverified.",
+      },
+    },
+    {
+      title: "glow — collapsed",
+      note: "One muted line. Click it and it becomes the full card.",
+      card: {
+        id: "g-ready",
+        variant: "glow",
+        state: "ready",
+        createdAtMs: now,
+        headline: "Nobody has said who writes the digest copy",
+        whyNow: "the digest was just decided",
+        detailMd: "It has come up twice and been dropped twice, both times near a decision.",
+        evidence: [
+          { turnId: "s1:22", quote: "We'll figure out the copy later.", speaker: "Craig" },
+        ],
+      },
+    },
+    {
+      title: "glow — thinking",
+      note: "Still arriving, and still only one line.",
+      card: {
+        id: "g-thinking",
+        variant: "glow",
+        state: "thinking",
+        createdAtMs: now,
+        headline: "",
+      },
+    },
+    {
+      title: "glow — error",
+      note: "Opened, with the muted message in place of the content.",
+      card: {
+        id: "g-error",
+        variant: "glow",
+        state: "error",
+        createdAtMs: now,
+        headline: "A dropped thread could not be checked",
+        whyNow: "the thread came up three turns ago",
+        message: "The observer's call failed; this thought is incomplete.",
+      },
+    },
+  ];
+}
+
+export function DevCards() {
+  const now = Date.now();
+  const cases = samples(now);
+
+  /**
+   * The stage, as a group sees it: an answer, an interjection and a fresh glow
+   * stacked newest first, plus two glows already past the two-minute mark so
+   * the tray is on screen rather than described.
+   */
+  const stageCards: StageCardView[] = [
+    { ...card("i-ready", cases), id: "stage-i", receivedAtMs: now - 4_000 },
+    { ...card("a-ready", cases), id: "stage-a", receivedAtMs: now - 20_000 },
+    { ...card("g-ready", cases), id: "stage-g", receivedAtMs: now - 1_000 },
+    {
+      ...card("g-ready", cases),
+      id: "stage-quiet-1",
+      headline: "The mobile app was dropped without a reason",
+      receivedAtMs: now - QUIET_TRAY_MS - 10_000,
+    },
+    {
+      ...card("g-ready", cases),
+      id: "stage-quiet-2",
+      headline: "No one has named the launch date out loud",
+      receivedAtMs: now - QUIET_TRAY_MS - 90_000,
+    },
+  ];
+
+  return (
+    <div className="dev">
+      <header className="header">
+        <h1 className="brand">Sotto</h1>
+        <p className="dev__title">/dev/cards — every variant and state</p>
+        <a className="dev__back" href="/">
+          back to the app
+        </a>
+      </header>
+      <section className="dev__section">
+        <h2 className="dev__heading">On the stage</h2>
+        <p className="dev__note">
+          Newest on top. Glows older than two minutes have collapsed into the tray.
+        </p>
+        <div className="dev__stage" data-testid="dev-stage">
+          <Stage cards={stageCards} />
+        </div>
+      </section>
+      <section className="dev__section">
+        <h2 className="dev__heading">Variants and states</h2>
+        <div className="dev__grid">
+          {cases.map((one) => (
+            <div className="dev__case" data-testid="dev-case" data-case={one.card.id} key={one.card.id}>
+              <h3 className="dev__case-title">{one.title}</h3>
+              <p className="dev__note">{one.note}</p>
+              {/* The expanded glows are shown too, since that is a state of
+                  the card a reader reaches with one click. */}
+              <Card card={one.card} defaultExpanded={one.card.id === "g-error"} />
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function card(id: string, cases: { card: StageCard }[]): StageCard {
+  const found = cases.find((one) => one.card.id === id);
+  if (found === undefined) throw new Error(`no sample card ${id}`);
+  return found.card;
+}

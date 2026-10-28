@@ -368,7 +368,10 @@ if (!options.some((o) => o.value === "mic" && !o.disabled)) {
 if (idleDots.transcription !== "idle" || idleDots.model !== "idle") {
   problems.push(`dots were not idle before Start: ${JSON.stringify(idleDots)}`);
 }
-if (runningDots.transcription !== "active" || runningDots.model !== "active") {
+// Both dots were waited for as `active` above. This later sample is read
+// whenever the replay happens to be, and the model dot goes `connecting` for
+// the length of every board call, so that counts as working too.
+if (runningDots.transcription !== "active" || !["active", "connecting"].includes(runningDots.model)) {
   problems.push(`dots did not go active: ${JSON.stringify(runningDots)}`);
 }
 if (!runningState?.startsWith("Listening to Replay events: brainstorm")) {

@@ -425,3 +425,370 @@ body {
 .board__dropped-toggle:hover {
   color: var(--accent);
 }
+
+/* ---- The stage and its cards (US-011) ---- */
+
+/* An empty stage centres its hint; a full one stacks from the top. */
+.stage:has(.stage__cards) {
+  place-items: stretch;
+  align-content: start;
+  justify-items: center;
+}
+
+.stage__cards,
+.stage__tray-cards {
+  width: 100%;
+  max-width: 46rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.stage__tray {
+  width: 100%;
+  max-width: 46rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stage__tray-toggle {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+  background: none;
+  border: 1px solid #2a2824;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+}
+
+.stage__tray-toggle:hover {
+  color: var(--accent);
+  border-color: #3a3730;
+}
+
+.card {
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid #2a2824;
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+}
+
+/* An interjection, and an opened glow, carry the accent on the left edge: a
+   raised hand, not an alarm. */
+.card--interject,
+.card--glow[data-expanded="true"] {
+  border-left: 3px solid var(--accent);
+}
+
+.card--glow[data-expanded="true"] {
+  border-left-color: #8a6b38;
+}
+
+.card__label {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card__label--button {
+  display: block;
+  font-family: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.card__ask {
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+}
+
+.card__asker {
+  font-size: 0.75rem;
+  color: var(--bg);
+  background: var(--ink-dim);
+  border-radius: 0.25rem;
+  padding: 0.0625rem 0.375rem;
+  white-space: nowrap;
+}
+
+/* Readable from across a table: 30 px, above the 28 px the PRD asks for. */
+.card__headline {
+  margin: 0;
+  font-size: 1.875rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card__pending {
+  margin: 0;
+  min-height: 1.875rem;
+  display: flex;
+  align-items: center;
+}
+
+.card__why {
+  margin: 0.625rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+}
+
+.card__why-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-right: 0.375rem;
+}
+
+.card__error {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+}
+
+.card__evidence {
+  margin: 0.875rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.card__quote {
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+  border-left: 2px solid #3a3730;
+  padding-left: 0.625rem;
+}
+
+.card__quote-speaker {
+  margin-left: 0.375rem;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.card__details {
+  margin-top: 0.875rem;
+}
+
+.card__details-toggle {
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.card__details-toggle:hover {
+  color: var(--accent);
+}
+
+.card__markdown {
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+
+.md__p {
+  margin: 0 0 0.625rem;
+}
+
+.md__h {
+  margin: 0.75rem 0 0.375rem;
+  font-size: 0.9375rem;
+}
+
+.md__ul,
+.md__ol {
+  margin: 0 0 0.625rem;
+  padding-left: 1.25rem;
+}
+
+.md__code {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 0.875em;
+  background: #00000040;
+  border-radius: 0.25rem;
+  padding: 0.0625rem 0.25rem;
+}
+
+.card__markdown a,
+.card__source-link {
+  color: var(--accent);
+  text-underline-offset: 0.1875rem;
+}
+
+.card__sources {
+  margin: 0.875rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  font-size: 0.8125rem;
+}
+
+.card__source {
+  display: flex;
+  gap: 0.375rem;
+  color: var(--ink-dim);
+}
+
+.card__source-number {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A glow: one line, muted, and clickable all the way across. */
+.card--collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--ink-dim);
+  padding: 0.625rem 1rem;
+  border-left: 3px solid #6b5429;
+  cursor: pointer;
+}
+
+.card--collapsed:hover {
+  color: var(--ink);
+  border-left-color: var(--accent);
+}
+
+.card__glow-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  flex: none;
+  border-radius: 50%;
+  background: #8a6b38;
+}
+
+.card__glow-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Three dots breathing in turn — the only animation on the stage. */
+.card__thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  vertical-align: 0.125em;
+}
+
+.card__thinking-label {
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+  margin-right: 0.25rem;
+}
+
+.card__dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.25;
+  animation: card-thinking 1.2s ease-in-out infinite;
+}
+
+.card__dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.card__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.card__dot:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+@keyframes card-thinking {
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---- /dev/cards ---- */
+
+.dev {
+  min-height: 100vh;
+}
+
+.dev__title {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+}
+
+.dev__back {
+  font-size: 0.875rem;
+  color: var(--accent);
+}
+
+.dev__section {
+  padding: 1.5rem;
+  border-bottom: 1px solid #2a2824;
+}
+
+.dev__heading {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.dev__note {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+}
+
+/* The dev page scrolls as a page, so the stage inside it is given a height
+   rather than taking the viewport's. */
+.dev__stage {
+  display: flex;
+  min-height: 24rem;
+}
+
+.dev__stage .stage {
+  padding: 0;
+  overflow: visible;
+}
+
+.dev__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(26rem, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.dev__case-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}

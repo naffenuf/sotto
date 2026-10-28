@@ -16,12 +16,20 @@ import {
 import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCapture.js";
 import { BoardPanel } from "./BoardPanel.js";
 import { SessionControls, parseSourceValue, sourceValue } from "./SessionControls.js";
+import { Stage } from "./Stage.js";
+import type { StageCardView } from "./stageView.js";
 import { StatusDots } from "./StatusDots.js";
 import { TranscriptPanel } from "./TranscriptPanel.js";
 import { useServerStatus } from "./useServerStatus.js";
 import { useSessionEvents } from "./useSessionEvents.js";
 
 const NO_FIXTURES: FixtureListResponse = { wav: [], events: [] };
+
+/**
+ * The stage is built now (US-011) and fed later: interjections land on it in
+ * US-015 and answers in US-018. Until then it shows the hint.
+ */
+const NO_CARDS: readonly StageCardView[] = [];
 
 export function App() {
   const health = useServerStatus();
@@ -150,18 +158,23 @@ export function App() {
             updating={statuses.model.state === "connecting"}
           />
         </aside>
-        <main className="stage">
-          {problem !== null && (
-            <p className="stage__problem" data-testid="session-problem" role="alert">
-              {problem}
+        <Stage
+          cards={NO_CARDS}
+          banner={
+            problem !== null ? (
+              <p className="stage__problem" data-testid="session-problem" role="alert">
+                {problem}
+              </p>
+            ) : undefined
+          }
+          placeholder={
+            <p className="stage__hint" data-testid="session-state">
+              {session === null
+                ? "Sotto listens to a brainstorm and speaks up only when it matters."
+                : `Listening to ${describeSource(session.source)} — ${events.turnCount} turns so far.`}
             </p>
-          )}
-          <p className="stage__hint" data-testid="session-state">
-            {session === null
-              ? "Sotto listens to a brainstorm and speaks up only when it matters."
-              : `Listening to ${describeSource(session.source)} — ${events.turnCount} turns so far.`}
-          </p>
-        </main>
+          }
+        />
       </div>
     </div>
   );
