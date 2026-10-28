@@ -7,3 +7,8 @@ ralph/STOP
 .DS_Store
 ralph/iterations/
 *.tmp.mjs
+
+# Eval harness output: session folders, raw runs and cached judge verdicts.
+eval/sessions/
+eval/runs/
+eval/cache/

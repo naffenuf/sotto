@@ -22,6 +22,8 @@ export const PROMPTS = {
   observer: "observer",
   /** Checking a claim against the web before raising it (US-013). */
   verify: "verify",
+  /** Deciding whether a delivered card raises a planted moment (US-016). */
+  judge: "judge",
 } as const;
 
 export type PromptName = (typeof PROMPTS)[keyof typeof PROMPTS];
