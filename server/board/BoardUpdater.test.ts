@@ -24,6 +24,11 @@ class FakeModel implements ModelClient {
 
   constructor(private readonly replies: (() => Promise<unknown>)[]) {}
 
+  /** The board and the observer never search; US-013's verifier does. */
+  async grounded(): Promise<never> {
+    throw new Error("unexpected grounded call");
+  }
+
   async structured(call: StructuredCall): Promise<unknown> {
     this.calls.push(call);
     const reply = this.replies.shift();

@@ -9,8 +9,13 @@ import {
 } from "../audio/AudioSource.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
-import type { CandidateLogRecord } from "../../shared/candidates.js";
-import type { ModelClient, StructuredCall } from "../model/client.js";
+import type { CandidateLogLine, CandidateLogRecord } from "../../shared/candidates.js";
+import type {
+  GroundedCall,
+  GroundedReply,
+  ModelClient,
+  StructuredCall,
+} from "../model/client.js";
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
 
@@ -254,6 +259,11 @@ describe("SessionManager, board and observer", () => {
     readonly calls: StructuredCall[] = [];
     private items = 0;
 
+    /** It only ever notices assumptions, so nothing here is ever checked. */
+    async grounded(): Promise<never> {
+      throw new Error("unexpected grounded call");
+    }
+
     async structured(call: StructuredCall): Promise<unknown> {
       this.calls.push(call);
       if (call.label === "board") {
@@ -333,6 +343,127 @@ describe("SessionManager, board and observer", () => {
     );
     // Different board items each time, so none of them is a repeat.
     for (const record of candidates) expect(record.candidate.duplicateOf).toBeUndefined();
+  });
+
+  /**
+   * US-013's wiring: a claim that looks wrong is checked against the web
+   * before anything else sees it, and the check lands in the same log as the
+   * candidate it checked.
+   */
+  it("checks a factual error against the web and writes the verdict down", async () => {
+    /**
+     * A different wrong claim every look, so the observer's duplicate rule
+     * (same type, overlapping board items or an equivalent headline) passes
+     * every one of them on and each gets its own check.
+     */
+    const claims = [
+      "The iPad launched in 2012",
+      "Spotify has two billion subscribers",
+      "The App Store keeps forty percent",
+      "Swift shipped before Objective-C",
+      "Node 22 removed WebSocket support",
+      "Figma was founded last year",
+      "Stripe bills a flat ten dollars",
+      "Postgres cannot store JSON",
+    ];
+
+    /** One board item, one `factual_error` per look, one verdict per check. */
+    class CheckingModel implements ModelClient {
+      readonly calls: string[] = [];
+      private items = 0;
+
+      async structured(call: StructuredCall): Promise<unknown> {
+        this.calls.push(call.label);
+        if (call.label === "board") {
+          this.items += 1;
+          return {
+            operations: [
+              { op: "add_point", text: `point ${this.items}`, sourceTurnIds: ["0:0"] },
+            ],
+          };
+        }
+        return {
+          candidates: [
+            {
+              type: "factual_error",
+              headline: claims[(this.items - 1) % claims.length]!,
+              detail: "The number they are costing this off is wrong.",
+              whyNow: "They are about to commit to it",
+              evidenceTurnIds: ["0:0"],
+              relatedBoardItemIds: [`p${this.items}`],
+              scores: { relevance: 0.9, novelty: 0.8, importance: 0.8, confidence: 0.9 },
+            },
+          ],
+        };
+      }
+
+      async grounded(call: GroundedCall): Promise<GroundedReply> {
+        this.calls.push(call.label);
+        return {
+          value: {
+            verdict: "wrong",
+            correction: "It launched in October 2010.",
+            citations: [{ url: "https://example.com/launch", title: "Launch" }],
+          },
+          citations: [],
+          searchedUrls: ["https://example.com/launch"],
+          searched: true,
+        };
+      }
+    }
+
+    const bus = new EventBus(quiet);
+    const model = new CheckingModel();
+    const lines: CandidateLogLine[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: (record: unknown) => lines.push(record as CandidateLogLine),
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      writeArtifact: () => "",
+      end: () => {},
+    } satisfies SessionWriter;
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => model,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-fact" });
+    await ended;
+
+    const noticed = lines.filter((line) => line.kind === "candidate");
+    const checked = lines.filter((line) => line.kind === "verification");
+    expect(noticed.length).toBeGreaterThan(0);
+    // Every candidate this model notices is a factual error, so every one of
+    // them is checked — and nothing is checked that was not noticed first.
+    expect(checked).toHaveLength(noticed.length);
+    expect(model.calls.filter((label) => label === "verify")).toHaveLength(checked.length);
+    for (const record of checked) {
+      expect(record.outcome).toBe("verified");
+      expect(record.verification?.citations).toEqual([
+        { url: "https://example.com/launch", title: "Launch" },
+      ]);
+    }
+    const ids = new Set(noticed.map((record) => record.candidate.id));
+    for (const record of checked) expect(ids.has(record.candidateId)).toBe(true);
   });
 });
 

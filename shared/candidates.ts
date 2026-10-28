@@ -15,6 +15,7 @@
  * so anything downstream can lay a candidate out without measuring it first.
  */
 import { z } from "zod";
+import type { Citation, EvidenceQuote } from "./cards.js";
 
 /**
  * The four things the observer looks for.
@@ -139,6 +140,26 @@ export interface Candidate extends ObserverCandidate {
    * passed on to the policy.
    */
   duplicateOf?: string;
+  /**
+   * The turns in {@link ObserverCandidate.evidenceTurnIds}, resolved to what
+   * was actually said, oldest first. A cited turn the assembler has never
+   * seen is left out, so this can be shorter than the id list — or empty.
+   *
+   * The headline is the observer's *reading* of the conversation and usually
+   * states the correction rather than the claim ("Instagram launched in 2010,
+   * not 2014"), so anything that has to reason about what the group said —
+   * the fact check (US-013) first, the evidence quotes on a card (US-015)
+   * next — needs the words, not the headline.
+   */
+  evidence: EvidenceQuote[];
+  /**
+   * What the web check made of it (US-013). Present only on a `factual_error`
+   * that was checked *and* came back `wrong`: the other verdicts stop at the
+   * verifier and never reach the policy.
+   */
+  verification?: CandidateVerification;
+  /** The pages the check rested on, in the order they were cited. */
+  citations?: Citation[];
 }
 
 /**
@@ -146,7 +167,8 @@ export interface Candidate extends ObserverCandidate {
  *
  * Every candidate is written here before the policy sees it, so the file is
  * the record of what Sotto noticed as well as of what it said. US-013's
- * verification and US-014's decisions append their own `kind`s alongside.
+ * verification appends {@link VerificationLogRecord}s alongside and US-014's
+ * decisions will append their own `kind`.
  */
 export interface CandidateLogRecord {
   kind: "candidate";
@@ -154,6 +176,89 @@ export interface CandidateLogRecord {
   atMs: number;
   candidate: Candidate;
 }
+
+/** What the web check (US-013) decided about a claim. */
+export const verificationVerdicts = ["wrong", "right", "unclear"] as const;
+export type VerificationVerdict = (typeof verificationVerdicts)[number];
+
+/** Words of correction. The right fact, not an essay about it. */
+export const CORRECTION_MAX_WORDS = 30;
+
+/**
+ * Words a *verified* candidate's detail can run to: its own
+ * {@link DETAIL_MAX_WORDS} plus the correction appended to it by
+ * {@link correctedDetail}. The UI lays out for this, not for the shorter cap.
+ */
+export const VERIFIED_DETAIL_MAX_WORDS = DETAIL_MAX_WORDS + CORRECTION_MAX_WORDS;
+
+/** The label the correction is appended under, so one spelling exists. */
+export const CORRECTION_LABEL = "**Correction:**";
+
+/**
+ * The detail a verified candidate carries: its own reasoning, then the
+ * checked fact underneath it.
+ *
+ * Both halves are already clipped — the detail by
+ * {@link ObserverCandidateSchema}, the correction by
+ * {@link VerificationReplySchema} — so the result is bounded by
+ * {@link VERIFIED_DETAIL_MAX_WORDS} by construction and is never re-clipped:
+ * cutting words off a correction to fit a layout would be cutting the one
+ * part the group actually needs.
+ */
+export function correctedDetail(detail: string, correction: string): string {
+  const checked = correction.trim();
+  if (checked === "") return detail;
+  return `${detail}\n\n${CORRECTION_LABEL} ${checked}`;
+}
+
+/** One claim, checked against the web. */
+export interface CandidateVerification {
+  verdict: VerificationVerdict;
+  /** The right fact, when the verdict is `wrong`. Empty otherwise. */
+  correction: string;
+  /**
+   * The pages the verdict rests on, deduplicated by URL. These come from the
+   * reply's `url_citation` annotations — pages the search really returned —
+   * never from URLs the model merely listed.
+   */
+  citations: Citation[];
+  /**
+   * Whether the model actually ran a web search. It may answer a question it
+   * is confident about from training data alone, and a verdict reached that
+   * way is worth telling apart from a grounded one in the log.
+   */
+  searched: boolean;
+}
+
+/**
+ * What became of a checked candidate.
+ *
+ * - `verified`: the claim is wrong and the candidate went on to the policy.
+ * - `unverified`: `right` or `unclear`, so it stops here (PRD US-013).
+ * - `failed`: the check itself did not come back. Also stops: an unchecked
+ *   claim must not be told to the group as an error.
+ */
+export const verificationOutcomes = ["verified", "unverified", "failed"] as const;
+export type VerificationOutcome = (typeof verificationOutcomes)[number];
+
+/** One line of `candidates.jsonl` recording a check. */
+export interface VerificationLogRecord {
+  kind: "verification";
+  /** When the check came back, on the session clock. */
+  atMs: number;
+  /** The {@link Candidate.id} that was checked. */
+  candidateId: string;
+  /** The claim as it was sent for checking, for reading the file later. */
+  headline: string;
+  outcome: VerificationOutcome;
+  /** Absent when the outcome is `failed`. */
+  verification?: CandidateVerification;
+  /** Why the check did not come back, when it did not. */
+  error?: string;
+}
+
+/** Every kind of line `candidates.jsonl` holds. */
+export type CandidateLogLine = CandidateLogRecord | VerificationLogRecord;
 
 /** The `json_schema.name` an observer request sends. */
 export const OBSERVER_SCHEMA_NAME = "observer_candidates";
@@ -243,5 +348,78 @@ export const observerCandidatesJsonSchema = {
     },
   },
   required: ["candidates"],
+  additionalProperties: false,
+} as const;
+
+/** The `json_schema.name` a verification request sends. */
+export const VERIFICATION_SCHEMA_NAME = "fact_verification";
+
+/**
+ * The verifier's reply (US-013).
+ *
+ * `citations` is in the reply because asking the model to name its sources
+ * keeps it honest about whether it looked, but the citations that reach the
+ * group are the response's `url_citation` annotations; a URL only the model
+ * listed is never attached. See {@link CandidateVerification.citations}.
+ */
+export const VerificationReplySchema = z.strictObject({
+  verdict: z.enum(verificationVerdicts),
+  correction: z.string().transform((text) => clipWords(oneLine(text), CORRECTION_MAX_WORDS)),
+  /** Validated one element at a time, as the observer's candidates are. */
+  citations: z.array(z.unknown()),
+});
+
+/** One source as the model lists it. Only its title is ever used. */
+export const ModelCitationSchema = z.strictObject({
+  url: z.string(),
+  title: z.string(),
+});
+
+/**
+ * {@link VerificationReplySchema} as a JSON Schema, in the subset strict
+ * structured output accepts — closed objects, everything required, no length
+ * keywords. The thirty-word limit lives in the description, in
+ * `server/prompts/verify.md`, and is enforced by the zod schema above;
+ * `shared/candidates.test.ts` holds the two in agreement.
+ */
+export const verificationJsonSchema = {
+  type: "object",
+  properties: {
+    verdict: {
+      type: "string",
+      description:
+        "wrong: the claim is false and you can show it. " +
+        "right: the claim is true, or true enough that saying anything would be pedantry. " +
+        "unclear: you could not establish it either way.",
+      enum: [...verificationVerdicts],
+    },
+    correction: {
+      type: "string",
+      description:
+        `When the verdict is wrong: the right fact, in at most ${CORRECTION_MAX_WORDS} words, ` +
+        `as one sentence a person could say out loud. Empty string for any other verdict.`,
+    },
+    citations: {
+      type: "array",
+      description:
+        "The pages you actually read, best first. Empty if you did not search. " +
+        "Do not invent a URL: a source that was not in the search results is worse than none.",
+      items: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description:
+              "The page's full URL, exactly as the search gave it to you, with its path and " +
+              "query string. Not the site's name and not a shortened form of it.",
+          },
+          title: { type: "string", description: "The page's title." },
+        },
+        required: ["url", "title"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["verdict", "correction", "citations"],
   additionalProperties: false,
 } as const;

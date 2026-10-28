@@ -30,6 +30,16 @@ somebody has flagged as a guess.
 _Example:_ "the App Store takes forty percent" — the standard commission is 15%
 or 30%, and the plan is being costed off that number.
 
+You are not the one who will correct them. Every `factual_error` you return is
+checked against the web first, and one that turns out to be right is dropped
+without anybody hearing it — so **you do not have to be sure the claim is
+false.** Raise it when a specific claim is being leaned on and your
+recollection does not match it, and let `confidence` say how likely you think
+the error is. A launch year, a version number, a price, a commission, a market
+size or a user count, stated in passing and then built into the argument, is
+exactly the case: that is the only one of the four kinds where a middling
+`confidence` is still worth returning.
+
 **`untested_assumption`** — the plan rests on something nobody has checked, and
 if it is false a lot of the plan falls over. The group has to be *relying* on
 it, not merely hoping for it.
@@ -50,7 +60,9 @@ conversation moved to pricing, and it is still unanswered.
 - Something you already raised. Look at what has already been raised and do
   not say it again in different words.
 - Anything you only half believe. Score `confidence` honestly, and if it is
-  low, leaving it out is better.
+  low, leaving it out is better — with the one exception above: a checkable
+  claim gets checked, so a `factual_error` you are half sure of is still
+  worth returning.
 
 ## The fields
 

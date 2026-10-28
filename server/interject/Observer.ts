@@ -27,6 +27,7 @@ import {
   type ObserverCandidate,
 } from "../../shared/candidates.js";
 import type { Board, Item } from "../../shared/board.js";
+import type { EvidenceQuote } from "../../shared/cards.js";
 import { boardSections } from "../../shared/board.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import type { Clock } from "../clock.js";
@@ -217,6 +218,7 @@ export class Observer {
       id: `cand-${this.candidateCount}`,
       createdAtMs: atMs,
       run: this.runCount,
+      evidence: this.quotes(candidate.evidenceTurnIds),
       ...(duplicateOf === undefined ? {} : { duplicateOf }),
     };
     if (duplicateOf !== undefined) {
@@ -225,6 +227,28 @@ export class Observer {
       );
     }
     return identified;
+  }
+
+  /**
+   * The cited turns, in the words they were said in.
+   *
+   * The model cites ids it read in the request, so they are nearly always
+   * real — but a hallucinated id must not invent a quote, so an id the
+   * assembler never produced is simply dropped. The speaker is the
+   * diarization label; a display name is the delivery story's to resolve.
+   */
+  private quotes(turnIds: readonly string[]): EvidenceQuote[] {
+    const quotes: EvidenceQuote[] = [];
+    for (const turnId of turnIds) {
+      const turn = this.turns.find((one) => one.turnId === turnId);
+      if (turn === undefined || turn.text.trim() === "") continue;
+      quotes.push({
+        turnId,
+        quote: turn.text.trim(),
+        ...(turn.speaker === null ? {} : { speaker: turn.speaker }),
+      });
+    }
+    return quotes;
   }
 
   /** One call, with each candidate validated on its own. */

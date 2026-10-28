@@ -1,15 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
+  CORRECTION_LABEL,
+  CORRECTION_MAX_WORDS,
   DETAIL_MAX_WORDS,
   HEADLINE_MAX_CHARS,
   OBSERVER_SCHEMA_NAME,
   ObserverCandidateSchema,
   ObserverReplySchema,
+  VERIFICATION_SCHEMA_NAME,
+  VERIFIED_DETAIL_MAX_WORDS,
+  VerificationReplySchema,
   WHY_NOW_MAX_WORDS,
   candidateTypes,
   clipChars,
   clipWords,
+  correctedDetail,
   observerCandidatesJsonSchema,
+  verificationJsonSchema,
+  verificationVerdicts,
 } from "./candidates.js";
 
 /** Keywords strict structured output rejects, and the union form it wants. */
@@ -196,5 +204,86 @@ describe("observerCandidatesJsonSchema", () => {
     for (const [name, score] of Object.entries(scores)) {
       expect(score.description, name).toContain("0 to 1");
     }
+  });
+});
+
+describe("VerificationReplySchema", () => {
+  const reply = { verdict: "wrong", correction: "Instagram launched in 2010.", citations: [] };
+
+  it("accepts a verdict, a correction and a list of citations", () => {
+    const parsed = VerificationReplySchema.parse(reply);
+    expect(parsed.verdict).toBe("wrong");
+    expect(parsed.correction).toBe("Instagram launched in 2010.");
+    expect(parsed.citations).toEqual([]);
+  });
+
+  it("clips a correction that runs on, and puts it on one line", () => {
+    const long = Array.from({ length: CORRECTION_MAX_WORDS + 10 }, (_, i) => `w${i}`).join("\n");
+    const parsed = VerificationReplySchema.parse({ ...reply, correction: long });
+    expect(parsed.correction.split(" ")).toHaveLength(CORRECTION_MAX_WORDS);
+    expect(parsed.correction.endsWith("…")).toBe(true);
+  });
+
+  it("rejects a verdict it does not know", () => {
+    expect(VerificationReplySchema.safeParse({ ...reply, verdict: "false" }).success).toBe(false);
+  });
+
+  it("leaves the citations unvalidated, so one bad entry drops on its own", () => {
+    const parsed = VerificationReplySchema.parse({ ...reply, citations: [{ url: 1 }, "junk"] });
+    expect(parsed.citations).toHaveLength(2);
+  });
+});
+
+describe("correctedDetail", () => {
+  it("puts the checked fact under the reasoning", () => {
+    expect(correctedDetail("They are costing it off 2014.", "It launched in 2010.")).toBe(
+      `They are costing it off 2014.\n\n${CORRECTION_LABEL} It launched in 2010.`,
+    );
+  });
+
+  it("leaves the detail alone when there is no correction", () => {
+    expect(correctedDetail("The claim stands.", "   ")).toBe("The claim stands.");
+  });
+
+  it("stays inside the length the UI lays out for", () => {
+    const detail = Array.from({ length: DETAIL_MAX_WORDS }, () => "word").join(" ");
+    const correction = Array.from({ length: CORRECTION_MAX_WORDS }, () => "fact").join(" ");
+    const words = correctedDetail(detail, correction).split(/\s+/);
+    // The two halves plus the label that joins them.
+    expect(words).toHaveLength(VERIFIED_DETAIL_MAX_WORDS + 1);
+  });
+});
+
+describe("verificationJsonSchema", () => {
+  it("is named, closed and fully required all the way down", () => {
+    expect(VERIFICATION_SCHEMA_NAME).toBe("fact_verification");
+    for (const { path, node } of walk(verificationJsonSchema)) {
+      for (const keyword of unsupportedKeywords) {
+        expect(node[keyword], `${path} uses ${keyword}`).toBeUndefined();
+      }
+      if (node.type !== "object") continue;
+      expect(node.additionalProperties, `${path} is open`).toBe(false);
+      const properties = Object.keys(node.properties as JsonSchemaNode);
+      expect(node.required, `${path} does not require every property`).toEqual(properties);
+    }
+  });
+
+  it("offers exactly the verdicts the zod schema accepts", () => {
+    const verdict = (verificationJsonSchema.properties as Record<string, JsonSchemaNode>).verdict!;
+    expect(verdict.enum).toEqual([...verificationVerdicts]);
+  });
+
+  it("describes a reply zod then accepts, with every field required", () => {
+    const full = sample(verificationJsonSchema as unknown as JsonSchemaNode);
+    expect(VerificationReplySchema.safeParse(full).success).toBe(true);
+    for (const key of Object.keys(full)) {
+      const { [key]: _dropped, ...without } = full;
+      expect(VerificationReplySchema.safeParse(without).success, `${key} is optional`).toBe(false);
+    }
+  });
+
+  it("states the limit it cannot express as a keyword", () => {
+    const properties = verificationJsonSchema.properties as Record<string, JsonSchemaNode>;
+    expect(properties.correction?.description).toContain(String(CORRECTION_MAX_WORDS));
   });
 });

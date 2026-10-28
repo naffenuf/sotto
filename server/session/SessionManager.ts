@@ -38,6 +38,7 @@ import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
 import { Observer } from "../interject/Observer.js";
+import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import { SessionStore, type SessionWriter } from "./SessionStore.js";
 
@@ -126,6 +127,7 @@ interface StoreSlot {
 interface ModelLoops {
   board: BoardUpdater | null;
   observer: Observer | null;
+  verifier: Verifier | null;
 }
 
 interface RunningSession {
@@ -138,6 +140,8 @@ interface RunningSession {
   board: BoardUpdater | null;
   /** The observer (US-012), or `null` when there is no model client. */
   observer: Observer | null;
+  /** The fact check (US-013), or `null` when there is no model client. */
+  verifier: Verifier | null;
   /** What the transcription dot shows once the session is published. */
   transcription: [state: StatusState, detail: string];
   /** What the model dot shows once the session is published. */
@@ -419,19 +423,32 @@ export class SessionManager {
       this.logger.warn(
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
       );
-      return { board: null, observer: null };
+      return { board: null, observer: null, verifier: null };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
       if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
     };
-    const observer = new Observer({
+    const verifier = new Verifier({
       clock,
       model,
       logger: this.logger,
       onRecord: (record) => store.writer?.appendCandidate(record),
       // US-014 is what turns a candidate into something on the stage. Until
-      // then the observer's output is the log and nothing else.
-      onCandidate: () => {},
+      // then a checked candidate's output is the log and nothing else.
+      onVerified: () => {},
+      onModelState,
+    });
+    const observer = new Observer({
+      clock,
+      model,
+      logger: this.logger,
+      onRecord: (record) => store.writer?.appendCandidate(record),
+      // A claim that looks wrong is checked against the web before it can be
+      // said to anyone (US-013); everything else goes straight to the policy,
+      // which US-014 will supply.
+      onCandidate: (candidate) => {
+        if (candidate.type === "factual_error") verifier.verify(candidate);
+      },
       onModelState,
     });
     const board = new BoardUpdater({
@@ -453,7 +470,7 @@ export class SessionManager {
       },
       onModelState,
     });
-    return { board, observer };
+    return { board, observer, verifier };
   }
 
   /**
@@ -503,6 +520,7 @@ export class SessionManager {
     if (wasCurrent) this.current = undefined;
     running.board?.stop();
     running.observer?.stop();
+    running.verifier?.stop();
     // Whether it ended, was stopped or failed, the folder gets its `endedAt`.
     running.store.writer?.end();
 
@@ -543,14 +561,15 @@ export class SessionManager {
 }
 
 /**
- * Gives both loops the end of the conversation: the board gets a last update
- * for the turns that never reached four, and the observer gets a last look at
- * the board that came out of it. In that order, because the observer reads
- * what the board update wrote.
+ * Gives every loop the end of the conversation: the board gets a last update
+ * for the turns that never reached four, the observer gets a last look at the
+ * board that came out of it, and the checks that look produced get to come
+ * back. In that order, because each one reads what the one before it wrote.
  */
 async function drainLoops(loops: ModelLoops): Promise<void> {
   await loops.board?.flush();
   await loops.observer?.flush();
+  await loops.verifier?.flush();
 }
 
 /** What the model dot says about a session: ready, or not running at all. */

@@ -20,6 +20,8 @@ export const PROMPTS = {
   board: "board",
   /** Noticing things worth raising, and scoring them (US-012). */
   observer: "observer",
+  /** Checking a claim against the web before raising it (US-013). */
+  verify: "verify",
 } as const;
 
 export type PromptName = (typeof PROMPTS)[keyof typeof PROMPTS];

@@ -25,6 +25,11 @@ class FakeModel implements ModelClient {
 
   constructor(private readonly replies: (() => Promise<unknown>)[]) {}
 
+  /** The board and the observer never search; US-013's verifier does. */
+  async grounded(): Promise<never> {
+    throw new Error("unexpected grounded call");
+  }
+
   async structured(call: StructuredCall): Promise<unknown> {
     this.calls.push(call);
     const reply = this.replies.shift();
@@ -206,6 +211,23 @@ describe("Observer", () => {
     ]);
   });
 
+  /**
+   * The headline states the observer's reading of the conversation, not the
+   * words that provoked it, so a candidate carries the cited turns verbatim
+   * for the fact check (US-013) and the evidence quotes on a card (US-015).
+   */
+  it("carries the cited turns in the words they were said in", async () => {
+    const test = harness([candidates(raw({ evidenceTurnIds: ["0:1", "0:3", "9:9"] }))]);
+    test.say(4);
+    test.observer.observe(boardWithConstraint());
+    await test.observer.flush();
+
+    expect(test.passed[0]?.evidence).toEqual([
+      { turnId: "0:1", speaker: "B", quote: "turn 1" },
+      { turnId: "0:3", speaker: "B", quote: "turn 3" },
+    ]);
+  });
+
   it("marks a repeat of an earlier candidate and does not pass it on", async () => {
     const test = harness([candidates(raw()), candidates(raw({ headline: "Booking the studio breaks the budget they set" }))]);
     test.say(4);
@@ -339,6 +361,7 @@ describe("findDuplicate", () => {
     id: "cand-1",
     createdAtMs: 0,
     run: 1,
+    evidence: [],
   });
 
   it("finds the same type pointing at an overlapping board item", () => {
