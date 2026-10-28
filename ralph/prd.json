@@ -354,8 +354,8 @@
         "Verify in browser using webapp-testing skill (Playwright screenshot after a moment-contradiction events replay shows an interject card)"
       ],
       "priority": 20,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done; all 6 criteria met. server/interject/delivery.ts is pure (Interjection -> StageCard: level becomes variant, quotes re-attributed to the names the group gave the labels, card id derived as card-<candidateId>). EventBus remembers cards and clears them on a session *starting*, so a finished replay keeps its stage and a reload is caught up; the snapshot is now seven events plus one `card` per card. POST /api/feedback takes only a card id (409 no-cards, 404 unknown-card, 400 bad body) and writes FeedbackLogRecord to the most recent session's feedback.jsonl. Clicking an evidence quote scrolls the transcript to that turn, marks it (data-cited) and stops following the live edge. Needed REPLAY_TRAILING_SILENCE_MS (3 s on the pipeline clock, after the board/observer/verifier flush and before the policy's last look): moment-contradiction has no reported silence >= 1,500 ms anywhere, so without it every candidate dies session_ended. Checked: npm run typecheck, npm test (383 / 30 files), npm run test:integration (19 / 5 files, 177 s), npm run build, and npm run verify:delivery - a real replay delivered the planted contradiction as an interject card 145 s after Start, the quote scrolled turn 0:20 into view, the verdict landed in feedback.jsonl, and 0 sounds / 0 dialogs were counted. Screenshots /tmp/sotto-shots/us020*.png. Nothing human-only is pending."
     },
     {
       "id": "US-021",

@@ -424,3 +424,41 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   detection (US-017) calls `wakePhraseDetected()` and the answer agent (US-018) brackets its work
   with `setAnswerThinking(true/false)`; both make held candidates wait rather than dropping them,
   and the one that finishes releases them on the spot.
+- **A delivered card is a pure function of the decision, and its id is the candidate's.**
+  `server/interject/delivery.ts` turns an `Interjection` into a `StageCard`: the level becomes
+  the `variant` and *nothing else* changes with it, because a glow the reader opens has to be
+  exactly the card an interjection would have been. The only thing not copied straight across is
+  the evidence — the observer attaches diarization labels (`A`, `B`) and the group wants the
+  names it gave them (US-007). `deliveredCardId(candidateId)` is `card-<id>`, derived rather
+  than counted, so `POST /api/feedback` is handed only a card id and finds its way back to the
+  candidate, its level and its type: a tab must not be able to file a verdict about a card the
+  server never showed.
+- **The stage outlives its session, so the feedback target does too.** `EventBus` remembers
+  cards and clears them when a session *starts*, never when one ends — a replay's cards are read
+  after it finishes, which is exactly when the 👍 gets clicked. `SessionManager.recordFeedback`
+  therefore answers for the most recent session and writes to *that* folder's `feedback.jsonl`
+  (`no-cards` → 409, `unknown-card` → 404). The bus snapshot is now seven events **plus one
+  `card` event per card**, which is also how the browser folds a live arrival: same id replaces
+  in place, so an answer landing in pieces (US-018) never doubles itself.
+- **A replay has to be handed its last pause.** A capture ends within milliseconds of the last
+  word (`moment-contradiction`'s final `speechEnd` is 17 ms before its last frame), but the
+  conversation did not — a group that has stopped talking is in the longest pause of the
+  session. `REPLAY_TRAILING_SILENCE_MS` (3 s) is advanced on the pipeline clock after the
+  board/observer/verifier flush and before the policy's last look. It is what makes
+  `moment-contradiction` deliver at all: that fixture has **no** reported silence ≥ 1,500 ms
+  anywhere in its 26 lines, so its one real candidate (measured: score 0.855, found at 115.0 s)
+  holds `waiting_for_pause` and goes out as `interject` at 123.5 s, in the quiet after the end.
+  Without it the policy writes everything off as `session_ended`.
+- **"No sound and no modal" is tested by instrumenting the page, not by listening.** A headless
+  browser is silent either way, so `scripts/verify-delivery.mjs` (`npm run verify:delivery`)
+  counts `new Audio`, `new AudioContext`, `HTMLMediaElement.play`, `showModal` and `alert` in an
+  `addInitScript` that runs before any app code, and the criterion is a count of zero. The same
+  check drives a real `moment-contradiction` replay to a real interject card (~145 s from the
+  Start click), clicks an evidence quote and reads back which transcript row got `data-cited`
+  and whether it is actually inside the list's box, then clicks ⏱ and reads the line out of
+  `feedback.jsonl`. The glow/interject pair it cannot rely on a conversation producing comes
+  from a second page with `/ws/events` mocked.
+- **A replay that has finished leaves Stop disabled, not absent.** `locator.count()` is still 1,
+  so a Playwright click on it waits out the full 30 s timeout and then throws. Ask
+  `isEnabled()`. And a session folder is named `<when>-<source slug>`, so matching the newest
+  one means `endsWith("events-moment-contradiction")`, not `endsWith("events")`.

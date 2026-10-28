@@ -613,3 +613,42 @@
   setting, not the tab), and `active` chosen mid-replay is in the folder's `session.json`.
   Checked: npm run typecheck, npm test (366 / 29 files), npm run test:integration (19 / 5 files,
   144 s), npm run build, npm run verify:chattiness. Nothing human-only is pending.
+
+[2026-10-28 09:05] US-020 — completed — Interjection delivery and feedback: decisions become cards,
+  and the group can answer them.
+  FOUND IT HALF-DONE. The working tree held a cut-off iteration's US-020 (server/interject/
+  delivery.ts, shared/feedback.ts, the route, the bus's card memory, the Card/Stage/Transcript
+  wiring and REPLAY_TRAILING_SILENCE_MS) and it was sound — continued from it rather than
+  restarting. What was missing was every test and the browser check. Deleted its throwaway
+  scripts/probe-delivery.ts once verify:delivery covered the same ground.
+  THE CARD IS A PURE FUNCTION OF THE DECISION. `cardForInterjection` copies the candidate across,
+  makes the policy's level the `variant` and changes nothing else — a glow the reader opens is
+  exactly the card an interjection would have been — and re-attributes the evidence quotes from
+  diarization labels to the names the group gave them. `deliveredCardId` is `card-<candidateId>`,
+  derived not counted, so the browser can send only a card id and the server still knows which
+  candidate, at what level and of what type it showed.
+  THE STAGE OUTLIVES THE SESSION. `EventBus` clears cards when a session *starts*, never when one
+  ends: a replay's cards are read after it finishes, which is when the 👍 is clicked. So
+  `SessionManager.recordFeedback` answers for the most recent session and writes to *that*
+  folder's feedback.jsonl — 409 when Sotto has said nothing, 404 for a card nobody saw.
+  THE TRAILING SILENCE IS LOAD-BEARING. moment-contradiction has NO reported silence >= 1,500 ms
+  in its 26 lines, so its one candidate (real run: score 0.855, found at 115.0 s) holds
+  `waiting_for_pause` the whole way and only goes out because the replay is handed 3 s of quiet
+  before the policy's last look. Delivered `interject` at 123.5 s. Anything that changes
+  drainLoops must keep that silence after the verifier flush and before the policy.
+  NEW CHECK: `npm run verify:delivery` (scripts/verify-delivery.mjs). Page one is the real thing —
+  a moment-contradiction replay to a real interject card (145 s from Start), a quote clicked and
+  the cited transcript row read back (0:20, inside the list's box), ⏱ clicked and the line read
+  out of feedback.jsonl, and an addInitScript that counts `new Audio` / `new AudioContext` /
+  `play()` / `showModal()` / `alert()` from before any app code (zero of each — a headless
+  browser is silent either way, so counting is the only real test of "no sound, no modal").
+  Page two mocks /ws/events for the interject-plus-glow pair a conversation will not produce on
+  demand. Two gotchas it cost: a finished replay leaves Stop *disabled*, not absent (count() is
+  still 1, so the click waits out 30 s), and a session folder ends with the whole source slug
+  (`events-moment-contradiction`), not `events`.
+  FOR US-021/US-022 (eval harness). Everything the harness needs is now in the session folder:
+  candidates.jsonl carries candidate / verification / decision lines and feedback.jsonl the
+  verdicts. A delivered decision is one whose `decision` is `interject` or `glow` — the reason
+  may be `delivered`, `cooldown` or `budget`, the last two being downgrades, not losses.
+  Checked: npm run typecheck, npm test (383 / 30 files), npm run test:integration (19 / 5 files,
+  177 s), npm run build, npm run verify:delivery. Nothing human-only is pending.
