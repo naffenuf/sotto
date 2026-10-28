@@ -549,3 +549,24 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   read back in by `writeReport` and rendered as the report's `## Notes` section, because
   `npm run eval:report` rewrites `<id>.md` from the run record and would otherwise erase anything
   typed into it. That is where a judge spot-check goes.
+- **The wake phrase is matched on position, because the spelling is not enough.** `server/wake.ts`
+  is pure (`detect(text, { spellings })`) and `server/wakeWatcher.ts` holds the stream state. The
+  rules come from `fixtures/events/NOTES.md`, not from the scripts: `ask-search` was *written* as
+  `Sotto, what do the main competitors charge per month?` and came back with **neither the comma nor
+  the question mark**, so punctuation can never be required. What separates an address from
+  `Sotto voce` (same spelling, same capitalisation, start of a sentence) is the following word, and
+  from `Soto's Restaurant` is the position. Without a comma only **wh-words** make a question:
+  auxiliaries would catch one more shape and would also fire on "Sotto is being too chatty", which
+  is what a team building Sotto says all day. A wake word with nothing after it does not trigger —
+  which is every partial on its way to a question, including `" Sotto"` itself.
+- **The wake indicator is the partial's job and the question is the final's.** `WakeWatcher` raises
+  "Sotto is listening" on the first partial that matches (and calls
+  `InterjectionPolicy.wakePhraseDetected`, so the floor belongs to whoever is asking) and emits the
+  question only when the turn goes final, at most once per `turnId`. A turn that stops matching as
+  the speaker says more takes the indicator back down; another speaker's turn cannot, which is what
+  `setListening`'s `about` argument is for. It is built in `SessionManager.assembler`, **not** in
+  `modelLoops`: a session with no `MODEL_API_KEY` still shows that it heard its name.
+- **The bus snapshot is eight events now, plus one per card.** `wake` joined it, remembered like the
+  rest and cleared by a session event in both directions — and `useSessionEvents` clears `listening`
+  on `session: null` too, because a session that ends mid-question would otherwise leave the
+  indicator up forever.

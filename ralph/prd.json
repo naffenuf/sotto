@@ -425,8 +425,8 @@
         "Typecheck passes"
       ],
       "priority": 24,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done. server/wake.ts (pure detect) + server/wakeWatcher.ts (one trigger per turnId, indicator on the partial, question on the final). Wired in SessionManager.assembler via wakeWatcher(), which exists even with no model client. New `wake` ServerEvent, remembered by the bus (snapshot is EIGHT events now, plus one per card) and cleared on any session event; the browser shows it on the stage as \"Sotto is listening\" + three breathing dots. DESIGN CALL worth knowing: with no comma, only wh-words make a question - auxiliaries were dropped deliberately, because \"Sotto is being too chatty\" is what a group building Sotto says all day and answering when nobody asked is the failure this product exists to avoid. Cost: \"Sotto can you help\" with both comma and ? lost by the transcription would miss; US-026's typed question is the fallback. Checks: npm run typecheck, npm test (534 / 43 files), npm run build, npm run test:integration on server/wake.integration.test.ts (13 tests, makes NO API calls - it is a capture replay), npm run verify:wake (new script, mocks /ws/events because the indicator is only up for a second of a real replay)."
     },
     {
       "id": "US-025",

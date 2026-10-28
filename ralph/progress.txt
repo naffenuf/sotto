@@ -764,3 +764,39 @@
   spot-checks survive `npm run eval:report`.
   Checked: npm run typecheck, npm test (498 / 41 files), npm run build, npm run fixtures:check, one
   full npm run eval. Nothing human-only is pending.
+
+[2026-10-28 19:25] US-024 — completed — Wake-phrase detection: pure matcher, stateful watcher,
+  `wake` event, "Sotto is listening" on the stage.
+  US-023 WAS SKIPPED DELIBERATELY, not forgotten. Its own criterion 1 allows only observer.md and
+  policy weights, and the previous iteration measured that recall 0.7 is unreachable through those:
+  the board loop's 4-turn cadence (PRD US-009) eats a median 12.6 s of an 11.8-20.6 s moment window,
+  and the silence left in the remainder is 129-488 ms. The named fix - letting the observer look
+  every 1-2 final turns - contradicts PRD US-012 and is a PRD decision, not a tuning pass. Nothing
+  in this iteration changed that; read ralph/prd.json's US-023 notes and
+  eval/reports/2026-10-28_185157-notes.md before spending another $1 run on it.
+  WHAT LANDED. server/wake.ts: detect(text, {spellings}) -> {triggered, question}. A spelling
+  (sotto/soto/sota, configurable) at the start of a sentence or right after hey/okay/ok, not
+  followed by "voce" or a possessive 's, and followed by a separator, a wh-word, or a "?". Rules
+  taken from fixtures/events/NOTES.md, which is explicit that the transcription dropped both the
+  comma and the question mark from ask-search, so punctuation cannot be required and position has to
+  carry it. server/wakeWatcher.ts holds the stream state: one trigger per turnId, indicator up on
+  the first matching partial (also the policy courtesy hook, so the floor belongs to whoever is
+  asking), question out on the final, and another speaker's turn cannot pull the indicator down.
+  SessionManager.wakeWatcher() builds one per session from assembler.onUpdate, with no model client
+  needed. New `wake` ServerEvent; EventBus.setListening publishes only on a change and the snapshot
+  is now EIGHT events plus one per card (server/app.test.ts and bus.test.ts updated to match).
+  THE ONE JUDGEMENT CALL. Without a comma, only wh-words count as a question. Auxiliaries ("is",
+  "can", "should") were considered and dropped: they would catch "Sotto can you sketch the flow"
+  with the punctuation lost, but they also fire on "Sotto is being too chatty", which is what a
+  group building Sotto says all day - and no-wake is literally a fixture of people discussing it.
+  Tests document the boundary both ways.
+  FOR US-025 (answer agent). The question arrives at SessionManager's wakeWatcher onQuestion, which
+  today logs it and refreshes the courtesy window; replace that body with the answer call and
+  bracket it with policy.setAnswerThinking(true/false). WakeTrigger carries turnId, speaker and
+  question. The "thinking" card is the existing Card `thinking` state (US-016).
+  Checked: npm run typecheck, npm test (534 / 43 files), npm run build, and
+  server/wake.integration.test.ts under test:integration (13 tests; it is a capture replay and makes
+  no API calls, so it runs with or without MODEL_API_KEY). npm run verify:wake is new - it mocks
+  /ws/events because the indicator is only up for the second or two a partial is live. Screenshot
+  looked right: accent-coloured line centred on the stage, three breathing dots, no modal.
+  Nothing human-only is pending.
