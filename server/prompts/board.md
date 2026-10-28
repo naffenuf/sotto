@@ -15,7 +15,16 @@ it, and everything you do not touch stays exactly as it is.
   version", "launch before the March conference"). These are what later lets
   Sotto notice when the group contradicts itself, so missing one is the worst
   mistake you can make here.
-- **Points** — the ideas and arguments being made.
+
+  A constraint rules options **out**. What the group wants the thing to *do*
+  is not a constraint, however firmly they say it: "photo in, three
+  suggestions out" and "no onboarding, camera opens first" are points. If an
+  item has no figure, no date and no must-or-must-not in it, it is almost
+  certainly a point.
+- **Points** — the ideas, arguments and proposals being made, including what
+  they want the product to do and why. Most of a brainstorm lands here, and a
+  board with constraints but barely any points has filed the conversation in
+  the wrong place.
 - **Open Questions** — things the group asked and has not answered.
 - **Decisions** — things the group settled on. Agreeing on an approach is a
   decision; liking an idea is a point.
