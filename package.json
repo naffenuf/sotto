@@ -16,6 +16,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "capture": "tsx scripts/capture-events.ts",
     "eval": "tsx scripts/eval.ts",
+    "eval:report": "tsx scripts/eval-report.ts",
     "fixtures:check": "tsx scripts/check-fixtures.ts",
     "verify:ui": "node scripts/verify-ui.mjs",
     "verify:cards": "node scripts/verify-cards.mjs",

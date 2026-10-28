@@ -1,5 +1,5 @@
 /**
- * The interjection eval harness (PRD US-016, part 1).
+ * The interjection eval harness (PRD US-016).
  *
  *   npm run eval                                  # every eval fixture, normal
  *   npm run eval -- --chattiness all              # quiet, normal and active
@@ -9,8 +9,9 @@
  * Every captured conversation is replayed at `max` speed through the real
  * board → observer → verification → policy chain, and every card that reached
  * the stage is judged against the moments its fixture planted. The whole run
- * lands in `eval/runs/<timestamp>.json`; the scoring, the report and the gates
- * read that file (US-016 part 2).
+ * lands in `eval/runs/<timestamp>.json`, and the scoring, the report and the
+ * gates are computed from that file — so `npm run eval:report` can rebuild
+ * `eval/reports/<timestamp>.md` for any past run without replaying anything.
  *
  * This calls the real API. A replay costs the model calls the conversation
  * would really have made — six or seven board updates, a look after each, a
@@ -26,8 +27,12 @@ import type { EvalRunRecord, FixtureRunRecord } from "../shared/eval.js";
 import type { Chattiness } from "../shared/policy.js";
 import { loadConfig } from "../server/config.js";
 import { listFixtures } from "../server/fixtures.js";
+import { UsageMeter, estimateCostUsd, formatUsd } from "../server/eval/cost.js";
 import { Judge, JudgeCache, JUDGE_CACHE_DIR } from "../server/eval/judge.js";
 import { evalFixtures, parseEvalArgs, runTimestamp, EVAL_USAGE } from "../server/eval/options.js";
+import { promptHashes } from "../server/eval/prompts.js";
+import { renderTerminalReport } from "../server/eval/report.js";
+import { writeReport } from "../server/eval/reportFile.js";
 import { runFixture } from "../server/eval/runner.js";
 import { MuseClient, SPARK_MODEL } from "../server/model/client.js";
 
@@ -107,10 +112,13 @@ async function main(): Promise<void> {
 
   const startedAt = new Date();
   const id = runTimestamp(startedAt);
+  // One meter for the whole run: the replays' board, observer and verifier
+  // calls and the judge's verdicts all land in it, and the report prices it.
+  const meter = new UsageMeter();
   const judge = parsed.skipJudge
     ? undefined
     : new Judge({
-        model: new MuseClient({ apiKey }),
+        model: new MuseClient({ apiKey, onUsage: meter.record }),
         cache: new JudgeCache(join(repoRoot, JUDGE_CACHE_DIR)),
         modelName: SPARK_MODEL,
       });
@@ -129,6 +137,7 @@ async function main(): Promise<void> {
         chattiness,
         sessionRoot: join(SESSIONS_DIR, id, chattiness),
         apiKey,
+        createModel: () => new MuseClient({ apiKey, onUsage: meter.record }),
         judge,
       });
       runs.push(run);
@@ -149,25 +158,27 @@ async function main(): Promise<void> {
       calls: judge?.counts().calls ?? 0,
       cacheHits: judge?.counts().cacheHits ?? 0,
     },
+    promptHashes: promptHashes(),
+    usage: meter.total(),
     runs,
   };
   mkdirSync(RUNS_DIR, { recursive: true });
   const path = join(RUNS_DIR, `${id}.json`);
   writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
 
-  const delivered = runs.reduce((total, run) => total + run.deliveries.length, 0);
-  const outside = runs.reduce(
-    (total, run) => total + run.deliveries.filter((one) => !one.inPause).length,
-    0,
-  );
+  const { score, path: reportPath } = writeReport(record, repoRoot);
+  console.log(renderTerminalReport(record, score));
   console.log(
-    `\n[eval] ${delivered} card(s) delivered, ${outside} outside a pause, ` +
-      `${record.judge.calls} judge call(s) (${record.judge.cacheHits} cached)`,
+    `\n[eval] ${record.usage?.calls ?? 0} model call(s), ` +
+      `${record.judge.calls} judge call(s) (${record.judge.cacheHits} cached), ` +
+      `about ${formatUsd(estimateCostUsd(meter.total()))}`,
   );
-  console.log(`[eval] written to ${path}`);
-  // The gates — recall, precision, false interjects — are US-016 part 2. A
-  // replay that failed is still a failed run, and says so here.
-  if (runs.some((run) => run.error !== undefined)) process.exitCode = 1;
+  console.log(`[eval] run     ${path}`);
+  console.log(`[eval] report  ${reportPath}`);
+  if (!score.passed) {
+    console.error("[eval] GATES FAILED");
+    process.exitCode = 1;
+  }
 }
 
 await main();

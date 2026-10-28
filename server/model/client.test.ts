@@ -11,6 +11,7 @@ import {
   MuseClient,
   SPARK_MODEL,
   type ChatCompletions,
+  type ModelUsage,
   type Responses,
 } from "./client.js";
 
@@ -306,5 +307,84 @@ describe("MuseClient.grounded", () => {
   it("fails when the reply is not JSON", async () => {
     const { museClient } = grounded({ output: [message("I could not check that.")] });
     await expect(museClient.grounded(groundedCall)).rejects.toThrow(/was not JSON/);
+  });
+});
+
+describe("MuseClient usage reporting", () => {
+  const quiet = { log: () => {}, warn: () => {} };
+
+  it("reports what a structured call spent, under the call's label", async () => {
+    const spent: ModelUsage[] = [];
+    const fake = new FakeCompletions(choice('{"operations":[]}'));
+    const museClient = new MuseClient({
+      completions: fake,
+      logger: quiet,
+      onUsage: (usage) => spent.push(usage),
+    });
+    await museClient.structured(call);
+    expect(spent).toEqual([
+      { label: "board", inputTokens: 100, outputTokens: 210, reasoningTokens: 180 },
+    ]);
+  });
+
+  it("reports a truncated reply too: the tokens were billed either way", async () => {
+    const spent: ModelUsage[] = [];
+    const fake = new FakeCompletions(choice(null, "length"));
+    const museClient = new MuseClient({
+      completions: fake,
+      logger: quiet,
+      onUsage: (usage) => spent.push(usage),
+    });
+    await expect(museClient.structured(call)).rejects.toThrow(ModelCallError);
+    expect(spent).toHaveLength(1);
+  });
+
+  it("reports zero rather than nothing when the API omits the usage", async () => {
+    const spent: ModelUsage[] = [];
+    const fake = new FakeCompletions({
+      choices: [
+        {
+          index: 0,
+          finish_reason: "stop",
+          logprobs: null,
+          message: { role: "assistant", content: "{}", refusal: null },
+        },
+      ],
+    } as Partial<Completion>);
+    const museClient = new MuseClient({
+      completions: fake,
+      logger: quiet,
+      onUsage: (usage) => spent.push(usage),
+    });
+    await museClient.structured(call);
+    expect(spent[0]).toEqual({
+      label: "board",
+      inputTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+    });
+  });
+
+  it("reports a grounded call, whose endpoint names the tokens differently", async () => {
+    const spent: ModelUsage[] = [];
+    const fake = new FakeResponses({
+      output: [message('{"verdict":"right"}')],
+      usage: {
+        input_tokens: 2_400,
+        output_tokens: 1_800,
+        total_tokens: 4_200,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens_details: { reasoning_tokens: 1_500 },
+      },
+    } as Partial<Response>);
+    const museClient = new MuseClient({
+      responses: fake,
+      logger: quiet,
+      onUsage: (usage) => spent.push(usage),
+    });
+    await museClient.grounded(groundedCall);
+    expect(spent).toEqual([
+      { label: "verify", inputTokens: 2_400, outputTokens: 1_800, reasoningTokens: 1_500 },
+    ]);
   });
 });

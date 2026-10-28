@@ -164,6 +164,22 @@ export interface FixtureRunRecord {
   error?: string;
 }
 
+/** One prompt file and the hash of the text the model was given. */
+export interface PromptHash {
+  /** Repo-relative, e.g. `server/prompts/observer.md`. */
+  file: string;
+  hash: string;
+}
+
+/** What a run spent at the model, as the API reported it. */
+export interface RunTokenUsage {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Part of {@link outputTokens}, not an addition to it. */
+  reasoningTokens: number;
+}
+
 /** One `npm run eval`: every fixture, at every chattiness asked for. */
 export interface EvalRunRecord {
   /** The run's id, which is also its file name: `YYYY-MM-DD_HHMMSS`. */
@@ -182,5 +198,13 @@ export interface EvalRunRecord {
     calls: number;
     cacheHits: number;
   };
+  /**
+   * Every prompt in `server/prompts/`, hashed — the other half of what the
+   * numbers depend on, beside the commit. Optional because the two runs
+   * written before US-016 part 2 do not have it.
+   */
+  promptHashes?: PromptHash[];
+  /** What the whole run spent, replays and judge together. Optional as above. */
+  usage?: RunTokenUsage;
   runs: FixtureRunRecord[];
 }

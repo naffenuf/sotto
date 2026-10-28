@@ -99,6 +99,22 @@ export interface GroundedReply {
   searched: boolean;
 }
 
+/**
+ * What one call spent, as the API reported it.
+ *
+ * Only the eval harness listens (PRD US-016's estimated cost); the pipeline
+ * itself never needs to know. Reasoning tokens are a *part of* the output
+ * tokens, not an addition to them, so a price is `input + output` and nothing
+ * else.
+ */
+export interface ModelUsage {
+  /** The call's {@link StructuredCall.label}. */
+  label: string;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+}
+
 /** A call that didn't come back with usable JSON. Always catchable. */
 export class ModelCallError extends Error {
   constructor(message: string) {
@@ -151,6 +167,11 @@ export interface MuseClientOptions {
   completions?: ChatCompletions;
   /** Seam for tests: the responses endpoint to call instead of the real one. */
   responses?: Responses;
+  /**
+   * Told what every call spent, before any error is thrown — a truncated
+   * reply is billed too. The eval harness uses it to price a run (US-016).
+   */
+  onUsage?: (usage: ModelUsage) => void;
 }
 
 export class MuseClient implements ModelClient {
@@ -185,6 +206,23 @@ export class MuseClient implements ModelClient {
     }));
   }
 
+  /**
+   * Passes on what a call spent. The two endpoints name the same numbers
+   * differently (`prompt_tokens` against `input_tokens`), and either may omit
+   * them, so a missing count is zero rather than a reason not to report.
+   */
+  private reportUsage(
+    label: string,
+    tokens: { input?: number | undefined; output?: number | undefined; reasoning?: number | undefined },
+  ): void {
+    this.options.onUsage?.({
+      label,
+      inputTokens: tokens.input ?? 0,
+      outputTokens: tokens.output ?? 0,
+      reasoningTokens: tokens.reasoning ?? 0,
+    });
+  }
+
   async structured(call: StructuredCall): Promise<unknown> {
     const completion = await this.completions.create({
       model: this.model,
@@ -210,6 +248,11 @@ export class MuseClient implements ModelClient {
         `, ${completion.usage?.completion_tokens ?? 0} completion tokens` +
         (reasoning === undefined ? "" : ` (${reasoning} reasoning)`),
     );
+    this.reportUsage(call.label, {
+      input: completion.usage?.prompt_tokens,
+      output: completion.usage?.completion_tokens,
+      reasoning,
+    });
 
     if (choice === undefined) {
       throw new ModelCallError(`${call.label}: the model returned no choices`);
@@ -268,6 +311,11 @@ export class MuseClient implements ModelClient {
         `, ${searched ? `${searchedUrls.length} page(s) searched` : "no search"}` +
         `, ${citations.length} annotated citation(s)`,
     );
+    this.reportUsage(call.label, {
+      input: response.usage?.input_tokens,
+      output: response.usage?.output_tokens,
+      reasoning,
+    });
 
     // The Responses API's version of running out of budget: a 200, a status of
     // `incomplete`, and whatever text had been produced so far.
