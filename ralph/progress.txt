@@ -692,3 +692,43 @@
   all` runs quiet, normal and active in turn (three replays, so ~3× the API bill).
   Checked: npm run typecheck, npm test (431 / 36 files), npm run build, npm run eval (full set)
   and npm run eval -- --fixtures moment-contradiction. Nothing human-only is pending.
+
+[2026-10-28 13:50] US-022 — completed — Eval scoring, report and gates: the run record turned into
+  numbers, a committed report and an exit code.
+  SCORING IS PURE AND LIVES OFF THE RECORD. `server/eval/score.ts` takes an `EvalRunRecord` and
+  returns outcomes, totals, the three headline metrics and the gates — no filesystem, no API, 30
+  unit tests over hand-built records. So `npm run eval:report` (new) rebuilds any past run's report
+  from `eval/runs/<id>.json` alone, which is the loop US-023 should tune in: replay once, re-score
+  for free. It exits on the same gates `npm run eval` does.
+  WHICH CLOCK THE WINDOW IS ON. A moment's window is "after triggerLine ends, before deadlineLine
+  ends", and those are positions in the *audio* while a delivery time is on the session clock
+  (~700 ms ahead). So `windowFor` uses `MomentRecord.triggerTurnEndMs`/`deadlineTurnEndMs` — the
+  session-clock ends of the turns those same lines produced, resolved from `timing.json` in
+  `moments.ts` — and falls back to the scripted times only for a line no turn overlapped. Same
+  lines, right clock, no slack needed because both sides are on one timeline.
+  OUTCOME RULES, written down because they are judgement calls the PRD only implies: late is
+  decided before level (a card after the deadline did not catch the moment however well pitched);
+  a moment matched by several cards takes the *best* outcome, earliest card breaking a tie; a
+  delivery before the trigger line ended still counts as caught; `late` does NOT count towards
+  recall; a delivery matching no moment is a false interject or false glow by the level it went
+  out at, and only `brainstorm`/`no-wake` false interjects are gated. `--no-judge` marks the two
+  gates that need matches `skipped` rather than silently scoring zero.
+  COST IS REAL TOKENS, NOT A GUESS. `MuseClient` gained an `onUsage` seam that both endpoints
+  report through (`prompt_tokens` vs `input_tokens`, zero when the API omits them) *before* any
+  error is thrown — a truncated reply is billed too. One `UsageMeter` for the whole run catches
+  board, observer, verifier and judge together. Measured: moment-contradiction alone is 15 calls,
+  30,387 in / 15,556 out (14,804 of it reasoning), $0.1041 — so the seven-fixture set is roughly
+  $0.5–0.7, inside the PRD's "under $1".
+  REPORTS ARE COMMITTED, RUNS ARE NOT. `eval/reports/<run id>.md` is 1:1 with its run and is NOT
+  git-ignored: it carries the commit, the hash of every `server/prompts/*.md` and the cost, so two
+  reports are comparable. Committed two: `2026-10-28_091323.md` (the full set, the baseline US-023
+  starts from — recall 0/6, one late catch, zero false interjects) and `2026-10-28_134217.md` (one
+  fixture, but with the prompt hashes and real cost the older run predates).
+  THE GATES FAIL RIGHT NOW AND THAT IS THE POINT. Recall is 0.00 on the full set. US-023's notes in
+  `ralph/prd.json` carry the measured ceiling: only 3 of 6 moments have a >= 1,500 ms reported
+  silence inside their window (1,840 / 2,240 / 1,680 ms), so PAUSE_MS 1,500 caps recall at 0.50 and
+  prompt tuning alone cannot reach 0.70. `PAUSE_MS` ~500 would make 5 of 6 reachable. The PRD does
+  not fix the delivery threshold at 1.5 s, so it is a fair policy weight to tune.
+  Checked: npm run typecheck, npm test (496 / 41 files), npm run build, one real `npm run eval`
+  fixture end to end, and `npm run eval:report` over both existing runs (exit 1, as the gates
+  intend). Nothing human-only is pending.

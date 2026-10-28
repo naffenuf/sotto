@@ -495,3 +495,32 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   before it ever gets a pause. `brainstorm` and `no-wake` produced zero candidates, so precision
   is not the problem — recall is, and `STALE_TURNS`, `PAUSE_MS` and the observer's coverage of
   assumptions and dropped threads are the three dials the harness now measures.
+- **Scoring reads the record, so re-scoring is free.** `server/eval/score.ts` is pure over an
+  `EvalRunRecord`, and `npm run eval:report` rebuilds any past run's `eval/reports/<id>.md` from
+  `eval/runs/<id>.json` with no API calls and the same exit code `npm run eval` would give. A
+  moment's window is on the **session clock** — `MomentRecord.triggerTurnEndMs`/`deadlineTurnEndMs`,
+  the turns the scripted trigger and deadline lines produced — never the audio times, which run
+  ~700 ms behind the delivery times they would be compared to. The outcome rules that the PRD only
+  implies: `late` beats level (a card after the deadline did not catch the moment), the *best*
+  outcome of several matching cards wins, `late` does not count towards recall, and `--no-judge`
+  marks the match-dependent gates `skipped` rather than scoring them zero.
+- **A report is committed; the run it came from is not.** `eval/reports/` is deliberately outside
+  `.gitignore` while `eval/runs/`, `eval/sessions/` and `eval/cache/` are inside it, so a report
+  has to stand alone: it carries the git commit, a hash of every `server/prompts/*.md` and the
+  estimated cost. That is also why `EvalRunRecord.promptHashes` and `.usage` are optional — the two
+  runs written before US-022 have neither, and the report says so rather than printing zeros as
+  fact.
+- **Cost comes off the calls, through one seam.** `MuseClientOptions.onUsage` is told what every
+  call spent *before* any error is thrown, because a truncated reply is billed too; the two
+  endpoints name the same numbers differently (`prompt_tokens` vs `input_tokens`) and either may
+  omit them, so a missing count is zero. Reasoning tokens are *part of* the output tokens, not an
+  addition — pricing `input + output` is the whole bill. Measured: `moment-contradiction` alone is
+  15 calls and $0.10, so the seven-fixture set is roughly $0.5–0.7.
+- **The pause the policy needs may not be in the fixture.** Measured over the captures, only 3 of
+  the 6 planted moments have a reported silence >= `PAUSE_MS` (1,500 ms) anywhere inside their
+  window: `moment-assumption` 1,840 ms, `moment-fact` 2,240 ms, `moment-mixed`/demo-deadline
+  1,680 ms. `moment-dropped`'s best is 1,200 ms, `moment-mixed`/nightly-photo 560 ms and
+  `moment-contradiction` **320 ms**. So at 1,500 ms the ceiling on recall is 3/6 and no observer
+  prompt can lift it; a found candidate holds `waiting_for_pause` until `STALE_TURNS` drops it, or
+  until the 3 s trailing silence, which is after the deadline and scores `late`. Measure the gaps
+  before blaming the prompt.
