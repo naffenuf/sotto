@@ -524,3 +524,52 @@
   currently passes `() => {}` for it, because US-014's policy is what turns a candidate into
   something on the stage. Append a second `kind` to `candidates.jsonl` (the record type is a
   discriminated `{ kind: "candidate", atMs, candidate }`) rather than widening that one.
+
+[2026-10-28 04:10] US-018 — completed — Fact verification: every factual_error is checked against the web before anyone hears it.
+  CONTINUED FROM A CUT-OFF ITERATION. The tree already held `server/interject/Verifier.ts`,
+  `verify.md`, `MuseClient.grounded` and most of the unit tests; they were sound and only the
+  two test files failed to compile (missing imports, a `private` field a test reached into).
+  Kept all of it. What I added: the integration test, the citation resolution below, the
+  evidence quotes, and the two prompt changes.
+  THE GROUNDED SEAM. `MuseClient.grounded` is the Responses API — `tools: [{type:"web_search"}]`
+  plus strict structured output — and it works, which the docs do not say anywhere:
+  https://dev.meta.ai/docs/cookbook/search-grounding only shows prose. Measured: 1,350–1,800
+  reasoning tokens and 9–17 s per check, 16–40 pages searched, **zero `url_citation`
+  annotations** (an annotation is a character range into prose, and the reply is pure JSON).
+  So the citations that reach the group come from the model's own `citations` array, each one
+  resolved against `include: ["web_search_call.action.sources"]` — exact URL, else the first
+  page the search returned from that host, else dropped. Asked for "the full URL exactly as
+  the search gave it" the model obliges; asked only for "the URL" it answered
+  `"en.wikipedia.org"`, which is a real source named imprecisely, not an invention, hence the
+  host fallback.
+  THE BUG THAT MATTERED. The first integration run came back `unverified (right)` — correctly.
+  `renderVerificationRequest` was sending `candidate.headline` as "## The claim", and the
+  observer's headline *is* the correction ("Instagram launched in 2010, not 2014"). So a
+  `Candidate` now carries `evidence: EvidenceQuote[]`, resolved from `evidenceTurnIds` against
+  the observer's own turns (an id the assembler never produced is dropped, never invented), and
+  the request leads with `> **Speaker B:** <what was actually said>`. US-020 needs those quotes
+  anyway.
+  THE OBSERVER WOULD NOT RAISE IT. Even then: five observer looks over `moment-fact`, zero
+  candidates, twice in a row — it sees "Instagram launched in 2014" cleanly in the transcript
+  (checked the capture) and declines, because the prompt says to leave out anything you only
+  half believe and it has no web access. `observer.md` now says the opposite for this one type:
+  a `factual_error` is checked downstream and a right one is dropped silently, so a middling
+  `confidence` is still worth returning. After that, `moment-fact` gives exactly one candidate
+  (confidence 0.95, citing turn 0:5) which verifies `wrong` with two real citations, and
+  `brainstorm` still gives **zero** — re-probed, so US-021's "brainstorm has no interject cards"
+  is still in reach.
+  BOARD PROMPT FLAKE, FIXED THIS TIME. `board.integration.test.ts`'s ">= 4 points" failed again
+  (2 points). As CLAUDE.md said to, sharpened `server/prompts/board.md`'s constraints/points
+  boundary rather than lowering the threshold — separate commit b94096c, since it is not this
+  story. Five clean board replays since.
+  FOR WHOEVER OWNS THE BOARD NEXT (US-014 code, not a story of its own): board update 6 of
+  `moment-fact` fails with `finish_reason: "length"` at the 4,096-token default once the board
+  is ~15 items, and the retry fails identically, so the last four turns never land. Raise the
+  board call's `maxTokens`.
+  FOR US-019 (policy). `Verifier.onVerified` is the input: a `Candidate` with the correction
+  already in `detail` under `**Correction:**` and `citations` attached. `SessionManager.modelLoops()`
+  passes `() => {}` for it. `candidates.jsonl` is now a two-kind union (`CandidateLogLine` =
+  candidate | verification); append a third `kind` for the policy's decisions rather than
+  widening either.
+  Checked: npm run typecheck, npm test (325 / 27 files), npm run test:integration (18 / 5 files),
+  npm run build. Nothing human-only is pending.

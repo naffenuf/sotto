@@ -356,3 +356,38 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   constraints and left a single point, failing the `>= 4 points` assertion; the next replay gave
   six. If it recurs, sharpen `server/prompts/board.md` — a stated limit versus a desired
   behaviour — rather than lowering the threshold.
+- **Structured output and web search do work together, and the citations do not come from the
+  annotations.** `MuseClient.grounded` (`server/model/client.ts`) is the Responses API seam —
+  `tools: [{ type: "web_search" }]` beside a strict `json_schema` — which the docs never show
+  (https://dev.meta.ai/docs/cookbook/search-grounding only demonstrates prose). Measured: 9–17 s
+  and 1,350–1,800 reasoning tokens a check, 16–40 pages searched, and **zero `url_citation`
+  annotations every time**, because an annotation is a character range into the model's prose and
+  the reply is pure JSON. So the sources shown to a group come from the model's own `citations`
+  array, each one *resolved* against `include: ["web_search_call.action.sources"]` — the API's
+  record of what it actually put in front of the model. Exact URL, else the first page the search
+  returned from that host, else dropped. (Ask for "the URL" and it answers `"en.wikipedia.org"`;
+  ask for "the full URL exactly as the search gave it" and it gives one. The host fallback stays
+  because a shortened name is a real source named badly, not an invention.) `readGrounded` also
+  has to pick the structured reply out of the model's narration: one response holds several
+  `message` items and `response.output_text` concatenates them all.
+- **A candidate's headline is not the claim — it is the correction.** The observer's headline
+  states what it believes ("Instagram launched in 2010, not 2014"), so anything that has to
+  reason about what the *group* said needs the words. `Candidate.evidence` carries the cited
+  turns verbatim (resolved in `Observer.quotes`, dropping an id the assembler never produced
+  rather than inventing a quote), and `renderVerificationRequest` leads with those quotes and
+  labels the headline as a listener's note that may itself be wrong. Sending the headline as
+  the claim got a verdict of `right` on a conversation that was wrong — the first thing the
+  US-013 integration test caught.
+- **The verifier changed what the observer should say.** The observer has no web access, and
+  `observer.md`'s "leave out anything you only half believe" meant it returned *zero*
+  candidates for `moment-fact` across five looks, twice over, while reading
+  "Instagram launched in 2014" in clean transcript. The prompt now carves out exactly one type:
+  a `factual_error` is checked against the web before anybody hears it and a right one is
+  dropped silently, so a middling `confidence` is still worth returning. `brainstorm` still
+  returns zero candidates afterwards — check that whenever either prompt is loosened.
+- **Checks run concurrently; the board and observer loops do not.** `Verifier.verify` returns
+  as soon as a check is under way and keeps a set of in-flight promises, because a claim waiting
+  on a search must not hold up the next one — each is registered with `clock.track` before
+  `verify` returns, so a `max`-speed replay still waits for all of them, and `flush()` loops
+  until the set is empty (a check can start while it waits). `right`, `unclear` **and a check
+  that failed** all stop: an unchecked claim must not be told to a group as an error.
