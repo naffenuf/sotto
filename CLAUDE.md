@@ -326,3 +326,33 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
 - **The `model` dot is `connecting` for the whole of every board call**, so any Playwright
   assertion that samples it at an uncontrolled moment mid-replay will flake. Wait for `active`
   to prove it came up, then accept `active` or `connecting` on later samples.
+- **The observer hangs off the board, not off the turns.** `server/interject/Observer.ts` runs
+  because `BoardUpdater.onUpdate` calls `observer.observe(update.board)` — one look per board
+  update, which is where the PRD's "right after each board update" comes from and why the
+  observer gets the board's memory (what was stated, what was decided) for free instead of
+  re-reading the transcript. `observe()` returns immediately so the board loop never waits, but
+  registers `clock.track("observer", …)` *before* returning, so a `max`-speed replay still stops
+  for it. `SessionManager.modelLoops()` builds both loops from **one** `ModelClient` and both push
+  the same `model` dot; `drainLoops()` flushes board-then-observer at session end, in that order,
+  because the observer reads what the board update wrote.
+- **Strict structured output has no `maxLength` and no `maximum`, so the limits are clipped after
+  the fact.** The PRD's 90-char headline, 60-word detail, 20-word "why now" and 0–1 scores live in
+  `observerCandidatesJsonSchema`'s `description`s and in `server/prompts/observer.md`, and are
+  *enforced* by transforms inside `ObserverCandidateSchema` (`clipChars`/`clipWords` at a word
+  boundary, `clamp01`). Rejecting an overlong headline would throw away a real contradiction over
+  two characters; clipping means anything downstream can lay a candidate out without measuring it.
+- **Validate a list reply one element at a time.** `ObserverReplySchema` deliberately types the
+  array as `unknown[]` and the observer parses each candidate on its own, so one malformed
+  candidate is dropped (and warned about) while the good ones beside it get through — the same
+  rule `applyOps` follows for board operations. A whole-reply `z.array(CandidateSchema)` would
+  lose all three.
+- **"Zero candidates is normal" is a measurable property, and the prompt gets it.** Six observer
+  runs over `moment-contradiction` produced exactly one candidate — the planted contradiction, at
+  confidence 1.0, citing the trigger turn — and `brainstorm` produced none at all (no
+  `candidates.jsonl` is written, since `SessionStore` only opens a log on first append). A test
+  that expects the file to exist should say so with a message rather than failing on ENOENT.
+- **The board prompt's constraints/points boundary is the flakiest thing in the suite.** One
+  `board.integration.test.ts` run filed most of `brainstorm`'s product requirements as
+  constraints and left a single point, failing the `>= 4 points` assertion; the next replay gave
+  six. If it recurs, sharpen `server/prompts/board.md` — a stated limit versus a desired
+  behaviour — rather than lowering the threshold.

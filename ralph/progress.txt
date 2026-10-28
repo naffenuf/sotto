@@ -485,3 +485,42 @@
   Checked: npm run typecheck, npm test (252 tests, 26 files), npm run build,
   npm run verify:cards and npm run verify:ui — screenshots at /tmp/sotto-shots/us016*.png,
   looked at. Nothing human-only is pending.
+
+[2026-10-27 23:20] US-017 — completed — Observer: 0-3 scored interjection candidates after each board update, logged to candidates.jsonl.
+  WHAT I BUILT. `shared/candidates.ts` (the four types, `CandidateScores`,
+  `ObserverCandidateSchema`, `ObserverReplySchema`, `observerCandidatesJsonSchema`,
+  `CandidateLogRecord`), `server/prompts/observer.md`, `server/interject/Observer.ts`
+  (+ `findDuplicate`, `renderObserverRequest`), and the integration test
+  `server/interject/observer.integration.test.ts`. `SessionManager.boardUpdater()` became
+  `modelLoops()`: one `ModelClient` shared by the board and the observer, both pushing the
+  same `model` dot, and `drainLoops()` flushes board-then-observer at the end of a session.
+  WHERE IT HANGS. `BoardUpdater.onUpdate` calls `observer.observe(update.board)` — that is
+  what "right after each board update" means, and it is also why the observer gets the board's
+  memory for free. `observe()` returns immediately (the board must not wait on it) but
+  registers `clock.track("observer", …)` before returning, so a `max` replay waits.
+  THE LIMITS ARE CLIPPED, NOT REJECTED. Strict structured output has no `maxLength`/`maximum`,
+  so the 90-char headline / 60-word detail / 20-word whyNow and the 0-1 scores are stated in
+  the schema descriptions and in the prompt, and *enforced* by transforms inside
+  `ObserverCandidateSchema` (clip at a word boundary, clamp the score). So anything downstream
+  can lay a candidate out without measuring it. Candidates are validated one at a time —
+  `ObserverReplySchema` keeps the array as `unknown[]` — so one malformed candidate is dropped
+  alone, like a bad board op.
+  WHAT THE REAL MODEL DID. `moment-contradiction`: six board updates, six observer runs, and
+  exactly one candidate in the whole conversation — the planted contradiction ("The $20k
+  studio doesn't fit the $4k first-version budget", confidence 1.0), citing turns 0:20 and
+  0:23 and board items c1,c2. `brainstorm`: zero candidates, no `candidates.jsonl` at all.
+  That is the prompt's "an empty list is the normal result" working, and it is also US-021's
+  "brainstorm has no interject cards" looking achievable.
+  Checked: npm run typecheck, npm test (282 tests / 26 files), npm run test:integration
+  (14 tests / 4 files), npm run build. Nothing human-only is pending.
+  BOARD FLAKE, NOT MINE. The first full `test:integration` run failed
+  `board.integration.test.ts > organizes the conversation into points…` with 1 point: that run
+  of the *board* prompt filed most of brainstorm's product requirements as constraints. A
+  repeat replay gave 6 points and the whole suite then passed. The board request is byte-identical
+  to before this story, so it is model variance in the board prompt; if it recurs, tighten
+  `server/prompts/board.md`'s constraints/points boundary rather than lowering the threshold.
+  FOR US-018 (fact verification, PRD US-013): `factual_error` candidates are the ones to
+  verify. `Observer`'s `onCandidate` is where they come out; `SessionManager.modelLoops()`
+  currently passes `() => {}` for it, because US-014's policy is what turns a candidate into
+  something on the stage. Append a second `kind` to `candidates.jsonl` (the record type is a
+  discriminated `{ kind: "candidate", atMs, candidate }`) rather than widening that one.
