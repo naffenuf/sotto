@@ -9,6 +9,8 @@ import {
 } from "../audio/AudioSource.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
+import type { CandidateLogRecord } from "../../shared/candidates.js";
+import type { ModelClient, StructuredCall } from "../model/client.js";
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
 
@@ -226,6 +228,111 @@ describe("SessionManager, events replay", () => {
       expect((error as SessionStartError).status).toBe(400);
       expect((error as Error).message).toContain("nope");
     }
+  });
+});
+
+describe("SessionManager, board and observer", () => {
+  /**
+   * A model that answers both loops from their label: one board operation per
+   * update, and one candidate per look. Nothing reaches the network.
+   */
+  class ScriptedModel implements ModelClient {
+    /** Distinct subjects, so no two candidates read as the same thought. */
+    private static readonly subjects = [
+      "the hospital handover",
+      "the vendor quote",
+      "the studio timeline",
+      "the API pricing",
+      "the launch date",
+      "the data licence",
+      "the hosting bill",
+      "the hardware stock",
+      "the pilot headcount",
+      "the support rota",
+    ];
+
+    readonly calls: StructuredCall[] = [];
+    private items = 0;
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.calls.push(call);
+      if (call.label === "board") {
+        this.items += 1;
+        return {
+          operations: [
+            { op: "add_point", text: `point ${this.items}`, sourceTurnIds: ["0:0"] },
+          ],
+        };
+      }
+      return {
+        candidates: [
+          {
+            type: "untested_assumption",
+            headline: `${ScriptedModel.subjects[(this.items - 1) % ScriptedModel.subjects.length]} is unchecked`,
+            detail: "The plan rests on it.",
+            whyNow: "They are about to decide",
+            evidenceTurnIds: ["0:0"],
+            relatedBoardItemIds: [`p${this.items}`],
+            scores: { relevance: 0.8, novelty: 0.7, importance: 0.6, confidence: 0.5 },
+          },
+        ],
+      };
+    }
+  }
+
+  it("looks for candidates after each board update and writes them to the folder", async () => {
+    const bus = new EventBus(quiet);
+    const model = new ScriptedModel();
+    const candidates: CandidateLogRecord[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: (record: unknown) => candidates.push(record as CandidateLogRecord),
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      writeArtifact: () => "",
+      end: () => {},
+    } satisfies SessionWriter;
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => model,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-contradiction" });
+    await ended;
+
+    const boardCalls = model.calls.filter((call) => call.label === "board");
+    const observerCalls = model.calls.filter((call) => call.label === "observer");
+    expect(boardCalls.length).toBeGreaterThan(1);
+    // One look per update, and each look happens after the update it follows:
+    // its request carries the item that update added.
+    expect(observerCalls).toHaveLength(boardCalls.length);
+    expect(observerCalls.at(-1)!.user).toContain(`[p${boardCalls.length}] point ${boardCalls.length}`);
+
+    expect(candidates).toHaveLength(observerCalls.length);
+    expect(candidates[0]!.kind).toBe("candidate");
+    expect(candidates.map((record) => record.candidate.id)).toEqual(
+      candidates.map((_, index) => `cand-${index + 1}`),
+    );
+    // Different board items each time, so none of them is a repeat.
+    for (const record of candidates) expect(record.candidate.duplicateOf).toBeUndefined();
   });
 });
 

@@ -6,6 +6,9 @@
  *     capture (1x) ------------------------------------/        |
  *                                                              v
  *                                                        board updater -> bus
+ *                                                              |
+ *                                                              v
+ *                                                     observer -> candidates
  *
  * Only the left-hand column differs between sources. Everything downstream —
  * the turn assembler (US-005), the board update loop (US-009), and the
@@ -34,6 +37,7 @@ import { WavReplaySource } from "../audio/WavReplaySource.js";
 import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
+import { Observer } from "../interject/Observer.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import { SessionStore, type SessionWriter } from "./SessionStore.js";
 
@@ -118,6 +122,12 @@ interface StoreSlot {
   writer: SessionWriter | null;
 }
 
+/** The model-driven loops a session runs, or nulls when it has no model. */
+interface ModelLoops {
+  board: BoardUpdater | null;
+  observer: Observer | null;
+}
+
 interface RunningSession {
   info: SessionInfo;
   assembler: TurnAssembler;
@@ -126,6 +136,8 @@ interface RunningSession {
   mic: MicSource | undefined;
   /** The board update loop, or `null` when there is no model client. */
   board: BoardUpdater | null;
+  /** The observer (US-012), or `null` when there is no model client. */
+  observer: Observer | null;
   /** What the transcription dot shows once the session is published. */
   transcription: [state: StatusState, detail: string];
   /** What the model dot shows once the session is published. */
@@ -250,8 +262,8 @@ export class SessionManager {
     // Replay sets this clock to each frame's recorded arrival time, so the
     // whole pipeline reads the conversation's own timeline (US-006).
     const clock = new SimulatedClock(0);
-    const board = this.boardUpdater(info, clock, store);
-    const assembler = this.assembler(clock, store, board);
+    const loops = this.modelLoops(info, clock, store);
+    const assembler = this.assembler(clock, store, loops);
     let source: EventReplaySource;
     try {
       source = EventReplaySource.forFixture(fixture, {
@@ -271,9 +283,9 @@ export class SessionManager {
       assembler,
       store,
       mic: undefined,
-      board,
+      ...loops,
       transcription: ["active", `replaying ${fixture} events at ${this.replaySpeed}`],
-      model: modelStatus(board),
+      model: modelStatus(loops.board),
       stop: () => source.stop(),
       // Not `assemblerSink`: a saved session records every raw frame first,
       // so `events.jsonl` is a capture of the stream the assembler saw.
@@ -286,8 +298,9 @@ export class SessionManager {
           onEnd: () => {},
         })
         // The last few turns of a conversation never reach four, so the board
-        // gets one more update before the session is declared over.
-        .then(() => board?.flush()),
+        // gets one more update — and the observer one more look — before the
+        // session is declared over.
+        .then(() => drainLoops(loops)),
       stopRequested: false,
     };
   }
@@ -325,8 +338,8 @@ export class SessionManager {
       }
     }
 
-    const board = this.boardUpdater(info, this.liveClock, store);
-    const assembler = this.assembler(this.liveClock, store, board);
+    const loops = this.modelLoops(info, this.liveClock, store);
+    const assembler = this.assembler(this.liveClock, store, loops);
     const client = this.createAsrClient({
       apiKey,
       clock: this.liveClock,
@@ -353,25 +366,21 @@ export class SessionManager {
       assembler,
       store,
       mic,
-      board,
+      ...loops,
       transcription: [
         "connecting",
         source.kind === "mic"
           ? "waiting for the microphone"
           : "opening transcription session",
       ],
-      model: modelStatus(board),
+      model: modelStatus(loops.board),
       stop: () => client.stop(),
-      done: client.run(audio).then(() => board?.flush()),
+      done: client.run(audio).then(() => drainLoops(loops)),
       stopRequested: false,
     };
   }
 
-  private assembler(
-    clock: Clock,
-    store: StoreSlot,
-    board: BoardUpdater | null,
-  ): TurnAssembler {
+  private assembler(clock: Clock, store: StoreSlot, loops: ModelLoops): TurnAssembler {
     return new TurnAssembler({
       clock,
       // Frame times are measured from the start of the stream on both paths —
@@ -381,38 +390,51 @@ export class SessionManager {
       logger: this.logger,
       onUpdate: (turn) => {
         this.bus.publish({ type: "turn", turn });
-        // Partials are dropped by both of these; only final turns are saved,
-        // and only final turns can trigger a board update.
+        // Partials are dropped by all three of these; only final turns are
+        // saved, and only final turns can trigger a board update.
         store.writer?.appendTurn(turn);
-        board?.acceptTurn(turn);
+        loops.board?.acceptTurn(turn);
+        loops.observer?.acceptTurn(turn);
       },
     });
   }
 
   /**
-   * Builds the board update loop for a session (US-009), or `null` when there
-   * is no model client to run it with — in which case the session still
-   * transcribes and still saves, it just has no board.
+   * Builds the two model loops a session runs: the board update loop (US-009)
+   * and the observer (US-012), sharing one model client. Both are `null` when
+   * there is no client — in which case the session still transcribes and still
+   * saves, it just has no board and notices nothing.
    *
-   * It writes `board.json`/`board.md` and pushes the board to every attached
-   * browser. The status dot it drives is guarded on the session still being
-   * the current one, the same way frames are: a board update that lands after
-   * Stop must not light the dot back up. The board itself is published either
-   * way, because the last update of a session is the one worth reading.
+   * The board writes `board.json`/`board.md` and pushes the board to every
+   * attached browser; the observer writes `candidates.jsonl` and, right after
+   * each board update, looks at the conversation. Both drive the one `model`
+   * dot, guarded on the session still being the current one the same way
+   * frames are: work that lands after Stop must not light the dot back up.
+   * The board itself is published either way, because the last update of a
+   * session is the one worth reading.
    */
-  private boardUpdater(
-    info: SessionInfo,
-    clock: Clock,
-    store: StoreSlot,
-  ): BoardUpdater | null {
+  private modelLoops(info: SessionInfo, clock: Clock, store: StoreSlot): ModelLoops {
     const model = this.createModel();
     if (model === null) {
       this.logger.warn(
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
       );
-      return null;
+      return { board: null, observer: null };
     }
-    return new BoardUpdater({
+    const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
+      if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
+    };
+    const observer = new Observer({
+      clock,
+      model,
+      logger: this.logger,
+      onRecord: (record) => store.writer?.appendCandidate(record),
+      // US-014 is what turns a candidate into something on the stage. Until
+      // then the observer's output is the log and nothing else.
+      onCandidate: () => {},
+      onModelState,
+    });
+    const board = new BoardUpdater({
       clock,
       model,
       logger: this.logger,
@@ -424,11 +446,14 @@ export class SessionManager {
           changedIds: update.changedIds,
           updatedAtMs: update.atMs,
         });
+        // Right after each board update, while the board says what the group
+        // has stated and decided. Tracked on the clock inside, so the call is
+        // registered before this returns and `max` replay waits for it.
+        observer.observe(update.board);
       },
-      onModelState: (state, detail) => {
-        if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
-      },
+      onModelState,
     });
+    return { board, observer };
   }
 
   /**
@@ -477,6 +502,7 @@ export class SessionManager {
     const wasCurrent = this.current === running;
     if (wasCurrent) this.current = undefined;
     running.board?.stop();
+    running.observer?.stop();
     // Whether it ended, was stopped or failed, the folder gets its `endedAt`.
     running.store.writer?.end();
 
@@ -514,6 +540,17 @@ export class SessionManager {
       cancelTimer?.();
     }
   }
+}
+
+/**
+ * Gives both loops the end of the conversation: the board gets a last update
+ * for the turns that never reached four, and the observer gets a last look at
+ * the board that came out of it. In that order, because the observer reads
+ * what the board update wrote.
+ */
+async function drainLoops(loops: ModelLoops): Promise<void> {
+  await loops.board?.flush();
+  await loops.observer?.flush();
 }
 
 /** What the model dot says about a session: ready, or not running at all. */

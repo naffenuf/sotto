@@ -18,6 +18,8 @@ import { fileURLToPath } from "node:url";
 export const PROMPTS = {
   /** Keeping the living board up to date (US-009). */
   board: "board",
+  /** Noticing things worth raising, and scoring them (US-012). */
+  observer: "observer",
 } as const;
 
 export type PromptName = (typeof PROMPTS)[keyof typeof PROMPTS];
