@@ -282,8 +282,8 @@
         "Verify in browser using webapp-testing skill (Playwright screenshot of /dev/cards)"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Card (answer/interject/glow, thinking/error), Stage with the two-minute quiet-thoughts tray, /dev/cards routed on location.pathname, and a tiny markdown renderer for \"details \u25be\". Checked: npm run typecheck, npm test (252 tests), npm run build, npm run verify:cards (new) and npm run verify:ui, both looked at. Nothing human-only is pending. The stage is wired into App.tsx with an empty card list \u2014 US-020 (interjection delivery) and US-025 (answers) are what fill it."
     },
     {
       "id": "US-017",

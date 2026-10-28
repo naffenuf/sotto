@@ -455,3 +455,33 @@
   FOR US-016 (stage layout and Card): the layout grid and the sidebar split already exist
   (`.layout` 25%/75%, transcript `flex: 1 1 55%` / board `flex: 1 1 45%`); the stage is still
   the one-line hint in `App.tsx`. The dark palette is in `:root` in `styles.css`.
+
+[2026-10-27 23:04] US-016 — completed — Stage layout plus one Card in three variants, the quiet-thoughts tray, and /dev/cards.
+  WHAT I BUILT. `shared/cards.ts` (`StageCard` — the shape US-020 and US-025 will push),
+  `web/src/Card.tsx`, `web/src/Stage.tsx`, the pure `web/src/stageView.ts` and
+  `web/src/markdown.ts` (both unit-tested in node, 252 tests), `web/src/DevCards.tsx` at
+  `/dev/cards`, card styles in `styles.css`, and `npm run verify:cards`.
+  ONE CARD, THREE VARIANTS. `variant` is the *level* the policy picks, not different content:
+  a `glow` is a one-line <button> until it is clicked, at which point it renders as exactly
+  the article an `interject` would have been (`data-expanded="true"`). So US-020 can hand the
+  same payload to either level. `thinking` shows the dot indicator *beside* an existing
+  headline, which is what US-025's streaming answer needs (thinking → headline → detail).
+  NO MARKDOWN DEPENDENCY. "details ▾" renders through `parseMarkdown`, which returns a block
+  tree the card draws as React elements — paragraphs, bullet/numbered lists, bold, italics,
+  inline code, links. Nothing is ever an HTML string, and only `http(s)` becomes an href
+  (a model can hallucinate `javascript:` as easily as anything else).
+  THE ROUTER IS `location.pathname`. `main.tsx` picks `DevCards` for `/dev/cards` and `App`
+  otherwise; Vite's SPA fallback serves index.html for it in dev. There is no production
+  static route for either page yet (`@fastify/static` is a dependency but unregistered).
+  FOR US-017 (observer): the card's fields line up with the PRD's candidate shape —
+  `headline`, `detailMd`, `whyNow`, `evidence[{turnId, quote, speaker}]`, `citations`. The
+  stage is already in `App.tsx` with `NO_CARDS`; US-020 only has to feed it a
+  `StageCardView[]` (a `StageCard` plus `receivedAtMs`, stamped with `Date.now()` on arrival
+  the way `boardReceivedAtMs` is).
+  ALSO FIXED one flake in `verify-ui.mjs`: its late `runningDots` sample asserted the model
+  dot was `active`, but that dot is `connecting` for the whole of every board call, so the
+  sample landed mid-call about one run in two. It now accepts either; the `waitForDots`
+  earlier in the run still proves `active`.
+  Checked: npm run typecheck, npm test (252 tests, 26 files), npm run build,
+  npm run verify:cards and npm run verify:ui — screenshots at /tmp/sotto-shots/us016*.png,
+  looked at. Nothing human-only is pending.

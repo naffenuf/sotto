@@ -299,3 +299,30 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `connecting` for exactly the duration of a board call, so `statuses.model.state ===
   "connecting"` is the board panel's in-flight state. Later queues (observer, answers) should
   push the same channel rather than inventing a second one.
+- **One card, three variants, and the glow is not a different card.** `web/src/Card.tsx`
+  draws `answer`, `interject` and `glow` from one `StageCard` (`shared/cards.ts`): a glow is a
+  one-line `<button>` that, clicked, renders as exactly the `<article>` an interject would have
+  been. `variant` is the *level* the policy (US-014) chose, not different content, so a
+  delivery story can hand the same payload to either. `thinking` puts the dot indicator
+  *beside* whatever headline has already arrived, which is how a streaming answer (US-018)
+  shows up: thinking → headline → detail. An `error` card with no headline renders no headline
+  at all — the message is the whole card.
+- **The stage's clock is the browser's, like the board panel's.** `StageCard.createdAtMs` is
+  on the session clock, so a `StageCardView` adds `receivedAtMs` (`Date.now()` on arrival) and
+  `arrangeCards` sorts and trays on that. `nextTrayDueAt(cards, now)` deliberately skips glows
+  already past due: a due time in the past is a timer that fires immediately, finds nothing to
+  do and re-renders — which is a loop, not a tray.
+- **The card's markdown is parsed, never injected.** `web/src/markdown.ts` turns the little
+  markdown a detail can hold (paragraphs, bullet and numbered lists, bold, italics, inline
+  code, links) into a block tree the card renders as React elements. No HTML string, no
+  `dangerouslySetInnerHTML`, no dependency — and only `http(s)` becomes an `href`, because a
+  model can hallucinate `javascript:` as easily as any other URL. Anything it does not
+  recognize stays literal text.
+- **`location.pathname` is the whole router.** `main.tsx` renders `DevCards` for `/dev/cards`
+  and `App` for everything else; Vite's SPA fallback serves `index.html` for the dev path in
+  dev. `npm run verify:cards` drives that page — it is the only place an error card, a
+  thinking card and a two-minute-old glow exist at once, which a replay will never reliably
+  produce.
+- **The `model` dot is `connecting` for the whole of every board call**, so any Playwright
+  assertion that samples it at an uncontrolled moment mid-replay will flake. Wait for `active`
+  to prove it came up, then accept `active` or `connecting` on later samples.
