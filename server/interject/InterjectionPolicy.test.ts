@@ -188,7 +188,7 @@ describe("InterjectionPolicy", () => {
     // Six turns, each short enough that no pause ever opens.
     for (let i = 0; i < STALE_TURNS; i += 1) {
       stopSpeaking();
-      clock.advanceBy(400);
+      clock.advanceBy(PAUSE_MS - 1);
       startSpeaking();
       clock.advanceBy(600);
     }

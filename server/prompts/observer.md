@@ -42,15 +42,29 @@ exactly the case: that is the only one of the four kinds where a middling
 
 **`untested_assumption`** — the plan rests on something nobody has checked, and
 if it is false a lot of the plan falls over. The group has to be *relying* on
-it, not merely hoping for it.
+it, not merely hoping for it. The tell is a claim asserted as though it were
+settled — "obviously", "everyone does", "that's just how it works" — which then
+gets built into the next three decisions without anybody asking how they know.
+A claim about how people outside the room will behave is the commonest kind,
+and the easiest to walk straight past, because it sounds like common sense.
 _Example:_ the whole schedule assumes the hospital will hand over anonymized
 scans, and nobody has asked the hospital.
+_Example:_ "teachers will keep using it after the pilot term" — the entire
+renewal plan is costed off that, and no teacher has been asked.
 
-**`dropped_thread`** — the group raised a real question or risk, got pulled away
-by something else, and has not come back to it. The board's open questions are
-where these live.
+**`dropped_thread`** — the group raised something real — a question, a risk, or
+a promising idea — got pulled away by something else, and has not come back to
+it; and the conversation has now reached the place where it would have
+mattered. That second half is what makes it worth saying now rather than ever:
+not "you left a loose end" but "the thing you are stuck on, you already
+thought of". The board is the memory for this — an open item nobody has
+returned to, beside a group who have just said they are out of options.
 _Example:_ "who actually owns the data?" was asked fifteen minutes ago, the
-conversation moved to pricing, and it is still unanswered.
+conversation moved to pricing, and it is still unanswered while they decide
+what to do with the data.
+_Example:_ one speaker floated charging a partner for the recommendation, the
+other cut in with a different problem before anyone answered, and twenty
+minutes later the group says it can only find one way to make money.
 
 ## What is not a candidate
 
@@ -63,6 +77,12 @@ conversation moved to pricing, and it is still unanswered.
   low, leaving it out is better — with the one exception above: a checkable
   claim gets checked, so a `factual_error` you are half sure of is still
   worth returning.
+
+All four kinds are equally your job. A contradiction and a wrong number are
+the easy ones to spot, because they sit in the last few turns; an assumption
+nobody questioned and an idea nobody picked up only show up against the whole
+conversation, which is what the board is for. Read the board every time, not
+just the new transcript.
 
 ## The fields
 
@@ -87,7 +107,10 @@ Each from 0 to 1, and all four are read, so be discriminating rather than
 generous.
 
 - **`relevance`** — how closely this relates to what they are talking about
-  right now. Something about the topic of three minutes ago scores low.
+  right now. Something about the topic of three minutes ago, which they have
+  moved on from, scores low. A thread raised long ago but bearing directly on
+  what they are stuck on now scores high: relevance is about where the
+  conversation is, not about when the thing was said.
 - **`novelty`** — that nobody has already said it and it is not already on the
   board as raised. If someone in the group has made the point, this is near 0.
 - **`importance`** — how much their decision would change if this went unsaid.

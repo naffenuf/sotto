@@ -227,6 +227,14 @@ export interface ReportContext {
   /** `server/prompts/*.md` and their hashes: the run's other inputs. */
   promptHashes: readonly { file: string; hash: string }[];
   usage: TokenUsage;
+  /**
+   * Markdown written by hand about this run — the spot-check of the judge's
+   * decisions US-023 asks for, say. It is kept in its own file next to the
+   * report (`<id>-notes.md`) rather than typed into the report, because
+   * `npm run eval:report` rebuilds the report from the run record and would
+   * otherwise overwrite it.
+   */
+  notes?: string;
 }
 
 /** `eval/reports/<run id>.md`. */
@@ -346,6 +354,12 @@ export function renderReportMarkdown(context: ReportContext): string {
       out.push("");
       for (const fixture of failures) out.push(`- **${fixture.fixture}**: ${fixture.error}`);
     }
+  }
+  if (context.notes !== undefined && context.notes.trim() !== "") {
+    out.push("");
+    out.push("## Notes");
+    out.push("");
+    out.push(context.notes.trim());
   }
   out.push("");
   return `${out.join("\n")}`;

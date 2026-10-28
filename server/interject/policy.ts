@@ -34,12 +34,29 @@ import {
 import type { PauseState } from "../../shared/turns.js";
 
 /**
- * How long nobody may have been talking before Sotto will say anything. The
- * endpointer eats about half a second of every pause (`fixtures/events/
- * NOTES.md`), so 1.5 s of reported silence is a good two seconds of real
- * quiet: a gap, not a breath.
+ * How long nobody may have been talking before Sotto will say anything.
+ *
+ * Measured, not guessed. The silence the API reports between turns across all
+ * nine captures (189 gaps) decays smoothly from a median of 160 ms: half of
+ * every handover is under 200 ms, 78% is under 400 ms, and the tail thins out
+ * sharply above that — 42 gaps clear 400 ms, 21 clear 500 ms. So 400 ms is the
+ * top fifth of gaps: a beat somebody left, not the join between two sentences.
+ *
+ * It reads low because the instrument under-reports. The endpointer trims both
+ * ends of a line, so the reported gap is consistently ~460 ms shorter than the
+ * silence that is really in the audio — every scripted pause in
+ * `moment-assumption` comes back 380–560 ms short, and `brainstorm`'s 1,600 and
+ * 2,400 ms pauses came back as 1,084 and 1,944 ms (`fixtures/events/NOTES.md`).
+ * 400 ms reported is therefore about 0.86 s of real quiet.
+ *
+ * US-023 moved this, down from 1,500 ms, and 1,500 was the wrong number for a
+ * measurable reason: only 6 of those 189 gaps reach it, and none of them falls
+ * inside a planted moment's window after the observer has looked. 400 ms is the
+ * lowest value that still discriminates; it is **not** enough to reach the
+ * 0.7 recall gate, which is timing-bound rather than threshold-bound (see
+ * `ralph/prd.json` US-023 for the measurement).
  */
-export const PAUSE_MS = 1_500;
+export const PAUSE_MS = 400;
 
 /** How long a candidate may wait for a pause before it is no longer about now. */
 export const STALE_MS = 90_000;

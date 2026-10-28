@@ -226,9 +226,10 @@ describe("decide: budget", () => {
 
 describe("nextCheckDelay", () => {
   it("waits out the rest of the silence a pause needs", () => {
+    const sofar = Math.round(PAUSE_MS / 2);
     expect(
-      nextCheckDelay(input({ pause: { speaking: false, silentForMs: 400 } })),
-    ).toBe(PAUSE_MS - 400);
+      nextCheckDelay(input({ pause: { speaking: false, silentForMs: sofar } })),
+    ).toBe(PAUSE_MS - sofar);
   });
 
   it("falls back to expiry while somebody is talking", () => {

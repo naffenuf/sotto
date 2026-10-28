@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -65,5 +65,25 @@ describe("writeReport", () => {
     const markdown = readFileSync(path, "utf8");
     expect(markdown).toContain("_No prompt hashes were recorded for this run._");
     expect(markdown).toContain("| estimate | $0.00 |");
+  });
+
+  it("folds hand-written notes in, so a re-score does not lose them", () => {
+    const root = tempRoot();
+    mkdirSync(join(root, REPORTS_DIR), { recursive: true });
+    writeFileSync(
+      join(root, REPORTS_DIR, `${record.id}-notes.md`),
+      "Spot-checked five judge decisions; agreed with all five.\n",
+    );
+    const { path } = writeReport(record, root);
+    const markdown = readFileSync(path, "utf8");
+    expect(markdown).toContain("## Notes");
+    expect(markdown).toContain("Spot-checked five judge decisions; agreed with all five.");
+    // Written again from the same record: the notes are still there.
+    expect(readFileSync(writeReport(record, root).path, "utf8")).toContain("## Notes");
+  });
+
+  it("leaves the notes section out when nobody wrote any", () => {
+    const root = tempRoot();
+    expect(readFileSync(writeReport(record, root).path, "utf8")).not.toContain("## Notes");
   });
 });

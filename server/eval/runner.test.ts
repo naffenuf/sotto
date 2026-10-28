@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DecisionLogRecord } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { TurnUpdate } from "../../shared/turns.js";
+import { PAUSE_MS } from "../interject/policy.js";
 import { SESSION_FILES } from "../session/SessionStore.js";
 import {
   deliveredDecisions,
@@ -224,10 +225,13 @@ describe("deliveriesFrom", () => {
     const [delivery] = deliveriesFrom(result({ cards: [card({ createdAtMs: 7_000 })] }));
     expect(delivery?.inPause).toBe(false);
     expect(delivery?.pause.speaking).toBe(true);
-    // And a gap too short to count as a pause is not one either.
-    const [tooSoon] = deliveriesFrom(result({ cards: [card({ createdAtMs: 9_500 })] }));
+    // And a gap too short to count as a pause is not one either. The length
+    // is `PAUSE_MS` rather than a number, so tuning the threshold (US-023)
+    // moves the boundary this test is about instead of breaking it.
+    const tooSoonAtMs = 9_000 + PAUSE_MS - 1;
+    const [tooSoon] = deliveriesFrom(result({ cards: [card({ createdAtMs: tooSoonAtMs })] }));
     expect(tooSoon?.inPause).toBe(false);
-    expect(tooSoon?.pause).toEqual({ speaking: false, silentForMs: 500 });
+    expect(tooSoon?.pause).toEqual({ speaking: false, silentForMs: PAUSE_MS - 1 });
   });
 
   it("takes a glow as a delivery and leaves an answer card alone", () => {

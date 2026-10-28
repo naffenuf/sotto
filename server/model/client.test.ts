@@ -109,7 +109,9 @@ describe("MuseClient", () => {
   it("fails loudly when the reasoning budget ran out", async () => {
     const { museClient } = client(choice(null, "length"));
     await expect(museClient.structured(call)).rejects.toThrow(ModelCallError);
-    await expect(museClient.structured(call)).rejects.toThrow(/finish_reason "length".*4096/s);
+    await expect(museClient.structured(call)).rejects.toThrow(
+      new RegExp(`finish_reason "length".*${DEFAULT_MAX_TOKENS}`, "s"),
+    );
   });
 
   it("fails when the content is empty despite a clean stop", async () => {
@@ -295,7 +297,7 @@ describe("MuseClient.grounded", () => {
     });
     await expect(museClient.grounded(groundedCall)).rejects.toThrow(ModelCallError);
     await expect(museClient.grounded(groundedCall)).rejects.toThrow(
-      /came back incomplete \(max_output_tokens\).*4096/s,
+      new RegExp(`came back incomplete \\(max_output_tokens\\).*${DEFAULT_MAX_TOKENS}`, "s"),
     );
   });
 

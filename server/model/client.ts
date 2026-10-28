@@ -31,8 +31,17 @@ export const SPARK_MODEL = "muse-spark-1.3";
 /**
  * Completion-token budget when a caller doesn't name one. Big enough for a few
  * hundred tokens of structured output *after* the model has finished thinking.
+ *
+ * 4,096 was not: the eval run of 2026-10-28 lost eight board updates and an
+ * observer look to `finish_reason: "length"`, every one of them having spent
+ * the whole budget on reasoning and emitted nothing (`4096 completion tokens
+ * (4094 reasoning)`). A board update that fails costs more than itself — the
+ * observer only looks *after* a successful one — so the budget is sized for
+ * the worst thinking seen rather than the typical, which measured 1,300–3,200.
+ * Nothing is billed for room that goes unused; a truncated reply is billed in
+ * full for nothing.
  */
-export const DEFAULT_MAX_TOKENS = 4_096;
+export const DEFAULT_MAX_TOKENS = 12_288;
 
 /** One structured-output request. */
 export interface StructuredCall {
