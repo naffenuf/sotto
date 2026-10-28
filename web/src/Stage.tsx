@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card } from "./Card.js";
 import type { StageCardView } from "./stageView.js";
 import { arrangeCards, nextTrayDueAt, trayLabel } from "./stageView.js";
+import type { FeedbackVerdict, StageCard } from "../../shared/index.js";
 
 export interface StageProps {
   cards: readonly StageCardView[];
@@ -18,9 +19,13 @@ export interface StageProps {
   placeholder?: ReactNode;
   /** Shown above the cards, whatever else is on the stage. */
   banner?: ReactNode;
+  /** Shows an evidence quote's turn in the transcript (US-015). */
+  onQuoteClick?: ((turnId: string) => void) | undefined;
+  /** Files the group's verdict on a card (US-015). */
+  onFeedback?: ((card: StageCard, verdict: FeedbackVerdict) => void) | undefined;
 }
 
-export function Stage({ cards, placeholder, banner }: StageProps) {
+export function Stage({ cards, placeholder, banner, onQuoteClick, onFeedback }: StageProps) {
   const now = useTrayClock(cards);
   const { stack, tray } = useMemo(() => arrangeCards(cards, now), [cards, now]);
   const [trayOpen, setTrayOpen] = useState(false);
@@ -33,7 +38,12 @@ export function Stage({ cards, placeholder, banner }: StageProps) {
       ) : (
         <div className="stage__cards" data-testid="stage-cards">
           {stack.map((card) => (
-            <Card key={card.id} card={card} />
+            <Card
+              key={card.id}
+              card={card}
+              onQuoteClick={onQuoteClick}
+              onFeedback={onFeedback}
+            />
           ))}
         </div>
       )}
@@ -51,7 +61,12 @@ export function Stage({ cards, placeholder, banner }: StageProps) {
           {trayOpen && (
             <div className="stage__tray-cards" data-testid="stage-tray-cards">
               {tray.map((card) => (
-                <Card key={card.id} card={card} />
+                <Card
+                  key={card.id}
+                  card={card}
+                  onQuoteClick={onQuoteClick}
+                  onFeedback={onFeedback}
+                />
               ))}
             </div>
           )}

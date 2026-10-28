@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Chattiness,
+  FeedbackVerdict,
   FixtureListResponse,
   SessionSource,
+  StageCard,
   StatusChannel,
   StatusUpdate,
 } from "../../shared/index.js";
@@ -11,6 +13,7 @@ import {
   ApiCallError,
   fetchFixtures,
   renameSpeaker,
+  sendFeedback,
   setChattiness,
   startSession,
   stopSession,
@@ -19,19 +22,12 @@ import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCaptu
 import { BoardPanel } from "./BoardPanel.js";
 import { SessionControls, parseSourceValue, sourceValue } from "./SessionControls.js";
 import { Stage } from "./Stage.js";
-import type { StageCardView } from "./stageView.js";
 import { StatusDots } from "./StatusDots.js";
-import { TranscriptPanel } from "./TranscriptPanel.js";
+import { TranscriptPanel, type TurnHighlight } from "./TranscriptPanel.js";
 import { useServerStatus } from "./useServerStatus.js";
 import { useSessionEvents } from "./useSessionEvents.js";
 
 const NO_FIXTURES: FixtureListResponse = { wav: [], events: [] };
-
-/**
- * The stage is built now (US-011) and fed later: interjections land on it in
- * US-015 and answers in US-018. Until then it shows the hint.
- */
-const NO_CARDS: readonly StageCardView[] = [];
 
 export function App() {
   const health = useServerStatus();
@@ -42,6 +38,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   /** The microphone, while a `mic` session is running (US-012). */
   const mic = useRef<MicCapture | null>(null);
+  /** The turn an evidence quote last asked the transcript to show (US-015). */
+  const [cited, setCited] = useState<TurnHighlight | null>(null);
 
   const stopMic = useCallback(() => {
     mic.current?.stop();
@@ -119,6 +117,21 @@ export function App() {
     );
   }, []);
 
+  // A fresh object every click, so clicking the same quote twice scrolls back
+  // to it twice rather than being seen as the same request.
+  const onQuoteClick = useCallback((turnId: string) => {
+    setCited({ turnId, at: Date.now() });
+  }, []);
+
+  // Nothing comes back but a line in the session folder, so a failure is
+  // shown and otherwise ignored: the card keeps the button it just pressed.
+  const onFeedback = useCallback((card: StageCard, verdict: FeedbackVerdict) => {
+    setProblem(null);
+    void sendFeedback(card.id, verdict).catch((error: unknown) =>
+      setProblem(error instanceof ApiCallError ? error.message : String(error)),
+    );
+  }, []);
+
   const onRenameSpeaker = useCallback((label: string, name: string | null) => {
     setProblem(null);
     void renameSpeaker(label, name).catch((error: unknown) =>
@@ -160,6 +173,7 @@ export function App() {
             turns={events.turns}
             speakers={events.speakers}
             onRename={onRenameSpeaker}
+            highlight={cited}
           />
           <BoardPanel
             board={events.board}
@@ -172,7 +186,9 @@ export function App() {
           />
         </aside>
         <Stage
-          cards={NO_CARDS}
+          cards={events.cards}
+          onQuoteClick={onQuoteClick}
+          onFeedback={onFeedback}
           banner={
             problem !== null ? (
               <p className="stage__problem" data-testid="session-problem" role="alert">

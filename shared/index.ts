@@ -69,6 +69,7 @@ export type { CardState, CardVariant, Citation, EvidenceQuote, StageCard } from 
 export { statusChannels, statusStates } from "./events.js";
 export type {
   BoardEvent,
+  CardEvent,
   ServerEvent,
   SessionEvent,
   SettingsEvent,
@@ -80,6 +81,13 @@ export type {
   StatusUpdate,
   TurnEvent,
 } from "./events.js";
+export { FeedbackRequestSchema, feedbackVerdicts } from "./feedback.js";
+export type {
+  FeedbackLogRecord,
+  FeedbackRequest,
+  FeedbackResponse,
+  FeedbackVerdict,
+} from "./feedback.js";
 export {
   CHATTINESS_THRESHOLDS,
   ChattinessSchema,

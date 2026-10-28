@@ -14,6 +14,8 @@ import type {
   CandidateLogRecord,
   DecisionLogRecord,
 } from "../../shared/candidates.js";
+import type { FeedbackLogRecord } from "../../shared/feedback.js";
+import type { StageCard } from "../../shared/cards.js";
 import type {
   GroundedCall,
   GroundedReply,
@@ -486,6 +488,194 @@ describe("SessionManager, board and observer", () => {
     }
     const ids = new Set(noticed.map((record) => record.candidate.id));
     for (const record of checked) expect(ids.has(record.candidateId)).toBe(true);
+  });
+});
+
+describe("SessionManager, delivery and feedback", () => {
+  /**
+   * One board item and one contradiction per look, every one of them scored
+   * as high as a candidate can be, so the policy (US-014) delivers rather
+   * than holding — and a different subject each time, so the observer's
+   * duplicate rule passes them all on rather than folding them into the
+   * first.
+   */
+  class LoudModel implements ModelClient {
+    /** One per look, so no two candidates read as the same thing. */
+    private static readonly subjects = [
+      "the hosting bill",
+      "the launch date",
+      "the pilot headcount",
+      "the support rota",
+      "the data licence",
+      "the vendor quote",
+      "the studio timeline",
+      "the API pricing",
+      "the hardware stock",
+      "the discount floor",
+    ];
+
+    private items = 0;
+
+    async grounded(): Promise<never> {
+      throw new Error("a contradiction is never checked against the web");
+    }
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      if (call.label === "board") {
+        this.items += 1;
+        return {
+          operations: [
+            { op: "add_point", text: `point ${this.items}`, sourceTurnIds: ["0:0"] },
+          ],
+        };
+      }
+      return {
+        candidates: [
+          {
+            type: "contradiction",
+            headline: `${LoudModel.subjects[(this.items - 1) % LoudModel.subjects.length]} cannot hold with what was just agreed`,
+            detail: "The number they just agreed is under the floor they set.",
+            whyNow: "the price is about to be written down",
+            evidenceTurnIds: ["0:0"],
+            relatedBoardItemIds: [`p${this.items}`],
+            scores: { relevance: 1, novelty: 1, importance: 1, confidence: 1 },
+          },
+        ],
+      };
+    }
+  }
+
+  /** A writer that keeps the two logs this story writes to. */
+  function recordingWriter(): {
+    writer: SessionWriter;
+    candidates: CandidateLogLine[];
+    feedback: FeedbackLogRecord[];
+  } {
+    const candidates: CandidateLogLine[] = [];
+    const feedback: FeedbackLogRecord[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: (record: unknown) => candidates.push(record as CandidateLogLine),
+      appendFeedback: (record: unknown) => feedback.push(record as FeedbackLogRecord),
+      appendAnswer: () => {},
+      writeArtifact: () => "",
+      end: () => {},
+    } satisfies SessionWriter;
+    return { writer, candidates, feedback };
+  }
+
+  async function replay(): Promise<{
+    sessions: SessionManager;
+    bus: EventBus;
+    cards: StageCard[];
+    candidates: CandidateLogLine[];
+    feedback: FeedbackLogRecord[];
+  }> {
+    const bus = new EventBus(quiet);
+    const { writer, candidates, feedback } = recordingWriter();
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => new LoudModel(),
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-contradiction" });
+    await ended;
+    return { sessions, bus, cards, candidates, feedback };
+  }
+
+  it("puts every delivered decision on the stage as a card", async () => {
+    const { bus, cards, candidates } = await replay();
+
+    // A decision that puts something on the stage, whatever the reason it
+    // came out at that level: `cooldown` and `budget` are downgrades, not
+    // losses, so they are deliveries too.
+    const delivered = candidates.filter(
+      (line): line is DecisionLogRecord =>
+        line.kind === "decision" && (line.decision === "interject" || line.decision === "glow"),
+    );
+    expect(delivered.length).toBeGreaterThan(1);
+    // One card per delivery, at the level the policy chose, carrying the
+    // candidate's own id so a verdict can find its way back to it.
+    expect(cards.map((card) => card.id)).toEqual(
+      delivered.map((record) => `card-${record.candidateId}`),
+    );
+    expect(cards.map((card) => card.variant)).toEqual(
+      delivered.map((record) => record.decision),
+    );
+    for (const card of cards) {
+      expect(card.state).toBe("ready");
+      expect(card.headline).not.toBe("");
+    }
+    // The first one is a full interjection; the cooldown turns the rest down
+    // to glows rather than dropping them.
+    expect(cards[0]?.variant).toBe("interject");
+    expect(delivered.map((record) => record.reason)).toEqual([
+      "delivered",
+      ...delivered.slice(1).map(() => "cooldown"),
+    ]);
+    // And the stage survives the session it came from, which is when it is read.
+    expect(bus.cardState()).toEqual(cards);
+  });
+
+  it("files a verdict on a delivered card in the session folder", async () => {
+    const { sessions, cards, feedback } = await replay();
+    const card = cards[0];
+    expect(card).toBeDefined();
+
+    expect(sessions.recordFeedback(card!.id, "wrong_moment")).toBe("recorded");
+
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0]).toEqual({
+      kind: "feedback",
+      atMs: expect.any(Number),
+      cardId: card!.id,
+      candidateId: card!.id.replace("card-", ""),
+      level: card!.variant,
+      type: "contradiction",
+      headline: card!.headline,
+      deliveredAtMs: card!.createdAtMs,
+      verdict: "wrong_moment",
+    });
+
+    // A second click is a change of mind: the file keeps both lines and the
+    // later one is what was meant.
+    expect(sessions.recordFeedback(card!.id, "useful")).toBe("recorded");
+    expect(feedback.map((record) => record.verdict)).toEqual(["wrong_moment", "useful"]);
+  });
+
+  it("knows a card that was never delivered, and a stage that is still empty", async () => {
+    const { sessions } = await replay();
+
+    expect(sessions.recordFeedback("card-cand-999", "useful")).toBe("unknown-card");
+
+    const bare = new SessionManager({
+      bus: new EventBus(quiet),
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => null,
+    });
+    expect(bare.recordFeedback("card-cand-1", "useful")).toBe("no-cards");
   });
 });
 

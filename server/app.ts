@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import websocket from "@fastify/websocket";
 import type { ApiError, HealthResponse } from "../shared/types.js";
 import type { ServerEvent } from "../shared/events.js";
+import { FeedbackRequestSchema, type FeedbackResponse } from "../shared/feedback.js";
 import {
   SessionSettingsRequestSchema,
   SessionStartRequestSchema,
@@ -99,6 +100,32 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     return {
       settings: sessions.setChattiness(parsed.data.chattiness),
     } satisfies SessionSettingsResponse;
+  });
+
+  // The group's verdict on a card Sotto put up (US-015). The browser sends
+  // only the card id: which candidate it was and what level it went out at
+  // are the server's own record of the delivery, so a tab cannot file a
+  // verdict about a card that was never shown. It answers for the most recent
+  // session, not only a running one — a replay's cards are read after it ends.
+  app.post("/api/feedback", async (request, reply) => {
+    const parsed = FeedbackRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: `not a feedback verdict: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
+      } satisfies ApiError);
+    }
+    const outcome = sessions.recordFeedback(parsed.data.cardId, parsed.data.verdict);
+    if (outcome === "no-cards") {
+      return reply.code(409).send({
+        error: "Sotto has not put anything on the stage yet",
+      } satisfies ApiError);
+    }
+    if (outcome === "unknown-card") {
+      return reply.code(404).send({
+        error: `no card ${parsed.data.cardId} was delivered in this session`,
+      } satisfies ApiError);
+    }
+    return { recorded: true, verdict: parsed.data.verdict } satisfies FeedbackResponse;
   });
 
   // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,

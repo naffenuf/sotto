@@ -4,12 +4,13 @@
  * The server publishes to an in-process bus (`server/events/bus.ts`) and each
  * attached socket gets the events as JSON lines. A socket that attaches part
  * way through a session is caught up first with the bus's remembered state
- * (the three statuses, the running session, the speaker names, the board and
- * the settings), so the UI never has to poll.
+ * (the three statuses, the running session, the speaker names, the board, the
+ * settings and every card Sotto has put up), so the UI never has to poll.
  */
 import type { TurnUpdate } from "./turns.js";
 import type { SessionInfo, SessionSettings } from "./session.js";
 import type { Board } from "./board.js";
+import type { StageCard } from "./cards.js";
 
 /**
  * The three things the header shows a dot for.
@@ -95,6 +96,19 @@ export interface SettingsEvent {
   settings: SessionSettings;
 }
 
+/**
+ * A card for the stage (US-011): an interjection, a glow, or an answer.
+ *
+ * The whole card goes out every time, and a card with an id that has already
+ * been seen *replaces* the one on the stage rather than joining it — which is
+ * how a card arrives in pieces (`thinking`, then a headline, then the detail)
+ * without the stage growing three of them.
+ */
+export interface CardEvent {
+  type: "card";
+  card: StageCard;
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -108,4 +122,5 @@ export type ServerEvent =
   | SessionEvent
   | SpeakersEvent
   | BoardEvent
-  | SettingsEvent;
+  | SettingsEvent
+  | CardEvent;

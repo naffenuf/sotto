@@ -8,6 +8,7 @@ import { buildApp } from "./app.js";
 import { EventBus } from "./events/bus.js";
 import type { ReplaySpeed } from "./asr/EventReplaySource.js";
 import { AUDIO_CHUNK_BYTES, type AudioEndReason, type AudioSource } from "./audio/AudioSource.js";
+import type { ModelClient, StructuredCall } from "./model/client.js";
 import { SessionManager, type AsrClient } from "./session/SessionManager.js";
 
 let app: FastifyInstance | undefined;
@@ -25,8 +26,13 @@ const quiet = { log: () => {}, warn: () => {}, error: () => {} };
  * capture through in milliseconds, `1x` leaves it running until it is stopped.
  */
 async function buildTestApp(
-  options: { apiKey?: string; speed?: ReplaySpeed } = {},
-): Promise<{ app: FastifyInstance; bus: EventBus; audio: FakeAsrClient }> {
+  options: { apiKey?: string; speed?: ReplaySpeed; model?: ModelClient } = {},
+): Promise<{
+  app: FastifyInstance;
+  bus: EventBus;
+  audio: FakeAsrClient;
+  sessions: SessionManager;
+}> {
   const bus = new EventBus(quiet);
   const audio = new FakeAsrClient();
   const sessions = new SessionManager({
@@ -38,9 +44,10 @@ async function buildTestApp(
     replaySpeed: options.speed ?? "max",
     // A live source (`mic`, `wav`) must not reach the real API from here.
     createAsrClient: () => audio,
+    ...(options.model === undefined ? {} : { createModel: () => options.model as ModelClient }),
   });
   app = await buildApp({ bus, sessions });
-  return { app, bus, audio };
+  return { app, bus, audio, sessions };
 }
 
 /** Drains an audio source and counts its chunks, in place of the real client. */
@@ -253,6 +260,123 @@ describe("POST /api/session/settings", () => {
     const { app: server } = await buildTestApp();
     for (const payload of [{}, { chattiness: "" }, { chattiness: "loud" }, { chattiness: 2 }]) {
       const response = await server.inject(change(payload));
+      expect(response.statusCode, JSON.stringify(payload)).toBe(400);
+    }
+  });
+});
+
+describe("POST /api/feedback", () => {
+  /**
+   * A model that notices one serious contradiction per board update, each
+   * about something else, so the policy (US-014) puts cards on the stage
+   * instead of holding everything.
+   */
+  class LoudModel implements ModelClient {
+    /** One per look, so no two candidates read as the same thing. */
+    private static readonly subjects = [
+      "the hosting bill",
+      "the launch date",
+      "the pilot headcount",
+      "the support rota",
+      "the data licence",
+      "the vendor quote",
+      "the studio timeline",
+      "the API pricing",
+      "the hardware stock",
+      "the discount floor",
+    ];
+
+    private items = 0;
+
+    async grounded(): Promise<never> {
+      throw new Error("a contradiction is never checked against the web");
+    }
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      if (call.label === "board") {
+        this.items += 1;
+        return {
+          operations: [
+            { op: "add_point", text: `point ${this.items}`, sourceTurnIds: ["0:0"] },
+          ],
+        };
+      }
+      return {
+        candidates: [
+          {
+            type: "contradiction",
+            headline: `${LoudModel.subjects[(this.items - 1) % LoudModel.subjects.length]} cannot hold with what was just agreed`,
+            detail: "The number they just agreed is under the floor they set.",
+            whyNow: "the price is about to be written down",
+            evidenceTurnIds: ["0:0"],
+            relatedBoardItemIds: [`p${this.items}`],
+            scores: { relevance: 1, novelty: 1, importance: 1, confidence: 1 },
+          },
+        ],
+      };
+    }
+  }
+
+  const file = (payload: Record<string, unknown>) => ({
+    method: "POST" as const,
+    url: "/api/feedback",
+    payload,
+  });
+
+  /** Replays a fixture to the end, so its cards are on the stage to judge. */
+  async function withCards(): Promise<{ app: FastifyInstance; cardId: string }> {
+    const { app: server, bus } = await buildTestApp({ model: new LoudModel() });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "events", fixture: "moment-contradiction" } },
+    });
+    await ended;
+    const card = bus.cardState()[0];
+    if (card === undefined) throw new Error("the replay put nothing on the stage");
+    return { app: server, cardId: card.id };
+  }
+
+  it("files a verdict on a card that was shown", async () => {
+    const { app: server, cardId } = await withCards();
+
+    const response = await server.inject(file({ cardId, verdict: "wrong_moment" }));
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ recorded: true, verdict: "wrong_moment" });
+  });
+
+  it("will not take a verdict on a card nobody was shown", async () => {
+    const { app: server } = await withCards();
+
+    const response = await server.inject(file({ cardId: "card-cand-999", verdict: "useful" }));
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("answers 409 while Sotto has said nothing at all", async () => {
+    const { app: server } = await buildTestApp();
+
+    const response = await server.inject(file({ cardId: "card-cand-1", verdict: "useful" }));
+    expect(response.statusCode).toBe(409);
+  });
+
+  it("rejects anything that is not one of the three verdicts", async () => {
+    const { app: server } = await buildTestApp();
+    for (const payload of [
+      {},
+      { cardId: "card-cand-1" },
+      { cardId: "", verdict: "useful" },
+      { cardId: "card-cand-1", verdict: "meh" },
+      { cardId: 7, verdict: "useful" },
+    ]) {
+      const response = await server.inject(file(payload));
       expect(response.statusCode, JSON.stringify(payload)).toBe(400);
     }
   });

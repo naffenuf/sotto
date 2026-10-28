@@ -24,8 +24,11 @@
  * disk whether or not a browser was watching.
  */
 import type { AsrFrameRecord } from "../../shared/asr.js";
+import type { StageCard } from "../../shared/cards.js";
+import type { CandidateType } from "../../shared/candidates.js";
 import type { StatusState } from "../../shared/events.js";
-import type { Chattiness } from "../../shared/policy.js";
+import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
+import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { describeSource, sourceSlug } from "../../shared/session.js";
 import type { PauseState } from "../../shared/turns.js";
@@ -42,7 +45,8 @@ import { WavReplaySource } from "../audio/WavReplaySource.js";
 import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
-import { InterjectionPolicy } from "../interject/InterjectionPolicy.js";
+import { cardForInterjection } from "../interject/delivery.js";
+import { InterjectionPolicy, type Interjection } from "../interject/InterjectionPolicy.js";
 import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
@@ -56,6 +60,21 @@ type Logger = Pick<Console, "log" | "warn" | "error">;
  * only stops an HTTP request from hanging on it.
  */
 export const STOP_DRAIN_MS = 5_000;
+
+/**
+ * Silence to give a replayed conversation after its last frame, before the
+ * loops are drained.
+ *
+ * A capture ends within a few milliseconds of the last word (`moment-
+ * contradiction`'s final `speechEnd` is 17 ms before its last frame), but the
+ * conversation did not: a group that has stopped talking is in the longest
+ * pause of the session, and that pause is the one a candidate still waiting
+ * for a moment (US-014) has been waiting for. Without it the recording's end
+ * reads as "everyone is still mid-sentence" and the policy writes the whole
+ * thing off as `session_ended`. A live session needs none of this — its clock
+ * keeps running on its own.
+ */
+export const REPLAY_TRAILING_SILENCE_MS = 3_000;
 
 /** The part of {@link RealtimeTranscriptionClient} a session needs. */
 export interface AsrClient {
@@ -137,7 +156,38 @@ interface ModelLoops {
   observer: Observer | null;
   verifier: Verifier | null;
   policy: InterjectionPolicy | null;
+  /** Every card the policy delivered, by card id (US-015). */
+  deliveries: Map<string, Delivered>;
 }
+
+/** One card that reached the stage, kept so feedback can be filed on it. */
+interface Delivered {
+  card: StageCard;
+  candidateId: string;
+  /** The level it went out at, which is what `wrong_moment` is a verdict on. */
+  level: DeliveredLevel;
+  type: CandidateType;
+}
+
+/**
+ * Where a feedback click lands: the delivered cards of the most recent
+ * session, and the folder they belong to.
+ *
+ * It outlives the session deliberately. A replay's cards stay on the stage
+ * after it has finished — that is when somebody actually reads them — and a
+ * 👍 clicked then is still a verdict about *that* conversation, so it belongs
+ * in that folder's `feedback.jsonl`.
+ */
+interface FeedbackTarget {
+  sessionId: string;
+  store: StoreSlot;
+  /** The session's clock, for the time the click is recorded at. */
+  clock: Clock;
+  cards: Map<string, Delivered>;
+}
+
+/** What {@link SessionManager.recordFeedback} made of a click. */
+export type FeedbackOutcome = "recorded" | "no-cards" | "unknown-card";
 
 interface RunningSession {
   info: SessionInfo;
@@ -153,6 +203,10 @@ interface RunningSession {
   verifier: Verifier | null;
   /** The interjection policy (US-014), or `null` when there is no model client. */
   policy: InterjectionPolicy | null;
+  /** The cards this session has put on the stage, by card id (US-015). */
+  deliveries: Map<string, Delivered>;
+  /** The session's clock: simulated for a replay, live otherwise. */
+  clock: Clock;
   /** What the transcription dot shows once the session is published. */
   transcription: [state: StatusState, detail: string];
   /** What the model dot shows once the session is published. */
@@ -177,6 +231,11 @@ export class SessionManager {
   private readonly replaySpeed: ReplaySpeed;
 
   private current: RunningSession | undefined;
+  /**
+   * Where a feedback click lands (US-015): the most recent session's
+   * deliveries, kept after it ends because that is when its cards are read.
+   */
+  private feedback: FeedbackTarget | undefined;
   private started = 0;
   /**
    * The settings the next session starts with, and the ones the running
@@ -290,6 +349,14 @@ export class SessionManager {
     store.writer?.setSettings(this.currentSettings);
 
     this.current = running;
+    // Feedback follows the newest session: its predecessor's cards have just
+    // left the stage, since a session *starting* is what clears it.
+    this.feedback = {
+      sessionId: info.id,
+      store,
+      clock: running.clock,
+      cards: running.deliveries,
+    };
     // The session goes out before its statuses, so a listener always knows
     // which session a dot is talking about.
     this.bus.setSession(info);
@@ -350,6 +417,7 @@ export class SessionManager {
       store,
       mic: undefined,
       ...loops,
+      clock,
       transcription: ["active", `replaying ${fixture} events at ${this.replaySpeed}`],
       model: modelStatus(loops.board),
       stop: () => source.stop(),
@@ -365,8 +433,10 @@ export class SessionManager {
         })
         // The last few turns of a conversation never reach four, so the board
         // gets one more update — and the observer one more look — before the
-        // session is declared over.
-        .then(() => drainLoops(loops)),
+        // session is declared over. The capture runs out a few milliseconds
+        // after the last word, so the silence the conversation really ended
+        // in is handed to the policy before it accounts for what is left.
+        .then(() => drainLoops(loops, () => clock.advanceBy(REPLAY_TRAILING_SILENCE_MS))),
       stopRequested: false,
     };
   }
@@ -434,6 +504,7 @@ export class SessionManager {
       store,
       mic,
       ...loops,
+      clock: this.liveClock,
       transcription: [
         "connecting",
         source.kind === "mic"
@@ -500,20 +571,27 @@ export class SessionManager {
       this.logger.warn(
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
       );
-      return { board: null, observer: null, verifier: null, policy: null };
+      return {
+        board: null,
+        observer: null,
+        verifier: null,
+        policy: null,
+        deliveries: new Map(),
+      };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
       if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
     };
+    const deliveries = new Map<string, Delivered>();
     const policy = new InterjectionPolicy({
       clock,
       pauseState,
       chattiness: this.currentSettings.chattiness,
       logger: this.logger,
       onRecord: (record) => store.writer?.appendCandidate(record),
-      // US-015 is what turns a decision into a card on the stage. Until then
-      // a delivered candidate's output is the log and nothing else.
-      onDeliver: () => {},
+      // The stage (US-015). The level the policy chose becomes the card's
+      // variant, and the card is kept so a 👍 can find its way back to it.
+      onDeliver: (interjection) => this.deliver(info, deliveries, interjection),
     });
     const verifier = new Verifier({
       clock,
@@ -557,7 +635,64 @@ export class SessionManager {
       },
       onModelState,
     });
-    return { board, observer, verifier, policy };
+    return { board, observer, verifier, policy, deliveries };
+  }
+
+  /**
+   * Puts one delivered interjection on the stage (US-015).
+   *
+   * The card is recorded whatever happens, so feedback can be filed on it,
+   * but it is only published while this is still the running session: a
+   * decision that lands after Stop must not make a card appear on a stage the
+   * user has already finished with, the same rule late frames follow.
+   */
+  private deliver(
+    info: SessionInfo,
+    deliveries: Map<string, Delivered>,
+    interjection: Interjection,
+  ): void {
+    const candidate = interjection.candidate;
+    const card = cardForInterjection(interjection, this.bus.speakerNames());
+    deliveries.set(card.id, {
+      card,
+      candidateId: candidate.id,
+      level: interjection.level,
+      type: candidate.type,
+    });
+    this.logger.log(
+      `[stage] ${info.id} ${interjection.level} ${card.id}: ${card.headline}`,
+    );
+    if (this.current?.info.id === info.id) this.bus.publishCard(card);
+  }
+
+  /**
+   * Files the group's verdict on a delivered card (US-015): one line in the
+   * session folder's `feedback.jsonl`.
+   *
+   * It answers for the most recent session rather than only for a running
+   * one, because the cards stay on the stage after a replay ends and that is
+   * when they are read. A session whose folder could not be opened still
+   * accepts the click — as a rename does — it simply has nowhere to put it.
+   */
+  recordFeedback(cardId: string, verdict: FeedbackVerdict): FeedbackOutcome {
+    const target = this.feedback;
+    if (target === undefined || target.cards.size === 0) return "no-cards";
+    const delivered = target.cards.get(cardId);
+    if (delivered === undefined) return "unknown-card";
+    const record: FeedbackLogRecord = {
+      kind: "feedback",
+      atMs: target.clock.now(),
+      cardId,
+      candidateId: delivered.candidateId,
+      level: delivered.level,
+      type: delivered.type,
+      headline: delivered.card.headline,
+      deliveredAtMs: delivered.card.createdAtMs,
+      verdict,
+    };
+    target.store.writer?.appendFeedback(record);
+    this.logger.log(`[stage] ${target.sessionId} ${cardId} is ${verdict}`);
+    return "recorded";
   }
 
   /**
@@ -654,11 +789,17 @@ export class SessionManager {
  * board that came out of it, the checks that look produced get to come back,
  * and the policy decides about them. In that order, because each one reads
  * what the one before it wrote.
+ *
+ * `beforePolicy` is where a replay hands over its trailing silence
+ * ({@link REPLAY_TRAILING_SILENCE_MS}) — after the checks have come back, so
+ * everything the conversation produced is in the policy's hands, and before
+ * the policy's own last look, which is what that silence is for.
  */
-async function drainLoops(loops: ModelLoops): Promise<void> {
+async function drainLoops(loops: ModelLoops, beforePolicy?: () => void): Promise<void> {
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();
+  beforePolicy?.();
   // Last, and synchronous: the conversation has ended in silence, so the
   // policy gets one look at that final pause and then accounts for whatever
   // is still waiting.

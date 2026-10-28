@@ -199,6 +199,15 @@ body {
   color: var(--ink);
 }
 
+/* The turn an evidence quote pointed at (US-015): marked, not animated. */
+.turn--cited {
+  background: #2a2721;
+  border-left: 2px solid var(--accent);
+  border-radius: 0.25rem;
+  margin-left: -0.5rem;
+  padding: 0.25rem 0.375rem 0.25rem 0.375rem;
+}
+
 .turn__chip {
   font: inherit;
   font-size: 0.75rem;
@@ -582,6 +591,65 @@ body {
   font-size: 0.75rem;
   opacity: 0.8;
   white-space: nowrap;
+}
+
+/* A quote is a link to the transcript, so it reads as text and acts as one. */
+.card__quote-button {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.card__quote-button:hover .card__quote-text,
+.card__quote-button:focus-visible .card__quote-text {
+  color: var(--ink);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.1875rem;
+}
+
+/* The three verdicts (US-015). Quiet until the pointer is near them. */
+.card__feedback {
+  margin-top: 0.875rem;
+  display: flex;
+  gap: 0.375rem;
+}
+
+.card__feedback-button {
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+  background: none;
+  border: 1px solid #332f29;
+  border-radius: 999px;
+  padding: 0.1875rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.card__feedback-button:hover,
+.card__feedback-button:focus-visible {
+  opacity: 1;
+  color: var(--ink);
+  border-color: #4a443a;
+}
+
+.card__feedback-button[data-chosen="true"] {
+  opacity: 1;
+  color: var(--ink);
+  border-color: var(--accent);
+  background: #2a2721;
+}
+
+.card__feedback-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.01em;
 }
 
 .card__details {

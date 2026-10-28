@@ -8,13 +8,16 @@
  * exactly what the browser must not be sent.
  *
  * It remembers the state an event implies — the three status dots, the running
- * session, the speaker names the user has given (US-007), the board (US-009)
- * and the settings (US-014) — so a browser that attaches mid-session can be
- * caught up with {@link EventBus.snapshot} instead of asking. Turns are
- * deliberately not remembered: a transcript is the session folder's job, not
- * the bus's.
+ * session, the speaker names the user has given (US-007), the board (US-009),
+ * the settings (US-014) and the cards Sotto has put on the stage (US-015) —
+ * so a browser that attaches mid-session can be caught up with
+ * {@link EventBus.snapshot} instead of asking. Turns are deliberately not
+ * remembered: a transcript is the session folder's job, not the bus's. A card
+ * is the opposite case — there are a handful of them in a conversation and
+ * each one is the whole point of the app, so a reload must not lose them.
  */
 import { emptyBoard } from "../../shared/board.js";
+import type { StageCard } from "../../shared/cards.js";
 import {
   statusChannels,
   type BoardEvent,
@@ -27,6 +30,13 @@ import {
 import { defaultSettings, type SessionInfo, type SessionSettings } from "../../shared/session.js";
 
 export type EventListener = (event: ServerEvent) => void;
+
+/**
+ * How many cards a newly attached browser is caught up with. A conversation
+ * produces a handful, not hundreds; the cap only stops a runaway loop from
+ * growing the snapshot without bound.
+ */
+export const MAX_REMEMBERED_CARDS = 50;
 
 type Logger = Pick<Console, "warn">;
 
@@ -51,6 +61,8 @@ export class EventBus {
   private session: SessionInfo | null = null;
   private speakers: SpeakerNames = {};
   private board: BoardEvent = initialBoard();
+  /** The cards put on the stage this session, oldest first (US-015). */
+  private cards: StageCard[] = [];
   /** Server-wide, not per session: the next session inherits what is set. */
   private settings: SessionSettings = defaultSettings();
 
@@ -67,16 +79,21 @@ export class EventBus {
     if (event.type === "status") this.statuses[event.status.channel] = event.status;
     if (event.type === "speakers") this.speakers = event.speakers;
     if (event.type === "board") this.board = event;
+    if (event.type === "card") this.rememberCard(event.card);
     if (event.type === "settings") this.settings = event.settings;
     if (event.type === "session") {
       this.session = event.session;
       // Diarization labels belong to one session, so the names do too; a
       // listener clears its own on the same event.
       this.speakers = {};
-      // The board is cleared by a session *starting*, not by one ending: the
-      // last update of a replay is published after the session has gone, and
-      // a finished board is the thing you most want still on the screen.
-      if (event.session !== null) this.board = initialBoard();
+      // The board and the cards are cleared by a session *starting*, not by
+      // one ending: the last update of a replay is published after the
+      // session has gone, and a finished board — or the thing Sotto noticed
+      // in the last minute — is what you most want still on the screen.
+      if (event.session !== null) {
+        this.board = initialBoard();
+        this.cards = [];
+      }
     }
     for (const listener of [...this.listeners]) {
       try {
@@ -85,6 +102,11 @@ export class EventBus {
         this.logger.warn(`[bus] listener threw on ${event.type}: ${String(error)}`);
       }
     }
+  }
+
+  /** Puts one card on the stage, or replaces the one with the same id. */
+  publishCard(card: StageCard): void {
+    this.publish({ type: "card", card });
   }
 
   /** Publishes a status change, skipping it when nothing actually changed. */
@@ -134,6 +156,10 @@ export class EventBus {
       { type: "speakers", speakers: this.speakers },
       this.board,
       { type: "settings", settings: this.settings },
+      // One event per card, in the order they went up, rather than a second
+      // shape for "all of them": a browser folds each one in the same way it
+      // folds a live arrival, and a session that has said nothing adds none.
+      ...this.cards.map((card): ServerEvent => ({ type: "card", card })),
     ];
   }
 
@@ -157,9 +183,31 @@ export class EventBus {
     return this.settings;
   }
 
+  /** The cards on the stage, oldest first. */
+  cardState(): readonly StageCard[] {
+    return this.cards;
+  }
+
   /** The names given to diarization labels so far. */
   speakerNames(): SpeakerNames {
     return this.speakers;
+  }
+
+  /**
+   * Folds one card into the remembered stage: a card whose id is already
+   * there replaces it, so an answer arriving in pieces (US-018) does not
+   * leave three of itself in a reloading browser's snapshot.
+   */
+  private rememberCard(card: StageCard): void {
+    const index = this.cards.findIndex((one) => one.id === card.id);
+    if (index !== -1) {
+      this.cards[index] = card;
+      return;
+    }
+    this.cards.push(card);
+    if (this.cards.length > MAX_REMEMBERED_CARDS) {
+      this.cards = this.cards.slice(this.cards.length - MAX_REMEMBERED_CARDS);
+    }
   }
 
   /** Attaches a listener; call the returned function to detach it. */

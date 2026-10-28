@@ -13,18 +13,41 @@
 import { useState } from "react";
 import type { Block, Inline } from "./markdown.js";
 import { parseMarkdown } from "./markdown.js";
-import type { StageCard } from "../../shared/index.js";
+import { feedbackVerdicts, type FeedbackVerdict, type StageCard } from "../../shared/index.js";
 
 /** The label above an interjection — Sotto raising its hand, quietly. */
 const NOTICED = "Sotto noticed…";
+
+/** The three buttons under a delivered card (US-015), in the PRD's order. */
+const FEEDBACK: Readonly<Record<FeedbackVerdict, { icon: string; label: string }>> = {
+  useful: { icon: "👍", label: "useful" },
+  not_useful: { icon: "👎", label: "not useful" },
+  wrong_moment: { icon: "⏱", label: "wrong moment" },
+};
 
 export interface CardProps {
   card: StageCard;
   /** A `glow` starts collapsed; this opens it without touching the card. */
   defaultExpanded?: boolean;
+  /**
+   * Scrolls the transcript to one of the evidence quotes' turns and
+   * highlights it (US-015). Absent on a page with no transcript beside it,
+   * which leaves the quotes as plain text.
+   */
+  onQuoteClick?: ((turnId: string) => void) | undefined;
+  /**
+   * Files the group's verdict on this card. Absent means no buttons: a card
+   * nobody can give an opinion on is better than one whose buttons do nothing.
+   */
+  onFeedback?: ((card: StageCard, verdict: FeedbackVerdict) => void) | undefined;
 }
 
-export function Card({ card, defaultExpanded = false }: CardProps) {
+export function Card({
+  card,
+  defaultExpanded = false,
+  onQuoteClick,
+  onFeedback,
+}: CardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const glowCollapsed = card.variant === "glow" && !expanded;
 
@@ -71,11 +94,12 @@ export function Card({ card, defaultExpanded = false }: CardProps) {
         </p>
       ) : (
         <>
-          <Evidence card={card} />
+          <Evidence card={card} onQuoteClick={onQuoteClick} />
           <Details card={card} />
           <Sources card={card} />
         </>
       )}
+      <Feedback card={card} onFeedback={onFeedback} />
     </article>
   );
 }
@@ -149,26 +173,97 @@ function Thinking({ label }: { label?: string }) {
   );
 }
 
-/** The quotes an interjection rests on, attributed where the speaker is known. */
-function Evidence({ card }: { card: StageCard }) {
+/**
+ * The quotes an interjection rests on, attributed where the speaker is known.
+ *
+ * A quote is a button when there is a transcript to scroll: the fastest way
+ * to disagree with Sotto is to go and read what was actually said, so one
+ * click puts the cited turn on screen and highlights it (US-015).
+ */
+function Evidence({
+  card,
+  onQuoteClick,
+}: {
+  card: StageCard;
+  onQuoteClick?: ((turnId: string) => void) | undefined;
+}) {
   const quotes = card.evidence ?? [];
   if (quotes.length === 0) return null;
   return (
     <ul className="card__evidence" data-testid="card-evidence">
-      {quotes.map((one) => (
-        <li
-          key={`${one.turnId}:${one.quote}`}
-          className="card__quote"
-          data-testid="card-quote"
-          data-turn-id={one.turnId}
-        >
-          <span className="card__quote-text">“{one.quote}”</span>
-          {one.speaker !== undefined && one.speaker !== "" && (
-            <span className="card__quote-speaker">— {one.speaker}</span>
-          )}
-        </li>
-      ))}
+      {quotes.map((one) => {
+        const body = (
+          <>
+            <span className="card__quote-text">“{one.quote}”</span>
+            {one.speaker !== undefined && one.speaker !== "" && (
+              <span className="card__quote-speaker">— {one.speaker}</span>
+            )}
+          </>
+        );
+        return (
+          <li
+            key={`${one.turnId}:${one.quote}`}
+            className="card__quote"
+            data-testid="card-quote"
+            data-turn-id={one.turnId}
+          >
+            {onQuoteClick === undefined ? (
+              body
+            ) : (
+              <button
+                type="button"
+                className="card__quote-button"
+                data-testid="card-quote-link"
+                title="Show this in the transcript"
+                onClick={() => onQuoteClick(one.turnId)}
+              >
+                {body}
+              </button>
+            )}
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+/**
+ * 👍 / 👎 / ⏱, and nothing after the click but the button staying pressed.
+ *
+ * The verdict is the only thing this page does that Sotto learns from, so it
+ * has to cost one click and no confirmation. A second click changes the
+ * verdict: the file keeps both lines, and the later one is what was meant.
+ */
+function Feedback({
+  card,
+  onFeedback,
+}: {
+  card: StageCard;
+  onFeedback?: ((card: StageCard, verdict: FeedbackVerdict) => void) | undefined;
+}) {
+  const [chosen, setChosen] = useState<FeedbackVerdict | null>(null);
+  if (onFeedback === undefined) return null;
+  return (
+    <div className="card__feedback" data-testid="card-feedback">
+      {feedbackVerdicts.map((verdict) => (
+        <button
+          key={verdict}
+          type="button"
+          className="card__feedback-button"
+          data-testid={`card-feedback-${verdict}`}
+          data-chosen={verdict === chosen}
+          aria-pressed={verdict === chosen}
+          title={FEEDBACK[verdict].label}
+          onClick={() => {
+            setChosen(verdict);
+            onFeedback(card, verdict);
+          }}
+        >
+          <span aria-hidden="true">{FEEDBACK[verdict].icon}</span>
+          <span className="card__feedback-label">{FEEDBACK[verdict].label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 

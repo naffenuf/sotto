@@ -19,7 +19,8 @@
     "verify:ui": "node scripts/verify-ui.mjs",
     "verify:cards": "node scripts/verify-cards.mjs",
     "verify:mic": "node scripts/verify-mic.mjs",
-    "verify:chattiness": "node scripts/verify-chattiness.mjs"
+    "verify:chattiness": "node scripts/verify-chattiness.mjs",
+    "verify:delivery": "node scripts/verify-delivery.mjs"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",

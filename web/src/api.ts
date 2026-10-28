@@ -1,6 +1,8 @@
 import type {
   ApiError,
   Chattiness,
+  FeedbackResponse,
+  FeedbackVerdict,
   FixtureListResponse,
   SessionSettingsResponse,
   SessionSource,
@@ -57,6 +59,18 @@ export function stopSession(): Promise<SessionStopResponse> {
  */
 export function setChattiness(chattiness: Chattiness): Promise<SessionSettingsResponse> {
   return call<SessionSettingsResponse>("/api/session/settings", { chattiness });
+}
+
+/**
+ * Files the group's verdict on a card Sotto put up (US-015). Only the card id
+ * goes over the wire: the server knows which candidate it was and at what
+ * level it was shown.
+ */
+export function sendFeedback(
+  cardId: string,
+  verdict: FeedbackVerdict,
+): Promise<FeedbackResponse> {
+  return call<FeedbackResponse>("/api/feedback", { cardId, verdict });
 }
 
 /** Names one diarization label for the running session; `null` clears it. */

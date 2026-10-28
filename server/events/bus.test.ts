@@ -1,13 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { ServerEvent, SessionInfo } from "../../shared/index.js";
+import type { ServerEvent, SessionInfo, StageCard } from "../../shared/index.js";
 import { emptyBoard } from "../../shared/index.js";
-import { EventBus } from "./bus.js";
+import { EventBus, MAX_REMEMBERED_CARDS } from "./bus.js";
 
 const session: SessionInfo = {
   id: "events-brainstorm-1",
   source: { kind: "events", fixture: "brainstorm" },
   startedAtMs: 0,
 };
+
+function glow(id: string, over: Partial<StageCard> = {}): StageCard {
+  return {
+    id,
+    variant: "glow",
+    state: "ready",
+    createdAtMs: 12_000,
+    headline: `nobody has said who writes ${id}`,
+    ...over,
+  };
+}
 
 function collect(bus: EventBus): ServerEvent[] {
   const seen: ServerEvent[] = [];
@@ -165,6 +176,64 @@ describe("EventBus", () => {
     // Labels belong to one session, so the next one starts nameless.
     bus.setSession(null);
     expect(bus.speakerNames()).toEqual({});
+  });
+
+  it("remembers the cards on the stage, one snapshot event each", () => {
+    const bus = new EventBus();
+    bus.setSession(session);
+    const seen = collect(bus);
+
+    bus.publishCard(glow("card-cand-1"));
+    bus.publishCard(glow("card-cand-2"));
+
+    expect(seen).toEqual([
+      { type: "card", card: glow("card-cand-1") },
+      { type: "card", card: glow("card-cand-2") },
+    ]);
+    // A browser that attaches now folds each one in exactly the way it folds
+    // a live arrival, oldest first.
+    expect(bus.snapshot().slice(-2)).toEqual([
+      { type: "card", card: glow("card-cand-1") },
+      { type: "card", card: glow("card-cand-2") },
+    ]);
+    expect(bus.cardState()).toEqual([glow("card-cand-1"), glow("card-cand-2")]);
+  });
+
+  it("replaces a card that arrives again rather than stacking it", () => {
+    const bus = new EventBus();
+    bus.publishCard(glow("card-cand-1", { state: "thinking", headline: "" }));
+    bus.publishCard(glow("card-cand-1", { headline: "the digest copy has no owner" }));
+
+    expect(bus.cardState()).toEqual([
+      glow("card-cand-1", { headline: "the digest copy has no owner" }),
+    ]);
+  });
+
+  it("clears the stage when a session starts, not when one ends", () => {
+    const bus = new EventBus();
+    bus.setSession(session);
+    bus.publishCard(glow("card-cand-1"));
+
+    // The last decision of a replay is published after the session has gone,
+    // and what Sotto noticed is what you most want still on the screen.
+    bus.setSession(null);
+    expect(bus.cardState()).toEqual([glow("card-cand-1")]);
+
+    bus.setSession({ ...session, id: "events-brainstorm-2" });
+    expect(bus.cardState()).toEqual([]);
+    expect(bus.snapshot().some((event) => event.type === "card")).toBe(false);
+  });
+
+  it("keeps the newest cards when a runaway loop produces too many", () => {
+    const bus = new EventBus();
+    for (let index = 0; index < MAX_REMEMBERED_CARDS + 5; index += 1) {
+      bus.publishCard(glow(`card-cand-${index}`));
+    }
+
+    const remembered = bus.cardState();
+    expect(remembered).toHaveLength(MAX_REMEMBERED_CARDS);
+    expect(remembered[0]?.id).toBe("card-cand-5");
+    expect(remembered.at(-1)?.id).toBe(`card-cand-${MAX_REMEMBERED_CARDS + 4}`);
   });
 
   it("keeps going when a listener throws", () => {

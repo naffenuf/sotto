@@ -6,8 +6,13 @@
  * partial is gray and italic, which is the only signal that the words may
  * still change; a partial also has no diarization label yet, so its chip
  * stays blank until the API sends one.
+ *
+ * It is also where an interjection's evidence lands: clicking a quote on a
+ * card (US-015) asks this panel to show that turn, which means scrolling to
+ * it, marking it, and stopping following the live edge — the reader has gone
+ * back to check something and should not be yanked forward again.
  */
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SpeakerNames, TurnUpdate } from "../../shared/index.js";
 
 /** How close to the bottom still counts as following the conversation. */
@@ -42,14 +47,32 @@ function speakerText(label: string | null, speakers: SpeakerNames): string {
   return speakers[label] ?? label;
 }
 
+/**
+ * Which turn to show, and a fresh object each time it is asked for: clicking
+ * the same quote twice has to scroll twice, so the request carries the moment
+ * it was made rather than only the turn.
+ */
+export interface TurnHighlight {
+  turnId: string;
+  /** `Date.now()` of the click, which is what makes a repeat a new request. */
+  at: number;
+}
+
 export interface TranscriptPanelProps {
   turns: TurnUpdate[];
   speakers: SpeakerNames;
   /** Saves a display name for one label; `null` goes back to the bare label. */
   onRename: (label: string, name: string | null) => void;
+  /** The turn an evidence quote asked for, or `null` (US-015). */
+  highlight?: TurnHighlight | null;
 }
 
-export function TranscriptPanel({ turns, speakers, onRename }: TranscriptPanelProps) {
+export function TranscriptPanel({
+  turns,
+  speakers,
+  onRename,
+  highlight = null,
+}: TranscriptPanelProps) {
   const list = useRef<HTMLDivElement>(null);
   /** True while the newest turn should stay in view. */
   const [following, setFollowing] = useState(true);
@@ -63,6 +86,24 @@ export function TranscriptPanel({ turns, speakers, onRename }: TranscriptPanelPr
     if (node === null || !following) return;
     node.scrollTop = node.scrollHeight;
   }, [turns, following]);
+
+  // After the rows are laid out, so the turn being looked for is on the page.
+  useEffect(() => {
+    if (highlight === null) return;
+    const node = list.current;
+    if (node === null) return;
+    const row = node.querySelector(`[data-turn-id="${CSS.escape(highlight.turnId)}"]`);
+    // A cited turn can be off the end of the capped list; there is then
+    // nothing to scroll to, and nothing to apologise for either.
+    if (row === null) return;
+    // Reading an old line is the opposite of following the live edge.
+    setFollowing(false);
+    // Centred in the list by hand rather than with `scrollIntoView`, which
+    // would scroll every ancestor and can take the whole page with it.
+    const rowBox = row.getBoundingClientRect();
+    const listBox = node.getBoundingClientRect();
+    node.scrollTop += rowBox.top - listBox.top - (listBox.height - rowBox.height) / 2;
+  }, [highlight]);
 
   const onScroll = useCallback(() => {
     const node = list.current;
@@ -105,9 +146,12 @@ export function TranscriptPanel({ turns, speakers, onRename }: TranscriptPanelPr
           turns.map((turn) => (
             <p
               key={turn.turnId}
-              className={`turn ${turn.final ? "turn--final" : "turn--partial"}`}
+              className={`turn ${turn.final ? "turn--final" : "turn--partial"}${
+                turn.turnId === highlight?.turnId ? " turn--cited" : ""
+              }`}
               data-testid="turn"
               data-turn-id={turn.turnId}
+              data-cited={turn.turnId === highlight?.turnId ? true : undefined}
               data-final={turn.final}
               data-speaker={turn.speaker ?? ""}
             >
