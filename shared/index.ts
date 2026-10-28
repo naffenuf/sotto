@@ -71,6 +71,7 @@ export type {
   BoardEvent,
   ServerEvent,
   SessionEvent,
+  SettingsEvent,
   SpeakerNames,
   SpeakersEvent,
   StatusChannel,
@@ -80,15 +81,39 @@ export type {
   TurnEvent,
 } from "./events.js";
 export {
+  CHATTINESS_THRESHOLDS,
+  ChattinessSchema,
+  DEFAULT_CHATTINESS,
+  candidateLevels,
+  chattinessLevels,
+  decisionReasons,
+  decisions,
+  thresholdsFor,
+} from "./policy.js";
+export type {
+  CandidateLevel,
+  Chattiness,
+  ChattinessThresholds,
+  Decision,
+  DecisionReason,
+  DeliveredLevel,
+  PolicyDecision,
+} from "./policy.js";
+export {
+  SessionSettingsRequestSchema,
   SessionSourceSchema,
   SessionStartRequestSchema,
   SpeakerRenameRequestSchema,
+  defaultSettings,
   describeSource,
   sourceSlug,
 } from "./session.js";
 export type {
   FixtureListResponse,
   SessionInfo,
+  SessionSettings,
+  SessionSettingsRequest,
+  SessionSettingsResponse,
   SessionSource,
   SessionSourceKind,
   SessionStartRequest,

@@ -9,7 +9,11 @@ import {
 } from "../audio/AudioSource.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
-import type { CandidateLogLine, CandidateLogRecord } from "../../shared/candidates.js";
+import type {
+  CandidateLogLine,
+  CandidateLogRecord,
+  DecisionLogRecord,
+} from "../../shared/candidates.js";
 import type {
   GroundedCall,
   GroundedReply,
@@ -293,7 +297,7 @@ describe("SessionManager, board and observer", () => {
   it("looks for candidates after each board update and writes them to the folder", async () => {
     const bus = new EventBus(quiet);
     const model = new ScriptedModel();
-    const candidates: CandidateLogRecord[] = [];
+    const logged: CandidateLogLine[] = [];
     const writer = {
       dir: "/tmp/not-a-real-folder",
       appendEvent: () => {},
@@ -301,7 +305,7 @@ describe("SessionManager, board and observer", () => {
       renameSpeaker: () => {},
       setSettings: () => {},
       writeBoard: () => {},
-      appendCandidate: (record: unknown) => candidates.push(record as CandidateLogRecord),
+      appendCandidate: (record: unknown) => logged.push(record as CandidateLogLine),
       appendFeedback: () => {},
       appendAnswer: () => {},
       writeArtifact: () => "",
@@ -336,13 +340,31 @@ describe("SessionManager, board and observer", () => {
     expect(observerCalls).toHaveLength(boardCalls.length);
     expect(observerCalls.at(-1)!.user).toContain(`[p${boardCalls.length}] point ${boardCalls.length}`);
 
+    const candidates = logged.filter(
+      (line): line is CandidateLogRecord => line.kind === "candidate",
+    );
     expect(candidates).toHaveLength(observerCalls.length);
-    expect(candidates[0]!.kind).toBe("candidate");
     expect(candidates.map((record) => record.candidate.id)).toEqual(
       candidates.map((_, index) => `cand-${index + 1}`),
     );
     // Different board items each time, so none of them is a repeat.
     for (const record of candidates) expect(record.candidate.duplicateOf).toBeUndefined();
+
+    // And the policy (US-014) decided about every one of them in the same
+    // file. These score 0.6 × 0.5 × 0.9 × 0.7 = 0.19, under `normal`'s glow
+    // threshold, so nothing is ever said out loud.
+    const decisions = logged.filter(
+      (line): line is DecisionLogRecord => line.kind === "decision",
+    );
+    expect(decisions.map((record) => record.candidateId)).toEqual(
+      candidates.map((record) => record.candidate.id),
+    );
+    for (const record of decisions) {
+      expect(record.decision).toBe("silent");
+      expect(record.reason).toBe("below_threshold");
+      expect(record.chattiness).toBe("normal");
+      expect(record.score).toBeCloseTo(0.189, 3);
+    }
   });
 
   /**
@@ -464,6 +486,81 @@ describe("SessionManager, board and observer", () => {
     }
     const ids = new Set(noticed.map((record) => record.candidate.id));
     for (const record of checked) expect(ids.has(record.candidateId)).toBe(true);
+  });
+});
+
+describe("SessionManager, chattiness", () => {
+  /** A model that is wired up but never actually asked anything here. */
+  const idleModel: ModelClient = {
+    async structured(): Promise<never> {
+      throw new Error("no call was expected");
+    },
+    async grounded(): Promise<never> {
+      throw new Error("no call was expected");
+    },
+  };
+
+  it("sets the level with nothing running, and the next session starts there", () => {
+    const bus = new EventBus(quiet);
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => null,
+      createModel: () => idleModel,
+      liveClock: new SimulatedClock(0),
+      createAsrClient: ({ onFrame }) => new FakeAsrClient(onFrame),
+    });
+
+    expect(sessions.settings()).toEqual({ chattiness: "normal" });
+    expect(sessions.setChattiness("quiet")).toEqual({ chattiness: "quiet" });
+    expect(bus.settingsState()).toEqual({ chattiness: "quiet" });
+
+    sessions.start({ kind: "wav", fixture: "brainstorm" });
+    expect(sessions.interjectionPolicy()?.setting()).toBe("quiet");
+  });
+
+  it("changes a running session's policy and its folder", async () => {
+    const bus = new EventBus(quiet);
+    const settings: unknown[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: (saved: unknown) => settings.push(saved),
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      writeArtifact: () => "",
+      end: () => {},
+    } satisfies SessionWriter;
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => idleModel,
+      liveClock: new SimulatedClock(0),
+      createAsrClient: ({ onFrame }) => new FakeAsrClient(onFrame),
+    });
+
+    sessions.start({ kind: "wav", fixture: "brainstorm" });
+    // The folder records the level the session started at.
+    expect(settings).toEqual([{ chattiness: "normal" }]);
+
+    sessions.setChattiness("active");
+    expect(sessions.interjectionPolicy()?.setting()).toBe("active");
+    expect(settings).toEqual([{ chattiness: "normal" }, { chattiness: "active" }]);
+    // Setting it to what it already is changes nothing and writes nothing.
+    sessions.setChattiness("active");
+    expect(settings).toHaveLength(2);
+
+    await sessions.stop();
+    expect(sessions.interjectionPolicy()).toBeNull();
+    // And it outlives the session, for the next one to inherit.
+    expect(sessions.settings()).toEqual({ chattiness: "active" });
   });
 });
 

@@ -9,6 +9,7 @@
  */
 import { z } from "zod";
 import type { SpeakerNames } from "./events.js";
+import { ChattinessSchema, DEFAULT_CHATTINESS, type Chattiness } from "./policy.js";
 
 /** Fixture names are file stems under `fixtures/`, never paths. */
 const FixtureNameSchema = z
@@ -96,10 +97,33 @@ export interface FixtureListResponse {
 
 /**
  * Whatever the user can change about a running session, saved to
- * `session.json` so a replay of the folder can be read in context. Empty so
- * far: `chattiness` (US-014) is the first setting that lands here.
+ * `session.json` so a session folder can be read back in the context it was
+ * recorded in — which is what the eval harness (US-016) reports alongside its
+ * numbers.
  */
-export type SessionSettings = Readonly<Record<string, string | number | boolean>>;
+export interface SessionSettings {
+  /** How talkative Sotto is being (US-014), set from the header. */
+  readonly chattiness: Chattiness;
+}
+
+/** Where a server starts, before the header has said anything. */
+export function defaultSettings(): SessionSettings {
+  return { chattiness: DEFAULT_CHATTINESS };
+}
+
+/**
+ * Body of `POST /api/session/settings`. It works with no session running
+ * too — the setting is the server's, and the next session inherits it.
+ */
+export const SessionSettingsRequestSchema = z.object({
+  chattiness: ChattinessSchema,
+});
+export type SessionSettingsRequest = z.infer<typeof SessionSettingsRequestSchema>;
+
+/** Response to it: the settings as they now stand. */
+export interface SessionSettingsResponse {
+  settings: SessionSettings;
+}
 
 /** One diarization label, and the display name the user gave it (US-007). */
 export interface SpeakerRecord {

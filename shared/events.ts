@@ -4,11 +4,11 @@
  * The server publishes to an in-process bus (`server/events/bus.ts`) and each
  * attached socket gets the events as JSON lines. A socket that attaches part
  * way through a session is caught up first with the bus's remembered state
- * (the three statuses, the running session, the speaker names and the board),
- * so the UI never has to poll.
+ * (the three statuses, the running session, the speaker names, the board and
+ * the settings), so the UI never has to poll.
  */
 import type { TurnUpdate } from "./turns.js";
-import type { SessionInfo } from "./session.js";
+import type { SessionInfo, SessionSettings } from "./session.js";
 import type { Board } from "./board.js";
 
 /**
@@ -83,6 +83,18 @@ export interface BoardEvent {
   updatedAtMs: number;
 }
 
+/**
+ * The settings as the server now holds them (US-014's chattiness).
+ *
+ * The setting belongs to the server rather than to one browser tab — the
+ * policy reads it, and `session.json` records it — so the header shows what
+ * came back on this event rather than what it last clicked.
+ */
+export interface SettingsEvent {
+  type: "settings";
+  settings: SessionSettings;
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -95,4 +107,5 @@ export type ServerEvent =
   | TurnEvent
   | SessionEvent
   | SpeakersEvent
-  | BoardEvent;
+  | BoardEvent
+  | SettingsEvent;

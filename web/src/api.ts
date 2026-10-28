@@ -1,6 +1,8 @@
 import type {
   ApiError,
+  Chattiness,
   FixtureListResponse,
+  SessionSettingsResponse,
   SessionSource,
   SessionStartResponse,
   SessionStopResponse,
@@ -46,6 +48,15 @@ export function startSession(source: SessionSource): Promise<SessionStartRespons
 
 export function stopSession(): Promise<SessionStopResponse> {
   return call<SessionStopResponse>("/api/session/stop", {});
+}
+
+/**
+ * Sets how talkative Sotto is (US-014). The server answers with the settings
+ * as they now stand and pushes them to every tab, so the header follows the
+ * reply rather than its own click.
+ */
+export function setChattiness(chattiness: Chattiness): Promise<SessionSettingsResponse> {
+  return call<SessionSettingsResponse>("/api/session/settings", { chattiness });
 }
 
 /** Names one diarization label for the running session; `null` clears it. */

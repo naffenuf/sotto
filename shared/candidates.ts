@@ -16,6 +16,7 @@
  */
 import { z } from "zod";
 import type { Citation, EvidenceQuote } from "./cards.js";
+import type { Decision, DecisionReason, PolicyDecision } from "./policy.js";
 
 /**
  * The four things the observer looks for.
@@ -167,8 +168,8 @@ export interface Candidate extends ObserverCandidate {
  *
  * Every candidate is written here before the policy sees it, so the file is
  * the record of what Sotto noticed as well as of what it said. US-013's
- * verification appends {@link VerificationLogRecord}s alongside and US-014's
- * decisions will append their own `kind`.
+ * verification appends {@link VerificationLogRecord}s alongside, and the
+ * policy's decisions {@link DecisionLogRecord}s.
  */
 export interface CandidateLogRecord {
   kind: "candidate";
@@ -257,8 +258,35 @@ export interface VerificationLogRecord {
   error?: string;
 }
 
+/**
+ * One line of `candidates.jsonl` recording what the policy (US-014) decided
+ * about a candidate.
+ *
+ * A candidate can be decided more than once: one `hold` while somebody is
+ * still talking, then `delivered` at the pause that follows. Each decision is
+ * its own line, so the file shows how long something waited as well as what
+ * became of it.
+ */
+export interface DecisionLogRecord extends PolicyDecision {
+  kind: "decision";
+  /** When the decision was made, on the session clock. */
+  atMs: number;
+  /** The {@link Candidate.id} it was made about. */
+  candidateId: string;
+  /** The claim, so the file reads without cross-referencing. */
+  headline: string;
+  type: CandidateType;
+  /** How long the candidate had been waiting for a pause when it was made. */
+  heldForMs: number;
+  /** Final turns that have gone by since the policy first saw it. */
+  turnsWaited: number;
+}
+
 /** Every kind of line `candidates.jsonl` holds. */
-export type CandidateLogLine = CandidateLogRecord | VerificationLogRecord;
+export type CandidateLogLine = CandidateLogRecord | VerificationLogRecord | DecisionLogRecord;
+
+/** Re-exported so a reader of a log line has the vocabulary to hand. */
+export type { Decision, DecisionReason };
 
 /** The `json_schema.name` an observer request sends. */
 export const OBSERVER_SCHEMA_NAME = "observer_candidates";

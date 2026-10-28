@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  Chattiness,
   FixtureListResponse,
   SessionSource,
   StatusChannel,
@@ -10,6 +11,7 @@ import {
   ApiCallError,
   fetchFixtures,
   renameSpeaker,
+  setChattiness,
   startSession,
   stopSession,
 } from "./api.js";
@@ -108,6 +110,15 @@ export function App() {
       .finally(() => setBusy(false));
   }, [stopMic]);
 
+  // The server owns the setting and pushes it back on `/ws/events`, so there
+  // is nothing to remember here: the selector shows what came back.
+  const onChattinessChange = useCallback((chattiness: Chattiness) => {
+    setProblem(null);
+    void setChattiness(chattiness).catch((error: unknown) =>
+      setProblem(error instanceof ApiCallError ? error.message : String(error)),
+    );
+  }, []);
+
   const onRenameSpeaker = useCallback((label: string, name: string | null) => {
     setProblem(null);
     void renameSpeaker(label, name).catch((error: unknown) =>
@@ -138,6 +149,8 @@ export function App() {
           busy={busy}
           onStart={onStart}
           onStop={onStop}
+          chattiness={events.settings.chattiness}
+          onChattinessChange={onChattinessChange}
         />
         <StatusDots statuses={statuses} />
       </header>

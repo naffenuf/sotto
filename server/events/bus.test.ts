@@ -25,6 +25,7 @@ describe("EventBus", () => {
       { type: "session", session: null },
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
+      { type: "settings", settings: { chattiness: "normal" } },
     ]);
   });
 
@@ -77,6 +78,24 @@ describe("EventBus", () => {
     ]);
   });
 
+  it("remembers the settings, and does not reset them for a new session", () => {
+    const bus = new EventBus();
+    const seen = collect(bus);
+
+    bus.setSettings({ chattiness: "active" });
+    expect(seen).toEqual([{ type: "settings", settings: { chattiness: "active" } }]);
+    expect(bus.settingsState()).toEqual({ chattiness: "active" });
+
+    // Turning Sotto up is meant for the next conversation too, unlike the
+    // speaker names and the board.
+    bus.setSession(session);
+    expect(bus.settingsState()).toEqual({ chattiness: "active" });
+    expect(bus.snapshot()).toContainEqual({
+      type: "settings",
+      settings: { chattiness: "active" },
+    });
+  });
+
   it("catches a late listener up with the statuses and the running session", () => {
     const bus = new EventBus();
     bus.setStatus("transcription", "active", "replaying brainstorm events at 1x");
@@ -96,6 +115,7 @@ describe("EventBus", () => {
       { type: "session", session },
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
+      { type: "settings", settings: { chattiness: "normal" } },
     ]);
     expect(bus.currentSession()).toEqual(session);
     expect(bus.status("transcription").state).toBe("active");

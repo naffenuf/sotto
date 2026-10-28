@@ -114,7 +114,7 @@ describe("SessionStore session.json", () => {
       source: { kind: "events", fixture: "brainstorm" },
       speakers: {},
       asrSessions: [],
-      settings: {},
+      settings: { chattiness: "normal" },
     });
 
     saved.end();
@@ -126,11 +126,11 @@ describe("SessionStore session.json", () => {
     saved.appendTurn(turn({ turnId: "0:0", speaker: "A" }));
     saved.appendTurn(turn({ turnId: "0:1", speaker: "B" }));
     saved.appendTurn(turn({ turnId: "0:2", speaker: "A" }));
-    saved.setSettings({ chattiness: "normal" });
+    saved.setSettings({ chattiness: "active" });
 
     const record = session(saved.dir);
     expect(record.speakers).toEqual({ A: { name: null }, B: { name: null } });
-    expect(record.settings).toEqual({ chattiness: "normal" });
+    expect(record.settings).toEqual({ chattiness: "active" });
   });
 
   it("collects the realtime session id of every ASR session, once each", () => {

@@ -228,6 +228,36 @@ describe("POST /api/session/speaker", () => {
   });
 });
 
+describe("POST /api/session/settings", () => {
+  const change = (payload: Record<string, unknown>) => ({
+    method: "POST" as const,
+    url: "/api/session/settings",
+    payload,
+  });
+
+  it("sets the chattiness with nothing running and remembers it on the bus", async () => {
+    const { app: server, bus } = await buildTestApp();
+
+    const response = await server.inject(change({ chattiness: "quiet" }));
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ settings: { chattiness: "quiet" } });
+    expect(bus.settingsState()).toEqual({ chattiness: "quiet" });
+    // So a browser that attaches afterwards is caught up with it.
+    expect(bus.snapshot()).toContainEqual({
+      type: "settings",
+      settings: { chattiness: "quiet" },
+    });
+  });
+
+  it("rejects anything that is not one of the three levels", async () => {
+    const { app: server } = await buildTestApp();
+    for (const payload of [{}, { chattiness: "" }, { chattiness: "loud" }, { chattiness: 2 }]) {
+      const response = await server.inject(change(payload));
+      expect(response.statusCode, JSON.stringify(payload)).toBe(400);
+    }
+  });
+});
+
 describe("/ws/audio", () => {
   /** Waits for something the socket causes on the other side of the server. */
   async function waitFor(ready: () => boolean, what: string): Promise<void> {
@@ -330,7 +360,7 @@ describe("/ws/events", () => {
     const { app: server, bus } = await buildTestApp();
     bus.setStatus("transcription", "active", "replaying brainstorm events at max");
 
-    const { socket, events } = await open(server, (seen) => seen.length === 6);
+    const { socket, events } = await open(server, (seen) => seen.length === 7);
     const snapshot = await events;
     socket.close();
 
@@ -350,15 +380,17 @@ describe("/ws/events", () => {
       { type: "speakers", speakers: {} },
       // Nothing has been said, so the board is empty rather than absent.
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
+      // And Sotto is as talkative as it comes (US-014).
+      { type: "settings", settings: { chattiness: "normal" } },
     ]);
   });
 
   it("pushes turns and status changes while a session runs", async () => {
     const { app: server } = await buildTestApp();
-    // The six snapshot events, then the session's own, ending back at null.
+    // The seven snapshot events, then the session's own, ending back at null.
     const { socket, events } = await open(server, (seen) => {
       const last = seen.at(-1);
-      return seen.length > 6 && last?.type === "session" && last.session === null;
+      return seen.length > 7 && last?.type === "session" && last.session === null;
     });
 
     await server.inject({

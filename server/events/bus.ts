@@ -8,11 +8,11 @@
  * exactly what the browser must not be sent.
  *
  * It remembers the state an event implies — the three status dots, the running
- * session, the speaker names the user has given (US-007) and the board
- * (US-009) — so a browser that attaches mid-session can be caught up with
- * {@link EventBus.snapshot}
- * instead of asking. Turns are deliberately not remembered: a transcript is
- * the session folder's job, not the bus's.
+ * session, the speaker names the user has given (US-007), the board (US-009)
+ * and the settings (US-014) — so a browser that attaches mid-session can be
+ * caught up with {@link EventBus.snapshot} instead of asking. Turns are
+ * deliberately not remembered: a transcript is the session folder's job, not
+ * the bus's.
  */
 import { emptyBoard } from "../../shared/board.js";
 import {
@@ -24,7 +24,7 @@ import {
   type StatusState,
   type StatusUpdate,
 } from "../../shared/events.js";
-import type { SessionInfo } from "../../shared/session.js";
+import { defaultSettings, type SessionInfo, type SessionSettings } from "../../shared/session.js";
 
 export type EventListener = (event: ServerEvent) => void;
 
@@ -51,6 +51,8 @@ export class EventBus {
   private session: SessionInfo | null = null;
   private speakers: SpeakerNames = {};
   private board: BoardEvent = initialBoard();
+  /** Server-wide, not per session: the next session inherits what is set. */
+  private settings: SessionSettings = defaultSettings();
 
   constructor(logger: Logger = console) {
     this.logger = logger;
@@ -65,6 +67,7 @@ export class EventBus {
     if (event.type === "status") this.statuses[event.status.channel] = event.status;
     if (event.type === "speakers") this.speakers = event.speakers;
     if (event.type === "board") this.board = event;
+    if (event.type === "settings") this.settings = event.settings;
     if (event.type === "session") {
       this.session = event.session;
       // Diarization labels belong to one session, so the names do too; a
@@ -94,6 +97,15 @@ export class EventBus {
     });
   }
 
+  /**
+   * Publishes the settings as they now stand (US-014's chattiness). They are
+   * deliberately *not* reset by a session starting: a user who turned Sotto
+   * down meant it for the next conversation too.
+   */
+  setSettings(settings: SessionSettings): void {
+    this.publish({ type: "settings", settings });
+  }
+
   /** Publishes the session that is now running, or `null` when it ends. */
   setSession(session: SessionInfo | null): void {
     this.publish({ type: "session", session });
@@ -121,6 +133,7 @@ export class EventBus {
       { type: "session", session: this.session },
       { type: "speakers", speakers: this.speakers },
       this.board,
+      { type: "settings", settings: this.settings },
     ];
   }
 
@@ -137,6 +150,11 @@ export class EventBus {
   /** The board as the last update left it. */
   boardState(): BoardEvent {
     return this.board;
+  }
+
+  /** The settings as they now stand. */
+  settingsState(): SessionSettings {
+    return this.settings;
   }
 
   /** The names given to diarization labels so far. */

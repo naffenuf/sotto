@@ -3,9 +3,11 @@ import websocket from "@fastify/websocket";
 import type { ApiError, HealthResponse } from "../shared/types.js";
 import type { ServerEvent } from "../shared/events.js";
 import {
+  SessionSettingsRequestSchema,
   SessionStartRequestSchema,
   SpeakerRenameRequestSchema,
   type FixtureListResponse,
+  type SessionSettingsResponse,
   type SessionStartResponse,
   type SessionStopResponse,
   type SpeakerRenameResponse,
@@ -81,6 +83,22 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       } satisfies ApiError);
     }
     return { renamed: true, speakers: bus.speakerNames() } satisfies SpeakerRenameResponse;
+  });
+
+  // How talkative Sotto is (US-014). The setting belongs to the server rather
+  // than to one tab — the policy reads it and `session.json` records it — so
+  // this answers with the settings as they now stand and the header shows
+  // what came back. It works with nothing running: the next session inherits.
+  app.post("/api/session/settings", async (request, reply) => {
+    const parsed = SessionSettingsRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: `not a settings change: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
+      } satisfies ApiError);
+    }
+    return {
+      settings: sessions.setChattiness(parsed.data.chattiness),
+    } satisfies SessionSettingsResponse;
   });
 
   // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,

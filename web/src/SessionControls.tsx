@@ -1,4 +1,5 @@
-import type { FixtureListResponse, SessionSource } from "../../shared/index.js";
+import type { Chattiness, FixtureListResponse, SessionSource } from "../../shared/index.js";
+import { chattinessLevels } from "../../shared/index.js";
 
 /**
  * The selector's option values, since a `<select>` only carries strings:
@@ -26,9 +27,13 @@ export interface SessionControlsProps {
   busy: boolean;
   onStart: () => void;
   onStop: () => void;
+  /** How talkative Sotto is (US-014), as the server last reported it. */
+  chattiness: Chattiness;
+  /** Changes it mid-conversation: the policy picks it up at once. */
+  onChattinessChange: (chattiness: Chattiness) => void;
 }
 
-/** Source selector plus Start / Stop, in the header. */
+/** Source selector, chattiness and Start / Stop, in the header. */
 export function SessionControls({
   fixtures,
   value,
@@ -37,6 +42,8 @@ export function SessionControls({
   busy,
   onStart,
   onStop,
+  chattiness,
+  onChattinessChange,
 }: SessionControlsProps) {
   return (
     <div className="controls">
@@ -66,6 +73,22 @@ export function SessionControls({
             </option>
           ))}
         </optgroup>
+      </select>
+      <label className="controls__label" htmlFor="chattiness">
+        Chattiness
+      </label>
+      <select
+        id="chattiness"
+        className="controls__select"
+        data-testid="chattiness-select"
+        value={chattiness}
+        onChange={(event) => onChattinessChange(event.target.value as Chattiness)}
+      >
+        {chattinessLevels.map((level) => (
+          <option key={level} value={level}>
+            {level}
+          </option>
+        ))}
       </select>
       <button
         type="button"

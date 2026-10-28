@@ -3,12 +3,13 @@ import type {
   Board,
   ServerEvent,
   SessionInfo,
+  SessionSettings,
   SpeakerNames,
   StatusChannel,
   StatusUpdate,
   TurnUpdate,
 } from "../../shared/index.js";
-import { emptyBoard } from "../../shared/index.js";
+import { defaultSettings, emptyBoard } from "../../shared/index.js";
 
 /** How long to wait before dialling `/ws/events` again after it drops. */
 const RECONNECT_MS = 2_000;
@@ -55,6 +56,11 @@ export interface SessionEventsState {
   boardReceivedAtMs: number;
   /** How many turns have gone final in this session. */
   turnCount: number;
+  /**
+   * The settings as the server holds them (US-014's chattiness). The header's
+   * selector shows this rather than its own last click, so two tabs agree.
+   */
+  settings: SessionSettings;
 }
 
 function idle(channel: StatusChannel): StatusUpdate {
@@ -72,11 +78,12 @@ const initial: SessionEventsState = {
   boardUpdatedAtMs: 0,
   boardReceivedAtMs: 0,
   turnCount: 0,
+  settings: defaultSettings(),
 };
 
 /**
  * Follows `/ws/events`: the status dots, the running session, the turns, the
- * speaker names and the board.
+ * speaker names, the board and the settings.
  *
  * The server sends its remembered state the moment the socket opens, so a
  * reload mid-session catches up without asking, and a dropped socket is
@@ -146,6 +153,8 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
           };
     case "speakers":
       return { ...state, speakers: event.speakers };
+    case "settings":
+      return { ...state, settings: event.settings };
     case "turn":
       return {
         ...state,

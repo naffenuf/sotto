@@ -30,8 +30,11 @@ import {
   HEADLINE_MAX_CHARS,
   candidateTypes,
   type Candidate,
+  type CandidateLogLine,
   type CandidateLogRecord,
+  type DecisionLogRecord,
 } from "../../shared/candidates.js";
+import { CHATTINESS_THRESHOLDS, decisionReasons, decisions } from "../../shared/policy.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { EventBus } from "../events/bus.js";
 import { SessionManager } from "../session/SessionManager.js";
@@ -62,8 +65,10 @@ const fixture = "moment-contradiction";
 
 /** One replayed conversation: what the observer noticed, and what was said. */
 interface Replayed {
-  /** Every line of `candidates.jsonl`, in order. */
+  /** The candidate lines of `candidates.jsonl`, in order. */
   records: CandidateLogRecord[];
+  /** The policy's decisions from the same file (US-014). */
+  decided: DecisionLogRecord[];
   /** Every final turn, oldest first. */
   turns: TurnUpdate[];
 }
@@ -111,8 +116,13 @@ async function replay(root: string, name: string): Promise<Replayed> {
   expect(existsSync(path), `the observer wrote no ${SESSION_FILES.candidates}`).toBe(true);
   const lines = readFileSync(path, "utf8")
     .split("\n")
-    .filter((line) => line.trim() !== "");
-  return { records: lines.map((line) => JSON.parse(line) as CandidateLogRecord), turns };
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as CandidateLogLine);
+  return {
+    records: lines.filter((line): line is CandidateLogRecord => line.kind === "candidate"),
+    decided: lines.filter((line): line is DecisionLogRecord => line.kind === "decision"),
+    turns,
+  };
 }
 
 /** The ids of the final turns that overlap one scripted line of the fixture. */
@@ -198,6 +208,28 @@ describe.skipIf(apiKey === "")(`the observer after replaying ${fixture}`, () => 
     // candidates is the prompt working; one per board update is it padding.
     const passed = result.records.filter((record) => record.candidate.duplicateOf === undefined);
     expect(passed.length, JSON.stringify(summary(result.records))).toBeLessThanOrEqual(8);
+  });
+
+  it("decides about everything it passed on, in the same file", () => {
+    // A `factual_error` can stop at the verifier, but a contradiction always
+    // reaches the policy — and the first test here insists on one.
+    expect(result.decided.length).toBeGreaterThan(0);
+    const passed = new Set(
+      result.records
+        .filter((record) => record.candidate.duplicateOf === undefined)
+        .map((record) => record.candidate.id),
+    );
+    for (const decision of result.decided) {
+      expect(passed.has(decision.candidateId), `${decision.candidateId} was decided unasked`).toBe(
+        true,
+      );
+      expect(decisions).toContain(decision.decision);
+      expect(decisionReasons).toContain(decision.reason);
+      expect(decision.score).toBeGreaterThanOrEqual(0);
+      expect(decision.score).toBeLessThanOrEqual(1);
+      expect(decision.chattiness).toBe("normal");
+      expect(decision.thresholds).toEqual(CHATTINESS_THRESHOLDS.normal);
+    }
   });
 
   it("does not raise the same thing twice", () => {

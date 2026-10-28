@@ -8,7 +8,10 @@
  *                                                        board updater -> bus
  *                                                              |
  *                                                              v
- *                                                     observer -> candidates
+ *                                                     observer -> verifier
+ *                                                              |
+ *                                                              v
+ *                                                     policy -> candidates.jsonl
  *
  * Only the left-hand column differs between sources. Everything downstream —
  * the turn assembler (US-005), the board update loop (US-009), and the
@@ -22,8 +25,10 @@
  */
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { StatusState } from "../../shared/events.js";
-import type { SessionInfo, SessionSource } from "../../shared/session.js";
+import type { Chattiness } from "../../shared/policy.js";
+import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { describeSource, sourceSlug } from "../../shared/session.js";
+import type { PauseState } from "../../shared/turns.js";
 import {
   EventReplaySource,
   fixtureEventsPath,
@@ -37,6 +42,7 @@ import { WavReplaySource } from "../audio/WavReplaySource.js";
 import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
+import { InterjectionPolicy } from "../interject/InterjectionPolicy.js";
 import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
@@ -109,6 +115,8 @@ export interface SessionManagerOptions {
   wallClock?: Clock;
   /** Replay speed for `events` sources. `1x` for the UI, `max` for tests. */
   replaySpeed?: ReplaySpeed;
+  /** How talkative the policy starts out (US-014). The header changes it live. */
+  chattiness?: Chattiness;
 }
 
 /**
@@ -128,6 +136,7 @@ interface ModelLoops {
   board: BoardUpdater | null;
   observer: Observer | null;
   verifier: Verifier | null;
+  policy: InterjectionPolicy | null;
 }
 
 interface RunningSession {
@@ -142,6 +151,8 @@ interface RunningSession {
   observer: Observer | null;
   /** The fact check (US-013), or `null` when there is no model client. */
   verifier: Verifier | null;
+  /** The interjection policy (US-014), or `null` when there is no model client. */
+  policy: InterjectionPolicy | null;
   /** What the transcription dot shows once the session is published. */
   transcription: [state: StatusState, detail: string];
   /** What the model dot shows once the session is published. */
@@ -167,6 +178,12 @@ export class SessionManager {
 
   private current: RunningSession | undefined;
   private started = 0;
+  /**
+   * The settings the next session starts with, and the ones the running
+   * session is using. Server-wide rather than per session, so turning Sotto
+   * down between conversations sticks.
+   */
+  private currentSettings: SessionSettings;
 
   constructor(options: SessionManagerOptions) {
     this.bus = options.bus;
@@ -186,11 +203,50 @@ export class SessionManager {
     this.liveClock = options.liveClock ?? systemClock;
     this.wallClock = options.wallClock ?? systemClock;
     this.replaySpeed = options.replaySpeed ?? "1x";
+    // The bus is where the settings a browser is caught up with are
+    // remembered, so they start from there and are only published when this
+    // manager was built with something else in mind.
+    this.currentSettings = options.chattiness === undefined
+      ? this.bus.settingsState()
+      : { chattiness: options.chattiness };
+    if (this.currentSettings.chattiness !== this.bus.settingsState().chattiness) {
+      this.bus.setSettings(this.currentSettings);
+    }
   }
 
   /** The session that is running, or `null`. */
   state(): SessionInfo | null {
     return this.current?.info ?? null;
+  }
+
+  /** The settings as they now stand (US-014's chattiness). */
+  settings(): SessionSettings {
+    return this.currentSettings;
+  }
+
+  /**
+   * Changes how talkative Sotto is, live. A running session's policy picks it
+   * up at once and `session.json` records it; with nothing running it is the
+   * setting the next session will start with.
+   */
+  setChattiness(chattiness: Chattiness): SessionSettings {
+    if (chattiness !== this.currentSettings.chattiness) {
+      this.currentSettings = { chattiness };
+      this.bus.setSettings(this.currentSettings);
+      this.current?.policy?.setChattiness(chattiness);
+      this.current?.store.writer?.setSettings(this.currentSettings);
+    }
+    return this.currentSettings;
+  }
+
+  /**
+   * The running session's interjection policy (US-014), or `null`. This is
+   * where the courtesy hooks live: wake-phrase detection (US-017) and the
+   * answer agent (US-018) call `wakePhraseDetected` and `setAnswerThinking`
+   * on it so that Sotto does not talk over itself.
+   */
+  interjectionPolicy(): InterjectionPolicy | null {
+    return this.current?.policy ?? null;
   }
 
   /**
@@ -229,6 +285,9 @@ export class SessionManager {
         ? this.startReplay(info, source.fixture, store)
         : this.startLive(info, source, store);
     store.writer = this.openStore(info);
+    // The folder records the context the session ran in, so the eval harness
+    // (US-016) can read a report's chattiness off the disk.
+    store.writer?.setSettings(this.currentSettings);
 
     this.current = running;
     // The session goes out before its statuses, so a listener always knows
@@ -266,7 +325,10 @@ export class SessionManager {
     // Replay sets this clock to each frame's recorded arrival time, so the
     // whole pipeline reads the conversation's own timeline (US-006).
     const clock = new SimulatedClock(0);
-    const loops = this.modelLoops(info, clock, store);
+    // The policy asks the assembler whether anybody is talking, and the
+    // assembler is built from the loops, so the getter closes over the
+    // `const` below. It is only ever called once `start()` has returned.
+    const loops = this.modelLoops(info, clock, store, () => assembler.pauseState());
     const assembler = this.assembler(clock, store, loops);
     let source: EventReplaySource;
     try {
@@ -342,7 +404,8 @@ export class SessionManager {
       }
     }
 
-    const loops = this.modelLoops(info, this.liveClock, store);
+    // As in `startReplay`: the pause getter reads the assembler built below.
+    const loops = this.modelLoops(info, this.liveClock, store, () => assembler.pauseState());
     const assembler = this.assembler(this.liveClock, store, loops);
     const client = this.createAsrClient({
       apiKey,
@@ -399,43 +462,67 @@ export class SessionManager {
         store.writer?.appendTurn(turn);
         loops.board?.acceptTurn(turn);
         loops.observer?.acceptTurn(turn);
+        // The policy is the one that wants the partials too: a `speechEnd`
+        // arrives as one, and it is what opens a pause (US-014).
+        loops.policy?.acceptTurn(turn);
       },
     });
   }
 
   /**
-   * Builds the two model loops a session runs: the board update loop (US-009)
-   * and the observer (US-012), sharing one model client. Both are `null` when
-   * there is no client — in which case the session still transcribes and still
-   * saves, it just has no board and notices nothing.
+   * Builds everything a session does with a model, sharing one client: the
+   * board update loop (US-009), the observer (US-012), the fact check
+   * (US-013) and the interjection policy (US-014). All four are `null` when
+   * there is no client — in which case the session still transcribes and
+   * still saves, it just has no board and notices nothing.
    *
-   * The board writes `board.json`/`board.md` and pushes the board to every
-   * attached browser; the observer writes `candidates.jsonl` and, right after
-   * each board update, looks at the conversation. Both drive the one `model`
-   * dot, guarded on the session still being the current one the same way
-   * frames are: work that lands after Stop must not light the dot back up.
-   * The board itself is published either way, because the last update of a
-   * session is the one worth reading.
+   * They form a chain. The board writes `board.json`/`board.md` and pushes
+   * the board to every attached browser; the observer looks at the
+   * conversation right after each update; a claim that looks wrong goes to
+   * the verifier first and everything else straight to the policy, which
+   * decides whether and when it is worth saying. Every candidate, check and
+   * decision lands in `candidates.jsonl` on the way past.
+   *
+   * The model loops all drive the one `model` dot, guarded on the session
+   * still being the current one the same way frames are: work that lands
+   * after Stop must not light the dot back up. The board itself is published
+   * either way, because the last update of a session is the one worth
+   * reading.
    */
-  private modelLoops(info: SessionInfo, clock: Clock, store: StoreSlot): ModelLoops {
+  private modelLoops(
+    info: SessionInfo,
+    clock: Clock,
+    store: StoreSlot,
+    pauseState: () => PauseState,
+  ): ModelLoops {
     const model = this.createModel();
     if (model === null) {
       this.logger.warn(
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
       );
-      return { board: null, observer: null, verifier: null };
+      return { board: null, observer: null, verifier: null, policy: null };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
       if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
     };
+    const policy = new InterjectionPolicy({
+      clock,
+      pauseState,
+      chattiness: this.currentSettings.chattiness,
+      logger: this.logger,
+      onRecord: (record) => store.writer?.appendCandidate(record),
+      // US-015 is what turns a decision into a card on the stage. Until then
+      // a delivered candidate's output is the log and nothing else.
+      onDeliver: () => {},
+    });
     const verifier = new Verifier({
       clock,
       model,
       logger: this.logger,
       onRecord: (record) => store.writer?.appendCandidate(record),
-      // US-014 is what turns a candidate into something on the stage. Until
-      // then a checked candidate's output is the log and nothing else.
-      onVerified: () => {},
+      // A claim that really is wrong has the correction in its detail by now,
+      // and goes to the policy like any other candidate.
+      onVerified: (candidate) => policy.accept(candidate),
       onModelState,
     });
     const observer = new Observer({
@@ -444,10 +531,10 @@ export class SessionManager {
       logger: this.logger,
       onRecord: (record) => store.writer?.appendCandidate(record),
       // A claim that looks wrong is checked against the web before it can be
-      // said to anyone (US-013); everything else goes straight to the policy,
-      // which US-014 will supply.
+      // said to anyone (US-013); everything else goes straight to the policy.
       onCandidate: (candidate) => {
         if (candidate.type === "factual_error") verifier.verify(candidate);
+        else policy.accept(candidate);
       },
       onModelState,
     });
@@ -470,7 +557,7 @@ export class SessionManager {
       },
       onModelState,
     });
-    return { board, observer, verifier };
+    return { board, observer, verifier, policy };
   }
 
   /**
@@ -521,6 +608,7 @@ export class SessionManager {
     running.board?.stop();
     running.observer?.stop();
     running.verifier?.stop();
+    running.policy?.stop();
     // Whether it ended, was stopped or failed, the folder gets its `endedAt`.
     running.store.writer?.end();
 
@@ -563,13 +651,18 @@ export class SessionManager {
 /**
  * Gives every loop the end of the conversation: the board gets a last update
  * for the turns that never reached four, the observer gets a last look at the
- * board that came out of it, and the checks that look produced get to come
- * back. In that order, because each one reads what the one before it wrote.
+ * board that came out of it, the checks that look produced get to come back,
+ * and the policy decides about them. In that order, because each one reads
+ * what the one before it wrote.
  */
 async function drainLoops(loops: ModelLoops): Promise<void> {
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();
+  // Last, and synchronous: the conversation has ended in silence, so the
+  // policy gets one look at that final pause and then accounts for whatever
+  // is still waiting.
+  loops.policy?.flush();
 }
 
 /** What the model dot says about a session: ready, or not running at all. */

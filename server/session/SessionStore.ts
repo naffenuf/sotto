@@ -26,6 +26,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import {
+  defaultSettings,
   sourceSlug,
   type SessionInfo,
   type SessionRecord,
@@ -72,7 +73,7 @@ export interface SessionWriter {
   appendTurn(turn: TurnUpdate): void;
   /** Gives a diarization label a display name, or clears it with `null`. */
   renameSpeaker(label: string, name: string | null): void;
-  /** Replaces the saved settings (US-014's chattiness). */
+  /** Replaces the saved settings: the chattiness the policy is using (US-014). */
   setSettings(settings: SessionSettings): void;
   /** Writes the board as JSON and as markdown (US-009). */
   writeBoard(board: unknown, markdown: string): void;
@@ -140,7 +141,9 @@ export class SessionStore implements SessionWriter {
       source: info.source,
       speakers: {},
       asrSessions: [],
-      settings: {},
+      // Overwritten by whatever the server is actually set to, as soon as
+      // SessionManager has opened the folder.
+      settings: defaultSettings(),
     };
     this.writeSession();
   }
