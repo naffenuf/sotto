@@ -524,3 +524,28 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   prompt can lift it; a found candidate holds `waiting_for_pause` until `STALE_TURNS` drops it, or
   until the 3 s trailing silence, which is after the deadline and scores `late`. Measure the gaps
   before blaming the prompt.
+- **Recall in the eval is bounded by the board loop, not by the prompt or the threshold.** A planted
+  moment's window is its trigger turn's end to its deadline turn's end — 11.8–20.6 s on these
+  fixtures — and the observer cannot see the trigger until the board update that carries it, which
+  PRD US-009 fixes at 4 new final turns: a median **12.6 s** later. What is left of the window holds
+  129–488 ms of reported silence, so 0 of the 6 moments are deliverable at `PAUSE_MS` 500, 1 at
+  300–480, 2 at 200–250 and 6 only at ≤ 100 ms, which is the ordinary join between two sentences.
+  Three cards in run `2026-10-28_185157` matched their moment and landed **0.4–2.5 s** late, and two
+  of those could not have been in time at *any* threshold: the first silence they could use starts
+  exactly when the deadline turn ends. Before tuning anything for recall, compute the ceiling off
+  the captures — it needs no API call.
+- **The endpointer under-reports silence by a near-constant ~460 ms, so a reported gap is not a
+  pause length.** Every scripted pause in `moment-assumption` (500–2,400 ms) comes back 380–560 ms
+  short. Across the nine captures the 189 inter-turn gaps run: median 160 ms, 78% under 400 ms, 42
+  clear 400 ms, 21 clear 500 ms, 6 clear 1,500 ms. `PAUSE_MS` is therefore 400 — the top fifth of
+  gaps, ≈0.86 s of real quiet — and 1,500 was a threshold almost nothing in a real conversation
+  reaches.
+- **Size the token budget for the worst thinking, not the typical.** `DEFAULT_MAX_TOKENS` at 4,096
+  lost eight board updates and an observer look in one eval run to `finish_reason: "length"`, each
+  having spent the whole budget on reasoning and emitted nothing — and a board update that fails
+  costs more than itself, because the observer only looks after a successful one. Unused budget is
+  not billed; a truncated reply is billed in full for nothing. 12,288 against a measured 1,300–3,200.
+- **A report is regenerated, so hand-written notes live beside it.** `eval/reports/<id>-notes.md` is
+  read back in by `writeReport` and rendered as the report's `## Notes` section, because
+  `npm run eval:report` rewrites `<id>.md` from the run record and would otherwise erase anything
+  typed into it. That is where a judge spot-check goes.

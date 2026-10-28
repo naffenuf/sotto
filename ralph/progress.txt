@@ -732,3 +732,35 @@
   Checked: npm run typecheck, npm test (496 / 41 files), npm run build, one real `npm run eval`
   fixture end to end, and `npm run eval:report` over both existing runs (exit 1, as the gates
   intend). Nothing human-only is pending.
+
+[2026-10-28 19:10] US-023 — blocked (targets not reached, by arithmetic) — Interjections tuned; the
+  0.7 recall gate is unreachable under the PRD's own board cadence and the fixtures' window widths.
+  THE RUN TO READ: eval/reports/2026-10-28_185157.md and 2026-10-28_185157-notes.md, both committed.
+  recall 1/6 (0.17), interject precision 1/1, zero false interjects on brainstorm + no-wake, 4/4
+  deliveries in a pause, 98 model calls, $1.08. Five judge decisions, five agreements, written up.
+  WHAT MOVED. observer.md: untested_assumption now names the tell (a claim asserted as settled, then
+  built into the next decisions) and dropped_thread names the second half (the conversation has
+  reached where the dropped thing would have mattered); "all four kinds are equally your job, read
+  the board every time"; relevance is about where the conversation IS, not when the thing was said.
+  Effect: 4 candidates covering 1 matched moment -> 6 candidates, one per planted moment, 4 matched.
+  moment-assumption and moment-dropped produced no candidate at all before and now produce the right
+  one. PAUSE_MS 1,500 -> 400. DEFAULT_MAX_TOKENS 4,096 -> 12,288 (eight board updates and an observer
+  look in the baseline run died on finish_reason "length" with the whole budget spent on reasoning;
+  unused budget is not billed, a truncated reply is).
+  WHY IT STILL FAILS, AND WHY NO MORE EVAL RUNS. A moment's window is 11.8-20.6 s wide, the board
+  loop needs a median 12.6 s to carry the trigger turn to the observer (PRD US-009 fixes it at 4 new
+  final turns), and the largest reported silence left in the remainder is 129-488 ms across the six
+  moments. Three cards matched their moment and landed 0.4-2.5 s past the deadline; two of those
+  three could not have been in time at ANY PAUSE_MS, because the only silence they could use starts
+  exactly when the deadline turn ends. The ceiling is computable off the captures with no API call
+  (0 moments reachable at PAUSE_MS 500, 1 at 300-480, 2 at 200-250, 6 only at <= 100 ms), so burning
+  four more $1 runs to re-observe it would have told us nothing. STALE_MS/STALE_TURNS and the board
+  cadence are PRD criteria, not dials; fixtures/moments/judge/scoring are out of bounds.
+  FOR WHOEVER PICKS THIS UP. The one change that works is letting the observer look every 1-2 final
+  turns against the last board instead of only after a board update — computed to put 5 of 6 moments
+  in reach at PAUSE_MS 300-400. That contradicts PRD US-012's "right after each board update" and
+  costs a model call per turn, so it needs a PRD decision, not another tuning pass.
+  New in the harness: eval/reports/<id>-notes.md is folded into the rendered report, so hand-written
+  spot-checks survive `npm run eval:report`.
+  Checked: npm run typecheck, npm test (498 / 41 files), npm run build, npm run fixtures:check, one
+  full npm run eval. Nothing human-only is pending.
