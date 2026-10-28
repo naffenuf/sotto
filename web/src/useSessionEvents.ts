@@ -43,6 +43,16 @@ export interface SessionEventsState {
    * first update, which is how the panel knows there has not been one.
    */
   boardUpdatedAtMs: number;
+  /**
+   * When that update reached the browser, by `Date.now()`; `0` until the
+   * first one. The session clock cannot answer "12s ago" — it is an offset
+   * into the conversation, and a `max`-speed replay runs it far ahead of the
+   * wall — so the panel's freshness line reads this instead.
+   *
+   * A socket that attaches mid-session counts the bus's snapshot as arriving
+   * now, because the event carries no wall-clock stamp to do better with.
+   */
+  boardReceivedAtMs: number;
   /** How many turns have gone final in this session. */
   turnCount: number;
 }
@@ -60,6 +70,7 @@ const initial: SessionEventsState = {
   board: emptyBoard(),
   boardChangedIds: [],
   boardUpdatedAtMs: 0,
+  boardReceivedAtMs: 0,
   turnCount: 0,
 };
 
@@ -130,6 +141,7 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
             board: emptyBoard(),
             boardChangedIds: [],
             boardUpdatedAtMs: 0,
+            boardReceivedAtMs: 0,
             turnCount: 0,
           };
     case "speakers":
@@ -146,6 +158,9 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
         board: event.board,
         boardChangedIds: event.changedIds,
         boardUpdatedAtMs: event.updatedAtMs,
+        // The bus opens every socket with a board, empty and `updatedAtMs: 0`
+        // when there has not been an update; that is not an update arriving.
+        boardReceivedAtMs: event.updatedAtMs === 0 ? 0 : Date.now(),
       };
   }
 }

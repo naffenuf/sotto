@@ -14,6 +14,7 @@ import {
   stopSession,
 } from "./api.js";
 import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCapture.js";
+import { BoardPanel } from "./BoardPanel.js";
 import { SessionControls, parseSourceValue, sourceValue } from "./SessionControls.js";
 import { StatusDots } from "./StatusDots.js";
 import { TranscriptPanel } from "./TranscriptPanel.js";
@@ -133,12 +134,20 @@ export function App() {
         <StatusDots statuses={statuses} />
       </header>
       <div className="layout">
-        {/* The board lands under the transcript in this column (US-009). */}
         <aside className="sidebar">
           <TranscriptPanel
             turns={events.turns}
             speakers={events.speakers}
             onRename={onRenameSpeaker}
+          />
+          <BoardPanel
+            board={events.board}
+            changedIds={events.boardChangedIds}
+            updatedAt={events.boardReceivedAtMs}
+            // The model dot goes `connecting` for exactly as long as a board
+            // update is out (`BoardUpdater.onModelState`), so it is also the
+            // panel's spinner.
+            updating={statuses.model.state === "connecting"}
           />
         </aside>
         <main className="stage">

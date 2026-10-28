@@ -1,15 +1,18 @@
 /**
  * Browser check for the Sotto UI: the header's source selector and dots, a
- * brainstorm events replay started and stopped (US-009), and the transcript
+ * brainstorm events replay started and stopped (US-009), the transcript
  * panel it fills — first text, partial and final rows, naming a speaker, and
- * jump-to-live (US-007).
+ * jump-to-live (US-007) — and the board panel below it (US-010), both filled
+ * by the real replay and, on a second page with `/ws/events` mocked, driven
+ * through every item state the model is not guaranteed to produce.
  *
  * Run with the dev server up, e.g.
  *   python3 ~/.claude/skills/webapp-testing/scripts/with_server.py \
  *     --server "npm run dev" --port 5173 -- node scripts/verify-ui.mjs /tmp/shot.png
  *
  * Writes the running state to the path given as the first argument, and the
- * state after Stop alongside it as `<name>-idle.png`.
+ * scrolled, idle and mocked-board states alongside it as `<name>-scrolled.png`,
+ * `<name>-idle.png` and `<name>-board.png`.
  */
 import { chromium } from "playwright";
 
@@ -17,6 +20,7 @@ const url = process.env.SOTTO_URL ?? "http://127.0.0.1:5173";
 const shot = process.argv[2] ?? "/tmp/sotto-shots/ui.png";
 const idleShot = shot.replace(/\.png$/, "-idle.png");
 const scrolledShot = shot.replace(/\.png$/, "-scrolled.png");
+const boardShot = shot.replace(/\.png$/, "-board.png");
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1200, height: 760 } });
@@ -36,7 +40,7 @@ const dots = () =>
   );
 
 /** Waits until every named dot is in `state`. */
-const waitForDots = (channels, state) =>
+const waitForDots = (channels, state, timeout = 15_000) =>
   page.waitForFunction(
     ({ channels, state }) =>
       channels.every(
@@ -44,7 +48,7 @@ const waitForDots = (channels, state) =>
           document.querySelector(`[data-testid="status-${channel}"]`)?.dataset.state === state,
       ),
     { channels, state },
-    { timeout: 15_000 },
+    { timeout },
   );
 
 await page.goto(url, { waitUntil: "networkidle" });
@@ -60,12 +64,26 @@ const options = await page.locator('[data-testid="source-select"] option').evalu
 const idleDots = await dots();
 
 const emptyTranscript = (await page.getByTestId("transcript-empty").textContent())?.trim();
+const emptyBoard = (await page.getByTestId("board-empty").textContent())?.trim();
+const noUpdateYet = (await page.getByTestId("board-updated").textContent())?.trim();
 
 // Start the brainstorm replay and watch the dots come up.
 await page.selectOption('[data-testid="source-select"]', "events:brainstorm");
 const startedAt = Date.now();
 await page.getByTestId("start-session").click();
 await waitForDots(["transcription", "model"], "active");
+
+// The spinner is only up while a board update is out, and the highlight only
+// for the three seconds after one lands, so both are watched for from here
+// rather than checked once the replay has moved on.
+const sawBoardSpinner = page
+  .waitForSelector('[data-testid="board-spinner"]', { timeout: 150_000 })
+  .then(() => true)
+  .catch(() => false);
+const sawBoardHighlight = page
+  .waitForSelector('[data-testid="board-item"][data-changed="true"]', { timeout: 150_000 })
+  .then(() => true)
+  .catch(() => false);
 
 // The first words have to be on screen within 3 s of the first spoken one,
 // which in this capture is the moment the replay starts.
@@ -158,6 +176,14 @@ const atLive = await page.locator('.transcript__list').evaluate((node) => {
   return node.scrollHeight - node.scrollTop - node.clientHeight;
 });
 
+// By now the replay is a minute in, so the board has had its four final turns
+// and a model call. The panel is read straight off the page.
+await page.waitForSelector('[data-testid="board-item"]', { timeout: 150_000 });
+const liveBoard = await readBoard(page);
+const liveBoardUpdated = (await page.getByTestId("board-updated").textContent())?.trim();
+const boardSpinnerSeen = await sawBoardSpinner;
+const boardHighlightSeen = await sawBoardHighlight;
+
 const runningDots = await dots();
 const runningState = (await page.getByTestId("session-state").textContent())?.trim();
 const turnRows = await page.locator('[data-testid="turn"]').count();
@@ -165,10 +191,98 @@ await page.screenshot({ path: shot });
 
 // Stop, and watch them go back down.
 await page.getByTestId("stop-session").click();
-await waitForDots(["transcription", "model"], "idle");
+await waitForDots(["transcription", "model"], "idle", 90_000);
 const stoppedDots = await dots();
 const stoppedState = (await page.getByTestId("session-state").textContent())?.trim();
 await page.screenshot({ path: idleShot });
+
+
+// ---- The board panel's item states, on a mocked `/ws/events` (US-010) ----
+//
+// A replay shows whatever the model happens to say, and it will not reliably
+// cover a dropped item or a covered one. So the second page gets a crafted
+// board over a mocked socket: the panel is the real component, only the
+// server is not.
+
+const MOCK_BOARD = {
+  summary: "The group is pricing a solo plan and has settled on a weekly digest.",
+  constraints: [
+    item("c1", "Budget is 4,000 dollars a month", "open"),
+    item("c2", "Launch before the end of Q1", "covered"),
+  ],
+  points: [
+    item("p1", "Solo tier at 12 dollars a month", "open"),
+    item("p2", "Bundle the mobile app for free", "dropped"),
+  ],
+  questions: [item("q1", "What do competitors charge?", "open")],
+  decisions: [item("d1", "Ship a weekly digest email", "covered")],
+};
+
+function item(id, text, status) {
+  return { id, text, status, sourceTurnIds: ["m:1"], createdAtMs: 1_000, updatedAtMs: 2_000 };
+}
+
+const mockPage = await browser.newPage({ viewport: { width: 1200, height: 760 } });
+mockPage.on("console", (m) => m.type() === "error" && consoleErrors.push(`[mock] ${m.text()}`));
+mockPage.on("pageerror", (e) => consoleErrors.push(`[mock] ${e}`));
+
+// No `connectToServer`, so the page's socket terminates here and nothing it
+// sends reaches the real server. React's StrictMode runs the socket effect
+// twice in dev, and the first socket's close schedules a reconnect, so the
+// live ones are tracked rather than assumed to be one.
+const sockets = [];
+await mockPage.routeWebSocket(/\/ws\/events/, (ws) => {
+  sockets.push(ws);
+  ws.onClose(() => {
+    const at = sockets.indexOf(ws);
+    if (at !== -1) sockets.splice(at, 1);
+  });
+});
+await mockPage.goto(url, { waitUntil: "networkidle" });
+await mockPage.waitForTimeout(3_000);
+const push = (event) => {
+  for (const ws of [...sockets]) ws.send(JSON.stringify(event));
+};
+if (sockets.length === 0) throw new Error("the mocked /ws/events socket never settled");
+
+push({
+  type: "session",
+  session: { id: "mock-1", source: { kind: "events", fixture: "brainstorm" }, startedAtMs: 0 },
+});
+push({ type: "status", status: { channel: "transcription", state: "active" } });
+// A call is out: the header spins and says so, with no board yet.
+push({ type: "status", status: { channel: "model", state: "connecting", detail: "updating the board" } });
+await mockPage.waitForSelector('[data-testid="board-spinner"]');
+const mockUpdating = (await mockPage.getByTestId("board-updated").textContent())?.trim();
+
+push({ type: "board", board: MOCK_BOARD, changedIds: ["p1", "q1"], updatedAtMs: 42_000 });
+push({ type: "status", status: { channel: "model", state: "active", detail: "model client ready" } });
+await mockPage.waitForSelector('[data-testid="board-item"]');
+await mockPage.waitForSelector('[data-testid="board-spinner"]', { state: "detached" });
+
+const mockBoard = await readBoard(mockPage);
+const mockHighlighted = mockBoard.items.filter((one) => one.changed).map((one) => one.id);
+const mockFade = await mockPage
+  .locator('[data-testid="board-item"]')
+  .first()
+  .evaluate((node) => getComputedStyle(node).transitionDuration);
+await mockPage.screenshot({ path: boardShot });
+
+// The highlight is gone a little over three seconds after the update, and
+// the "ago" line has started counting.
+await mockPage.waitForSelector('[data-testid="board-item"][data-changed="true"]', {
+  state: "detached",
+  timeout: 6_000,
+});
+const mockFaded = (await mockPage.locator('[data-testid="board-item"][data-changed="true"]').count()) === 0;
+const mockAgo = (await mockPage.getByTestId("board-updated").textContent())?.trim();
+
+// Dropped items are behind the toggle, and only behind the toggle.
+const droppedToggleText = (await mockPage.getByTestId("show-dropped").textContent())?.trim();
+await mockPage.getByTestId("show-dropped").click();
+await mockPage.waitForSelector('[data-testid="board-item"][data-status="dropped"]');
+const shownDropped = await readBoard(mockPage);
+const hideToggleText = (await mockPage.getByTestId("show-dropped").textContent())?.trim();
 
 await browser.close();
 
@@ -190,9 +304,55 @@ const report = {
   runningState,
   stoppedDots,
   stoppedState,
+  emptyBoard,
+  noUpdateYet,
+  liveBoard,
+  liveBoardUpdated,
+  boardSpinnerSeen,
+  boardHighlightSeen,
+  mockUpdating,
+  mockBoard,
+  mockHighlighted,
+  mockFade,
+  mockFaded,
+  mockAgo,
+  droppedToggleText,
+  hideToggleText,
+  shownDropped,
   consoleErrors,
 };
 console.log(JSON.stringify(report, null, 2));
+
+/**
+ * The board panel as the page renders it: the summary, the section headings in
+ * order, and every visible item with the box character, whether it is struck
+ * through and whether it is still highlighted.
+ */
+function readBoard(target) {
+  return target.evaluate(() => {
+    const panel = document.querySelector('[data-testid="board"]');
+    const sections = [...panel.querySelectorAll('[data-testid="board-section"]')].map((node) => ({
+      section: node.dataset.section,
+      title: node.querySelector(".board__section-title").textContent.trim(),
+      ids: [...node.querySelectorAll('[data-testid="board-item"]')].map((row) => row.dataset.itemId),
+    }));
+    const items = [...panel.querySelectorAll('[data-testid="board-item"]')].map((row) => ({
+      id: row.dataset.itemId,
+      status: row.dataset.status,
+      changed: row.dataset.changed === "true",
+      box: row.querySelector(".board__box").textContent.trim(),
+      text: row.querySelector(".board__text").textContent.trim(),
+      struck: getComputedStyle(row.querySelector(".board__text")).textDecorationLine.includes(
+        "line-through",
+      ),
+    }));
+    return {
+      summary: panel.querySelector('[data-testid="board-summary"]')?.textContent.trim() ?? "",
+      sections,
+      items,
+    };
+  });
+}
 
 const problems = [];
 if (brand !== "Sotto") problems.push(`brand is ${JSON.stringify(brand)}`);
@@ -230,7 +390,64 @@ if (namedChips.A?.texts?.[0] !== "Craig") {
 }
 if (namedChips.B?.texts?.[0] === "Craig") problems.push("renaming A also renamed B");
 if (atLive > 48) problems.push(`jump to live left ${atLive}px of scroll below`);
+// ---- Board panel (US-010) ----
+if (!emptyBoard?.startsWith("Nothing on the board yet")) {
+  problems.push(`empty board reads ${JSON.stringify(emptyBoard)}`);
+}
+if (noUpdateYet !== "no update yet") problems.push(`idle freshness reads ${JSON.stringify(noUpdateYet)}`);
+if (liveBoard.items.length === 0) problems.push("the replay put nothing on the board");
+if (liveBoard.summary === "") problems.push("the replay left the board summary empty");
+if (!/^updated /.test(liveBoardUpdated ?? "")) {
+  problems.push(`live freshness reads ${JSON.stringify(liveBoardUpdated)}`);
+}
+if (!boardSpinnerSeen) problems.push("no spinner while a board update was in flight");
+if (!boardHighlightSeen) problems.push("no highlight on the items a live update changed");
+
+const SECTION_ORDER = [
+  ["constraints", "Constraints"],
+  ["points", "Points"],
+  ["questions", "Open Questions"],
+  ["decisions", "Decisions"],
+];
+const mockOrder = mockBoard.sections.map(({ section, title }) => [section, title]);
+if (JSON.stringify(mockOrder) !== JSON.stringify(SECTION_ORDER)) {
+  problems.push(`sections came out as ${JSON.stringify(mockOrder)}`);
+}
+if (mockBoard.summary !== MOCK_BOARD.summary) {
+  problems.push(`summary reads ${JSON.stringify(mockBoard.summary)}`);
+}
+if (mockUpdating !== "updating…") problems.push(`in-flight freshness reads ${JSON.stringify(mockUpdating)}`);
+for (const one of mockBoard.items) {
+  if (one.status === "open" && (one.box !== "☐" || one.struck)) {
+    problems.push(`open item ${one.id} rendered box ${one.box}, struck ${one.struck}`);
+  }
+  if (one.status === "covered" && (one.box !== "☑" || !one.struck)) {
+    problems.push(`covered item ${one.id} rendered box ${one.box}, struck ${one.struck}`);
+  }
+  if (one.status === "dropped") problems.push(`dropped item ${one.id} was on screen unasked`);
+}
+if (JSON.stringify(mockHighlighted) !== JSON.stringify(["p1", "q1"])) {
+  problems.push(`highlighted ${JSON.stringify(mockHighlighted)}, expected p1 and q1`);
+}
+if (mockFade !== "3s") problems.push(`the highlight fades over ${mockFade}, not 3s`);
+if (!mockFaded) problems.push("the highlight never faded");
+if (!/^updated (just now|\d+s ago)$/.test(mockAgo ?? "")) {
+  problems.push(`freshness after the fade reads ${JSON.stringify(mockAgo)}`);
+}
+if (droppedToggleText !== "show dropped (1)") {
+  problems.push(`the dropped toggle reads ${JSON.stringify(droppedToggleText)}`);
+}
+if (hideToggleText !== "hide dropped (1)") {
+  problems.push(`the toggle reads ${JSON.stringify(hideToggleText)} once dropped items are shown`);
+}
+const shownDroppedItem = shownDropped.items.find((one) => one.id === "p2");
+if (shownDroppedItem === undefined) problems.push("the toggle did not reveal the dropped item");
+else if (!shownDroppedItem.struck) problems.push("the dropped item was not struck through");
+if (shownDropped.sections.find((one) => one.section === "points")?.ids.join() !== "p1,p2") {
+  problems.push("the dropped item did not come back in board order");
+}
+
 if (consoleErrors.length > 0) problems.push(`console errors: ${consoleErrors.join("; ")}`);
 if (problems.length > 0) throw new Error(problems.join("\n"));
 
-console.log(`\nOK — screenshots at ${shot}, ${scrolledShot} and ${idleShot}`);
+console.log(`\nOK — screenshots at ${shot}, ${scrolledShot}, ${idleShot} and ${boardShot}`);

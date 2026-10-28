@@ -148,7 +148,8 @@ body {
 
 .transcript {
   position: relative;
-  flex: 1;
+  /* The two panels share the column; each scrolls inside itself. */
+  flex: 1 1 55%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -284,4 +285,143 @@ body {
   max-width: 32rem;
   text-align: center;
   color: var(--bad);
+}
+
+/* ---- Board panel (US-010) ---- */
+
+.board {
+  flex: 1 1 45%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #2a2824;
+}
+
+.board__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-right: 1rem;
+}
+
+.board__freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A quiet ring, not a flashing one: the board is glanced at, not watched. */
+.board__spinner {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  border: 1.5px solid #3a3730;
+  border-top-color: var(--accent);
+  animation: board-spin 0.9s linear infinite;
+}
+
+@keyframes board-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.board__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1rem 1rem;
+  scrollbar-width: thin;
+}
+
+.board__empty {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
+.board__summary {
+  margin: 0 0 0.875rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+
+.board__section + .board__section {
+  margin-top: 0.75rem;
+}
+
+.board__section-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.board__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.board__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  padding: 0.0625rem 0.25rem;
+  margin-left: -0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  /* The highlight is applied instantly and taken away over three seconds. */
+  transition: background-color 3s ease-out;
+}
+
+.board__item[data-changed="true"] {
+  background-color: #d8a65733;
+  transition: none;
+}
+
+.board__box {
+  color: var(--ink-dim);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* A checked box carries the "this is handled" at a glance; the text only
+   confirms it. A dropped one stays grey — it was not handled, it was let go. */
+.board__item--covered .board__box {
+  color: var(--ok);
+}
+
+.board__item--covered .board__text,
+.board__item--dropped .board__text {
+  text-decoration: line-through;
+  color: var(--ink-dim);
+}
+
+.board__item--dropped {
+  opacity: 0.65;
+}
+
+.board__dropped-toggle {
+  font: inherit;
+  font-size: 0.6875rem;
+  margin-top: 0.75rem;
+  padding: 0;
+  color: var(--ink-dim);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 0.1875rem;
+  cursor: pointer;
+}
+
+.board__dropped-toggle:hover {
+  color: var(--accent);
 }
