@@ -652,3 +652,43 @@
   may be `delivered`, `cooldown` or `budget`, the last two being downgrades, not losses.
   Checked: npm run typecheck, npm test (383 / 30 files), npm run test:integration (19 / 5 files,
   177 s), npm run build, npm run verify:delivery. Nothing human-only is pending.
+
+[2026-10-28 09:40] US-021 — completed — Eval runner and judge: every capture replayed through the
+  real engine, every delivered card judged against the moments its fixture planted.
+  NO SECOND PIPELINE. `server/eval/runner.ts` starts an ordinary `SessionManager` session
+  (`replaySpeed: "max"`, the chattiness under test, a `SessionStore` rooted under
+  `eval/sessions/<run>/<chattiness>/`) and watches the same `EventBus` the browser watches: a
+  delivery is a `card` event, and the policy's reason and score are read back out of that
+  session folder's `candidates.jsonl` (the decision whose `decision` names a level). Everything
+  the harness needs was already in the published contract — nothing was added to the pipeline.
+  "IN A PAUSE" IS MEASURED, NOT TRUSTED. `server/eval/pause.ts` rebuilds `PauseState` from the
+  turn intervals a replay produced and feeds it to the policy's own `inPause()`, so the PRD's
+  "100% of deliveries in a pause" is a claim about the conversation rather than the policy
+  agreeing with itself. `pause.test.ts` holds it against `TurnAssembler.pauseState` at ten
+  moments of a synthetic conversation, so the two cannot drift apart.
+  TWO TIMELINES, BOTH RECORDED. A moment is written in script lines; `MomentRecord` carries the
+  scripted audio times from `<fixture>.timing.json` *and* the turns overlapping each line
+  (±1,500 ms, the board test's allowance) with their session-clock ends. US-022 needs both: the
+  audio times are exact, the turn times are what the policy actually saw.
+  THE JUDGE CACHE'S KEY INCLUDES THE PROMPT. `eval/cache/<hash>.json`, hashed over the card's
+  headline + detail, `<fixture>/<momentId>` (ids are only unique within a script) and a hash of
+  `server/prompts/judge.md` — so editing the judge invalidates every verdict, which is the point.
+  A failed judge call is recorded as a non-match with its error and is NOT cached.
+  WHAT THE FIRST REAL RUN SAYS (2026-10-28_091323, 7 fixtures, chattiness normal, 700 s wall
+  clock, ~1 min per fixture of conversation): 1 card delivered, 0 outside a pause, 1 judge call,
+  and it matched. brainstorm and no-wake produced zero candidates — no false interjects at all.
+  Only `moment-contradiction` caught its moment (cand-1 score 0.81, held 9 s, interject at 124 s).
+  THE RECALL PROBLEM IS `stale`, AND IT IS US-023's. `moment-assumption` and `moment-dropped`
+  produced no candidate at all; `moment-fact` produced its Instagram claim, the verifier came
+  back `wrong`, and the policy still wrote it off `silent/stale` after 28 s and 6 turns, as did
+  both of `moment-mixed`'s candidates (0.81 and 0.50). `STALE_TURNS` (6) is the binding limit,
+  not `STALE_MS`: these captures have almost no reported silence >= 1,500 ms, so a good candidate
+  runs out of turns before it ever gets a pause. Tune that, the observer prompt's coverage of
+  assumptions and dropped threads, or `PAUSE_MS` — the harness now measures all three.
+  FOR US-022. Read `eval/runs/<timestamp>.json`; do not replay again. Each `FixtureRunRecord`
+  has deliveries (level, `deliveredAtMs`, `inPause`, `pause`, reason, score, headline/detail),
+  moments (expectedLevel, trigger/deadline on both timelines) and matches (per card × moment).
+  `npm run eval -- --no-judge` replays without judging; `--fixtures a,b` narrows; `--chattiness
+  all` runs quiet, normal and active in turn (three replays, so ~3× the API bill).
+  Checked: npm run typecheck, npm test (431 / 36 files), npm run build, npm run eval (full set)
+  and npm run eval -- --fixtures moment-contradiction. Nothing human-only is pending.

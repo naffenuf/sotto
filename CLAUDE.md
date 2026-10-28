@@ -462,3 +462,36 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   so a Playwright click on it waits out the full 30 s timeout and then throws. Ask
   `isEnabled()`. And a session folder is named `<when>-<source slug>`, so matching the newest
   one means `endsWith("events-moment-contradiction")`, not `endsWith("events")`.
+- **The eval harness is not a second pipeline.** `server/eval/runner.ts` starts an ordinary
+  `SessionManager` session (`replaySpeed: "max"`, the chattiness under test, a `SessionStore`
+  under `eval/sessions/`) and watches the same `EventBus` a browser watches: a delivery is a
+  `card` event, and the policy's reason and score come from that session folder's
+  `candidates.jsonl` — the decision whose `decision` names a level, since a candidate is decided
+  several times. Everything US-016 needs was already in the published contract. `npm run eval`
+  measured ~1 minute of wall clock per fixture (seven fixtures, 700 s), because `max` only spends
+  time on the calls the conversation would really have made.
+- **"It happened in a pause" is measured, never taken from the policy.** `server/eval/pause.ts`
+  rebuilds `PauseState` from the turn intervals a replay produced (`endMs === null || endMs >
+  now` is speaking; silence counts from the last turn to close) and runs it through the policy's
+  own `inPause()`. `pause.test.ts` holds the two against each other at ten moments of a synthetic
+  conversation, so the reconstruction cannot drift from `TurnAssembler.pauseState`. Asking the
+  policy whether it obeyed its own rule would prove nothing.
+- **A planted moment lives on two timelines.** `<fixture>.timing.json` gives a line's position in
+  the *audio*; a delivery time is on the session clock, which runs ~700 ms ahead (a frame arrives
+  that long after the audio it describes) while the endpointer trims ~500 ms off each end of a
+  line. So `MomentRecord` carries both: the scripted `triggerEndMs`/`deadlineEndMs` and the turns
+  overlapping each line (±`TURN_SLACK_MS`, 1,500) with their session-clock ends. Never compare a
+  scripted time to a delivery time without the slack.
+- **The judge prompt is part of the judge cache key.** `eval/cache/<hash>.json` is hashed over the
+  card's headline + detail, `<fixture>/<momentId>` (ids are unique only within one script) and a
+  hash of `server/prompts/judge.md`, so editing the judge invalidates every verdict rather than
+  mixing two standards in one report. A judge call that *fails* is recorded as a non-match with
+  its error and deliberately not cached.
+- **At `normal`, what loses a good candidate is `STALE_TURNS`, not the thresholds.** The first
+  full eval run delivered one card out of five planted moments, and the log says why:
+  `moment-fact`'s claim came back from the verifier as `wrong` and was still written off
+  `silent/stale` after 28 s and 6 turns, as were both of `moment-mixed`'s (scores 0.81 and 0.50).
+  These captures have almost no reported silence ≥ 1,500 ms, so a candidate runs out of turns
+  before it ever gets a pause. `brainstorm` and `no-wake` produced zero candidates, so precision
+  is not the problem — recall is, and `STALE_TURNS`, `PAUSE_MS` and the observer's coverage of
+  assumptions and dropped threads are the three dials the harness now measures.
