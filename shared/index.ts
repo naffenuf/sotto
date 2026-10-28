@@ -66,6 +66,7 @@ export type {
 } from "./board.js";
 export { statusChannels, statusStates } from "./events.js";
 export type {
+  BoardEvent,
   ServerEvent,
   SessionEvent,
   SpeakerNames,

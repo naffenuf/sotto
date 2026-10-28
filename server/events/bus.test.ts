@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ServerEvent, SessionInfo } from "../../shared/index.js";
+import { emptyBoard } from "../../shared/index.js";
 import { EventBus } from "./bus.js";
 
 const session: SessionInfo = {
@@ -23,6 +24,7 @@ describe("EventBus", () => {
       { type: "status", status: { channel: "model", state: "idle" } },
       { type: "session", session: null },
       { type: "speakers", speakers: {} },
+      { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
     ]);
   });
 
@@ -93,6 +95,7 @@ describe("EventBus", () => {
       { type: "status", status: { channel: "model", state: "idle" } },
       { type: "session", session },
       { type: "speakers", speakers: {} },
+      { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
     ]);
     expect(bus.currentSession()).toEqual(session);
     expect(bus.status("transcription").state).toBe("active");

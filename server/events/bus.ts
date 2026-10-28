@@ -8,13 +8,16 @@
  * exactly what the browser must not be sent.
  *
  * It remembers the state an event implies — the three status dots, the running
- * session and the speaker names the user has given (US-007) — so a browser
- * that attaches mid-session can be caught up with {@link EventBus.snapshot}
+ * session, the speaker names the user has given (US-007) and the board
+ * (US-009) — so a browser that attaches mid-session can be caught up with
+ * {@link EventBus.snapshot}
  * instead of asking. Turns are deliberately not remembered: a transcript is
  * the session folder's job, not the bus's.
  */
+import { emptyBoard } from "../../shared/board.js";
 import {
   statusChannels,
+  type BoardEvent,
   type ServerEvent,
   type SpeakerNames,
   type StatusChannel,
@@ -26,6 +29,11 @@ import type { SessionInfo } from "../../shared/session.js";
 export type EventListener = (event: ServerEvent) => void;
 
 type Logger = Pick<Console, "warn">;
+
+/** The board a listener is told about before anything has been said. */
+function initialBoard(): BoardEvent {
+  return { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 };
+}
 
 /** Where each dot starts: the server is up, nothing else is happening. */
 function initialStatuses(): Record<StatusChannel, StatusUpdate> {
@@ -42,6 +50,7 @@ export class EventBus {
   private readonly logger: Logger;
   private session: SessionInfo | null = null;
   private speakers: SpeakerNames = {};
+  private board: BoardEvent = initialBoard();
 
   constructor(logger: Logger = console) {
     this.logger = logger;
@@ -55,11 +64,16 @@ export class EventBus {
   publish(event: ServerEvent): void {
     if (event.type === "status") this.statuses[event.status.channel] = event.status;
     if (event.type === "speakers") this.speakers = event.speakers;
+    if (event.type === "board") this.board = event;
     if (event.type === "session") {
       this.session = event.session;
       // Diarization labels belong to one session, so the names do too; a
       // listener clears its own on the same event.
       this.speakers = {};
+      // The board is cleared by a session *starting*, not by one ending: the
+      // last update of a replay is published after the session has gone, and
+      // a finished board is the thing you most want still on the screen.
+      if (event.session !== null) this.board = initialBoard();
     }
     for (const listener of [...this.listeners]) {
       try {
@@ -106,6 +120,7 @@ export class EventBus {
       })),
       { type: "session", session: this.session },
       { type: "speakers", speakers: this.speakers },
+      this.board,
     ];
   }
 
@@ -117,6 +132,11 @@ export class EventBus {
   /** The running session, or `null`. */
   currentSession(): SessionInfo | null {
     return this.session;
+  }
+
+  /** The board as the last update left it. */
+  boardState(): BoardEvent {
+    return this.board;
   }
 
   /** The names given to diarization labels so far. */

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type {
+  Board,
   ServerEvent,
   SessionInfo,
   SpeakerNames,
@@ -7,6 +8,7 @@ import type {
   StatusUpdate,
   TurnUpdate,
 } from "../../shared/index.js";
+import { emptyBoard } from "../../shared/index.js";
 
 /** How long to wait before dialling `/ws/events` again after it drops. */
 const RECONNECT_MS = 2_000;
@@ -32,6 +34,15 @@ export interface SessionEventsState {
   turns: TurnUpdate[];
   /** Display names the user has given diarization labels. */
   speakers: SpeakerNames;
+  /** The board as the last update left it (US-009). */
+  board: Board;
+  /** Ids the latest board update added or changed, for the panel to highlight. */
+  boardChangedIds: string[];
+  /**
+   * When the board was last updated, on the session clock; `0` until the
+   * first update, which is how the panel knows there has not been one.
+   */
+  boardUpdatedAtMs: number;
   /** How many turns have gone final in this session. */
   turnCount: number;
 }
@@ -46,12 +57,15 @@ const initial: SessionEventsState = {
   session: null,
   turns: [],
   speakers: {},
+  board: emptyBoard(),
+  boardChangedIds: [],
+  boardUpdatedAtMs: 0,
   turnCount: 0,
 };
 
 /**
- * Follows `/ws/events`: the status dots, the running session, the turns and
- * the speaker names.
+ * Follows `/ws/events`: the status dots, the running session, the turns, the
+ * speaker names and the board.
  *
  * The server sends its remembered state the moment the socket opens, so a
  * reload mid-session catches up without asking, and a dropped socket is
@@ -108,7 +122,16 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
       // read. Diarization labels belong to a session, so the names go with it.
       return event.session === null
         ? { ...state, session: null }
-        : { ...state, session: event.session, turns: [], speakers: {}, turnCount: 0 };
+        : {
+            ...state,
+            session: event.session,
+            turns: [],
+            speakers: {},
+            board: emptyBoard(),
+            boardChangedIds: [],
+            boardUpdatedAtMs: 0,
+            turnCount: 0,
+          };
     case "speakers":
       return { ...state, speakers: event.speakers };
     case "turn":
@@ -116,6 +139,13 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
         ...state,
         turns: withTurn(state.turns, event.turn),
         turnCount: event.turn.final ? state.turnCount + 1 : state.turnCount,
+      };
+    case "board":
+      return {
+        ...state,
+        board: event.board,
+        boardChangedIds: event.changedIds,
+        boardUpdatedAtMs: event.updatedAtMs,
       };
   }
 }

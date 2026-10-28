@@ -4,10 +4,12 @@
  * The server publishes to an in-process bus (`server/events/bus.ts`) and each
  * attached socket gets the events as JSON lines. A socket that attaches part
  * way through a session is caught up first with the bus's remembered state
- * (the three statuses and the running session), so the UI never has to poll.
+ * (the three statuses, the running session, the speaker names and the board),
+ * so the UI never has to poll.
  */
 import type { TurnUpdate } from "./turns.js";
 import type { SessionInfo } from "./session.js";
+import type { Board } from "./board.js";
 
 /**
  * The three things the header shows a dot for.
@@ -16,7 +18,8 @@ import type { SessionInfo } from "./session.js";
  * - `transcription`: turns are arriving — from the realtime API for a `wav` or
  *   `mic` session, or from a capture being replayed for an `events` one.
  * - `model`: a model client is configured, so the board, observer and answers
- *   (US-009 onwards) can call Muse Spark.
+ *   (US-009 onwards) can call Muse Spark. `connecting` means a call is in
+ *   flight — a board update, say — not that the client is still starting up.
  */
 export const statusChannels = ["server", "transcription", "model"] as const;
 export type StatusChannel = (typeof statusChannels)[number];
@@ -64,6 +67,22 @@ export interface SpeakersEvent {
   speakers: SpeakerNames;
 }
 
+/**
+ * The board after an update (US-009).
+ *
+ * The whole board goes out every time, because it is small and because the
+ * browser must never have to replay operations to stay in step; `changedIds`
+ * is what the board panel (US-010) highlights.
+ */
+export interface BoardEvent {
+  type: "board";
+  board: Board;
+  /** Ids of the items the latest update added or changed. */
+  changedIds: string[];
+  /** When the update was applied, on the session clock. */
+  updatedAtMs: number;
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -71,4 +90,9 @@ export interface SessionEvent {
 }
 
 /** Everything `/ws/events` sends. Narrow on `type`. */
-export type ServerEvent = StatusEvent | TurnEvent | SessionEvent | SpeakersEvent;
+export type ServerEvent =
+  | StatusEvent
+  | TurnEvent
+  | SessionEvent
+  | SpeakersEvent
+  | BoardEvent;

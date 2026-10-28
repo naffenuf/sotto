@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
+import { emptyBoard } from "../shared/board.js";
 import type { ServerEvent } from "../shared/events.js";
 import type { FixtureListResponse } from "../shared/session.js";
 import { buildApp } from "./app.js";
@@ -329,7 +330,7 @@ describe("/ws/events", () => {
     const { app: server, bus } = await buildTestApp();
     bus.setStatus("transcription", "active", "replaying brainstorm events at max");
 
-    const { socket, events } = await open(server, (seen) => seen.length === 5);
+    const { socket, events } = await open(server, (seen) => seen.length === 6);
     const snapshot = await events;
     socket.close();
 
@@ -347,15 +348,17 @@ describe("/ws/events", () => {
       { type: "status", status: { channel: "model", state: "idle" } },
       { type: "session", session: null },
       { type: "speakers", speakers: {} },
+      // Nothing has been said, so the board is empty rather than absent.
+      { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
     ]);
   });
 
   it("pushes turns and status changes while a session runs", async () => {
     const { app: server } = await buildTestApp();
-    // The five snapshot events, then the session's own, ending back at null.
+    // The six snapshot events, then the session's own, ending back at null.
     const { socket, events } = await open(server, (seen) => {
       const last = seen.at(-1);
-      return seen.length > 5 && last?.type === "session" && last.session === null;
+      return seen.length > 6 && last?.type === "session" && last.session === null;
     });
 
     await server.inject({

@@ -3,12 +3,15 @@
  *
  *     WAV fixture  -> realtime transcription client -\
  *     microphone   -> realtime transcription client --> turn assembler -> bus
- *     capture (1x) ------------------------------------/
+ *     capture (1x) ------------------------------------/        |
+ *                                                              v
+ *                                                        board updater -> bus
  *
  * Only the left-hand column differs between sources. Everything downstream —
- * the turn assembler (US-005), and the board, observer and answers that later
- * stories hang off the bus — sees the same frames and reads time from the same
- * injected clock, so a replay behaves exactly like a live session.
+ * the turn assembler (US-005), the board update loop (US-009), and the
+ * observer and answers that later stories hang off the bus — sees the same
+ * frames and reads time from the same injected clock, so a replay behaves
+ * exactly like a live session.
  *
  * On the way past, both the raw frames and the final turns are written to the
  * session folder (`SessionStore`, US-008), so every session leaves a record on
@@ -28,8 +31,10 @@ import { TurnAssembler } from "../asr/turns.js";
 import type { AudioSource } from "../audio/AudioSource.js";
 import { MicSource } from "../audio/MicSource.js";
 import { WavReplaySource } from "../audio/WavReplaySource.js";
+import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
+import { MuseClient, type ModelClient } from "../model/client.js";
 import { SessionStore, type SessionWriter } from "./SessionStore.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
@@ -64,6 +69,14 @@ export type AsrClientFactory = (options: AsrClientOptions) => AsrClient;
  */
 export type SessionStoreFactory = (info: SessionInfo) => SessionWriter | null;
 
+/**
+ * Builds the model client a session's board, observer and answers call, or
+ * returns `null` to run a session with no model at all — which is what
+ * happens without `MODEL_API_KEY`, and what the unit tests do so `npm test`
+ * makes no network calls.
+ */
+export type ModelClientFactory = () => ModelClient | null;
+
 /** A start that can't happen, with the HTTP status the route should answer. */
 export class SessionStartError extends Error {
   constructor(
@@ -83,6 +96,8 @@ export interface SessionManagerOptions {
   createAsrClient?: AsrClientFactory;
   /** Makes the session folder. Defaults to one under `sessions/`. */
   createStore?: SessionStoreFactory;
+  /** Makes the model client. Defaults to Muse Spark when there is an API key. */
+  createModel?: ModelClientFactory;
   /** Clock for live sessions; a replay brings its own simulated one. */
   liveClock?: Clock;
   /** Real time that a `1x` replay paces itself against. */
@@ -109,8 +124,12 @@ interface RunningSession {
   store: StoreSlot;
   /** Where `/ws/audio` delivers, for a `mic` session; `undefined` otherwise. */
   mic: MicSource | undefined;
+  /** The board update loop, or `null` when there is no model client. */
+  board: BoardUpdater | null;
   /** What the transcription dot shows once the session is published. */
   transcription: [state: StatusState, detail: string];
+  /** What the model dot shows once the session is published. */
+  model: [state: StatusState, detail: string];
   /** Ends input: `endStream` for a live session, no more frames for a replay. */
   stop(): void;
   /** Resolves when the session has fully drained; rejects if it failed. */
@@ -125,6 +144,7 @@ export class SessionManager {
   private readonly logger: Logger;
   private readonly createAsrClient: AsrClientFactory;
   private readonly createStore: SessionStoreFactory;
+  private readonly createModel: ModelClientFactory;
   private readonly liveClock: Clock;
   private readonly wallClock: Clock;
   private readonly replaySpeed: ReplaySpeed;
@@ -141,6 +161,12 @@ export class SessionManager {
       ((clientOptions) => new RealtimeTranscriptionClient(clientOptions));
     this.createStore =
       options.createStore ?? ((info) => SessionStore.create(info, { logger: this.logger }));
+    this.createModel =
+      options.createModel ??
+      ((): ModelClient | null =>
+        this.apiKey === undefined || this.apiKey === ""
+          ? null
+          : new MuseClient({ apiKey: this.apiKey, logger: this.logger }));
     this.liveClock = options.liveClock ?? systemClock;
     this.wallClock = options.wallClock ?? systemClock;
     this.replaySpeed = options.replaySpeed ?? "1x";
@@ -193,7 +219,7 @@ export class SessionManager {
     // which session a dot is talking about.
     this.bus.setSession(info);
     this.bus.setStatus("transcription", ...running.transcription);
-    this.bus.setStatus("model", ...this.modelStatus());
+    this.bus.setStatus("model", ...running.model);
     this.watch(running);
     this.logger.log(`[session] ${info.id} started (${describeSource(source)})`);
     return info;
@@ -224,7 +250,8 @@ export class SessionManager {
     // Replay sets this clock to each frame's recorded arrival time, so the
     // whole pipeline reads the conversation's own timeline (US-006).
     const clock = new SimulatedClock(0);
-    const assembler = this.assembler(clock, store);
+    const board = this.boardUpdater(info, clock, store);
+    const assembler = this.assembler(clock, store, board);
     let source: EventReplaySource;
     try {
       source = EventReplaySource.forFixture(fixture, {
@@ -244,17 +271,23 @@ export class SessionManager {
       assembler,
       store,
       mic: undefined,
+      board,
       transcription: ["active", `replaying ${fixture} events at ${this.replaySpeed}`],
+      model: modelStatus(board),
       stop: () => source.stop(),
       // Not `assemblerSink`: a saved session records every raw frame first,
       // so `events.jsonl` is a capture of the stream the assembler saw.
-      done: source.run({
-        onFrame: (record) => {
-          store.writer?.appendEvent(record);
-          assembler.accept(record);
-        },
-        onEnd: () => {},
-      }),
+      done: source
+        .run({
+          onFrame: (record) => {
+            store.writer?.appendEvent(record);
+            assembler.accept(record);
+          },
+          onEnd: () => {},
+        })
+        // The last few turns of a conversation never reach four, so the board
+        // gets one more update before the session is declared over.
+        .then(() => board?.flush()),
       stopRequested: false,
     };
   }
@@ -292,7 +325,8 @@ export class SessionManager {
       }
     }
 
-    const assembler = this.assembler(this.liveClock, store);
+    const board = this.boardUpdater(info, this.liveClock, store);
+    const assembler = this.assembler(this.liveClock, store, board);
     const client = this.createAsrClient({
       apiKey,
       clock: this.liveClock,
@@ -319,19 +353,25 @@ export class SessionManager {
       assembler,
       store,
       mic,
+      board,
       transcription: [
         "connecting",
         source.kind === "mic"
           ? "waiting for the microphone"
           : "opening transcription session",
       ],
+      model: modelStatus(board),
       stop: () => client.stop(),
-      done: client.run(audio),
+      done: client.run(audio).then(() => board?.flush()),
       stopRequested: false,
     };
   }
 
-  private assembler(clock: Clock, store: StoreSlot): TurnAssembler {
+  private assembler(
+    clock: Clock,
+    store: StoreSlot,
+    board: BoardUpdater | null,
+  ): TurnAssembler {
     return new TurnAssembler({
       clock,
       // Frame times are measured from the start of the stream on both paths —
@@ -341,8 +381,52 @@ export class SessionManager {
       logger: this.logger,
       onUpdate: (turn) => {
         this.bus.publish({ type: "turn", turn });
-        // Partials are dropped by the store; only final turns are saved.
+        // Partials are dropped by both of these; only final turns are saved,
+        // and only final turns can trigger a board update.
         store.writer?.appendTurn(turn);
+        board?.acceptTurn(turn);
+      },
+    });
+  }
+
+  /**
+   * Builds the board update loop for a session (US-009), or `null` when there
+   * is no model client to run it with — in which case the session still
+   * transcribes and still saves, it just has no board.
+   *
+   * It writes `board.json`/`board.md` and pushes the board to every attached
+   * browser. The status dot it drives is guarded on the session still being
+   * the current one, the same way frames are: a board update that lands after
+   * Stop must not light the dot back up. The board itself is published either
+   * way, because the last update of a session is the one worth reading.
+   */
+  private boardUpdater(
+    info: SessionInfo,
+    clock: Clock,
+    store: StoreSlot,
+  ): BoardUpdater | null {
+    const model = this.createModel();
+    if (model === null) {
+      this.logger.warn(
+        `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
+      );
+      return null;
+    }
+    return new BoardUpdater({
+      clock,
+      model,
+      logger: this.logger,
+      onUpdate: (update) => {
+        store.writer?.writeBoard(update.board, update.markdown);
+        this.bus.publish({
+          type: "board",
+          board: update.board,
+          changedIds: update.changedIds,
+          updatedAtMs: update.atMs,
+        });
+      },
+      onModelState: (state, detail) => {
+        if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
       },
     });
   }
@@ -381,13 +465,6 @@ export class SessionManager {
     return true;
   }
 
-  /** Whether the model dot can claim to be ready. */
-  private modelStatus(): [state: "active" | "error", detail: string] {
-    return this.apiKey === undefined || this.apiKey === ""
-      ? ["error", "MODEL_API_KEY is missing"]
-      : ["active", "model client ready"];
-  }
-
   /** Watches a session's own completion, whether or not anyone stops it. */
   private watch(running: RunningSession): void {
     void running.done.then(
@@ -399,6 +476,7 @@ export class SessionManager {
   private finish(running: RunningSession, error?: unknown): void {
     const wasCurrent = this.current === running;
     if (wasCurrent) this.current = undefined;
+    running.board?.stop();
     // Whether it ended, was stopped or failed, the folder gets its `endedAt`.
     running.store.writer?.end();
 
@@ -436,6 +514,13 @@ export class SessionManager {
       cancelTimer?.();
     }
   }
+}
+
+/** What the model dot says about a session: ready, or not running at all. */
+function modelStatus(board: BoardUpdater | null): [state: StatusState, detail: string] {
+  return board === null
+    ? ["error", "MODEL_API_KEY is missing"]
+    : ["active", "model client ready"];
 }
 
 function message(error: unknown): string {

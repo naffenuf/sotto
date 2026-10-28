@@ -10,7 +10,7 @@
     "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:web": "vite",
-    "build": "tsc -p tsconfig.server.json && vite build",
+    "build": "tsc -p tsconfig.server.json && mkdir -p dist/server/server/prompts && cp server/prompts/*.md dist/server/server/prompts/ && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
