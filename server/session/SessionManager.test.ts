@@ -15,7 +15,7 @@ import type {
   DecisionLogRecord,
 } from "../../shared/candidates.js";
 import type { FeedbackLogRecord } from "../../shared/feedback.js";
-import type { AnswerLogRecord } from "../../shared/answers.js";
+import { TYPED_ASKER, type AnswerLogRecord } from "../../shared/answers.js";
 import type { StageCard } from "../../shared/cards.js";
 import type {
   GroundedCall,
@@ -29,6 +29,15 @@ import { SessionManager, SessionStartError, type AsrClient } from "./SessionMana
 import type { SessionWriter } from "./SessionStore.js";
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
+
+/** Waits for something a stopped session's own clock is still working on. */
+async function waitFor(ready: () => boolean, what: string): Promise<void> {
+  for (let tries = 0; tries < 200; tries += 1) {
+    if (ready()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
 
 /** Wall clock a `1x` replay can race through: every wait takes no real time. */
 function instantWallClock(): Clock {
@@ -804,6 +813,166 @@ describe("SessionManager, answers", () => {
     });
     expect(answers[0]?.turnId).not.toBeNull();
     expect(answers[0]?.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("SessionManager, typed questions", () => {
+  /** Answers anything, and remembers which call was which (US-019). */
+  class AnsweringModel implements ModelClient {
+    readonly questions: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      return call.label === "board"
+        ? { operations: [{ op: "set_summary", text: "Pricing a note app." }] }
+        : { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("an answer is prose, not JSON");
+    }
+
+    async prose(call: ProseCall): Promise<ProseReply> {
+      this.questions.push(call.user);
+      return {
+        text: "Eight open questions\n\nFour of them are about pricing.",
+        citations: [],
+        searchedUrls: [],
+        searched: false,
+      };
+    }
+  }
+
+  /** A writer that only remembers the answers written to it. */
+  function recordingWriter(answers: AnswerLogRecord[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
+      writeArtifact: () => "",
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  /** Resolves when the running session publishes its end. */
+  function ends(bus: EventBus): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+  }
+
+  it("answers a question typed after Stop, in the session that just ended", async () => {
+    const bus = new EventBus(quiet);
+    const model = new AnsweringModel();
+    const answers: AnswerLogRecord[] = [];
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => recordingWriter(answers),
+      createModel: () => model,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+
+    // Nothing has run, so there is no conversation to answer in.
+    expect(sessions.askQuestion("what did we decide?")).toBe("no-session");
+
+    const ended = ends(bus);
+    sessions.start({ kind: "events", fixture: "no-wake" });
+    await ended;
+    expect(bus.currentSession()).toBeNull();
+    expect(cards).toHaveLength(0);
+
+    expect(sessions.askQuestion("what did we decide?")).toBe("asked");
+    // The call is on the ended session's clock, so it has to be waited for
+    // rather than advanced to.
+    await waitFor(() => answers.length > 0, "the answer");
+
+    // Same path as a spoken question: a card on the stage, a line in the
+    // folder — only who asked and the missing turn differ.
+    expect(answers).toHaveLength(1);
+    expect(answers[0]).toMatchObject({
+      kind: "answer",
+      id: "ans-1",
+      status: "done",
+      askedBy: TYPED_ASKER,
+      turnId: null,
+      question: "what did we decide?",
+      headline: "Eight open questions",
+    });
+    expect(cards.map((card) => card.state)).toEqual(["thinking", "ready"]);
+    expect(cards.at(-1)?.variant).toBe("answer");
+    // Answered against the conversation that just ended, not against nothing.
+    expect(model.questions[0]).toContain("Pricing a note app.");
+    expect(model.questions[0]).not.toContain("nothing has been transcribed yet");
+    // It was typed, so the model is not told anybody said it out loud.
+    expect(model.questions[0]).toContain("Somebody just typed this question to you");
+  });
+
+  it("hands typed questions to the newest session once one starts", async () => {
+    const bus = new EventBus(quiet);
+    const model = new AnsweringModel();
+    const first: AnswerLogRecord[] = [];
+    const second: AnswerLogRecord[] = [];
+    let opened = 0;
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => {
+        opened += 1;
+        return recordingWriter(opened === 1 ? first : second);
+      },
+      createModel: () => model,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+
+    const firstEnded = ends(bus);
+    sessions.start({ kind: "events", fixture: "no-wake" });
+    await firstEnded;
+    const secondEnded = ends(bus);
+    sessions.start({ kind: "events", fixture: "no-wake" });
+    await secondEnded;
+
+    expect(sessions.askQuestion("what did we decide?")).toBe("asked");
+    await waitFor(() => second.length > 0, "the answer");
+    // The first session's folder is closed to new questions: its cards left
+    // the stage when the second one started.
+    expect(first).toHaveLength(0);
+    expect(second).toHaveLength(1);
+  });
+
+  it("has nothing to answer with when the server has no model client", async () => {
+    const bus = new EventBus(quiet);
+    const sessions = new SessionManager({
+      bus,
+      logger: quiet,
+      createStore: () => null,
+      createModel: () => null,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    const ended = ends(bus);
+    sessions.start({ kind: "events", fixture: "no-wake" });
+    await ended;
+
+    expect(sessions.askQuestion("what did we decide?")).toBe("no-model");
   });
 });
 

@@ -19,60 +19,75 @@ export interface StageProps {
   placeholder?: ReactNode;
   /** Shown above the cards, whatever else is on the stage. */
   banner?: ReactNode;
+  /**
+   * Pinned under the cards rather than scrolling with them: the "Ask Sotto…"
+   * box (US-019) has to be reachable however much is on the stage.
+   */
+  footer?: ReactNode;
   /** Shows an evidence quote's turn in the transcript (US-015). */
   onQuoteClick?: ((turnId: string) => void) | undefined;
   /** Files the group's verdict on a card (US-015). */
   onFeedback?: ((card: StageCard, verdict: FeedbackVerdict) => void) | undefined;
 }
 
-export function Stage({ cards, placeholder, banner, onQuoteClick, onFeedback }: StageProps) {
+export function Stage({
+  cards,
+  placeholder,
+  banner,
+  footer,
+  onQuoteClick,
+  onFeedback,
+}: StageProps) {
   const now = useTrayClock(cards);
   const { stack, tray } = useMemo(() => arrangeCards(cards, now), [cards, now]);
   const [trayOpen, setTrayOpen] = useState(false);
 
   return (
-    <main className="stage" data-testid="stage">
-      {banner}
-      {cards.length === 0 ? (
-        placeholder
-      ) : (
-        <div className="stage__cards" data-testid="stage-cards">
-          {stack.map((card) => (
-            <Card
-              key={card.id}
-              card={card}
-              onQuoteClick={onQuoteClick}
-              onFeedback={onFeedback}
-            />
-          ))}
-        </div>
-      )}
-      {tray.length > 0 && (
-        <div className="stage__tray" data-testid="stage-tray">
-          <button
-            type="button"
-            className="stage__tray-toggle"
-            data-testid="stage-tray-toggle"
-            aria-expanded={trayOpen}
-            onClick={() => setTrayOpen((open) => !open)}
-          >
-            {trayLabel(tray.length)} <span aria-hidden="true">{trayOpen ? "▴" : "▾"}</span>
-          </button>
-          {trayOpen && (
-            <div className="stage__tray-cards" data-testid="stage-tray-cards">
-              {tray.map((card) => (
-                <Card
-                  key={card.id}
-                  card={card}
-                  onQuoteClick={onQuoteClick}
-                  onFeedback={onFeedback}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </main>
+    <section className="stage-area">
+      <main className="stage" data-testid="stage">
+        {banner}
+        {cards.length === 0 ? (
+          placeholder
+        ) : (
+          <div className="stage__cards" data-testid="stage-cards">
+            {stack.map((card) => (
+              <Card
+                key={card.id}
+                card={card}
+                onQuoteClick={onQuoteClick}
+                onFeedback={onFeedback}
+              />
+            ))}
+          </div>
+        )}
+        {tray.length > 0 && (
+          <div className="stage__tray" data-testid="stage-tray">
+            <button
+              type="button"
+              className="stage__tray-toggle"
+              data-testid="stage-tray-toggle"
+              aria-expanded={trayOpen}
+              onClick={() => setTrayOpen((open) => !open)}
+            >
+              {trayLabel(tray.length)} <span aria-hidden="true">{trayOpen ? "▴" : "▾"}</span>
+            </button>
+            {trayOpen && (
+              <div className="stage__tray-cards" data-testid="stage-tray-cards">
+                {tray.map((card) => (
+                  <Card
+                    key={card.id}
+                    card={card}
+                    onQuoteClick={onQuoteClick}
+                    onFeedback={onFeedback}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+      {footer}
+    </section>
   );
 }
 

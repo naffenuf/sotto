@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
+import { TYPED_ASKER } from "../shared/answers.js";
 import { emptyBoard } from "../shared/board.js";
 import type { ServerEvent } from "../shared/events.js";
 import type { FixtureListResponse } from "../shared/session.js";
@@ -19,6 +20,15 @@ afterEach(async () => {
 });
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
+
+/** Waits for something a request caused on the other side of the server. */
+async function waitFor(ready: () => boolean, what: string): Promise<void> {
+  for (let tries = 0; tries < 200; tries += 1) {
+    if (ready()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
 
 /**
  * An app with its own bus and session manager, so a test can look at the bus
@@ -386,16 +396,133 @@ describe("POST /api/feedback", () => {
   });
 });
 
-describe("/ws/audio", () => {
-  /** Waits for something the socket causes on the other side of the server. */
-  async function waitFor(ready: () => boolean, what: string): Promise<void> {
-    for (let tries = 0; tries < 200; tries += 1) {
-      if (ready()) return;
-      await new Promise((resolve) => setTimeout(resolve, 5));
+describe("POST /api/ask", () => {
+  /** A model that answers anything, and remembers what it was asked. */
+  class AnsweringModel implements ModelClient {
+    readonly questions: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      return call.label === "board" ? { operations: [] } : { candidates: [] };
     }
-    throw new Error(`timed out waiting for ${what}`);
+
+    async grounded(): Promise<never> {
+      throw new Error("an answer is prose, not JSON");
+    }
+
+    async prose(call: { user: string }): Promise<{
+      text: string;
+      citations: never[];
+      searchedUrls: never[];
+      searched: boolean;
+    }> {
+      this.questions.push(call.user);
+      return {
+        text: "Two weeks, at the rate they are going\n\nThe board has four open questions.",
+        citations: [],
+        searchedUrls: [],
+        searched: false,
+      };
+    }
   }
 
+  const ask = (payload: Record<string, unknown>) => ({
+    method: "POST" as const,
+    url: "/api/ask",
+    payload,
+  });
+
+  /** A replay run to the end, so there is a finished session to ask about. */
+  async function afterASession(
+    model: ModelClient,
+  ): Promise<{ app: FastifyInstance; bus: EventBus }> {
+    const { app: server, bus } = await buildTestApp({ model });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "events", fixture: "no-wake" } },
+    });
+    await ended;
+    return { app: server, bus };
+  }
+
+  it("answers a question typed while a session is running", async () => {
+    const model = new AnsweringModel();
+    // `1x`, so the replay is still going when the question is typed.
+    const { app: server, bus } = await buildTestApp({ model, speed: "1x" });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "events", fixture: "no-wake" } },
+    });
+
+    const response = await server.inject(ask({ question: "  how long is left?  " }));
+    expect(response.statusCode).toBe(200);
+    // The question comes back trimmed, as the server took it.
+    expect(response.json()).toEqual({ asked: true, question: "how long is left?" });
+
+    await waitFor(() => bus.cardState().length > 0, "the answer card");
+    const card = bus.cardState()[0];
+    expect(card?.variant).toBe("answer");
+    expect(card?.question).toBe("how long is left?");
+    expect(card?.askedBy).toBe(TYPED_ASKER);
+    expect(model.questions[0]).toContain("how long is left?");
+
+    await server.inject({ method: "POST", url: "/api/session/stop" });
+  });
+
+  it("answers one typed after Stop, against the session that just ended", async () => {
+    const model = new AnsweringModel();
+    const { app: server, bus } = await afterASession(model);
+    expect(bus.currentSession()).toBeNull();
+
+    const response = await server.inject(ask({ question: "what did we decide?" }));
+    expect(response.statusCode).toBe(200);
+
+    await waitFor(() => bus.cardState().length > 0, "the answer card");
+    const card = bus.cardState()[0];
+    expect(card?.variant).toBe("answer");
+    expect(card?.state).toBe("ready");
+    expect(card?.headline).toBe("Two weeks, at the rate they are going");
+    // It was answered with that conversation, not with nothing.
+    expect(model.questions[0]).toContain("What they have been saying");
+    expect(model.questions[0]).not.toContain("nothing has been transcribed yet");
+  });
+
+  it("has no conversation to answer in until something has run", async () => {
+    const { app: server } = await buildTestApp();
+    const response = await server.inject(ask({ question: "what did we decide?" }));
+    expect(response.statusCode).toBe(409);
+  });
+
+  it("says so when the server has no model client", async () => {
+    const { app: server } = await buildTestApp({ apiKey: "" });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "events", fixture: "no-wake" } },
+    });
+    const response = await server.inject(ask({ question: "what did we decide?" }));
+    expect(response.statusCode).toBe(503);
+  });
+
+  it("rejects anything that is not a question", async () => {
+    const { app: server } = await buildTestApp();
+    for (const payload of [{}, { question: "" }, { question: "   " }, { question: 7 }, { question: "x".repeat(501) }]) {
+      const response = await server.inject(ask(payload));
+      expect(response.statusCode, JSON.stringify(payload)).toBe(400);
+    }
+  });
+});
+
+describe("/ws/audio", () => {
   it("feeds the running microphone session", async () => {
     const { app: server, audio } = await buildTestApp();
     await server.ready();

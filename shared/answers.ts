@@ -13,6 +13,7 @@
  * applies the stated limits. It runs on a half-finished reply too, which is
  * what lets the headline reach the stage while the detail is still arriving.
  */
+import { z } from "zod";
 import type { Citation } from "./cards.js";
 
 /** Characters of headline. Long enough to answer, short enough to glance at. */
@@ -23,6 +24,37 @@ export const ANSWER_DETAIL_MAX_WORDS = 150;
 
 /** What `askedBy` says when the question was typed rather than spoken (US-019). */
 export const TYPED_ASKER = "typed";
+
+/**
+ * Characters a typed question may be (US-019).
+ *
+ * Generous — a question asked in writing is often longer than one asked out
+ * loud — but bounded, because this is a text box pointed at a model call.
+ */
+export const ASK_QUESTION_MAX_CHARS = 500;
+
+/**
+ * Body of `POST /api/ask`: one typed question (US-019).
+ *
+ * Nothing else goes over the wire. Who asked is {@link TYPED_ASKER} by
+ * definition, and the context the question is answered in — the board, the
+ * last ten minutes of transcript — is the server's, not the tab's.
+ */
+export const AskRequestSchema = z.object({
+  question: z.string().trim().min(1).max(ASK_QUESTION_MAX_CHARS),
+});
+export type AskRequest = z.infer<typeof AskRequestSchema>;
+
+/**
+ * Response to it. The answer itself does not come back this way: it arrives
+ * on `/ws/events` as an `answer` card, thinking first and finished later,
+ * exactly as a spoken question's does (US-018).
+ */
+export interface AskResponse {
+  asked: true;
+  /** The question as the server took it, trimmed. */
+  question: string;
+}
 
 /**
  * - `thinking`: the call is out. The headline may already be here, or not.

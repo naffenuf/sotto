@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ANSWER_DETAIL_MAX_WORDS,
   ANSWER_HEADLINE_MAX_CHARS,
+  ASK_QUESTION_MAX_CHARS,
+  AskRequestSchema,
   splitAnswer,
 } from "./answers.js";
 
@@ -110,5 +112,21 @@ describe("splitAnswer", () => {
     const answer = splitAnswer("Headline\n\nThe board already says this: we ship in March.");
     expect(answer.sources).toEqual([]);
     expect(answer.detailMd).toBe("The board already says this: we ship in March.");
+  });
+});
+
+describe("AskRequestSchema", () => {
+  it("takes a typed question, trimmed (US-019)", () => {
+    const parsed = AskRequestSchema.parse({ question: "  what did we decide?  " });
+    expect(parsed.question).toBe("what did we decide?");
+  });
+
+  it("refuses a question that is blank or longer than the box allows", () => {
+    for (const question of ["", "   ", "x".repeat(ASK_QUESTION_MAX_CHARS + 1)]) {
+      expect(() => AskRequestSchema.parse({ question })).toThrow();
+    }
+    expect(() =>
+      AskRequestSchema.parse({ question: "x".repeat(ASK_QUESTION_MAX_CHARS) }),
+    ).not.toThrow();
   });
 });

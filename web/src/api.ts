@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  AskResponse,
   Chattiness,
   FeedbackResponse,
   FeedbackVerdict,
@@ -71,6 +72,17 @@ export function sendFeedback(
   verdict: FeedbackVerdict,
 ): Promise<FeedbackResponse> {
   return call<FeedbackResponse>("/api/feedback", { cardId, verdict });
+}
+
+/**
+ * Asks Sotto a question somebody typed (US-019).
+ *
+ * Only the acknowledgement comes back: the answer itself arrives on
+ * `/ws/events` as an answer card, thinking first and finished later, exactly
+ * as a spoken question's does.
+ */
+export function askSotto(question: string): Promise<AskResponse> {
+  return call<AskResponse>("/api/ask", { question });
 }
 
 /** Names one diarization label for the running session; `null` clears it. */

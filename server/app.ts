@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import websocket from "@fastify/websocket";
 import type { ApiError, HealthResponse } from "../shared/types.js";
+import { AskRequestSchema, type AskResponse } from "../shared/answers.js";
 import type { ServerEvent } from "../shared/events.js";
 import { FeedbackRequestSchema, type FeedbackResponse } from "../shared/feedback.js";
 import {
@@ -126,6 +127,33 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       } satisfies ApiError);
     }
     return { recorded: true, verdict: parsed.data.verdict } satisfies FeedbackResponse;
+  });
+
+  // A question somebody typed instead of saying (US-019). It takes the same
+  // path as a spoken one — the session's answer agent, a card on the stage,
+  // a line in `answers.jsonl` — so nothing comes back here but the
+  // acknowledgement; the answer arrives on `/ws/events`. Like feedback, it
+  // is answered for the most recent session, running or not: the question
+  // somebody meant to ask is usually typed once the talking has stopped.
+  app.post("/api/ask", async (request, reply) => {
+    const parsed = AskRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: `not a question: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
+      } satisfies ApiError);
+    }
+    const outcome = sessions.askQuestion(parsed.data.question);
+    if (outcome === "no-session") {
+      return reply.code(409).send({
+        error: "start a session first — Sotto answers a question in the conversation it was asked in",
+      } satisfies ApiError);
+    }
+    if (outcome === "no-model") {
+      return reply.code(503).send({
+        error: "answering needs MODEL_API_KEY in .env",
+      } satisfies ApiError);
+    }
+    return { asked: true, question: parsed.data.question } satisfies AskResponse;
   });
 
   // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,

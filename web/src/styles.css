@@ -456,6 +456,13 @@ body {
 
 /* ---- The stage and its cards (US-011) ---- */
 
+/* The stage scrolls; the "Ask Sotto…" box under it does not. */
+.stage-area {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* An empty stage centres its hint; a full one stacks from the top. */
 .stage:has(.stage__cards) {
   place-items: stretch;
@@ -495,6 +502,64 @@ body {
 .stage__tray-toggle:hover {
   color: var(--accent);
   border-color: #3a3730;
+}
+
+/* A question typed instead of said (US-019). It is the quietest thing on the
+   screen until it has focus: the stage belongs to the cards. */
+.ask {
+  padding: 0.75rem 2rem 1rem;
+  border-top: 1px solid #2a2824;
+}
+
+/* The same column the cards sit in: the answer lands directly above it. */
+.ask__row {
+  width: 100%;
+  max-width: 46rem;
+  margin: 0 auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ask__input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid #2a2824;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.ask__input::placeholder {
+  color: var(--ink-dim);
+}
+
+.ask__input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ask__send {
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid #2a2824;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.ask__send:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: #3a3730;
+}
+
+.ask__send:disabled,
+.ask__input:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .card {

@@ -24,7 +24,8 @@
     "verify:wake": "node scripts/verify-wake.mjs",
     "verify:chattiness": "node scripts/verify-chattiness.mjs",
     "verify:delivery": "node scripts/verify-delivery.mjs",
-    "verify:answer": "node scripts/verify-answer.mjs"
+    "verify:answer": "node scripts/verify-answer.mjs",
+    "verify:ask": "node scripts/verify-ask.mjs"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",

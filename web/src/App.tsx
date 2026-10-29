@@ -11,6 +11,7 @@ import type {
 import { describeSource } from "../../shared/index.js";
 import {
   ApiCallError,
+  askSotto,
   fetchFixtures,
   renameSpeaker,
   sendFeedback,
@@ -18,6 +19,7 @@ import {
   startSession,
   stopSession,
 } from "./api.js";
+import { AskBox } from "./AskBox.js";
 import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCapture.js";
 import { BoardPanel } from "./BoardPanel.js";
 import { SessionControls, parseSourceValue, sourceValue } from "./SessionControls.js";
@@ -132,6 +134,19 @@ export function App() {
     );
   }, []);
 
+  // A typed question (US-019). It is sent, not answered here: what comes
+  // back is an answer card on `/ws/events`, the same as a spoken one. The
+  // rejection is re-thrown so the box keeps what was typed.
+  const onAsk = useCallback(async (question: string) => {
+    setProblem(null);
+    try {
+      return await askSotto(question);
+    } catch (error) {
+      setProblem(error instanceof ApiCallError ? error.message : String(error));
+      throw error;
+    }
+  }, []);
+
   const onRenameSpeaker = useCallback((label: string, name: string | null) => {
     setProblem(null);
     void renameSpeaker(label, name).catch((error: unknown) =>
@@ -189,6 +204,7 @@ export function App() {
           cards={events.cards}
           onQuoteClick={onQuoteClick}
           onFeedback={onFeedback}
+          footer={<AskBox onAsk={onAsk} />}
           banner={
             <>
               {/* Somebody has said Sotto's name and is still asking (US-017).

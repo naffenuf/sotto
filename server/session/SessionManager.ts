@@ -25,6 +25,7 @@
  * session folder (`SessionStore`, US-008), so every session leaves a record on
  * disk whether or not a browser was watching.
  */
+import { TYPED_ASKER } from "../../shared/answers.js";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { CandidateType } from "../../shared/candidates.js";
@@ -176,24 +177,40 @@ interface Delivered {
 }
 
 /**
- * Where a feedback click lands: the delivered cards of the most recent
- * session, and the folder they belong to.
+ * The most recent session, kept after it has ended.
  *
- * It outlives the session deliberately. A replay's cards stay on the stage
- * after it has finished — that is when somebody actually reads them — and a
- * 👍 clicked then is still a verdict about *that* conversation, so it belongs
- * in that folder's `feedback.jsonl`.
+ * It outlives the session deliberately, because two things the user does
+ * happen *after* Stop. A replay's cards stay on the stage once it has
+ * finished — that is when somebody actually reads them — so a 👍 clicked then
+ * is still a verdict about *that* conversation and belongs in that folder's
+ * `feedback.jsonl` (US-015). And a question typed into the stage is answered
+ * against the conversation that just happened, whether or not it is still
+ * running (US-019), by that session's own answer agent.
+ *
+ * Only one session is remembered: starting a new one clears the stage, so its
+ * predecessor has nothing left to receive.
  */
-interface FeedbackTarget {
+interface LastSession {
   sessionId: string;
   store: StoreSlot;
-  /** The session's clock, for the time the click is recorded at. */
+  /** The session's clock, for the time a click or a question is recorded at. */
   clock: Clock;
   cards: Map<string, Delivered>;
+  /** Its answer agent (US-018), which still takes typed questions (US-019). */
+  answers: AnswerAgent | null;
 }
 
 /** What {@link SessionManager.recordFeedback} made of a click. */
 export type FeedbackOutcome = "recorded" | "no-cards" | "unknown-card";
+
+/**
+ * What {@link SessionManager.askQuestion} made of a typed question (US-019).
+ *
+ * `no-session` is not "nothing is running": a question is answered against
+ * the last conversation as happily as against the running one. It means
+ * nothing has ever run, so there is no conversation to answer in.
+ */
+export type AskOutcome = "asked" | "no-session" | "no-model";
 
 interface RunningSession {
   info: SessionInfo;
@@ -240,10 +257,11 @@ export class SessionManager {
 
   private current: RunningSession | undefined;
   /**
-   * Where a feedback click lands (US-015): the most recent session's
-   * deliveries, kept after it ends because that is when its cards are read.
+   * The most recent session, running or not: what a feedback click (US-015)
+   * and a typed question (US-019) are addressed to, both of which happen
+   * after a replay has ended as readily as during one.
    */
-  private feedback: FeedbackTarget | undefined;
+  private last: LastSession | undefined;
   private started = 0;
   /**
    * The settings the next session starts with, and the ones the running
@@ -357,13 +375,16 @@ export class SessionManager {
     store.writer?.setSettings(this.currentSettings);
 
     this.current = running;
-    // Feedback follows the newest session: its predecessor's cards have just
-    // left the stage, since a session *starting* is what clears it.
-    this.feedback = {
+    // The newest session takes over: its predecessor's cards have just left
+    // the stage, since a session *starting* is what clears it, so there is
+    // nothing left to say to the old answer agent either.
+    this.last?.answers?.stop();
+    this.last = {
       sessionId: info.id,
       store,
       clock: running.clock,
       cards: running.deliveries,
+      answers: running.answers,
     };
     // The session goes out before its statuses, so a listener always knows
     // which session a dot is talking about.
@@ -718,8 +739,11 @@ export class SessionManager {
       board: () => board.board(),
       transcript,
       speakers: () => this.bus.speakerNames(),
+      // Published while this session still owns the stage — which it does
+      // until the next one starts, not only while it is running: a question
+      // typed after Stop (US-019) must put its answer somewhere.
       onCard: (card) => {
-        if (this.current?.info.id === info.id) this.bus.publishCard(card);
+        if (this.last?.sessionId === info.id) this.bus.publishCard(card);
       },
       onRecord: (record) => store.writer?.appendAnswer(record),
       // Sotto does not interject over its own answer.
@@ -766,7 +790,7 @@ export class SessionManager {
    * accepts the click — as a rename does — it simply has nowhere to put it.
    */
   recordFeedback(cardId: string, verdict: FeedbackVerdict): FeedbackOutcome {
-    const target = this.feedback;
+    const target = this.last;
     if (target === undefined || target.cards.size === 0) return "no-cards";
     const delivered = target.cards.get(cardId);
     if (delivered === undefined) return "unknown-card";
@@ -784,6 +808,27 @@ export class SessionManager {
     target.store.writer?.appendFeedback(record);
     this.logger.log(`[stage] ${target.sessionId} ${cardId} is ${verdict}`);
     return "recorded";
+  }
+
+  /**
+   * Asks Sotto a question somebody typed (US-019).
+   *
+   * It is the spoken path with a different front door: the same
+   * {@link AnswerAgent}, the same queue, the same card on the stage and the
+   * same line in `answers.jsonl` — only `askedBy` differs, because nobody
+   * said it out loud and there is no turn it belongs to.
+   *
+   * Like feedback, it is addressed to the most recent session rather than
+   * only to a running one. A group reads the board after a replay has ended
+   * and that is exactly when somebody types the question they meant to ask,
+   * so the answer is given against the conversation that just happened.
+   */
+  askQuestion(question: string): AskOutcome {
+    const target = this.last;
+    if (target === undefined) return "no-session";
+    if (target.answers === null) return "no-model";
+    target.answers.ask({ question, askedBy: TYPED_ASKER, turnId: null });
+    return "asked";
   }
 
   /**
@@ -835,7 +880,9 @@ export class SessionManager {
     running.observer?.stop();
     running.verifier?.stop();
     running.policy?.stop();
-    running.answers?.stop();
+    // Not `running.answers`: a question typed after Stop is answered against
+    // the conversation that just ended (US-019), so the agent is only
+    // retired when the next session supersedes it.
     // Whether it ended, was stopped or failed, the folder gets its `endedAt`.
     running.store.writer?.end();
 

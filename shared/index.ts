@@ -67,6 +67,8 @@ export type {
 export {
   ANSWER_DETAIL_MAX_WORDS,
   ANSWER_HEADLINE_MAX_CHARS,
+  ASK_QUESTION_MAX_CHARS,
+  AskRequestSchema,
   TYPED_ASKER,
   answerStatuses,
   splitAnswer,
@@ -76,6 +78,8 @@ export type {
   AnswerLogRecord,
   AnswerStatus,
   AnswerText,
+  AskRequest,
+  AskResponse,
   ListedSource,
 } from "./answers.js";
 export { cardStates, cardVariants } from "./cards.js";

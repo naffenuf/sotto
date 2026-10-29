@@ -409,7 +409,11 @@ export function renderAnswerRequest(
     turns.length === 0
       ? "_nothing has been transcribed yet_"
       : turns.map((turn) => renderTurn(turn, speakers)).join("\n"),
-    `## ${answer.askedBy} just asked you, out loud`,
+    // A typed question (US-019) is the same question by another route, but
+    // it has no speaker to name and nobody said it in the room.
+    answer.askedBy === TYPED_ASKER
+      ? "## Somebody just typed this question to you"
+      : `## ${answer.askedBy} just asked you, out loud`,
     answer.question,
     "Answer it: the headline on line 1, then the detail, then the pages you used.",
   ];
