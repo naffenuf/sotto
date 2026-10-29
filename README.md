@@ -42,6 +42,7 @@ cp .env.example .env    # then set MODEL_API_KEY to your Meta Model API key
 | `npm run typecheck` | `tsc --noEmit` across `server/`, `web/` and `shared/` |
 | `npm test` | Vitest unit tests. Makes no network calls |
 | `npm run test:integration` | Vitest tests that call the real Meta APIs. Skipped with a message if `MODEL_API_KEY` is missing |
+| `npm run e2e` | Streams four fixture WAVs at real-time pace through the whole loop against the real Meta APIs and asserts the result. Costs money; prints the estimate |
 | `npm run fixtures:check` | Validates the fixture scripts in `fixtures/scripts/` against their rendered audio and timings |
 | `npm run verify:ui` | Playwright check of the running UI; writes a screenshot. Needs `npm run dev` already up |
 | `npm run verify:mic` | Playwright check of the microphone, with Chromium's fake capture device: a refused permission and a live session. Needs `npm run dev` already up |

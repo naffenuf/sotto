@@ -12,3 +12,6 @@ ralph/iterations/
 eval/sessions/
 eval/runs/
 eval/cache/
+
+# End-to-end check output: one session folder per fixture, per run.
+e2e/sessions/

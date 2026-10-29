@@ -43,12 +43,27 @@ export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
   };
 }
 
+/**
+ * Realtime transcription, per hour of audio (`tasks/prd-sotto-core.md`).
+ *
+ * An eval replay pays none of this — the ASR bill for the captures was paid
+ * once by `npm run capture` — but the end-to-end check (US-021) streams the
+ * WAVs through the real API every time, so its estimate is tokens *plus*
+ * audio. The price lives here because this is where Sotto's prices live.
+ */
+export const ASR_USD_PER_HOUR = 0.18;
+
 /** The estimate, in US dollars. */
 export function estimateCostUsd(usage: TokenUsage): number {
   return (
     (usage.inputTokens / 1_000_000) * SPARK_INPUT_USD_PER_MTOK +
     (usage.outputTokens / 1_000_000) * SPARK_OUTPUT_USD_PER_MTOK
   );
+}
+
+/** What `seconds` of audio cost to transcribe, in US dollars. */
+export function estimateAsrCostUsd(seconds: number): number {
+  return (seconds / 3600) * ASR_USD_PER_HOUR;
 }
 
 /** `$0.0123`, or `$0.00` for nothing. Four places: a run is cents, not dollars. */
