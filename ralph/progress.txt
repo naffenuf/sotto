@@ -983,3 +983,39 @@
   directly in a live session.
   Checked: npm run typecheck, npm test (656 / 47 files), npm run build, npm run fixtures:check,
   npm run e2e (exit 0), npm run e2e -- --fixtures bogus (exit 1). Nothing human-only is pending.
+
+[2026-10-29 05:30] US-023 — blocked (attempt 2 of 3) — recall ceiling is now a command; 0.7 needs a
+  per-turn observer look, which costs 2.2x the e2e budget, so US-016 and US-021 conflict.
+  Working tree was clean apart from `fixtures/live-scripts/`, still untracked and still not mine.
+  WHAT I ADDED. `npm run eval:ceiling` — `scripts/eval-ceiling.ts` over the pure
+  `server/eval/ceiling.ts` (17 unit tests). It replays a capture through the turn assembler ONLY —
+  no model, no network, no session folder — and lays three things on one timeline: a planted
+  moment's window (`resolveMoments`), when the observer's look lands under the real board cadence
+  (`NEW_TURNS_PER_UPDATE`/`UPDATE_INTERVAL_MS`, imported not copied), and the longest silence the
+  transcription reported in between (`pauseAt`, exact rather than sampled). `--every N` re-prices
+  the whole thing at a different observer cadence. No API calls, so it reruns for free.
+  WHY: attempt 1's blocking claim was hand arithmetic in a notes file. Now it is a number anyone
+  can regenerate, and it came out within 1-2 ms of attempt 1 by a different route — 128/164/104/
+  134/288/487 ms of longest usable silence for the six moments, against 129/165/101/135/289/488.
+  THE NUMBERS. Ceiling at the shipped cadence: 1/6 at PAUSE_MS 400, 1/6 at 300, 2/6 at 200-250,
+  3/6 at 150, 6/6 only at 100 ms (the ordinary join between two sentences). The gate needs 5/6.
+  By cadence at PAUSE_MS 400: every 1 turn 0.83, every 2 turns 0.50, every 3 turns 0.33, every 4
+  (shipped) 0.17. Only a look per final turn clears 0.7.
+  AND THAT IS WHERE IT STOPS BEING TUNING. `npm run e2e` makes 16 observer looks across its four
+  fixtures; a look per final turn (24/26/11/11 turns) needs 72. 56 extra calls at a measured
+  $1.0773/98 = $0.011 is +$0.62 on a run that costs $0.4826 against the $0.50 gate `runPassed`
+  enforces. PRD US-016's recall gate and PRD US-021's cost gate cannot both hold while PRD US-012
+  ties the observer to US-009's four-turn board loop. Written up with three ways out in
+  `eval/reports/2026-10-28_185157-notes.md` (appended, and folded back into the report by
+  `npm run eval:report`) and in US-023's `notes`.
+  I DID NOT re-run `npm run eval`, on purpose: `git log 8226386..HEAD -- server/prompts/observer.md
+  server/prompts/board.md server/interject/policy.ts` is empty, so it would have re-measured
+  identical code for ~$1.08 and could not have moved a structural result. Criterion 1's run and
+  criterion 3's five-decision spot-check are from attempt 1 and both are committed.
+  NEXT ITERATION: do not retry this as a tuning story. One attempt remains, and the only in-scope
+  dials (observer.md, policy weights) are exhausted — the observer already produces one candidate
+  per planted moment. Either a human picks one of the three ways out, or US-023 is escalated as a
+  PRD conflict. Run `npm run eval:ceiling` first; it is free and it is the whole argument.
+  Checked: npm run typecheck, npm test (673 / 48 files), npm run eval:ceiling, npm run eval:report
+  -- 2026-10-28_185157 (gates unchanged: recall FAIL 0.17, the other three PASS). Nothing
+  human-only is pending.

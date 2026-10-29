@@ -675,3 +675,18 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `GET /api/sessions/:id/artifacts/` only answers for the **most recent** session. All of it is
   pure over two records (`E2eObserved` from the bus, `E2eFiles` from the folder), so `npm test`
   covers the judgement and the API is only paid for the evidence.
+- **The recall ceiling is measurable without an API call, and `npm run eval:ceiling` measures it.**
+  A planted moment can only be delivered inside its window, only in a pause, and only once the
+  observer has looked — and the observer looks after a board update, four final turns apart (PRD
+  US-012 + US-009). `server/eval/ceiling.ts` replays a capture through the turn assembler *alone*
+  and lays all three on one timeline, so "no prompt can catch this moment" is a number rather than
+  a hunch. Measured: 1 of 6 moments reachable at `PAUSE_MS` 400, 3 at 150, and 6 only at 100 ms,
+  which is the ordinary join between two sentences. `--every N` reprices it at another observer
+  cadence: 0.83 at a look per final turn, 0.50 every two, 0.17 at the shipped four. Run it before
+  paying for an eval run, and before blaming `observer.md`.
+- **US-016's recall gate and US-021's cost gate are in conflict, and the conflict is priced.** The
+  only cadence that clears 0.7 recall is an observer look on every final turn, which is 72 looks
+  across `npm run e2e`'s four fixtures instead of 16 — +56 calls at a measured $0.011 each, so
+  +$0.62 on a run that costs $0.4826 against a $0.50 gate. Cheapening it is not an option on the
+  input side: the bill is reasoning tokens, which don't shrink when you send one turn instead of
+  four. Resolving this needs a product decision (see US-023's notes), not another tuning pass.
