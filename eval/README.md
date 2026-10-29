@@ -37,6 +37,9 @@ npm run eval -- --no-judge               # replay and record, match nothing
 
 npm run eval:report                      # re-score the newest run, no API calls
 npm run eval:report -- 2026-10-28_091323 # re-score one run by its id
+
+npm run eval:ceiling                     # the most recall the fixtures allow
+npm run eval:ceiling -- --every 1        # ...if the observer looked every turn
 ```
 
 Both exit non-zero when a gate fails: moment recall below 0.7, a false
@@ -45,3 +48,14 @@ replay that threw.
 
 `npm run eval` calls the real Meta API for both the replays and the judge.
 `npm run eval:report` calls nothing: it only reads `runs/`.
+
+`npm run eval:ceiling` calls nothing either, and answers a different question:
+not what Sotto caught but what it *could* have. A moment can only be delivered
+inside its window, only in a pause, and only once the observer has looked —
+and the observer looks after a board update, four final turns apart (PRD
+US-009, US-012). Replaying the captures through the turn assembler alone
+places all three on one timeline, so the ceiling on recall is measurable
+before any run is paid for. It is an upper bound: the observer still has to
+notice the moment and the score still has to clear a threshold. See US-023 in
+`ralph/prd.json` and `reports/2026-10-28_185157-notes.md` for what it says
+about the current cadence.
