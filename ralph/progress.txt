@@ -841,3 +841,42 @@
   (3 tests, real API, 37 s), and `npm run verify:answer` through with_server.py — card arrived as
   thinking, headline streamed in, finished with 5 sources; screenshots looked right. US-023 is
   still the only story left behind, for the reasons in its own notes. Nothing human-only is pending.
+
+[2026-10-29 00:05] US-026 — completed — Typed questions: an "Ask Sotto…" box under the stage on
+  the same path a spoken question takes, working during a session and after Stop.
+  US-023 SKIPPED AGAIN, deliberately. Its notes carry the arithmetic: recall 0.7 is unreachable
+  while the observer only looks after a board update (PRD US-009's 4-turn cadence eats a median
+  12.6 s of a 11.8–20.6 s window). That is a PRD decision, not something an iteration can tune, so
+  priority 26 was the next story to take.
+  WORKING TREE was clean apart from `fixtures/live-scripts/`, which is still not mine (US-028's
+  read-aloud scripts) and is still untracked and untouched.
+  WHAT LANDED. `POST /api/ask` (`AskRequestSchema` in `shared/answers.ts`, trimmed, 1–500 chars)
+  -> `SessionManager.askQuestion` -> the session's `AnswerAgent.ask({ askedBy: TYPED_ASKER,
+  turnId: null })`. The route answers only an acknowledgement; the answer itself arrives on
+  `/ws/events` as an answer card, thinking then finished, exactly as US-025's does. 409 when
+  nothing has ever run (there is no conversation to answer in), 503 with no model client.
+  THE AFTER-STOP PART is the only structural change. `SessionManager`'s private `feedback` target
+  — already "the most recent session, kept because its cards are read after it ends" — became
+  `LastSession` and now holds that session's `AnswerAgent` as well. `finish()` no longer calls
+  `answers.stop()`; the agent is retired in `start()`, when the next session supersedes it (which
+  is also when the stage is cleared). The answer card's publish guard moved from
+  `this.current?.info.id === info.id` to `this.last?.sessionId === info.id` for the same reason.
+  The session folder needed nothing: `SessionStore.appendLine` reopens a closed fd, so a question
+  typed after `end()` still lands in that folder's `answers.jsonl` (with `endedAt` already stamped).
+  UI. `web/src/AskBox.tsx` holds its own text and sending state, submits on Enter through an
+  ordinary `<form>`, and clears only when the send resolves — a refused question stays in the box.
+  `Stage` gained a `footer` prop and a `.stage-area` wrapper so the box is pinned under the
+  scrolling cards rather than scrolling away with them.
+  MEASURED (npm run verify:ask, real API, ~$0.02 a run): 3.7–5.7 s per typed answer against the
+  `no-wake` capture — that fixture says "sotto voce" and "Soto's restaurant" but never addresses
+  Sotto, so every card on its stage must have been typed. Both cards read `typed`, both lines in
+  `answers.jsonl` have `turnId: null`. One timing trap the script now asserts on: `POST
+  /api/session/stop` drains the answer queue, so a question typed into that window holds the Stop
+  response and the header's Start/Stop stay disabled until the answer lands (`controlsFreed`).
+  Checked: npm run typecheck, npm test (579 / 45 files), npm run build, npm run verify:ask, and
+  `npx vitest run --config vitest.integration.config.ts server/answer/answer.integration.test.ts`
+  (3 tests, real API, 46 s) because `server/prompts/answer.md` and `renderAnswerRequest` both
+  changed to account for a question nobody said out loud. Nothing human-only is pending.
+  FOR US-027 (artifacts). The typed path is the cheap way to drive an artifact without waiting for
+  a wake line: `POST /api/ask {"question":"sketch the user flow as a diagram"}` reaches the same
+  `AnswerAgent`, and `scripts/verify-ask.mjs` is the template for a browser check of one.

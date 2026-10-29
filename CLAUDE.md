@@ -604,3 +604,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   up in that session's deliveries), and `useful`/`not useful`/`wrong moment` are verdicts on a
   decision to speak. So `Card.tsx` draws no feedback row on an `answer` card; a button there would
   have nothing to write.
+- **A session outlives its Stop in two places, and they are the same place.** `SessionManager`'s
+  `LastSession` is the most recent session — running or not — and both things a user does *after*
+  Stop are addressed to it: a 👍 on a card still on the stage (US-015) and a question typed into
+  "Ask Sotto…" (US-019). So the answer agent is retired when the **next** session supersedes it,
+  not by `finish()`, and an answer card is published while `this.last?.sessionId === info.id`
+  rather than while it is `this.current`. The session folder needed nothing — `SessionStore`'s
+  `appendLine` reopens a descriptor closed by `end()`, so a post-Stop answer still lands in that
+  conversation's `answers.jsonl`.
+- **A typed question is the spoken path with a different front door.** `POST /api/ask` hands it to
+  the same `AnswerAgent` with `askedBy: TYPED_ASKER` and `turnId: null`; the route answers only an
+  acknowledgement, because the answer arrives on `/ws/events` as a card. It is also the cheapest
+  way to drive the answer agent in a test or a browser check — no wake line to wait for. The only
+  thing that branches on it is `renderAnswerRequest`, which must not tell the model somebody said
+  it out loud.
+- **`POST /api/session/stop` drains the answer queue.** A question typed into that window holds
+  the Stop response until the answer lands, so the header's Start/Stop stay disabled for the
+  length of a model call. Harmless, but a Playwright check that screenshots straight after a
+  post-Stop answer will catch the controls mid-wait — wait for Start to be enabled first.
