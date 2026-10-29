@@ -487,14 +487,12 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   hash of `server/prompts/judge.md`, so editing the judge invalidates every verdict rather than
   mixing two standards in one report. A judge call that *fails* is recorded as a non-match with
   its error and deliberately not cached.
-- **At `normal`, what loses a good candidate is `STALE_TURNS`, not the thresholds.** The first
-  full eval run delivered one card out of five planted moments, and the log says why:
-  `moment-fact`'s claim came back from the verifier as `wrong` and was still written off
-  `silent/stale` after 28 s and 6 turns, as were both of `moment-mixed`'s (scores 0.81 and 0.50).
-  These captures have almost no reported silence ≥ 1,500 ms, so a candidate runs out of turns
-  before it ever gets a pause. `brainstorm` and `no-wake` produced zero candidates, so precision
-  is not the problem — recall is, and `STALE_TURNS`, `PAUSE_MS` and the observer's coverage of
-  assumptions and dropped threads are the three dials the harness now measures.
+- **What loses a good candidate is never the score thresholds.** Across every eval run,
+  `brainstorm` and `no-wake` produce **zero** candidates and precision has never been the problem —
+  recall has. Each time, the log named the real cause: first `STALE_TURNS` (a candidate ran out of
+  its 6 turns before a pause arrived), then the pause measurement itself
+  (`ENDPOINTER_HANGOVER_MS`), and now the observer's coverage of one hard type. Read
+  `candidates.jsonl`'s decision reasons before touching a weight.
 - **Scoring reads the record, so re-scoring is free.** `server/eval/score.ts` is pure over an
   `EvalRunRecord`, and `npm run eval:report` rebuilds any past run's `eval/reports/<id>.md` from
   `eval/runs/<id>.json` with no API calls and the same exit code `npm run eval` would give. A
@@ -516,30 +514,32 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   omit them, so a missing count is zero. Reasoning tokens are *part of* the output tokens, not an
   addition — pricing `input + output` is the whole bill. Measured: `moment-contradiction` alone is
   15 calls and $0.10, so the seven-fixture set is roughly $0.5–0.7.
-- **The pause the policy needs may not be in the fixture.** Measured over the captures, only 3 of
-  the 6 planted moments have a reported silence >= `PAUSE_MS` (1,500 ms) anywhere inside their
-  window: `moment-assumption` 1,840 ms, `moment-fact` 2,240 ms, `moment-mixed`/demo-deadline
-  1,680 ms. `moment-dropped`'s best is 1,200 ms, `moment-mixed`/nightly-photo 560 ms and
-  `moment-contradiction` **320 ms**. So at 1,500 ms the ceiling on recall is 3/6 and no observer
-  prompt can lift it; a found candidate holds `waiting_for_pause` until `STALE_TURNS` drops it, or
-  until the 3 s trailing silence, which is after the deadline and scores `late`. Measure the gaps
-  before blaming the prompt.
-- **Recall in the eval is bounded by the board loop, not by the prompt or the threshold.** A planted
-  moment's window is its trigger turn's end to its deadline turn's end — 11.8–20.6 s on these
-  fixtures — and the observer cannot see the trigger until the board update that carries it, which
-  PRD US-009 fixes at 4 new final turns: a median **12.6 s** later. What is left of the window holds
-  129–488 ms of reported silence, so 0 of the 6 moments are deliverable at `PAUSE_MS` 500, 1 at
-  300–480, 2 at 200–250 and 6 only at ≤ 100 ms, which is the ordinary join between two sentences.
-  Three cards in run `2026-10-28_185157` matched their moment and landed **0.4–2.5 s** late, and two
-  of those could not have been in time at *any* threshold: the first silence they could use starts
-  exactly when the deadline turn ends. Before tuning anything for recall, compute the ceiling off
-  the captures — it needs no API call.
-- **The endpointer under-reports silence by a near-constant ~460 ms, so a reported gap is not a
-  pause length.** Every scripted pause in `moment-assumption` (500–2,400 ms) comes back 380–560 ms
-  short. Across the nine captures the 189 inter-turn gaps run: median 160 ms, 78% under 400 ms, 42
-  clear 400 ms, 21 clear 500 ms, 6 clear 1,500 ms. `PAUSE_MS` is therefore 400 — the top fifth of
-  gaps, ≈0.86 s of real quiet — and 1,500 was a threshold almost nothing in a real conversation
-  reaches.
+- **A planted moment's window is narrow and most of it belongs to the board loop.** The window is
+  the trigger turn's end to the deadline turn's end — 11.8–20.6 s on these fixtures — and the
+  observer cannot see the trigger until the board update that carries it, which PRD US-009 fixes at
+  4 new final turns: a median **12.6 s** later. So a delivery has only the last few seconds to land
+  in, and anything that costs the policy a second costs it the moment. Compute the ceiling off the
+  captures (`npm run eval:ceiling`) before tuning for recall — it needs no API call.
+- **`speechEnd` is a decision, not an observation, and it is a median 647 ms late.** The endpointer
+  waits out a hangover before it will call a turn over, so `speechEnd.audioProcessedMs` lands that
+  far *after* the talking actually stopped — measured against `<fixture>.timing.json` over all 198
+  captured turns: p25 506, median **647**, p75 841, p90 1,155 ms. Counting silence from `speechEnd`
+  therefore understates the pause by about two-thirds of a second, and the understated part is the
+  part that has *already elapsed* when the server hears about it. `ENDPOINTER_HANGOVER_MS` (650) in
+  `server/asr/turns.ts` subtracts it, so `silentForMs` means how long the room has really been quiet
+  and `PAUSE_MS` (700) is a threshold in those units; `server/eval/pause.ts` undoes the same
+  constant, and the test holding it against `pauseState` keeps the two honest. The spread is wide
+  and does not scale with the pause being eaten, and the last `transcript` frame of a turn is no
+  help (its `audioProcessedMs` is exactly `speechEnd + 500` in all 198 turns), so a constant is the
+  only correction available at runtime.
+- **When a measurement looks impossible, measure the instrument.** US-023 spent two attempts
+  concluding that PRD US-016's recall gate and PRD US-021's cost gate were in conflict, from a
+  ceiling of 1/6 deliverable moments. The conflict was an artifact: inside those six windows the
+  longest gap the API *reports* is 104–487 ms, while the longest run of real quiet in the same
+  stretch of WAV (RMS over 10 ms frames) is **930–1,610 ms** — every one of them an obvious pause.
+  Correcting the endpointer took recall 1/6 → 5/6 with no extra model calls, no prompt change and
+  no threshold loosening. The audio and `<fixture>.timing.json` are ground truth and cost nothing;
+  reach for them before accepting that a target cannot be hit.
 - **Size the token budget for the worst thinking, not the typical.** `DEFAULT_MAX_TOKENS` at 4,096
   lost eight board updates and an observer look in one eval run to `finish_reason: "length"`, each
   having spent the whole budget on reasoning and emitted nothing — and a board update that fails
@@ -680,13 +680,13 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   observer has looked — and the observer looks after a board update, four final turns apart (PRD
   US-012 + US-009). `server/eval/ceiling.ts` replays a capture through the turn assembler *alone*
   and lays all three on one timeline, so "no prompt can catch this moment" is a number rather than
-  a hunch. Measured: 1 of 6 moments reachable at `PAUSE_MS` 400, 3 at 150, and 6 only at 100 ms,
-  which is the ordinary join between two sentences. `--every N` reprices it at another observer
-  cadence: 0.83 at a look per final turn, 0.50 every two, 0.17 at the shipped four. Run it before
+  a hunch. It reports 6/6 reachable at the shipped `PAUSE_MS` (700, on corrected silence), with
+  margins of 754–1,137 ms; `--every N` reprices it at another observer cadence. Run it before
   paying for an eval run, and before blaming `observer.md`.
-- **US-016's recall gate and US-021's cost gate are in conflict, and the conflict is priced.** The
-  only cadence that clears 0.7 recall is an observer look on every final turn, which is 72 looks
-  across `npm run e2e`'s four fixtures instead of 16 — +56 calls at a measured $0.011 each, so
-  +$0.62 on a run that costs $0.4826 against a $0.50 gate. Cheapening it is not an option on the
-  input side: the bill is reasoning tokens, which don't shrink when you send one turn instead of
-  four. Resolving this needs a product decision (see US-023's notes), not another tuning pass.
+- **The eval's one remaining miss is the observer's, not the policy's.** Run
+  `2026-10-29_053832` catches 5 of 6 planted moments, all in a pause and none late. The miss is
+  `moment-mixed`/demo-deadline-contradiction, where nine looks produced no candidate for a
+  three-week "hard wall" contradicted by a two-plus-four-week plan — cross-turn arithmetic is the
+  hardest of the four types, and the board carries the deadline as a constraint but not the sum.
+  938 ms of real quiet was available in its window, so a candidate would have been delivered in
+  time. That is the next thing to sharpen in `observer.md` if 6/6 is wanted.

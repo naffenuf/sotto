@@ -1019,3 +1019,50 @@
   Checked: npm run typecheck, npm test (673 / 48 files), npm run eval:ceiling, npm run eval:report
   -- 2026-10-28_185157 (gates unchanged: recall FAIL 0.17, the other three PASS). Nothing
   human-only is pending.
+
+[2026-10-29 05:55] US-023 — completed (attempt 3 of 3) — recall 1/6 -> 5/6, zero late deliveries;
+  the blocker was the pause measurement, not a PRD conflict.
+  Working tree was clean apart from `fixtures/live-scripts/`, still untracked and still not mine.
+  Passing report: `eval/reports/2026-10-29_053832.md` (+ `-notes.md`). All four gates PASS —
+  moment recall 5/6 (0.83) vs the 0.7 gate, 0 false interjects on brainstorm + no-wake, 6/6
+  deliveries in a pause, every replay completed. Interject precision 2/2, **0 late** (was 3), 100
+  model calls, $1.0513. Seven judge decisions spot-checked against the scripts, seven agreements,
+  including both non-matches.
+  ATTEMPTS 1 AND 2 WERE WRONG ABOUT THE BLOCKER, and the lesson is worth more than the fix. They
+  concluded US-016's recall gate and US-021's cost gate were in conflict, from a measured recall
+  ceiling of 1/6 deliverable moments. That ceiling was an artifact of the instrument. `pauseState`
+  counted silence from `speechEnd` — but `speechEnd` is not an observation that silence began, it
+  is a *decision* the endpointer takes after a hangover. Measured against where each line was
+  actually rendered in the WAV (`<fixture>.timing.json`), over all 198 captured turns,
+  `speechEnd.audioProcessedMs` lands a median **647 ms** after the talking stopped (p25 506, p75
+  841, p90 1,155). So the threshold was compared against a number that understates the pause by
+  two-thirds of a second — and the understated part is the part that has already elapsed when the
+  server hears about it.
+  THE PAUSES WERE THERE ALL ALONG. Inside the six planted moments' windows, after the observer's
+  look, the longest gap the API reports is 104–487 ms. The longest run of real quiet in that same
+  stretch of WAV (RMS over 10 ms frames) is **930–1,610 ms**, each sitting on a scripted pause of
+  1,000–1,600 ms. Every one an obvious pause, handed over as a rounding error.
+  THE FIX IS TWO CONSTANTS. (1) `ENDPOINTER_HANGOVER_MS = 650` in `server/asr/turns.ts`: silence
+  counted from `speechEnd` less the hangover, so `silentForMs` means how long the room has really
+  been quiet. `server/eval/pause.ts` undoes the same constant, so the harness still measures the
+  pause independently of the policy, and `pause.test.ts`'s agreement test still holds the two
+  together. (2) `PAUSE_MS` 400 -> 700, a threshold on corrected silence — in real terms stricter
+  than the 400 it replaced (~1.05 s). Every delivery in the run shows `silentForMs: 700` exactly:
+  the policy's own timer firing the millisecond the threshold is met.
+  WHAT I DID NOT TOUCH. No fixture, moment annotation, judge prompt or scoring code (criterion 2).
+  `observer.md`, `board.md`, the score formula, the chattiness thresholds, STALE_MS/STALE_TURNS and
+  the four-turn board cadence are exactly as attempt 1 left them. No model calls were added, so
+  PRD US-021's $0.50 budget is untouched and the "priced conflict" in attempt 2's notes is moot.
+  `npm run eval:ceiling` now reports 6/6 reachable (margins 754–1,137 ms), up from 1/6.
+  THE REMAINING MISS IS THE OBSERVER'S. `moment-mixed`/demo-deadline-contradiction: nine looks, no
+  candidate for a three-week "hard wall" contradicted by a two-plus-four-week plan, though 938 ms
+  of real quiet was available in its window. Attempt 1 missed it identically. Cross-turn
+  arithmetic is the hardest of the four types and the board carries the deadline as a constraint
+  but not the sum — that is where to sharpen `observer.md` if anyone wants 6/6.
+  NEXT ITERATION: every story in `ralph/prd.json` now passes. The one thing left worth doing is a
+  re-run of `npm run e2e` (US-028) against the new `PAUSE_MS`; it adds no model calls, so the cost
+  gate is unaffected, and its two policy-sensitive assertions can only improve, but it has not been
+  re-measured live.
+  Checked: npm run typecheck, npm test (673 / 48 files), npm run build, npm run fixtures:check,
+  npm run eval (exit 0, all gates PASS), npm run eval:report -- 2026-10-29_053832 (exit 0),
+  npm run eval:ceiling. Nothing human-only is pending.
