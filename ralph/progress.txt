@@ -800,3 +800,44 @@
   /ws/events because the indicator is only up for the second or two a partial is live. Screenshot
   looked right: accent-coloured line centred on the stage, three breathing dots, no modal.
   Nothing human-only is pending.
+
+[2026-10-28 23:50] US-025 — completed — Answer agent: a streamed, searching prose call behind the
+  wake phrase, on the stage as an answer card with sources.
+  FOUND A DIRTY TREE AND CONTINUED FROM IT. A cut-off iteration had already written
+  `shared/answers.ts` (splitAnswer), `server/prompts/answer.md`, `MuseClient.prose` + the
+  ProseCall/ProseReply types, `PROMPTS.answer` and the `prose()` stubs on every fake ModelClient in
+  the tests. All of it was good and is in this commit. Two untracked scratch probes
+  (`probe-answer.mjs`, and one I added) were deleted once their findings were written down.
+  `fixtures/live-scripts/` is still untracked and is NOT mine — it is two read-aloud scripts for
+  US-028's live check. Left alone.
+  WHAT LANDED. `server/answer/AnswerAgent.ts`: its own queue (one question at a time, waiting for
+  no other loop), `ask()` returns as soon as the `thinking` card is up, the call is registered with
+  `clock.track` before it returns so a `max` replay waits for it, every push carries the same card
+  id (`card-ans-1`) so the stage replaces rather than stacks, `policy.setAnswerThinking` brackets
+  the work, and one line goes to `answers.jsonl` whether it finished or failed. Wired in
+  `SessionManager.modelLoops` (fifth loop, same `model` dot, drained after the verifier) and fed by
+  the wake watcher's `onQuestion`.
+  THE MEASUREMENT THAT SHAPED IT. A grounded reply is several `message` items: the narration
+  ("I'll look up current pricing") comes in items whose ids begin `rs_`, the answer in one whose id
+  begins `msg_`, and the `type` is `message` for both. Narration items complete ~1 ms after they
+  start, the answer starts at ~18 s. So the streamed headline is only taken from an item matching
+  `ANSWER_ITEM_PREFIX`; without that the stage reads "I'll look up current pricing" for fifteen
+  seconds. Also measured: prose replies DO carry `url_citation` annotations (3-5 of them) where the
+  identical question as JSON carries none, which is why `MuseClient.prose` exists at all.
+  TWO JUDGEMENT CALLS, both documented in CLAUDE.md. (1) No feedback buttons on an answer card —
+  `POST /api/feedback` can only file a verdict about a card the policy delivered, and
+  useful/not-useful/wrong-moment are verdicts on a decision to speak; a button there would 404. If
+  a later story wants feedback on answers, `FeedbackLogRecord.level`/`type` have to widen.
+  (2) `latencyMs` is 0 in any replay: `EventReplaySource` settles before every frame at 1x as well
+  as max, so simulated time does not move during the call — and the replayed transcript visibly
+  pauses while Sotto is thinking. Live sessions are unaffected.
+  FOR US-026 (typed questions). `AnswerAgent.ask({ question, askedBy: null, turnId: null })` is the
+  whole path; `askedBy: null` files it as `typed`. The agent is reachable as
+  `SessionManager`'s loops — it needs a getter like `interjectionPolicy()`, and US-026's "works
+  while a session is stopped" means keeping the last session's agent alive the way `feedback` keeps
+  the last session's cards.
+  Checked: npm run typecheck, npm test (569 / 45 files), npm run build, npm run fixtures:check,
+  `npx vitest run --config vitest.integration.config.ts server/answer/answer.integration.test.ts`
+  (3 tests, real API, 37 s), and `npm run verify:answer` through with_server.py — card arrived as
+  thinking, headline streamed in, finished with 5 sources; screenshots looked right. US-023 is
+  still the only story left behind, for the reasons in its own notes. Nothing human-only is pending.

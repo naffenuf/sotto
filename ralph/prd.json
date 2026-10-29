@@ -446,8 +446,8 @@
         "Verify in browser using webapp-testing skill (Playwright screenshot after ask-search events replay shows the answer card)"
       ],
       "priority": 25,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done; all 11 criteria met (typecheck, npm test 569/45, build, fixtures:check, server/answer/answer.integration.test.ts against the real API, npm run verify:answer in the browser). An answer is the one PROSE call in Sotto: MuseClient.prose is the Responses API with web_search, stream:true and no schema, because url_citation annotations are character ranges into prose - the same question that returns zero annotations as JSON came back with 3-5 as prose. shared/answers.ts splitAnswer parses the reply (headline / detail / 'Sources:' block) and tolerates a half-written one, which is how the headline reaches the stage first. server/answer/AnswerAgent.ts has its own queue and waits for no other loop; one card id for all three pushes; policy.setAnswerThinking brackets the call; one answers.jsonl line at the end, done or error. THE ONE NON-OBVIOUS THING: a grounded reply narrates in `message` items whose ids begin `rs_` before writing the answer in one whose id begins `msg_`, so the streamed headline is only taken from an item matching ANSWER_ITEM_PREFIX - without it the stage would read \"I'll look up current pricing\" for the 15 s the real answer takes. Measured: 19 s and ~$0.01 a question, 5 citations on ask-search. latencyMs is 0 in any replay (simulated time does not move during a tracked call) and real only in a live session. Answer cards carry no feedback buttons: POST /api/feedback can only file a verdict against a card the policy delivered. US-026's typed questions call AnswerAgent.ask({question, askedBy: null, turnId: null})."
     },
     {
       "id": "US-026",
