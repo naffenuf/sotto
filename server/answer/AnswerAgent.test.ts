@@ -4,6 +4,7 @@ import { emptyBoard, type Board } from "../../shared/board.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
 import type { TurnUpdate } from "../../shared/turns.js";
+import type { Artifact, ShowHtmlArgs } from "../../shared/artifacts.js";
 import { SimulatedClock } from "../clock.js";
 import type { ProseCall, ProseReply, ModelClient } from "../model/client.js";
 import {
@@ -22,7 +23,7 @@ const ANSWER_ITEM = `${ANSWER_ITEM_PREFIX}-01`;
 
 /** A prose reply, with everything a test does not care about defaulted. */
 function reply(overrides: Partial<ProseReply> & { text: string }): ProseReply {
-  return { citations: [], searchedUrls: [], searched: true, ...overrides };
+  return { citations: [], searchedUrls: [], searched: true, functionCalls: 0, ...overrides };
 }
 
 /** A model whose prose calls are answered from a script. */
@@ -80,7 +81,13 @@ interface Harness {
 
 function harness(
   replies: ((call: ProseCall) => Promise<ProseReply>)[] = [],
-  options: { speakers?: SpeakerNames; board?: Board; turns?: TurnUpdate[] } = {},
+  options: {
+    speakers?: SpeakerNames;
+    board?: Board;
+    turns?: TurnUpdate[];
+    /** Absent means `show_html` is never offered (US-020). */
+    onArtifact?: (artifact: ShowHtmlArgs) => Artifact | null;
+  } = {},
 ): Harness {
   const clock = new SimulatedClock(0);
   const model = new FakeModel(replies);
@@ -101,6 +108,7 @@ function harness(
       pushes.push(answer);
     },
     onRecord: (record) => records.push(record),
+    ...(options.onArtifact === undefined ? {} : { onArtifact: options.onArtifact }),
     onThinking: (value) => thinking.push(value),
     onModelState: (state, detail) => states.push([state, detail]),
     logger: {
@@ -421,9 +429,164 @@ function cardAnswer(overrides: Partial<Answer>): Answer {
     headline: "",
     detailMd: "",
     citations: [],
+    artifacts: [],
     status: "thinking",
     createdAtMs: 0,
     latencyMs: 0,
     ...overrides,
   };
 }
+
+describe("AnswerAgent and show_html (US-020)", () => {
+  /** A saver that keeps what it was handed, numbering as the session would. */
+  function saver(): {
+    save: (artifact: ShowHtmlArgs) => Artifact | null;
+    saved: ShowHtmlArgs[];
+  } {
+    const saved: ShowHtmlArgs[] = [];
+    return {
+      saved,
+      save: (artifact) => {
+        saved.push(artifact);
+        const file = `0${saved.length}-${artifact.title.toLowerCase().replace(/\s+/g, "-")}.html`;
+        return {
+          title: artifact.title,
+          path: `artifacts/${file}`,
+          url: `/api/sessions/s-1/artifacts/${file}`,
+        };
+      },
+    };
+  }
+
+  /**
+   * A reply that draws once on its way to the answer, the way the real client
+   * does it: the tool runs during the call, and the text comes back after.
+   */
+  function drawing(
+    args: { title: string; html: string },
+    text: string,
+  ): (call: ProseCall) => Promise<ProseReply> {
+    return async (call) => {
+      const tool = (call.functions ?? []).find((one) => one.name === "show_html");
+      if (tool === undefined) throw new Error("show_html was not offered");
+      await tool.run(args);
+      return reply({ text, functionCalls: 1, searched: false });
+    };
+  }
+
+  it("offers the tool only when there is somewhere to save what it draws", async () => {
+    const without = harness([async (call) => {
+      expect(call.functions ?? []).toEqual([]);
+      return reply({ text: "An answer\n\nin words." });
+    }]);
+    without.agent.ask({ question: "sketch the flow", askedBy: null, turnId: null });
+    await without.agent.flush();
+
+    const { save } = saver();
+    const with_ = harness(
+      [
+        async (call) => {
+          expect((call.functions ?? []).map((one) => one.name)).toEqual(["show_html"]);
+          return reply({ text: "An answer\n\nin words." });
+        },
+      ],
+      { onArtifact: save },
+    );
+    with_.agent.ask({ question: "sketch the flow", askedBy: null, turnId: null });
+    await with_.agent.flush();
+  });
+
+  it("saves what the model drew and puts it on the card straight away", async () => {
+    const { save, saved } = saver();
+    const html = "<!DOCTYPE html><html><body><svg/></body></html>";
+    const h = harness(
+      [drawing({ title: "User flow", html }, "Four screens\n\nThe loops are at the bottom.")],
+      { onArtifact: save },
+    );
+    h.agent.ask({ question: "sketch the flow", askedBy: null, turnId: null });
+    await h.agent.flush();
+
+    expect(saved).toEqual([{ title: "User flow", html }]);
+    // thinking, the diagram, then the finished answer: the frame is on the
+    // stage before the sentence under it is written.
+    const withArtifacts = h.cards.filter((card) => (card.artifacts ?? []).length > 0);
+    expect(withArtifacts.length).toBeGreaterThanOrEqual(2);
+    expect(withArtifacts[0]?.state).toBe("thinking");
+    expect(new Set(h.cards.map((card) => card.id)).size).toBe(1);
+
+    const done = h.records[0]!;
+    expect(done.status).toBe("done");
+    expect(done.artifacts).toEqual([
+      {
+        title: "User flow",
+        path: "artifacts/01-user-flow.html",
+        url: "/api/sessions/s-1/artifacts/01-user-flow.html",
+      },
+    ]);
+    // The card carries where to read it, never the markup.
+    expect(h.cards.at(-1)?.artifacts).toEqual([
+      { title: "User flow", url: "/api/sessions/s-1/artifacts/01-user-flow.html" },
+    ]);
+  });
+
+  it("tells the model to answer in words when there is nowhere to save it", async () => {
+    let told = "";
+    const h = harness(
+      [
+        async (call) => {
+          const tool = (call.functions ?? [])[0]!;
+          told = await tool.run({ title: "User flow", html: "<svg/>" });
+          return reply({ text: "Four screens\n\nin words, then." });
+        },
+      ],
+      { onArtifact: () => null },
+    );
+    h.agent.ask({ question: "sketch the flow", askedBy: null, turnId: null });
+    await h.agent.flush();
+
+    expect(told).toMatch(/unavailable/);
+    expect(h.records[0]?.artifacts).toEqual([]);
+    expect(h.cards.at(-1)?.artifacts).toBeUndefined();
+    expect(h.warnings.join("\n")).toMatch(/could not save "User flow"/);
+  });
+
+  it("refuses a document that is not one, and says why", async () => {
+    let told = "";
+    const { save, saved } = saver();
+    const h = harness(
+      [
+        async (call) => {
+          const tool = (call.functions ?? [])[0]!;
+          told = await tool.run({ title: "Nothing", html: "   " });
+          return reply({ text: "Four screens\n\nin words, then." });
+        },
+      ],
+      { onArtifact: save },
+    );
+    h.agent.ask({ question: "sketch the flow", askedBy: null, turnId: null });
+    await h.agent.flush();
+
+    expect(told).toMatch(/could not be shown/);
+    expect(saved).toEqual([]);
+    expect(h.records[0]?.artifacts).toEqual([]);
+  });
+
+  it("keeps a diagram that was drawn before the words failed", async () => {
+    const { save } = saver();
+    const h = harness(
+      [
+        async (call) => {
+          await (call.functions ?? [])[0]!.run({ title: "User flow", html: "<svg/>" });
+          throw new Error("the model returned no text");
+        },
+      ],
+      { onArtifact: save },
+    );
+    h.agent.ask({ question: "sketch the flow", askedBy: null, turnId: null });
+    await h.agent.flush();
+
+    const card = h.cards.at(-1)!;
+    expect(card.state).toBe("error");
+    expect(h.records[0]?.artifacts).toHaveLength(1);
+  });
+});

@@ -10,10 +10,15 @@
  * Calm is a requirement, not a preference: no sound, no modal, nothing that
  * moves except the thinking indicator.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Block, Inline } from "./markdown.js";
 import { parseMarkdown } from "./markdown.js";
-import { feedbackVerdicts, type FeedbackVerdict, type StageCard } from "../../shared/index.js";
+import {
+  feedbackVerdicts,
+  type CardArtifact,
+  type FeedbackVerdict,
+  type StageCard,
+} from "../../shared/index.js";
 
 /** The label above an interjection — Sotto raising its hand, quietly. */
 const NOTICED = "Sotto noticed…";
@@ -95,6 +100,7 @@ export function Card({
       ) : (
         <>
           <Evidence card={card} onQuoteClick={onQuoteClick} />
+          <Artifacts card={card} />
           <Details card={card} />
           <Sources card={card} />
         </>
@@ -269,6 +275,64 @@ function Feedback({
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * The HTML the model drew, in a frame it cannot get out of (US-020).
+ *
+ * `sandbox="allow-scripts"` **without** `allow-same-origin` is the whole
+ * point: the document may animate itself and may not touch this page, its
+ * origin, its storage or its cookies. The server serves it with a CSP that
+ * blocks every request it could make. The page never sees the markup — only
+ * the URL — so there is nothing here to inject.
+ */
+function Artifacts({ card }: { card: StageCard }) {
+  const artifacts = card.artifacts ?? [];
+  if (artifacts.length === 0) return null;
+  return (
+    <div className="card__artifacts" data-testid="card-artifacts">
+      {artifacts.map((artifact) => (
+        <ArtifactFrame key={artifact.url} artifact={artifact} />
+      ))}
+    </div>
+  );
+}
+
+function ArtifactFrame({ artifact }: { artifact: CardArtifact }) {
+  const frame = useRef<HTMLDivElement>(null);
+  return (
+    <figure className="card__artifact" data-testid="card-artifact" ref={frame}>
+      <figcaption className="card__artifact-bar">
+        <span className="card__artifact-title" data-testid="card-artifact-title">
+          {artifact.title}
+        </span>
+        <button
+          type="button"
+          className="card__artifact-full"
+          data-testid="card-artifact-fullscreen"
+          title="Open full screen"
+          onClick={() => {
+            // The *frame* goes full screen, not the document inside it: the
+            // iframe is a foreign origin and cannot ask for this itself.
+            const element = frame.current;
+            if (element === null) return;
+            if (document.fullscreenElement === element) void document.exitFullscreen();
+            else void element.requestFullscreen?.();
+          }}
+        >
+          open full screen
+        </button>
+      </figcaption>
+      <iframe
+        className="card__artifact-frame"
+        data-testid="card-artifact-frame"
+        title={artifact.title}
+        src={artifact.url}
+        sandbox="allow-scripts"
+        loading="lazy"
+      />
+    </figure>
   );
 }
 

@@ -35,6 +35,21 @@ export interface Citation {
   title: string;
 }
 
+/**
+ * One piece of generated HTML on a card (US-020).
+ *
+ * The card holds a URL, not the HTML: the document is written into the
+ * session folder and served from there with a restrictive CSP, so what the
+ * browser renders is a sandboxed frame rather than markup the page has ever
+ * touched.
+ */
+export interface CardArtifact {
+  /** The label above the frame. */
+  title: string;
+  /** `/api/sessions/<id>/artifacts/<file>`. */
+  url: string;
+}
+
 /** A quote from the transcript, which an interjection rests its case on. */
 export interface EvidenceQuote {
   /** The turn it came from, so US-015 can scroll the transcript to it. */
@@ -65,6 +80,8 @@ export interface StageCard {
   evidence?: EvidenceQuote[];
   /** Numbered sources, deduplicated by URL before they get here. */
   citations?: Citation[];
+  /** `answer`: HTML the model drew, rendered in a sandboxed frame (US-020). */
+  artifacts?: CardArtifact[];
   /** `state: "error"`: the muted line shown in place of the content. */
   message?: string;
 }

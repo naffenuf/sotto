@@ -25,7 +25,14 @@
  * session folder (`SessionStore`, US-008), so every session leaves a record on
  * disk whether or not a browser was watching.
  */
+import { join } from "node:path";
 import { TYPED_ASKER } from "../../shared/answers.js";
+import {
+  ARTIFACT_FILE_PATTERN,
+  artifactFileName,
+  artifactUrl,
+  type Artifact,
+} from "../../shared/artifacts.js";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { CandidateType } from "../../shared/candidates.js";
@@ -55,7 +62,7 @@ import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import { WakeWatcher } from "../wakeWatcher.js";
-import { SessionStore, type SessionWriter } from "./SessionStore.js";
+import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
 
@@ -153,6 +160,13 @@ export interface SessionManagerOptions {
  */
 interface StoreSlot {
   writer: SessionWriter | null;
+  /**
+   * How many artifacts this folder holds, so the next one is numbered after
+   * them (US-020). It counts attempts rather than successes: `02` following a
+   * `01` that failed to write is a gap, which is better than two files called
+   * `01`.
+   */
+  artifacts: number;
 }
 
 /** The model-driven loops a session runs, or nulls when it has no model. */
@@ -364,7 +378,7 @@ export class SessionManager {
       startedAtMs: source.kind === "events" ? 0 : this.liveClock.now(),
     };
 
-    const store: StoreSlot = { writer: null };
+    const store: StoreSlot = { writer: null, artifacts: 0 };
     const running =
       source.kind === "events"
         ? this.startReplay(info, source.fixture, store)
@@ -746,6 +760,9 @@ export class SessionManager {
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
       },
       onRecord: (record) => store.writer?.appendAnswer(record),
+      // Generated HTML goes into this session's folder and is served back
+      // from it (US-020), so the numbering is per session and so is the URL.
+      onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
       // Sotto does not interject over its own answer.
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
@@ -829,6 +846,48 @@ export class SessionManager {
     if (target.answers === null) return "no-model";
     target.answers.ask({ question, askedBy: TYPED_ASKER, turnId: null });
     return "asked";
+  }
+
+  /**
+   * Writes one piece of generated HTML into a session's folder (US-020).
+   *
+   * `null` when there is nowhere to put it — a session whose folder could not
+   * be opened, or a disk that refused the write — because the card's frame is
+   * served from that file and an answer with a broken frame in it is worse
+   * than the same answer in words.
+   */
+  private saveArtifact(
+    info: SessionInfo,
+    store: StoreSlot,
+    title: string,
+    html: string,
+  ): Artifact | null {
+    const writer = store.writer;
+    if (writer === null) return null;
+    store.artifacts += 1;
+    const fileName = artifactFileName(store.artifacts, title);
+    const path = writer.writeArtifact(fileName, html);
+    if (path === null) return null;
+    return { title, path, url: artifactUrl(info.id, fileName) };
+  }
+
+  /**
+   * The file one artifact URL names, or `null` if there is no such artifact.
+   *
+   * Only the most recent session is reachable, which is the same session a
+   * feedback click and a typed question are addressed to: starting a new one
+   * clears the stage, so no earlier session has a card left that could point
+   * here. The file name is matched against {@link ARTIFACT_FILE_PATTERN}
+   * rather than cleaned up — this reads a path out of a URL, so anything that
+   * is not a name the server itself would have written is simply not found.
+   */
+  artifactFile(sessionId: string, fileName: string): string | null {
+    const target = this.last;
+    if (target === undefined || target.sessionId !== sessionId) return null;
+    const dir = target.store.writer?.dir;
+    if (dir === undefined) return null;
+    if (!ARTIFACT_FILE_PATTERN.test(fileName)) return null;
+    return join(dir, ARTIFACTS_DIR, fileName);
   }
 
   /**

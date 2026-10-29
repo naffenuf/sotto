@@ -83,7 +83,27 @@ export type {
   ListedSource,
 } from "./answers.js";
 export { cardStates, cardVariants } from "./cards.js";
-export type { CardState, CardVariant, Citation, EvidenceQuote, StageCard } from "./cards.js";
+export type {
+  CardArtifact,
+  CardState,
+  CardVariant,
+  Citation,
+  EvidenceQuote,
+  StageCard,
+} from "./cards.js";
+export {
+  ARTIFACT_CSP,
+  ARTIFACT_FILE_PATTERN,
+  ARTIFACT_HTML_MAX_BYTES,
+  ARTIFACT_TITLE_MAX_CHARS,
+  SHOW_HTML_TOOL,
+  ShowHtmlArgsSchema,
+  artifactFileName,
+  artifactSlug,
+  artifactUrl,
+  showHtmlJsonSchema,
+} from "./artifacts.js";
+export type { Artifact, ShowHtmlArgs } from "./artifacts.js";
 export { statusChannels, statusStates } from "./events.js";
 export type {
   BoardEvent,

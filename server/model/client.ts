@@ -80,6 +80,50 @@ export interface GroundedCall extends StructuredCall {
 }
 
 /**
+ * One function the model may call while it is writing (US-020).
+ *
+ * The only one in Sotto is `show_html`, which puts a diagram or a table on
+ * the shared screen. {@link MuseClient.prose} runs the loop itself — call the
+ * handler, hand the model what it returned, ask again — so a caller declares
+ * a tool and never sees a `function_call` item.
+ */
+export interface FunctionTool {
+  /** As the model sees it, e.g. `show_html`. */
+  name: string;
+  /** What it does and when to call it. The model reads this. */
+  description: string;
+  /**
+   * JSON Schema for the arguments, in the subset strict function calling
+   * accepts — closed object, everything required, no length keywords. See
+   * {@link showHtmlJsonSchema}.
+   */
+  parameters: object;
+  /**
+   * Runs the call and returns what the model is told about the result.
+   *
+   * It must not throw: a tool that failed is something the model should be
+   * told in words, so it can answer anyway, rather than a reason to lose the
+   * whole answer.
+   */
+  run: (args: unknown) => string | Promise<string>;
+}
+
+/**
+ * Rounds of "the model calls a tool, we answer it, it writes" one prose call
+ * may take before the answer has to be text.
+ *
+ * Measured: when the model calls `show_html` it ends that turn with no answer
+ * at all — only its own narration — so a second round is not optional, it is
+ * where the headline comes from. A third is slack for a model that draws
+ * twice. The tools stay on the table on every round, including the last: a
+ * request whose input holds a `function_call` whose tool is no longer declared
+ * is a shape the API has never been asked for here, and a 400 would lose the
+ * answer the withholding was meant to protect. A model that draws on all three
+ * rounds therefore ends as a handled error, not as a silent empty answer.
+ */
+export const PROSE_MAX_ROUNDS = 3;
+
+/**
  * One streamed, searching call whose reply is **prose** (US-018).
  *
  * The answer agent is the one caller that does not want JSON: the PRD's shape
@@ -101,6 +145,14 @@ export interface ProseCall {
   maxTokens?: number;
   /** How much search context the model is given. */
   searchContextSize?: "low" | "medium" | "high";
+  /**
+   * Tools the model may call while it writes (US-020), beside `web_search`.
+   *
+   * Confirmed against the real API: `web_search` and a function tool are
+   * accepted in the same request, so there is no intent routing here — see
+   * `fixtures/events/NOTES.md`.
+   */
+  functions?: readonly FunctionTool[];
   /**
    * Called as the text of the output item the model is writing grows.
    *
@@ -124,6 +176,12 @@ export interface ProseReply {
   searchedUrls: string[];
   /** Whether the model searched at all. */
   searched: boolean;
+  /**
+   * How many {@link ProseCall.functions} calls ran, in total. The results
+   * themselves went back to the model; a caller that cares what a tool did
+   * knows it from its own handler.
+   */
+  functionCalls: number;
 }
 
 /** A grounded reply: the JSON, and what the model actually read to write it. */
@@ -415,13 +473,119 @@ export class MuseClient implements ModelClient {
     }
   }
 
+  /**
+   * The prose call, which is a loop whenever there are function tools.
+   *
+   * A round is one streamed response. If the model finished it by calling a
+   * tool, its handler runs and the result goes back as a `function_call_output`
+   * — because a round that ends in a tool call carries **no answer at all**,
+   * only the model's own narration (measured against the real API; see
+   * `fixtures/events/NOTES.md`). So the answer comes from the first round that
+   * ends without one.
+   */
   async prose(call: ProseCall): Promise<ProseReply> {
+    const tools = call.functions ?? [];
+    const rounds = tools.length === 0 ? 1 : PROSE_MAX_ROUNDS;
+    const byName = new Map(tools.map((tool) => [tool.name, tool]));
+    // Only the user message, the tool calls and their results are resent: the
+    // model's reasoning and narration items are its own working, and the
+    // follow-up turn needs neither (measured).
+    const input: OpenAI.Responses.ResponseInputItem[] = [{ role: "user", content: call.user }];
+    const citations = new Map<string, Citation>();
+    const searchedUrls: string[] = [];
+    let searched = false;
+    let functionCalls = 0;
+
+    for (let round = 1; round <= rounds; round += 1) {
+      const response = await this.streamProse(call, input, tools);
+      const output = readGrounded(response);
+      for (const citation of output.citations) {
+        if (!citations.has(citation.url)) citations.set(citation.url, citation);
+      }
+      for (const url of output.searchedUrls) {
+        if (!searchedUrls.includes(url)) searchedUrls.push(url);
+      }
+      searched = searched || output.searched;
+
+      const calls = (response.output ?? []).filter(
+        (item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === "function_call",
+      );
+      this.logger.log(
+        `[model] ${call.label}: ${response.status ?? "no status"}` +
+          ` (round ${round}/${rounds})` +
+          `, ${response.usage?.output_tokens ?? 0} output tokens` +
+          reasoningNote(response) +
+          `, ${output.searched ? `${output.searchedUrls.length} page(s) searched` : "no search"}` +
+          `, ${output.citations.length} annotated citation(s)` +
+          `, ${calls.length} tool call(s)`,
+      );
+      this.reportUsage(call.label, {
+        input: response.usage?.input_tokens,
+        output: response.usage?.output_tokens,
+        reasoning: response.usage?.output_tokens_details?.reasoning_tokens,
+      });
+
+      if (response.status !== undefined && response.status !== "completed") {
+        const why = response.incomplete_details?.reason ?? response.error?.message ?? "no detail";
+        throw new ModelCallError(
+          `${call.label}: the response came back ${response.status} (${why})` +
+            `; raise maxTokens above ${call.maxTokens ?? DEFAULT_MAX_TOKENS} if it ran out of room`,
+        );
+      }
+
+      if (calls.length === 0) {
+        if (output.text.trim() === "") {
+          throw new ModelCallError(`${call.label}: the model returned no text`);
+        }
+        return {
+          text: output.text,
+          citations: [...citations.values()],
+          searchedUrls,
+          searched,
+          functionCalls,
+        };
+      }
+
+      for (const made of calls) {
+        functionCalls += 1;
+        input.push(made);
+        input.push({
+          type: "function_call_output",
+          call_id: made.call_id,
+          output: await this.runFunction(call.label, byName, made),
+        });
+      }
+    }
+
+    throw new ModelCallError(
+      `${call.label}: the model called a tool on all ${rounds} rounds and never wrote an answer`,
+    );
+  }
+
+  /** One streamed response, with {@link ProseCall.onText} fed as it arrives. */
+  private async streamProse(
+    call: ProseCall,
+    input: readonly OpenAI.Responses.ResponseInputItem[],
+    functions: readonly FunctionTool[],
+  ): Promise<OpenAI.Responses.Response> {
     const stream = await this.streamingResponses.create({
       model: this.model,
       instructions: call.system,
-      input: call.user,
+      input: [...input],
       max_output_tokens: call.maxTokens ?? DEFAULT_MAX_TOKENS,
-      tools: [{ type: "web_search", search_context_size: call.searchContextSize ?? "medium" }],
+      tools: [
+        { type: "web_search", search_context_size: call.searchContextSize ?? "medium" },
+        // Confirmed against the real API: `web_search` and a function tool in
+        // one request are accepted, so the PRD's intent-routing fallback is
+        // not needed (`fixtures/events/NOTES.md`).
+        ...functions.map((tool) => ({
+          type: "function" as const,
+          name: tool.name,
+          description: tool.description,
+          strict: true,
+          parameters: tool.parameters as Record<string, unknown>,
+        })),
+      ],
       include: ["web_search_call.action.sources"],
       store: false,
       stream: true,
@@ -463,35 +627,49 @@ export class MuseClient implements ModelClient {
         `${call.label}: the stream ended without a response (${failure ?? "no detail"})`,
       );
     }
-
-    const { text, citations, searchedUrls, searched } = readGrounded(response);
-    const reasoning = response.usage?.output_tokens_details?.reasoning_tokens;
-    this.logger.log(
-      `[model] ${call.label}: ${response.status ?? "no status"}` +
-        `, ${response.usage?.output_tokens ?? 0} output tokens` +
-        (reasoning === undefined ? "" : ` (${reasoning} reasoning)`) +
-        `, ${searched ? `${searchedUrls.length} page(s) searched` : "no search"}` +
-        `, ${citations.length} annotated citation(s)`,
-    );
-    this.reportUsage(call.label, {
-      input: response.usage?.input_tokens,
-      output: response.usage?.output_tokens,
-      reasoning,
-    });
-
-    if (response.status !== undefined && response.status !== "completed") {
-      const why =
-        response.incomplete_details?.reason ?? response.error?.message ?? failure ?? "no detail";
-      throw new ModelCallError(
-        `${call.label}: the response came back ${response.status} (${why})` +
-          `; raise maxTokens above ${call.maxTokens ?? DEFAULT_MAX_TOKENS} if it ran out of room`,
-      );
-    }
-    if (text.trim() === "") {
-      throw new ModelCallError(`${call.label}: the model returned no text`);
-    }
-    return { text, citations, searchedUrls, searched };
+    return response;
   }
+
+  /**
+   * Runs one tool call and returns the line the model is told about it.
+   *
+   * Nothing here throws. A tool the model invented, arguments that are not
+   * JSON and a handler that failed are all things to tell the model in words,
+   * because it can still answer in sentences — losing the whole answer
+   * because a diagram did not render would be the worse outcome.
+   */
+  private async runFunction(
+    label: string,
+    tools: ReadonlyMap<string, FunctionTool>,
+    made: OpenAI.Responses.ResponseFunctionToolCall,
+  ): Promise<string> {
+    const tool = tools.get(made.name);
+    if (tool === undefined) {
+      this.logger.warn(`[model] ${label}: the model called an unknown tool ${made.name}`);
+      return `There is no tool called ${made.name}. Answer in words instead.`;
+    }
+    let args: unknown;
+    try {
+      args = JSON.parse(made.arguments === "" ? "{}" : made.arguments) as unknown;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[model] ${label}: ${made.name} arguments were not JSON (${detail})`);
+      return `Those arguments were not valid JSON (${detail}). Answer in words instead.`;
+    }
+    try {
+      return await tool.run(args);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[model] ${label}: ${made.name} failed (${detail})`);
+      return `${made.name} failed (${detail}). Answer in words instead.`;
+    }
+  }
+}
+
+/** `, 962 reasoning` for a log line, or nothing when the API did not say. */
+function reasoningNote(response: OpenAI.Responses.Response): string {
+  const reasoning = response.usage?.output_tokens_details?.reasoning_tokens;
+  return reasoning === undefined ? "" : ` (${reasoning} reasoning)`;
 }
 
 /** What {@link readGrounded} finds in a response's `output` list. */

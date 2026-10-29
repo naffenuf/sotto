@@ -1,7 +1,9 @@
+import { readFile } from "node:fs/promises";
 import Fastify, { type FastifyInstance } from "fastify";
 import websocket from "@fastify/websocket";
 import type { ApiError, HealthResponse } from "../shared/types.js";
 import { AskRequestSchema, type AskResponse } from "../shared/answers.js";
+import { ARTIFACT_CSP } from "../shared/artifacts.js";
 import type { ServerEvent } from "../shared/events.js";
 import { FeedbackRequestSchema, type FeedbackResponse } from "../shared/feedback.js";
 import {
@@ -155,6 +157,41 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
     return { asked: true, question: parsed.data.question } satisfies AskResponse;
   });
+
+  // One generated HTML artifact (US-020), for the iframe on its card.
+  //
+  // The headers are the sandbox's other half: the card's frame has
+  // `sandbox="allow-scripts"` and no `allow-same-origin`, so the document is
+  // its own opaque origin, and `ARTIFACT_CSP` stops it reaching the network
+  // at all. `nosniff` is there because this is the one route that serves
+  // bytes a model wrote.
+  app.get<{ Params: { id: string; file: string } }>(
+    "/api/sessions/:id/artifacts/:file",
+    async (request, reply) => {
+      const path = sessions.artifactFile(request.params.id, request.params.file);
+      if (path === null) {
+        return reply.code(404).send({
+          error: `no artifact ${request.params.file} in session ${request.params.id}`,
+        } satisfies ApiError);
+      }
+      let html: string;
+      try {
+        html = await readFile(path, "utf8");
+      } catch {
+        // The session remembers the artifact but the file is gone, which is a
+        // missing artifact as far as the frame is concerned.
+        return reply.code(404).send({
+          error: `artifact ${request.params.file} is not on disk`,
+        } satisfies ApiError);
+      }
+      return reply
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Content-Security-Policy", ARTIFACT_CSP)
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Cache-Control", "no-store")
+        .send(html);
+    },
+  );
 
   // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,
   // already converted by the browser. The session is started over HTTP first,

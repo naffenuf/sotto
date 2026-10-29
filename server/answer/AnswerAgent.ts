@@ -29,6 +29,13 @@ import {
   type AnswerLogRecord,
   type AnswerText,
 } from "../../shared/answers.js";
+import {
+  SHOW_HTML_TOOL,
+  ShowHtmlArgsSchema,
+  showHtmlJsonSchema,
+  type Artifact,
+  type ShowHtmlArgs,
+} from "../../shared/artifacts.js";
 import type { Board } from "../../shared/board.js";
 import type { Citation, StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
@@ -37,7 +44,7 @@ import { renderBoardMarkdown } from "../board/markdown.js";
 import type { Clock } from "../clock.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
 import { searchedIndex, resolveCitation } from "../interject/Verifier.js";
-import { citationTitle, type ModelClient } from "../model/client.js";
+import { citationTitle, type FunctionTool, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 
 /** The label an answer is tracked under on the clock, and in the model logs. */
@@ -78,6 +85,20 @@ export const ANSWER_MAX_TOKENS = 12_288;
  */
 export const ANSWER_ITEM_PREFIX = "msg_";
 
+/**
+ * What the model is told `show_html` is for (US-020).
+ *
+ * The *when* matters more than the *what*: the tool is there for answers that
+ * are not sentences — a flow, a comparison, a layout — and offering it on
+ * every question would turn "what do rivals charge" into a bar chart nobody
+ * asked for.
+ */
+export const SHOW_HTML_DESCRIPTION =
+  "Render a diagram, table, chart or screen mockup on the group's shared screen." +
+  " Call this only when the answer is a shape rather than a sentence — a flow, a" +
+  " comparison, a layout, a timeline — and at most once. After it is shown, write" +
+  " your text answer as usual: the headline says what the picture shows.";
+
 type Logger = Pick<Console, "log" | "warn">;
 
 /** A question for Sotto, spoken (US-017) or typed (US-019). */
@@ -110,6 +131,14 @@ export interface AnswerAgentOptions {
   onCard: (card: StageCard, answer: Answer) => void;
   /** Records the finished answer in `answers.jsonl`, once (US-008). */
   onRecord: (record: AnswerLogRecord) => void;
+  /**
+   * Saves one piece of generated HTML and says where it can be read (US-020).
+   *
+   * `null` means it could not be saved — a session with no folder has nowhere
+   * to put it — and the model is told so, in time to answer in words instead.
+   * Absent means `show_html` is not offered at all.
+   */
+  onArtifact?: (artifact: ShowHtmlArgs) => Artifact | null;
   /**
    * The courtesy hook (US-014): true while an answer is being written, false
    * when the last one is done. Nothing is interjected in between.
@@ -180,6 +209,7 @@ export class AnswerAgent {
       headline: "",
       detailMd: "",
       citations: [],
+      artifacts: [],
       status: "thinking",
       createdAtMs: this.clock.now(),
       latencyMs: 0,
@@ -237,12 +267,16 @@ export class AnswerAgent {
   private async answer(queued: Queued): Promise<void> {
     const { answer, asked } = queued;
     let pushedHeadline = "";
+    // Filled in as the model draws (US-020), so a diagram can be on the stage
+    // while the sentence under it is still being written.
+    const artifacts: Artifact[] = [];
     try {
       const reply = await this.model.prose({
         label: ANSWER_TRACK_LABEL,
         system: loadPrompt(PROMPTS.answer),
         user: this.render(answer),
         maxTokens: ANSWER_MAX_TOKENS,
+        functions: this.functions(answer, artifacts, () => pushedHeadline),
         onText: ({ itemId, text }) => {
           // Narration, not the answer: see ANSWER_ITEM_PREFIX.
           if (!itemId.startsWith(ANSWER_ITEM_PREFIX)) return;
@@ -251,7 +285,12 @@ export class AnswerAgent {
           // typed must not reach the stage half-said.
           if (!partial.headlineComplete || partial.headline === pushedHeadline) return;
           pushedHeadline = partial.headline;
-          this.push({ ...answer, headline: partial.headline, latencyMs: this.elapsed(answer) });
+          this.push({
+            ...answer,
+            headline: partial.headline,
+            artifacts: [...artifacts],
+            latencyMs: this.elapsed(answer),
+          });
         },
       });
       const text = splitAnswer(reply.text);
@@ -260,22 +299,26 @@ export class AnswerAgent {
         headline: text.headline,
         detailMd: text.detailMd,
         citations: this.citations(answer, text, reply.citations, reply.searchedUrls),
+        artifacts: [...artifacts],
         status: "done",
         latencyMs: this.elapsed(answer),
       };
       this.finish(done, asked);
       this.logger.log(
         `[answer] ${done.id} answered in ${done.latencyMs} ms` +
-          ` (${done.citations.length} citation(s)${reply.searched ? "" : ", no search"})` +
+          ` (${done.citations.length} citation(s)${reply.searched ? "" : ", no search"}` +
+          `${done.artifacts.length === 0 ? "" : `, ${done.artifacts.length} artifact(s)`})` +
           `: ${done.headline}`,
       );
     } catch (error) {
       const detail = message(error);
       const failed: Answer = {
         ...answer,
-        // Whatever reached the stage stays there; the message says the rest
-        // is not coming.
+        // Whatever reached the stage stays there — including a diagram that
+        // was drawn before the words failed; the message says the rest is not
+        // coming.
         headline: pushedHeadline,
+        artifacts: [...artifacts],
         status: "error",
         latencyMs: this.elapsed(answer),
         error: detail,
@@ -285,6 +328,54 @@ export class AnswerAgent {
       this.options.onModelState?.("error", detail);
       this.finish(failed, asked);
     }
+  }
+
+  /**
+   * The tools this answer may use: `show_html`, or none (US-020).
+   *
+   * The handler is where an artifact becomes a file and a card. It never
+   * throws — the model is told in words when the screen is unavailable or the
+   * arguments did not fit, because an answer in sentences is a far better
+   * outcome than no answer.
+   */
+  private functions(
+    answer: Answer,
+    artifacts: Artifact[],
+    headline: () => string,
+  ): FunctionTool[] {
+    const save = this.options.onArtifact;
+    if (save === undefined) return [];
+    return [
+      {
+        name: SHOW_HTML_TOOL,
+        description: SHOW_HTML_DESCRIPTION,
+        parameters: showHtmlJsonSchema,
+        run: (args) => {
+          const parsed = ShowHtmlArgsSchema.safeParse(args);
+          if (!parsed.success) {
+            const why = parsed.error.issues.map((issue) => issue.message).join("; ");
+            this.logger.warn(`[answer] ${answer.id} drew something unusable: ${why}`);
+            return `That document could not be shown (${why}). Answer in words instead.`;
+          }
+          const artifact = save(parsed.data);
+          if (artifact === null) {
+            this.logger.warn(`[answer] ${answer.id} could not save "${parsed.data.title}"`);
+            return "The shared screen is unavailable in this session, so nothing was shown. Answer in words instead.";
+          }
+          artifacts.push(artifact);
+          this.logger.log(`[answer] ${answer.id} showed "${artifact.title}" (${artifact.path})`);
+          // Straight to the stage: the group watches the diagram appear while
+          // the model is still writing the line that goes under it.
+          this.push({
+            ...answer,
+            headline: headline(),
+            artifacts: [...artifacts],
+            latencyMs: this.elapsed(answer),
+          });
+          return `"${artifact.title}" is on the screen now. Write your answer: the headline on line 1, then the detail.`;
+        },
+      },
+    ];
   }
 
   /** The last push, and the one line in `answers.jsonl`. */
@@ -371,6 +462,14 @@ export function cardForAnswer(answer: Answer): StageCard {
     askedBy: answer.askedBy,
     ...(answer.detailMd.trim() === "" ? {} : { detailMd: answer.detailMd }),
     ...(answer.citations.length === 0 ? {} : { citations: answer.citations }),
+    ...(answer.artifacts.length === 0
+      ? {}
+      : {
+          artifacts: answer.artifacts.map((artifact) => ({
+            title: artifact.title,
+            url: artifact.url,
+          })),
+        }),
     ...(answer.error === undefined || answer.error === ""
       ? {}
       : { message: answer.error }),

@@ -1,7 +1,11 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { WebSocket } from "ws";
 import { TYPED_ASKER } from "../shared/answers.js";
+import { ARTIFACT_CSP } from "../shared/artifacts.js";
 import { emptyBoard } from "../shared/board.js";
 import type { ServerEvent } from "../shared/events.js";
 import type { FixtureListResponse } from "../shared/session.js";
@@ -9,8 +13,18 @@ import { buildApp } from "./app.js";
 import { EventBus } from "./events/bus.js";
 import type { ReplaySpeed } from "./asr/EventReplaySource.js";
 import { AUDIO_CHUNK_BYTES, type AudioEndReason, type AudioSource } from "./audio/AudioSource.js";
-import type { ModelClient, StructuredCall } from "./model/client.js";
-import { SessionManager, type AsrClient } from "./session/SessionManager.js";
+import type {
+  ModelClient,
+  ProseCall,
+  ProseReply,
+  StructuredCall,
+} from "./model/client.js";
+import {
+  SessionManager,
+  type AsrClient,
+  type SessionStoreFactory,
+} from "./session/SessionManager.js";
+import { SessionStore } from "./session/SessionStore.js";
 
 let app: FastifyInstance | undefined;
 
@@ -36,7 +50,13 @@ async function waitFor(ready: () => boolean, what: string): Promise<void> {
  * capture through in milliseconds, `1x` leaves it running until it is stopped.
  */
 async function buildTestApp(
-  options: { apiKey?: string; speed?: ReplaySpeed; model?: ModelClient } = {},
+  options: {
+    apiKey?: string;
+    speed?: ReplaySpeed;
+    model?: ModelClient;
+    /** A session folder, for the one route that serves a file out of it. */
+    store?: SessionStoreFactory;
+  } = {},
 ): Promise<{
   app: FastifyInstance;
   bus: EventBus;
@@ -50,7 +70,7 @@ async function buildTestApp(
     apiKey: options.apiKey ?? "test-key",
     logger: quiet,
     // `npm test` writes no session folders; US-008 has its own tests for those.
-    createStore: () => null,
+    createStore: options.store ?? ((): null => null),
     replaySpeed: options.speed ?? "max",
     // A live source (`mic`, `wav`) must not reach the real API from here.
     createAsrClient: () => audio,
@@ -414,6 +434,7 @@ describe("POST /api/ask", () => {
       citations: never[];
       searchedUrls: never[];
       searched: boolean;
+      functionCalls: number;
     }> {
       this.questions.push(call.user);
       return {
@@ -421,6 +442,7 @@ describe("POST /api/ask", () => {
         citations: [],
         searchedUrls: [],
         searched: false,
+        functionCalls: 0,
       };
     }
   }
@@ -688,5 +710,101 @@ describe("/ws/events", () => {
     // The close has to reach the server before the subscription goes.
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(bus.listenerCount).toBe(0);
+  });
+});
+
+describe("GET /api/sessions/:id/artifacts/:file", () => {
+  const HTML = "<!DOCTYPE html><html><body><svg width='10' height='10'/></body></html>";
+
+  /** A model that draws once, then answers. */
+  class DrawingModel implements ModelClient {
+    async structured(call: StructuredCall): Promise<unknown> {
+      return call.label === "board" ? { operations: [] } : { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("an answer is prose, not JSON");
+    }
+
+    async prose(call: ProseCall): Promise<ProseReply> {
+      const tool = (call.functions ?? []).find((one) => one.name === "show_html");
+      if (tool === undefined) throw new Error("show_html was not offered");
+      await tool.run({ title: "User flow", html: HTML });
+      return {
+        text: "Four screens, end to end\n\nThe loops are at the bottom.",
+        citations: [],
+        searchedUrls: [],
+        searched: false,
+        functionCalls: 1,
+      };
+    }
+  }
+
+  /** A finished session with one artifact on its stage. */
+  async function withAnArtifact(): Promise<{
+    app: FastifyInstance;
+    bus: EventBus;
+    root: string;
+    url: string;
+  }> {
+    const root = mkdtempSync(join(tmpdir(), "sotto-artifact-"));
+    const { app: server, bus } = await buildTestApp({
+      model: new DrawingModel(),
+      store: (info) => SessionStore.create(info, { root, logger: quiet }),
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "events", fixture: "no-wake" } },
+    });
+    await ended;
+    await server.inject({ method: "POST", url: "/api/ask", payload: { question: "sketch it" } });
+    await waitFor(
+      () => (bus.cardState()[0]?.artifacts ?? []).length > 0,
+      "the artifact on the card",
+    );
+    const url = bus.cardState()[0]?.artifacts?.[0]?.url as string;
+    return { app: server, bus, root, url };
+  }
+
+  it("serves the HTML with the headers that make the frame a sandbox", async () => {
+    const { app: server, root, url } = await withAnArtifact();
+    try {
+      expect(url).toBe("/api/sessions/events-no-wake-1/artifacts/01-user-flow.html");
+      const response = await server.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toBe(HTML);
+      expect(response.headers["content-type"]).toBe("text/html; charset=utf-8");
+      expect(response.headers["content-security-policy"]).toBe(ARTIFACT_CSP);
+      expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("finds nothing outside the artifacts it wrote", async () => {
+    const { app: server, root } = await withAnArtifact();
+    try {
+      for (const path of [
+        "/api/sessions/events-no-wake-1/artifacts/02-user-flow.html",
+        "/api/sessions/events-no-wake-1/artifacts/session.json",
+        "/api/sessions/events-no-wake-1/artifacts/..%2Fsession.json",
+        "/api/sessions/events-no-wake-1/artifacts/..%2F..%2F.env",
+        "/api/sessions/events-brainstorm-1/artifacts/01-user-flow.html",
+      ]) {
+        const response = await server.inject({ method: "GET", url: path });
+        expect(response.statusCode, path).toBe(404);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

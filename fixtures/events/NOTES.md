@@ -190,3 +190,35 @@ per-session facts above, is that a new session restarts `turnId` from 0 *and* re
 the diarization labels from `A` — hence the `"<session>:<turnId>"` turn keys and the
 label mapping in `server/asr/turns.ts`. If a long live session ever shows otherwise,
 this is the note to correct.
+
+## The model API: `web_search` and function tools together (US-020)
+
+The PRD allows for the API refusing to mix `web_search` with a function tool in one
+Responses request, and describes an intent-routing fallback — a cheap classification call
+picking `search` or `visual`, then the matching tool set. **That fallback is not used: the
+API accepts both in one request.** Probed against the real endpoint with
+`tools: [{ "type": "web_search" }, { "type": "function", "name": "show_html", "strict": true, … }]`
+and the `ask-diagram` question; `status: "completed"` and a `show_html` call with 5.9 kB of
+HTML, same as with the function tool alone. So `MuseClient.prose` always sends both.
+
+What *does* need handling is the shape of the turn that calls a tool:
+
+- **A round that ends in a `function_call` carries no answer at all.** Its `output` is
+  `reasoning`, a narration `message` ("Sketching your fridge-to-steps flow — putting the
+  diagram on screen") and the `function_call`, and nothing else. The answer only exists
+  after the result goes back as a `function_call_output` — a second round, measured at
+  1.8 s and 310 output tokens, whose message id begins `msg_` as usual. Hence
+  `PROSE_MAX_ROUNDS`.
+- **The follow-up turn needs three items, not the whole transcript**: the original user
+  message, the `function_call` item verbatim, and the `function_call_output`. The model's
+  own `reasoning` and narration items can be dropped (`store: false` means nothing is kept
+  server-side, so what is resent is all there is).
+- Streaming carries `response.function_call_arguments.delta`/`.done`, but the whole
+  arguments string arrived in **one** delta for a 6 kB document, so there is nothing to
+  gain by reading it incrementally; the `function_call` item on the final response is what
+  `prose` uses.
+
+Measured end to end on `ask-diagram` (`npm run verify:artifact`, one real answer): the
+model draws a 2.6–2.9 kB self-contained document with inline CSS and no external
+references, and the whole answer — wake phrase to a finished card with a frame on it —
+takes 25–40 s.

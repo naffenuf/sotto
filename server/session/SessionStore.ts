@@ -83,8 +83,15 @@ export interface SessionWriter {
   appendFeedback(feedback: unknown): void;
   /** Appends one answer record (US-018). */
   appendAnswer(answer: unknown): void;
-  /** Writes an HTML artifact and returns its path, relative to the folder (US-020). */
-  writeArtifact(fileName: string, html: string): string;
+  /**
+   * Writes an HTML artifact and returns its path relative to the folder, or
+   * `null` if it could not be written (US-020).
+   *
+   * The one write whose failure is reported back rather than only logged: an
+   * artifact that is not on disk is a card with a broken frame in it, so the
+   * answer agent needs to know it has nothing to show.
+   */
+  writeArtifact(fileName: string, html: string): string | null;
   /** Stamps `endedAt`, flushes and closes. Idempotent. */
   end(): void;
 }
@@ -228,14 +235,13 @@ export class SessionStore implements SessionWriter {
     this.appendLine(SESSION_FILES.answers, JSON.stringify(answer));
   }
 
-  writeArtifact(fileName: string, html: string): string {
+  writeArtifact(fileName: string, html: string): string | null {
     const safe = artifactName(fileName);
     const relative = join(ARTIFACTS_DIR, safe);
-    this.guard(relative, () => {
+    const made = this.guard(relative, () => {
       mkdirSync(join(this.dir, ARTIFACTS_DIR), { recursive: true });
     });
-    this.writeAtomic(relative, html);
-    return relative;
+    return made && this.writeAtomic(relative, html) ? relative : null;
   }
 
   end(): void {
@@ -285,8 +291,8 @@ export class SessionStore implements SessionWriter {
   }
 
   /** Writes a whole file the only safe way: temp file, then rename over it. */
-  private writeAtomic(file: string, contents: string): void {
-    this.guard(file, () => {
+  private writeAtomic(file: string, contents: string): boolean {
+    return this.guard(file, () => {
       const target = join(this.dir, file);
       const temp = `${target}.tmp`;
       writeFileSync(temp, contents);
@@ -297,16 +303,22 @@ export class SessionStore implements SessionWriter {
   /**
    * Runs a write, turning a failure into one warning per file. Losing the
    * folder is bad; losing the conversation because of it would be worse.
+   *
+   * Returns whether it worked, which only {@link writeArtifact} looks at.
    */
-  private guard(file: string, write: () => void): void {
+  private guard(file: string, write: () => void): boolean {
     try {
       write();
+      return true;
     } catch (error) {
-      if (this.reported.has(file)) return;
+      if (this.reported.has(file)) {
+        return false;
+      }
       this.reported.add(file);
       this.logger.warn(
         `[session] cannot write ${join(this.dir, file)}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return false;
     }
   }
 }

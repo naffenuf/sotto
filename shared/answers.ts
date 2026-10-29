@@ -14,6 +14,7 @@
  * what lets the headline reach the stage while the detail is still arriving.
  */
 import { z } from "zod";
+import type { Artifact } from "./artifacts.js";
 import type { Citation } from "./cards.js";
 
 /** Characters of headline. Long enough to answer, short enough to glance at. */
@@ -81,6 +82,11 @@ export interface Answer {
   detailMd: string;
   /** Numbered sources, deduplicated by URL. */
   citations: Citation[];
+  /**
+   * HTML the model drew while answering, in the order it drew it (US-020).
+   * Usually empty: most questions are answered in sentences.
+   */
+  artifacts: Artifact[];
   status: AnswerStatus;
   /** When the question arrived, on the session clock. */
   createdAtMs: number;

@@ -326,7 +326,7 @@ describe("SessionManager, board and observer", () => {
       appendCandidate: (record: unknown) => logged.push(record as CandidateLogLine),
       appendFeedback: () => {},
       appendAnswer: () => {},
-      writeArtifact: () => "",
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
     const sessions = new SessionManager({
@@ -469,7 +469,7 @@ describe("SessionManager, board and observer", () => {
       appendCandidate: (record: unknown) => lines.push(record as CandidateLogLine),
       appendFeedback: () => {},
       appendAnswer: () => {},
-      writeArtifact: () => "",
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
     const sessions = new SessionManager({
@@ -587,7 +587,7 @@ describe("SessionManager, delivery and feedback", () => {
       appendCandidate: (record: unknown) => candidates.push(record as CandidateLogLine),
       appendFeedback: (record: unknown) => feedback.push(record as FeedbackLogRecord),
       appendAnswer: () => {},
-      writeArtifact: () => "",
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
     return { writer, candidates, feedback };
@@ -741,6 +741,7 @@ describe("SessionManager, answers", () => {
         citations: [{ url: "https://example.com/prices", title: "Prices" }],
         searchedUrls: ["https://example.com/prices"],
         searched: true,
+        functionCalls: 0,
       };
     }
   }
@@ -759,7 +760,7 @@ describe("SessionManager, answers", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
-      writeArtifact: () => "",
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
     const cards: StageCard[] = [];
@@ -838,6 +839,7 @@ describe("SessionManager, typed questions", () => {
         citations: [],
         searchedUrls: [],
         searched: false,
+        functionCalls: 0,
       };
     }
   }
@@ -854,7 +856,7 @@ describe("SessionManager, typed questions", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
-      writeArtifact: () => "",
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
   }
@@ -1023,7 +1025,7 @@ describe("SessionManager, chattiness", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: () => {},
-      writeArtifact: () => "",
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
     const sessions = new SessionManager({
@@ -1239,7 +1241,7 @@ describe("SessionManager, speaker names", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: () => {},
-      writeArtifact: () => "",
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
     return { renames, writer };
@@ -1277,5 +1279,148 @@ describe("SessionManager, speaker names", () => {
     const { sessions, bus } = harness();
     expect(sessions.renameSpeaker("A", "Craig")).toBe(false);
     expect(bus.speakerNames()).toEqual({});
+  });
+});
+
+describe("SessionManager and generated artifacts (US-020)", () => {
+  /** A model that draws `drawings` times and then answers. */
+  class DrawingModel implements ModelClient {
+    constructor(private readonly titles: readonly string[]) {}
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      return call.label === "board" ? { operations: [] } : { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("an answer is prose, not JSON");
+    }
+
+    async prose(call: ProseCall): Promise<ProseReply> {
+      const tool = (call.functions ?? []).find((one) => one.name === "show_html");
+      if (tool === undefined) throw new Error("show_html was not offered");
+      for (const title of this.titles) await tool.run({ title, html: "<svg/>" });
+      return {
+        text: "Four screens, end to end\n\nThe loops are at the bottom.",
+        citations: [],
+        searchedUrls: [],
+        searched: false,
+        functionCalls: this.titles.length,
+      };
+    }
+  }
+
+  /** A writer that records what was asked of `artifacts/`. */
+  function drawingWriter(
+    written: [file: string, html: string][],
+    options: { dir?: string; fail?: boolean } = {},
+  ): SessionWriter {
+    return {
+      dir: options.dir ?? "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      writeArtifact: (fileName: string, html: string) => {
+        written.push([fileName, html]);
+        return options.fail === true ? null : `artifacts/${fileName}`;
+      },
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  async function answered(
+    model: ModelClient,
+    writer: SessionWriter | null,
+  ): Promise<{ sessions: SessionManager; cards: StageCard[] }> {
+    const bus = new EventBus(quiet);
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => model,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "no-wake" });
+    await ended;
+    expect(sessions.askQuestion("sketch the flow")).toBe("asked");
+    await waitFor(() => cards.some((card) => card.state !== "thinking"), "the answer");
+    return { sessions, cards };
+  }
+
+  it("numbers each artifact in the folder and serves it from that session", async () => {
+    const written: [string, string][] = [];
+    const { sessions, cards } = await answered(
+      new DrawingModel(["User flow", "Screen states"]),
+      drawingWriter(written, { dir: "/tmp/session-folder" }),
+    );
+
+    expect(written).toEqual([
+      ["01-user-flow.html", "<svg/>"],
+      ["02-screen-states.html", "<svg/>"],
+    ]);
+    expect(cards.at(-1)?.artifacts).toEqual([
+      {
+        title: "User flow",
+        url: "/api/sessions/events-no-wake-1/artifacts/01-user-flow.html",
+      },
+      {
+        title: "Screen states",
+        url: "/api/sessions/events-no-wake-1/artifacts/02-screen-states.html",
+      },
+    ]);
+    expect(sessions.artifactFile("events-no-wake-1", "01-user-flow.html")).toBe(
+      "/tmp/session-folder/artifacts/01-user-flow.html",
+    );
+  });
+
+  it("has no artifact for a name it never wrote, a bad name or another session", async () => {
+    const { sessions } = await answered(
+      new DrawingModel(["User flow"]),
+      drawingWriter([], { dir: "/tmp/session-folder" }),
+    );
+    for (const name of ["../session.json", "..", "board.md", "1-user-flow.html", ""]) {
+      expect(sessions.artifactFile("events-no-wake-1", name), name).toBeNull();
+    }
+    expect(sessions.artifactFile("events-brainstorm-1", "01-user-flow.html")).toBeNull();
+  });
+
+  it("shows nothing when the session has no folder, and answers in words", async () => {
+    const { cards } = await answered(new DrawingModel(["User flow"]), null);
+    expect(cards.at(-1)?.artifacts).toBeUndefined();
+    expect(cards.at(-1)?.headline).toBe("Four screens, end to end");
+  });
+
+  it("shows nothing when the folder refused the write", async () => {
+    const written: [string, string][] = [];
+    const { sessions, cards } = await answered(
+      new DrawingModel(["User flow"]),
+      drawingWriter(written, { fail: true }),
+    );
+    expect(written).toHaveLength(1);
+    expect(cards.at(-1)?.artifacts).toBeUndefined();
+    // The number was spent even though the file was not written, so a retry
+    // is `02` rather than a second `01`. The name still resolves to a path;
+    // nothing points at it, and the route answers 404 because it is not there.
+    expect(sessions.artifactFile("events-no-wake-1", "01-user-flow.html")).toBe(
+      "/tmp/not-a-real-folder/artifacts/01-user-flow.html",
+    );
   });
 });

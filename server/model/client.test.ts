@@ -9,8 +9,10 @@ import {
   DEFAULT_MAX_TOKENS,
   ModelCallError,
   MuseClient,
+  PROSE_MAX_ROUNDS,
   SPARK_MODEL,
   type ChatCompletions,
+  type FunctionTool,
   type ModelUsage,
   type Responses,
   type StreamingResponses,
@@ -394,7 +396,9 @@ describe("MuseClient.prose", () => {
     expect(body.model).toBe(SPARK_MODEL);
     expect(body.stream).toBe(true);
     expect(body.instructions).toBe("You answer one question.");
-    expect(body.input).toBe("## The question");
+    // A list, not a bare string: a prose call is a conversation as soon as
+    // there is a tool in it (US-020), so it is always sent as one.
+    expect(body.input).toEqual([{ role: "user", content: "## The question" }]);
     expect(body.max_output_tokens).toBe(DEFAULT_MAX_TOKENS);
     expect(body.tools).toEqual([{ type: "web_search", search_context_size: "medium" }]);
     expect(body.include).toEqual(["web_search_call.action.sources"]);
@@ -575,5 +579,220 @@ describe("MuseClient usage reporting", () => {
     expect(spent).toEqual([
       { label: "verify", inputTokens: 2_400, outputTokens: 1_800, reasoningTokens: 1_500 },
     ]);
+  });
+});
+
+/** Nothing in these tests reads the logs. */
+const silent = { log: () => {}, warn: () => {} };
+
+/** The streaming endpoint, with a different event list for each round. */
+class FakeRounds implements StreamingResponses {
+  readonly bodies: StreamParams[] = [];
+
+  constructor(private readonly rounds: StreamEvent[][]) {}
+
+  async create(body: StreamParams): Promise<AsyncIterable<StreamEvent>> {
+    this.bodies.push(structuredClone(body));
+    const events = this.rounds[this.bodies.length - 1];
+    if (events === undefined) throw new Error(`unexpected round ${this.bodies.length}`);
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (const event of events) yield event;
+      },
+    };
+  }
+}
+
+/** One `function_call` item, as the API ends a round with. */
+function functionCall(name: string, args: string, id = "call_1"): OpenAI.Responses.ResponseOutputItem {
+  return {
+    id: `fc_${id}`,
+    call_id: id,
+    type: "function_call",
+    name,
+    arguments: args,
+    status: "completed",
+  } as OpenAI.Responses.ResponseOutputItem;
+}
+
+function rounds(lists: StreamEvent[][]): { museClient: MuseClient; fake: FakeRounds } {
+  const fake = new FakeRounds(lists);
+  return {
+    museClient: new MuseClient({ streamingResponses: fake, logger: silent }),
+    fake,
+  };
+}
+
+/** `show_html`, with its calls collected. */
+function showHtml(result = "shown"): {
+  tool: FunctionTool;
+  calls: unknown[];
+} {
+  const calls: unknown[] = [];
+  return {
+    calls,
+    tool: {
+      name: "show_html",
+      description: "Show something.",
+      parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
+      run: (args) => {
+        calls.push(args);
+        return result;
+      },
+    },
+  };
+}
+
+describe("MuseClient.prose with function tools (US-020)", () => {
+  it("declares the function beside web_search, strictly", async () => {
+    const { tool } = showHtml();
+    const { museClient, fake } = rounds([
+      [delta("msg_1", "An answer"), completed({ output: [message("An answer")] })],
+    ]);
+    await museClient.prose({ ...proseCall, functions: [tool] });
+
+    expect(fake.bodies[0]?.tools).toEqual([
+      { type: "web_search", search_context_size: "medium" },
+      {
+        type: "function",
+        name: "show_html",
+        description: "Show something.",
+        strict: true,
+        parameters: tool.parameters,
+      },
+    ]);
+  });
+
+  it("runs the tool and asks again, because the round that called it has no answer", async () => {
+    const { tool, calls } = showHtml('"User flow" is on the screen now.');
+    const { museClient, fake } = rounds([
+      // Round 1: narration and a tool call, and no answer at all — which is
+      // exactly what the real API does (`fixtures/events/NOTES.md`).
+      [
+        delta("rs_1", "Sketching that for you."),
+        completed({
+          output: [
+            message("Sketching that for you."),
+            functionCall("show_html", '{"title":"User flow","html":"<svg/>"}'),
+          ],
+        }),
+      ],
+      // Round 2: the answer.
+      [
+        delta("msg_1", "Four screens, with recognition and suggestions on one\n"),
+        completed({ output: [message("Four screens\n\nThe loops are at the bottom.")] }),
+      ],
+    ]);
+
+    const reply = await museClient.prose({ ...proseCall, functions: [tool] });
+
+    expect(calls).toEqual([{ title: "User flow", html: "<svg/>" }]);
+    expect(reply.text).toBe("Four screens\n\nThe loops are at the bottom.");
+    expect(reply.functionCalls).toBe(1);
+    // The second round carries the question, the call and its result — and
+    // not the model's own narration, which it does not need back.
+    expect(fake.bodies[1]?.input).toEqual([
+      { role: "user", content: "## The question" },
+      expect.objectContaining({ type: "function_call", name: "show_html" }),
+      {
+        type: "function_call_output",
+        call_id: "call_1",
+        output: '"User flow" is on the screen now.',
+      },
+    ]);
+  });
+
+  it("keeps the citations and searched pages from every round", async () => {
+    const { tool } = showHtml();
+    const { museClient } = rounds([
+      [
+        completed({
+          output: [
+            searchCall("https://example.com/a"),
+            message("thinking", [
+              { type: "url_citation", url: "https://example.com/a", title: "A" },
+            ]),
+            functionCall("show_html", "{}"),
+          ],
+        }),
+      ],
+      [
+        completed({
+          output: [
+            searchCall("https://example.com/b"),
+            message("An answer", [
+              { type: "url_citation", url: "https://example.com/b", title: "B" },
+            ]),
+          ],
+        }),
+      ],
+    ]);
+
+    const reply = await museClient.prose({ ...proseCall, functions: [tool] });
+    expect(reply.citations.map((one) => one.url)).toEqual([
+      "https://example.com/a",
+      "https://example.com/b",
+    ]);
+    expect(reply.searchedUrls).toEqual(["https://example.com/a", "https://example.com/b"]);
+    expect(reply.searched).toBe(true);
+  });
+
+  it("tells the model in words when the tool is unknown, broken or badly called", async () => {
+    const answer = [
+      delta("msg_1", "An answer"),
+      completed({ output: [message("An answer")] }),
+    ];
+    const cases: [StreamEvent[], RegExp][] = [
+      [[completed({ output: [functionCall("draw_svg", "{}")] })], /no tool called draw_svg/],
+      [[completed({ output: [functionCall("show_html", "{not json")] })], /not valid JSON/],
+    ];
+    for (const [first, expected] of cases) {
+      const { tool } = showHtml();
+      const { museClient, fake } = rounds([first, answer]);
+      await museClient.prose({ ...proseCall, functions: [tool] });
+      const sent = fake.bodies[1]?.input as { output?: string }[];
+      // [user, function_call, function_call_output]
+      expect(sent[2]?.output).toMatch(expected);
+    }
+
+    // A handler that throws is the same kind of thing: an answer in words is
+    // a far better outcome than no answer.
+    const { museClient, fake } = rounds([
+      [completed({ output: [functionCall("show_html", "{}")] })],
+      answer,
+    ]);
+    const thrower: FunctionTool = {
+      name: "show_html",
+      description: "Show something.",
+      parameters: {},
+      run: () => {
+        throw new Error("the disk is full");
+      },
+    };
+    const reply = await museClient.prose({ ...proseCall, functions: [thrower] });
+    expect(reply.text).toBe("An answer");
+    expect((fake.bodies[1]?.input as { output?: string }[])[2]?.output).toMatch(
+      /show_html failed \(the disk is full\)/,
+    );
+  });
+
+  it("gives up once the model has used every round on tool calls", async () => {
+    const { tool } = showHtml();
+    const drawing = [completed({ output: [functionCall("show_html", "{}")] })];
+    const { museClient, fake } = rounds([drawing, drawing, drawing]);
+    await expect(museClient.prose({ ...proseCall, functions: [tool] })).rejects.toThrow(
+      /called a tool on all 3 rounds/,
+    );
+    expect(fake.bodies).toHaveLength(PROSE_MAX_ROUNDS);
+  });
+
+  it("makes exactly one round when there are no function tools", async () => {
+    const { museClient, fake } = rounds([
+      [completed({ output: [message("An answer")] })],
+    ]);
+    const reply = await museClient.prose(proseCall);
+    expect(reply.functionCalls).toBe(0);
+    expect(fake.bodies).toHaveLength(1);
+    expect(fake.bodies[0]?.tools).toEqual([{ type: "web_search", search_context_size: "medium" }]);
   });
 });

@@ -241,9 +241,12 @@ describe("SessionStore files the later stories own", () => {
     const saved = store();
     const relative = saved.writeArtifact("../../flow.html", "<p>hi</p>");
     // Separators are stripped, so the name stays one segment under artifacts/.
-    expect(relative.split(sep)).toEqual(["artifacts", "..-..-flow.html"]);
-    expect(resolve(saved.dir, relative).startsWith(join(saved.dir, "artifacts") + sep)).toBe(true);
-    expect(read(saved.dir, relative)).toBe("<p>hi</p>");
+    expect(relative, "the artifact was not written").not.toBeNull();
+    expect((relative as string).split(sep)).toEqual(["artifacts", "..-..-flow.html"]);
+    expect(
+      resolve(saved.dir, relative as string).startsWith(join(saved.dir, "artifacts") + sep),
+    ).toBe(true);
+    expect(read(saved.dir, relative as string)).toBe("<p>hi</p>");
     expect(() => saved.writeArtifact("", "<p>hi</p>")).toThrow(/usable artifact file name/);
   });
 });
