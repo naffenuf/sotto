@@ -24,6 +24,10 @@ class FakeModel implements ModelClient {
   grounded(_call: GroundedCall): Promise<GroundedReply> {
     throw new Error("the judge never searches");
   }
+
+  prose(): Promise<never> {
+    throw new Error("the judge never answers a question");
+  }
 }
 
 const moment: PlantedMoment = {

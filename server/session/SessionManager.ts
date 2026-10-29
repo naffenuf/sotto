@@ -12,6 +12,8 @@
  *                                                              |
  *                                                              v
  *                                                     policy -> candidates.jsonl
+ *                                                              |
+ *                                                   wake phrase -> answer agent
  *
  * Only the left-hand column differs between sources. Everything downstream —
  * the turn assembler (US-005), the board update loop (US-009), and the
@@ -31,7 +33,7 @@ import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.j
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { describeSource, sourceSlug } from "../../shared/session.js";
-import type { PauseState } from "../../shared/turns.js";
+import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import {
   EventReplaySource,
   fixtureEventsPath,
@@ -42,6 +44,7 @@ import { TurnAssembler } from "../asr/turns.js";
 import type { AudioSource } from "../audio/AudioSource.js";
 import { MicSource } from "../audio/MicSource.js";
 import { WavReplaySource } from "../audio/WavReplaySource.js";
+import { AnswerAgent } from "../answer/AnswerAgent.js";
 import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
@@ -157,6 +160,8 @@ interface ModelLoops {
   observer: Observer | null;
   verifier: Verifier | null;
   policy: InterjectionPolicy | null;
+  /** The answer agent (US-018), or `null` when there is no model client. */
+  answers: AnswerAgent | null;
   /** Every card the policy delivered, by card id (US-015). */
   deliveries: Map<string, Delivered>;
 }
@@ -204,6 +209,8 @@ interface RunningSession {
   verifier: Verifier | null;
   /** The interjection policy (US-014), or `null` when there is no model client. */
   policy: InterjectionPolicy | null;
+  /** The answer agent (US-018), or `null` when there is no model client. */
+  answers: AnswerAgent | null;
   /** The cards this session has put on the stage, by card id (US-015). */
   deliveries: Map<string, Delivered>;
   /** The session's clock: simulated for a replay, live otherwise. */
@@ -396,7 +403,13 @@ export class SessionManager {
     // The policy asks the assembler whether anybody is talking, and the
     // assembler is built from the loops, so the getter closes over the
     // `const` below. It is only ever called once `start()` has returned.
-    const loops = this.modelLoops(info, clock, store, () => assembler.pauseState());
+    const loops = this.modelLoops(
+      info,
+      clock,
+      store,
+      () => assembler.pauseState(),
+      () => assembler.finalTurns(),
+    );
     const assembler = this.assembler(info, clock, store, loops);
     let source: EventReplaySource;
     try {
@@ -476,7 +489,13 @@ export class SessionManager {
     }
 
     // As in `startReplay`: the pause getter reads the assembler built below.
-    const loops = this.modelLoops(info, this.liveClock, store, () => assembler.pauseState());
+    const loops = this.modelLoops(
+      info,
+      this.liveClock,
+      store,
+      () => assembler.pauseState(),
+      () => assembler.finalTurns(),
+    );
     const assembler = this.assembler(info, this.liveClock, store, loops);
     const client = this.createAsrClient({
       apiKey,
@@ -556,7 +575,8 @@ export class SessionManager {
    * It exists whether or not there is a model client, because the indicator
    * and the courtesy hook are not model work: a session with no key still
    * shows that it heard its name and still holds its (nonexistent)
-   * interjections out of the way. The question itself is what US-018 answers.
+   * interjections out of the way. The question goes to the answer agent
+   * (US-018), which is `null` in that case, so nothing is answered.
    */
   private wakeWatcher(info: SessionInfo, loops: ModelLoops): WakeWatcher {
     const current = (): boolean => this.current?.info.id === info.id;
@@ -573,12 +593,17 @@ export class SessionManager {
       },
       onQuestion: (trigger) => {
         if (!current()) return;
-        // Asking again refreshes the window; the answer agent (US-018) takes
-        // it from here and brackets its own work with `setAnswerThinking`.
+        // Asking again refreshes the window; from here the answer agent holds
+        // the floor itself, with `setAnswerThinking` (US-018).
         loops.policy?.wakePhraseDetected();
         this.logger.log(
           `[wake] ${info.id} ${trigger.turnId} asked: ${trigger.question}`,
         );
+        loops.answers?.ask({
+          question: trigger.question,
+          askedBy: trigger.speaker,
+          turnId: trigger.turnId,
+        });
       },
     });
   }
@@ -586,16 +611,19 @@ export class SessionManager {
   /**
    * Builds everything a session does with a model, sharing one client: the
    * board update loop (US-009), the observer (US-012), the fact check
-   * (US-013) and the interjection policy (US-014). All four are `null` when
-   * there is no client — in which case the session still transcribes and
-   * still saves, it just has no board and notices nothing.
+   * (US-013), the interjection policy (US-014) and the answer agent
+   * (US-018). All five are `null` when there is no client — in which case the
+   * session still transcribes and still saves, it just has no board, notices
+   * nothing and answers nothing.
    *
    * They form a chain. The board writes `board.json`/`board.md` and pushes
    * the board to every attached browser; the observer looks at the
    * conversation right after each update; a claim that looks wrong goes to
    * the verifier first and everything else straight to the policy, which
    * decides whether and when it is worth saying. Every candidate, check and
-   * decision lands in `candidates.jsonl` on the way past.
+   * decision lands in `candidates.jsonl` on the way past. The answer agent
+   * hangs off the side of all that, reading the board and the transcript but
+   * waiting for none of it.
    *
    * The model loops all drive the one `model` dot, guarded on the session
    * still being the current one the same way frames are: work that lands
@@ -608,6 +636,7 @@ export class SessionManager {
     clock: Clock,
     store: StoreSlot,
     pauseState: () => PauseState,
+    transcript: () => readonly TurnUpdate[],
   ): ModelLoops {
     const model = this.createModel();
     if (model === null) {
@@ -619,6 +648,7 @@ export class SessionManager {
         observer: null,
         verifier: null,
         policy: null,
+        answers: null,
         deliveries: new Map(),
       };
     }
@@ -678,7 +708,25 @@ export class SessionManager {
       },
       onModelState,
     });
-    return { board, observer, verifier, policy, deliveries };
+    // Its own queue, on purpose: an answer must not wait behind a board
+    // update, and the group must not wait for the board loop to let go of the
+    // model (US-018).
+    const answers = new AnswerAgent({
+      clock,
+      model,
+      logger: this.logger,
+      board: () => board.board(),
+      transcript,
+      speakers: () => this.bus.speakerNames(),
+      onCard: (card) => {
+        if (this.current?.info.id === info.id) this.bus.publishCard(card);
+      },
+      onRecord: (record) => store.writer?.appendAnswer(record),
+      // Sotto does not interject over its own answer.
+      onThinking: (thinking) => policy.setAnswerThinking(thinking),
+      onModelState,
+    });
+    return { board, observer, verifier, policy, answers, deliveries };
   }
 
   /**
@@ -787,6 +835,7 @@ export class SessionManager {
     running.observer?.stop();
     running.verifier?.stop();
     running.policy?.stop();
+    running.answers?.stop();
     // Whether it ended, was stopped or failed, the folder gets its `endedAt`.
     running.store.writer?.end();
 
@@ -842,6 +891,10 @@ async function drainLoops(loops: ModelLoops, beforePolicy?: () => void): Promise
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();
+  // An answer asked in the last seconds of a conversation is still owed to
+  // whoever asked for it, and the policy must not be left thinking one is
+  // still being written.
+  await loops.answers?.flush();
   beforePolicy?.();
   // Last, and synchronous: the conversation has ended in silence, so the
   // policy gets one look at that final pause and then accounts for whatever

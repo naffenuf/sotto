@@ -243,6 +243,11 @@ function Feedback({
 }) {
   const [chosen, setChosen] = useState<FeedbackVerdict | null>(null);
   if (onFeedback === undefined) return null;
+  // Not on an answer (US-018): the verdicts are about an interjection *call* —
+  // "useful", "not useful", "wrong moment" are what the policy (US-014) learns
+  // from — and the server only records one against a card it decided to
+  // deliver, so a button here would have nothing to file.
+  if (card.variant === "answer") return null;
   return (
     <div className="card__feedback" data-testid="card-feedback">
       {feedbackVerdicts.map((verdict) => (

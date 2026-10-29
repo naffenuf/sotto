@@ -64,6 +64,20 @@ export type {
   Item,
   ItemStatus,
 } from "./board.js";
+export {
+  ANSWER_DETAIL_MAX_WORDS,
+  ANSWER_HEADLINE_MAX_CHARS,
+  TYPED_ASKER,
+  answerStatuses,
+  splitAnswer,
+} from "./answers.js";
+export type {
+  Answer,
+  AnswerLogRecord,
+  AnswerStatus,
+  AnswerText,
+  ListedSource,
+} from "./answers.js";
 export { cardStates, cardVariants } from "./cards.js";
 export type { CardState, CardVariant, Citation, EvidenceQuote, StageCard } from "./cards.js";
 export { statusChannels, statusStates } from "./events.js";

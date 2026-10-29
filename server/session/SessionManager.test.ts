@@ -15,11 +15,14 @@ import type {
   DecisionLogRecord,
 } from "../../shared/candidates.js";
 import type { FeedbackLogRecord } from "../../shared/feedback.js";
+import type { AnswerLogRecord } from "../../shared/answers.js";
 import type { StageCard } from "../../shared/cards.js";
 import type {
   GroundedCall,
   GroundedReply,
   ModelClient,
+  ProseCall,
+  ProseReply,
   StructuredCall,
 } from "../model/client.js";
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
@@ -270,6 +273,10 @@ describe("SessionManager, board and observer", () => {
       throw new Error("unexpected grounded call");
     }
 
+    async prose(): Promise<never> {
+      throw new Error("unexpected prose call");
+    }
+
     async structured(call: StructuredCall): Promise<unknown> {
       this.calls.push(call);
       if (call.label === "board") {
@@ -421,6 +428,10 @@ describe("SessionManager, board and observer", () => {
         };
       }
 
+      async prose(): Promise<never> {
+        throw new Error("nobody asks Sotto anything here");
+      }
+
       async grounded(call: GroundedCall): Promise<GroundedReply> {
         this.calls.push(call.label);
         return {
@@ -518,6 +529,10 @@ describe("SessionManager, delivery and feedback", () => {
 
     async grounded(): Promise<never> {
       throw new Error("a contradiction is never checked against the web");
+    }
+
+    async prose(): Promise<never> {
+      throw new Error("nobody asks Sotto anything here");
     }
 
     async structured(call: StructuredCall): Promise<unknown> {
@@ -679,6 +694,119 @@ describe("SessionManager, delivery and feedback", () => {
   });
 });
 
+describe("SessionManager, answers", () => {
+  /**
+   * `ask-search` is the capture where somebody says Sotto's name and asks a
+   * question (US-017), so a replay of it is the whole path: wake watcher ->
+   * answer agent -> a card on the stage and a line in `answers.jsonl`.
+   *
+   * The board loop runs too — a board update is what gives the answer its
+   * context — so the model has to answer both kinds of call.
+   */
+  class AnsweringModel implements ModelClient {
+    readonly labels: string[] = [];
+    /** The user message of every answer call, to check what it was told. */
+    readonly questions: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "board") {
+        return { operations: [{ op: "set_summary", text: "Pricing a note app." }] };
+      }
+      // The observer finds nothing here; this fixture plants no moment.
+      return { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("an answer is prose, not JSON");
+    }
+
+    async prose(call: ProseCall): Promise<ProseReply> {
+      this.labels.push(call.label);
+      this.questions.push(call.user);
+      // As the real API does: narration first, under an id of its own.
+      call.onText?.({ itemId: "rs_1", text: "I'll look that up." });
+      call.onText?.({ itemId: "msg_1", text: "Rivals charge $5-$25 a seat\n" });
+      return {
+        text: "Rivals charge $5-$25 a seat\n\n- Notion $12 a seat",
+        citations: [{ url: "https://example.com/prices", title: "Prices" }],
+        searchedUrls: ["https://example.com/prices"],
+        searched: true,
+      };
+    }
+  }
+
+  it("answers a spoken question on the stage and writes it down", async () => {
+    const bus = new EventBus(quiet);
+    const model = new AnsweringModel();
+    const answers: AnswerLogRecord[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
+      writeArtifact: () => "",
+      end: () => {},
+    } satisfies SessionWriter;
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => model,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    await ended;
+
+    // One answer, pushed as it arrived: thinking, then the headline, then all
+    // of it — every push under the same card id.
+    expect(model.labels.filter((label) => label === "answer")).toHaveLength(1);
+    expect(new Set(cards.map((card) => card.id))).toEqual(new Set(["card-ans-1"]));
+    expect(cards.map((card) => card.state)).toEqual(["thinking", "thinking", "ready"]);
+    const last = cards.at(-1)!;
+    expect(last.variant).toBe("answer");
+    expect(last.headline).toBe("Rivals charge $5-$25 a seat");
+    expect(last.detailMd).toBe("- Notion $12 a seat");
+    expect(last.citations).toEqual([{ url: "https://example.com/prices", title: "Prices" }]);
+    expect(last.question?.toLowerCase()).toContain("competitors charge");
+    // The question is asked by a diarization label until the group names it.
+    expect(last.askedBy).toMatch(/^[A-Z]$/);
+
+    // The call was told the conversation and the board it was asked in.
+    expect(model.questions[0]).toContain("Pricing a note app.");
+    expect(model.questions[0]).toContain("competitors charge");
+
+    expect(answers).toHaveLength(1);
+    expect(answers[0]).toMatchObject({
+      kind: "answer",
+      id: "ans-1",
+      status: "done",
+      headline: "Rivals charge $5-$25 a seat",
+    });
+    expect(answers[0]?.turnId).not.toBeNull();
+    expect(answers[0]?.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
 describe("SessionManager, chattiness", () => {
   /** A model that is wired up but never actually asked anything here. */
   const idleModel: ModelClient = {
@@ -686,6 +814,9 @@ describe("SessionManager, chattiness", () => {
       throw new Error("no call was expected");
     },
     async grounded(): Promise<never> {
+      throw new Error("no call was expected");
+    },
+    async prose(): Promise<never> {
       throw new Error("no call was expected");
     },
   };

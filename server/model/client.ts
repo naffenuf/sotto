@@ -79,6 +79,53 @@ export interface GroundedCall extends StructuredCall {
   searchContextSize?: "low" | "medium" | "high";
 }
 
+/**
+ * One streamed, searching call whose reply is **prose** (US-018).
+ *
+ * The answer agent is the one caller that does not want JSON: the PRD's shape
+ * for an answer is "line 1 is a headline, then markdown", which is text — and
+ * text is also the only kind of reply the API attaches `url_citation`
+ * annotations to, since an annotation is a character range into what the model
+ * wrote (measured; see `CLAUDE.md`). So there is no schema here, and the reply
+ * arrives in pieces so that the headline can be on screen before the detail
+ * has been written.
+ */
+export interface ProseCall {
+  /** Short name for logs and {@link Clock.track} (`"answer"`). */
+  label: string;
+  /** The system prompt, from `server/prompts/`. */
+  system: string;
+  /** The rendered request: the conversation, and the question. */
+  user: string;
+  /** Reasoning + search + output budget. Defaults to {@link DEFAULT_MAX_TOKENS}. */
+  maxTokens?: number;
+  /** How much search context the model is given. */
+  searchContextSize?: "low" | "medium" | "high";
+  /**
+   * Called as the text of the output item the model is writing grows.
+   *
+   * `itemId` changes whenever it starts a new one, and it starts several: a
+   * grounded reply is narration ("I'll pull the current pricing"), then the
+   * searches, then the answer, each as its own item (measured — see
+   * `fixtures/events/NOTES.md`). So `text` is the current item from its
+   * beginning, not the whole reply, and a caller watching for the first line
+   * must start again when the id changes.
+   */
+  onText?: (update: { itemId: string; text: string }) => void;
+}
+
+/** A prose reply: the text, and what the model read to write it. */
+export interface ProseReply {
+  /** The model's answer — the last thing it wrote, without the narration. */
+  text: string;
+  /** Every `url_citation` annotation, deduplicated by URL, in order. */
+  citations: Citation[];
+  /** Every URL the search really returned or opened, in order. */
+  searchedUrls: string[];
+  /** Whether the model searched at all. */
+  searched: boolean;
+}
+
 /** A grounded reply: the JSON, and what the model actually read to write it. */
 export interface GroundedReply {
   /** The reply parsed as JSON, for the caller to validate. */
@@ -149,6 +196,14 @@ export interface ModelClient {
    * text, or was not JSON.
    */
   grounded(call: GroundedCall): Promise<GroundedReply>;
+
+  /**
+   * The same again, but the reply is prose and it arrives in pieces.
+   *
+   * @throws {ModelCallError} when the response did not complete or carried no
+   * text. Transport failures arrive as whatever the SDK threw.
+   */
+  prose(call: ProseCall): Promise<ProseReply>;
 }
 
 /** The slice of the OpenAI SDK a structured call uses. */
@@ -165,6 +220,13 @@ export interface Responses {
   ): Promise<OpenAI.Responses.Response>;
 }
 
+/** The slice of the OpenAI SDK a streamed prose call uses. */
+export interface StreamingResponses {
+  create(
+    body: OpenAI.Responses.ResponseCreateParamsStreaming,
+  ): Promise<AsyncIterable<OpenAI.Responses.ResponseStreamEvent>>;
+}
+
 type Logger = Pick<Console, "log" | "warn">;
 
 export interface MuseClientOptions {
@@ -176,6 +238,8 @@ export interface MuseClientOptions {
   completions?: ChatCompletions;
   /** Seam for tests: the responses endpoint to call instead of the real one. */
   responses?: Responses;
+  /** Seam for tests: the streaming responses endpoint, for {@link MuseClient.prose}. */
+  streamingResponses?: StreamingResponses;
   /**
    * Told what every call spent, before any error is thrown — a truncated
    * reply is billed too. The eval harness uses it to price a run (US-016).
@@ -206,6 +270,10 @@ export class MuseClient implements ModelClient {
 
   private get responses(): Responses {
     return this.options.responses ?? this.openai().responses;
+  }
+
+  private get streamingResponses(): StreamingResponses {
+    return this.options.streamingResponses ?? this.openai().responses;
   }
 
   private openai(): OpenAI {
@@ -345,6 +413,84 @@ export class MuseClient implements ModelClient {
         `${call.label}: the model's reply was not JSON (${error instanceof Error ? error.message : String(error)}): ${text.slice(0, 200)}`,
       );
     }
+  }
+
+  async prose(call: ProseCall): Promise<ProseReply> {
+    const stream = await this.streamingResponses.create({
+      model: this.model,
+      instructions: call.system,
+      input: call.user,
+      max_output_tokens: call.maxTokens ?? DEFAULT_MAX_TOKENS,
+      tools: [{ type: "web_search", search_context_size: call.searchContextSize ?? "medium" }],
+      include: ["web_search_call.action.sources"],
+      store: false,
+      stream: true,
+    });
+
+    let response: OpenAI.Responses.Response | undefined;
+    let failure: string | undefined;
+    let itemId = "";
+    let item = "";
+    for await (const event of stream) {
+      switch (event.type) {
+        case "response.output_text.delta":
+          // A new item starts the text again: the model narrates in items of
+          // its own before it writes the answer.
+          if (event.item_id !== itemId) {
+            itemId = event.item_id;
+            item = "";
+          }
+          item += event.delta;
+          call.onText?.({ itemId, text: item });
+          break;
+        case "response.completed":
+        case "response.incomplete":
+        case "response.failed":
+          response = event.response;
+          break;
+        case "error":
+          // The stream can carry a failure instead of ending: keep the first,
+          // which is the one that explains the rest.
+          failure ??= event.message;
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (response === undefined) {
+      throw new ModelCallError(
+        `${call.label}: the stream ended without a response (${failure ?? "no detail"})`,
+      );
+    }
+
+    const { text, citations, searchedUrls, searched } = readGrounded(response);
+    const reasoning = response.usage?.output_tokens_details?.reasoning_tokens;
+    this.logger.log(
+      `[model] ${call.label}: ${response.status ?? "no status"}` +
+        `, ${response.usage?.output_tokens ?? 0} output tokens` +
+        (reasoning === undefined ? "" : ` (${reasoning} reasoning)`) +
+        `, ${searched ? `${searchedUrls.length} page(s) searched` : "no search"}` +
+        `, ${citations.length} annotated citation(s)`,
+    );
+    this.reportUsage(call.label, {
+      input: response.usage?.input_tokens,
+      output: response.usage?.output_tokens,
+      reasoning,
+    });
+
+    if (response.status !== undefined && response.status !== "completed") {
+      const why =
+        response.incomplete_details?.reason ?? response.error?.message ?? failure ?? "no detail";
+      throw new ModelCallError(
+        `${call.label}: the response came back ${response.status} (${why})` +
+          `; raise maxTokens above ${call.maxTokens ?? DEFAULT_MAX_TOKENS} if it ran out of room`,
+      );
+    }
+    if (text.trim() === "") {
+      throw new ModelCallError(`${call.label}: the model returned no text`);
+    }
+    return { text, citations, searchedUrls, searched };
   }
 }
 

@@ -570,3 +570,37 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   rest and cleared by a session event in both directions — and `useSessionEvents` clears `listening`
   on `session: null` too, because a session that ends mid-question would otherwise leave the
   indicator up forever.
+- **An answer is prose, and prose is the only reply that carries citations.** `MuseClient.prose`
+  (`server/model/client.ts`) is the Responses API with `web_search`, `stream: true` and **no**
+  schema, because the PRD's shape for an answer — a headline then markdown — is text. Measured on
+  the same question that returns *zero* `url_citation` annotations as JSON: a prose reply came back
+  with **three to five**, on the final message item, arriving as `response.output_text.annotation.
+  added`. So `Answer.citations` really is the annotations; the `Sources:` lines the prompt asks for
+  are the fallback, resolved against `searchedUrls` exactly as US-013's are.
+- **The model narrates in message items, and only the last one is the answer.** A searching reply is
+  `reasoning`, `message` ("I'll look up current pricing"), four `web_search_call`s, `reasoning`,
+  `message`, … and finally the answer. The narration items are **`message`s whose ids begin `rs_`**;
+  the answer's begins `msg_` — the `type` is `message` for both, so the id prefix is the only thing
+  that separates them while the stream is still running, and each narration item completes within a
+  millisecond or two of starting. Hence `ANSWER_ITEM_PREFIX` in `server/answer/AnswerAgent.ts`:
+  without it the stage shows "I'll look up current pricing" as the headline for the fifteen seconds
+  it takes to write the real one. Measured end to end: first narration at 1.7–2.2 s, answer item
+  starts at 18.4 s and streams for 0.7 s, 19.2 s total, ~$0.01 a question.
+- **A replayed answer takes no time, and stalls the replay while it is written.**
+  `EventReplaySource.run` awaits `clock.settle()` before *every* frame, at `1x` as well as at `max`,
+  so a 20–30 s answer call freezes the replayed conversation and then the drift-corrected pacing
+  catches up. The visible consequences: `Answer.latencyMs` is **0** in any replay (simulated time
+  does not move during a tracked call) and real only in a live session, and a 1x replay's transcript
+  pauses while Sotto is thinking. Don't assert `latencyMs > 0` off a replay.
+- **The answer agent is the one loop with a queue of its own.** `server/answer/AnswerAgent.ts`
+  answers one question at a time and waits for nothing else: a question asked while the board loop
+  is mid-call goes out immediately. `ask()` returns as soon as the `thinking` card is on the stage,
+  registering the call with `clock.track` first so a `max` replay still waits for it, and every push
+  — thinking, headline, finished — carries the **same card id** (`card-ans-1`), which is what makes
+  the stage replace the card instead of stacking three. It brackets its work with
+  `InterjectionPolicy.setAnswerThinking`, so Sotto never interjects over its own answer.
+- **Feedback buttons are for interjections, not answers.** `POST /api/feedback` can only file a
+  verdict against a card the *policy* delivered (`SessionManager.recordFeedback` looks the card id
+  up in that session's deliveries), and `useful`/`not useful`/`wrong moment` are verdicts on a
+  decision to speak. So `Card.tsx` draws no feedback row on an `answer` card; a button there would
+  have nothing to write.

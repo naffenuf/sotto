@@ -29,6 +29,11 @@ class FakeModel implements ModelClient {
     throw new Error("unexpected grounded call");
   }
 
+  /** Nor does either of them answer a question; US-018's agent does. */
+  async prose(): Promise<never> {
+    throw new Error("unexpected prose call");
+  }
+
   async structured(call: StructuredCall): Promise<unknown> {
     this.calls.push(call);
     const reply = this.replies.shift();

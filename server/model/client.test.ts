@@ -13,11 +13,14 @@ import {
   type ChatCompletions,
   type ModelUsage,
   type Responses,
+  type StreamingResponses,
 } from "./client.js";
 
 type Params = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
 type Completion = OpenAI.Chat.Completions.ChatCompletion;
 type ResponseParams = OpenAI.Responses.ResponseCreateParamsNonStreaming;
+type StreamParams = OpenAI.Responses.ResponseCreateParamsStreaming;
+type StreamEvent = OpenAI.Responses.ResponseStreamEvent;
 type Response = OpenAI.Responses.Response;
 
 /** The completions endpoint, answered from a canned reply. */
@@ -309,6 +312,190 @@ describe("MuseClient.grounded", () => {
   it("fails when the reply is not JSON", async () => {
     const { museClient } = grounded({ output: [message("I could not check that.")] });
     await expect(museClient.grounded(groundedCall)).rejects.toThrow(/was not JSON/);
+  });
+});
+
+/** The streaming responses endpoint, answered from a scripted event list. */
+class FakeStream implements StreamingResponses {
+  readonly bodies: StreamParams[] = [];
+
+  constructor(private readonly events: StreamEvent[]) {}
+
+  async create(body: StreamParams): Promise<AsyncIterable<StreamEvent>> {
+    this.bodies.push(body);
+    const events = this.events;
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (const event of events) yield event;
+      },
+    };
+  }
+}
+
+/** One `response.output_text.delta`, as the API sends it. */
+function delta(itemId: string, text: string): StreamEvent {
+  return {
+    type: "response.output_text.delta",
+    item_id: itemId,
+    output_index: 0,
+    content_index: 0,
+    delta: text,
+    logprobs: [],
+    sequence_number: 0,
+  } as StreamEvent;
+}
+
+/** The terminal event, carrying the whole response. */
+function completed(reply: Partial<Response>): StreamEvent {
+  return {
+    type: "response.completed",
+    sequence_number: 0,
+    response: {
+      id: "r1",
+      created_at: 0,
+      model: SPARK_MODEL,
+      object: "response",
+      output: [],
+      output_text: "",
+      status: "completed",
+      error: null,
+      incomplete_details: null,
+      ...reply,
+    },
+  } as StreamEvent;
+}
+
+function streaming(events: StreamEvent[]): { museClient: MuseClient; fake: FakeStream } {
+  const fake = new FakeStream(events);
+  return {
+    museClient: new MuseClient({
+      streamingResponses: fake,
+      logger: { log: () => {}, warn: () => {} },
+    }),
+    fake,
+  };
+}
+
+const proseCall = {
+  label: "answer",
+  system: "You answer one question.",
+  user: "## The question",
+};
+
+describe("MuseClient.prose", () => {
+  it("asks for a streamed, searching reply with no schema", async () => {
+    const { museClient, fake } = streaming([
+      delta("msg_1", "An answer"),
+      completed({ output: [message("An answer")] }),
+    ]);
+    await museClient.prose(proseCall);
+
+    const body = fake.bodies[0]!;
+    expect(body.model).toBe(SPARK_MODEL);
+    expect(body.stream).toBe(true);
+    expect(body.instructions).toBe("You answer one question.");
+    expect(body.input).toBe("## The question");
+    expect(body.max_output_tokens).toBe(DEFAULT_MAX_TOKENS);
+    expect(body.tools).toEqual([{ type: "web_search", search_context_size: "medium" }]);
+    expect(body.include).toEqual(["web_search_call.action.sources"]);
+    expect("text" in body && body.text !== undefined).toBe(false);
+  });
+
+  it("reports the text of the item being written, from that item's start", async () => {
+    const seen: { itemId: string; text: string }[] = [];
+    const { museClient } = streaming([
+      delta("rs_1", "I'll look that up."),
+      delta("msg_1", "An answer"),
+      delta("msg_1", " of two halves"),
+      completed({ output: [message("An answer of two halves")] }),
+    ]);
+    const reply = await museClient.prose({ ...proseCall, onText: (update) => seen.push(update) });
+
+    expect(seen).toEqual([
+      { itemId: "rs_1", text: "I'll look that up." },
+      { itemId: "msg_1", text: "An answer" },
+      { itemId: "msg_1", text: "An answer of two halves" },
+    ]);
+    expect(reply.text).toBe("An answer of two halves");
+  });
+
+  it("returns the last message, the annotations and the pages searched", async () => {
+    const { museClient } = streaming([
+      completed({
+        output: [
+          message("I'll look up the pricing."),
+          searchCall("https://example.com/a", "https://example.com/b"),
+          message("Rivals charge $12 a seat", [
+            { type: "url_citation", url: "https://example.com/a", title: "Prices" },
+            { type: "url_citation", url: "https://example.com/a", title: "Prices again" },
+          ]),
+        ],
+      }),
+    ]);
+    const reply = await museClient.prose(proseCall);
+
+    expect(reply.text).toBe("Rivals charge $12 a seat");
+    expect(reply.citations).toEqual([{ url: "https://example.com/a", title: "Prices" }]);
+    expect(reply.searchedUrls).toEqual(["https://example.com/a", "https://example.com/b"]);
+    expect(reply.searched).toBe(true);
+  });
+
+  it("fails when the response never completed", async () => {
+    const { museClient } = streaming([delta("msg_1", "half an ans")]);
+    await expect(museClient.prose(proseCall)).rejects.toThrow(/without a response/);
+  });
+
+  it("fails when the response ran out of room, and says so", async () => {
+    const { museClient } = streaming([
+      {
+        type: "response.incomplete",
+        sequence_number: 0,
+        response: {
+          id: "r1",
+          created_at: 0,
+          model: SPARK_MODEL,
+          object: "response",
+          output: [message("half an answer")],
+          output_text: "",
+          status: "incomplete",
+          error: null,
+          incomplete_details: { reason: "max_output_tokens" },
+        },
+      } as StreamEvent,
+    ]);
+    await expect(museClient.prose(proseCall)).rejects.toThrow(
+      /came back incomplete \(max_output_tokens\)/,
+    );
+  });
+
+  it("fails when nothing was written at all", async () => {
+    const { museClient } = streaming([
+      completed({ output: [searchCall("https://example.com/a")] }),
+    ]);
+    await expect(museClient.prose(proseCall)).rejects.toThrow(/returned no text/);
+  });
+
+  it("reports what the answer spent", async () => {
+    const spent: ModelUsage[] = [];
+    const fake = new FakeStream([completed({
+      output: [message("An answer")],
+      usage: {
+        input_tokens: 3_000,
+        output_tokens: 2_100,
+        total_tokens: 5_100,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens_details: { reasoning_tokens: 1_700 },
+      },
+    } as Partial<Response>)]);
+    const museClient = new MuseClient({
+      streamingResponses: fake,
+      logger: { log: () => {}, warn: () => {} },
+      onUsage: (usage) => spent.push(usage),
+    });
+    await museClient.prose(proseCall);
+    expect(spent).toEqual([
+      { label: "answer", inputTokens: 3_000, outputTokens: 2_100, reasoningTokens: 1_700 },
+    ]);
   });
 });
 

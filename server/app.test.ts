@@ -292,6 +292,10 @@ describe("POST /api/feedback", () => {
       throw new Error("a contradiction is never checked against the web");
     }
 
+    async prose(): Promise<never> {
+      throw new Error("nobody asks Sotto anything here");
+    }
+
     async structured(call: StructuredCall): Promise<unknown> {
       if (call.label === "board") {
         this.items += 1;

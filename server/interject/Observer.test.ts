@@ -30,6 +30,10 @@ class FakeModel implements ModelClient {
     throw new Error("unexpected grounded call");
   }
 
+  async prose(): Promise<never> {
+    throw new Error("unexpected prose call");
+  }
+
   async structured(call: StructuredCall): Promise<unknown> {
     this.calls.push(call);
     const reply = this.replies.shift();

@@ -34,6 +34,10 @@ class FakeModel implements ModelClient {
     throw new Error("the verifier never makes an ungrounded call");
   }
 
+  async prose(): Promise<never> {
+    throw new Error("the verifier never asks for prose");
+  }
+
   async grounded(call: GroundedCall): Promise<GroundedReply> {
     this.calls.push(call);
     const next = this.replies.shift();

@@ -22,6 +22,8 @@ export const PROMPTS = {
   observer: "observer",
   /** Checking a claim against the web before raising it (US-013). */
   verify: "verify",
+  /** Answering a question somebody asked Sotto out loud (US-018). */
+  answer: "answer",
   /** Deciding whether a delivered card raises a planted moment (US-016). */
   judge: "judge",
 } as const;
