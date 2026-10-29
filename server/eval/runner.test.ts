@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DecisionLogRecord } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { TurnUpdate } from "../../shared/turns.js";
+import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { PAUSE_MS } from "../interject/policy.js";
 import { SESSION_FILES } from "../session/SessionStore.js";
 import {
@@ -216,7 +217,10 @@ describe("deliveriesFrom", () => {
       score: 0.81,
       inPause: true,
     });
-    expect(delivery?.pause).toEqual({ speaking: false, silentForMs: 3_000 });
+    expect(delivery?.pause).toEqual({
+      speaking: false,
+      silentForMs: 3_000 + ENDPOINTER_HANGOVER_MS,
+    });
   });
 
   it("measures the pause itself rather than trusting the policy", () => {
@@ -227,8 +231,9 @@ describe("deliveriesFrom", () => {
     expect(delivery?.pause.speaking).toBe(true);
     // And a gap too short to count as a pause is not one either. The length
     // is `PAUSE_MS` rather than a number, so tuning the threshold (US-023)
-    // moves the boundary this test is about instead of breaking it.
-    const tooSoonAtMs = 9_000 + PAUSE_MS - 1;
+    // moves the boundary this test is about instead of breaking it — less the
+    // hangover, since the room was already quiet when the turn closed.
+    const tooSoonAtMs = 9_000 + PAUSE_MS - ENDPOINTER_HANGOVER_MS - 1;
     const [tooSoon] = deliveriesFrom(result({ cards: [card({ createdAtMs: tooSoonAtMs })] }));
     expect(tooSoon?.inPause).toBe(false);
     expect(tooSoon?.pause).toEqual({ speaking: false, silentForMs: PAUSE_MS - 1 });

@@ -108,6 +108,32 @@ and 516 ms of pause eaten. **Size pause thresholds against the captures, never a
 > re-rendered and re-captured. The gap is now 1,944 ms. Nothing else about the fixture changed.
 > The other fixtures that clear 1.5 s on their own are marked in the table below.
 
+### How late `speechEnd` is, measured against the audio (US-023)
+
+The paragraph above measures the eaten pause *indirectly*, from two renders of one line.
+Measured directly, against where each line was actually rendered in the WAV
+(`fixtures/audio/<fixture>.timing.json`), `speechEnd.audioProcessedMs` lands **after the
+talking stopped** by:
+
+| | p10 | p25 | median | p75 | p90 | min | max |
+|---|---|---|---|---|---|---|---|
+| `speechEnd.audioProcessedMs` − true end of the line | 375 ms | 506 ms | **647 ms** | 841 ms | 1,155 ms | −140 ms | 2,296 ms |
+
+n = 198 (every captured turn). Per fixture the median runs 472–735 ms. So `speechEnd` is
+not an observation of silence starting, it is a *decision* taken after a hangover, and the
+reported gap between two turns understates the real pause by that much. The spread is wide
+and does **not** scale with the pause being eaten, so the only correction available at
+runtime is the constant: `ENDPOINTER_HANGOVER_MS` in `server/asr/turns.ts`.
+
+How much that matters: inside the six planted moments' windows, after the observer's look,
+the longest gap the API reports is **104–487 ms**, while the longest stretch of real quiet
+in that same stretch of WAV (RMS over 10 ms frames) is **930–1,610 ms**. Every one of those
+is an unmistakable pause handed over as a rounding error — which is why US-023's recall was
+capped at 1/6 until the hangover was subtracted.
+
+The last `transcript` frame of a turn is no help as a better estimate: its
+`audioProcessedMs` is exactly `speechEnd.audioProcessedMs + 500` in all 198 turns.
+
 ## End of stream
 
 After `{"type":"endStream"}` the server flushes, sends one last

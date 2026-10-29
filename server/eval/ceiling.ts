@@ -17,7 +17,8 @@
  *      turns or {@link UPDATE_INTERVAL_MS} (PRD US-009). Until then nobody has
  *      a candidate to decide about.
  *   3. **The pause.** Between the look and the deadline, the longest silence
- *      the transcription reported — which is what {@link inPause} is given.
+ *      the room really had — the transcription's gaps corrected for the
+ *      endpointer's hangover, which is what {@link inPause} is given.
  *
  * A moment is *reachable* at a pause threshold when that longest silence
  * clears it. Reachable is an upper bound, not a prediction: the observer still
@@ -60,7 +61,7 @@ export function lookTimes(
 }
 
 /**
- * The longest silence the transcription reported in `[fromMs, untilMs]`.
+ * The longest silence the room really had in `[fromMs, untilMs]`.
  *
  * Exact rather than sampled, because silence only ever grows: under
  * {@link pauseAt} it is longest either at the very end of the range or in the

@@ -28,6 +28,33 @@ import { systemClock, type Clock } from "../clock.js";
 
 type Logger = Pick<Console, "warn">;
 
+/**
+ * How long after speech really stopped the endpointer says it stopped.
+ *
+ * `speechEnd` is not an observation, it is a *decision*: the endpointer waits
+ * out a hangover before it will declare a turn over, and its
+ * `audioProcessedMs` is the position it made the call at, not the position the
+ * talking ended. Measured over all 198 captured turns, against the rendered
+ * position of the line each `speechEnd` closes
+ * (`<fixture>.timing.json`): median **647 ms** late, p25 506, p75 841, p10
+ * 375, p90 1,155.
+ *
+ * Which makes the raw gap between two turns a bad measure of a pause. Inside
+ * the six planted moments' windows the longest gap the API reported is
+ * 104–487 ms, while the longest stretch of real quiet in that same stretch of
+ * WAV is **930–1,610 ms** — every one of them an unmistakable pause that the
+ * instrument hands over as a rounding error. So silence is counted from
+ * `speechEnd` less this constant, and `PAUSE_MS` (`server/interject/policy.ts`)
+ * is a threshold on how long the room has really been quiet.
+ *
+ * It is a constant because nothing better is available at runtime: the last
+ * `transcript` frame of a turn is no help — its `audioProcessedMs` is exactly
+ * `speechEnd + 500` in all 198 turns — and the hangover does not scale with
+ * the pause it eats.
+ */
+export const ENDPOINTER_HANGOVER_MS = 650;
+
+
 export interface TurnAssemblerOptions {
   /** Supplies `pauseState()`'s default "now". Arrival times come from the frames. */
   clock?: Clock;
@@ -121,8 +148,10 @@ export class TurnAssembler {
    * Whether anybody is talking, and for how long nobody has been.
    *
    * `speaking` is true while any turn has a `speechStart` and no `speechEnd`.
-   * While speaking, `silentForMs` is 0; otherwise it counts from the most
-   * recent `speechEnd` (or from the assembler's start, before the first turn).
+   * While speaking, `silentForMs` is 0; otherwise it counts from the moment
+   * the room actually went quiet — the most recent `speechEnd` less
+   * {@link ENDPOINTER_HANGOVER_MS} (or from the assembler's start, before the
+   * first turn, where there is no hangover to undo).
    */
   pauseState(nowMs: number = this.clock.now()): PauseState {
     if (this.unclosed.length > 0) return { speaking: true, silentForMs: 0 };
@@ -247,8 +276,9 @@ export class TurnAssembler {
     }
     turn.endMs = atMs;
     this.forget(turnId);
-    // Silence only starts once nobody is left talking.
-    if (this.unclosed.length === 0) this.silenceSinceMs = atMs;
+    // Silence only starts once nobody is left talking, and it started before
+    // the API said so (see ENDPOINTER_HANGOVER_MS).
+    if (this.unclosed.length === 0) this.silenceSinceMs = atMs - ENDPOINTER_HANGOVER_MS;
     return this.emit(turn, false);
   }
 
@@ -263,7 +293,7 @@ export class TurnAssembler {
     if (turn.endMs === null) {
       turn.endMs = atMs;
       this.forget(turnId);
-      if (this.unclosed.length === 0) this.silenceSinceMs = atMs;
+      if (this.unclosed.length === 0) this.silenceSinceMs = atMs - ENDPOINTER_HANGOVER_MS;
     }
     this.live.delete(turnId);
     const final = snapshot(turn, true);

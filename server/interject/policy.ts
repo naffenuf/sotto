@@ -34,29 +34,29 @@ import {
 import type { PauseState } from "../../shared/turns.js";
 
 /**
- * How long nobody may have been talking before Sotto will say anything.
+ * How long the room must really have been quiet before Sotto will say anything.
  *
- * Measured, not guessed. The silence the API reports between turns across all
- * nine captures (189 gaps) decays smoothly from a median of 160 ms: half of
- * every handover is under 200 ms, 78% is under 400 ms, and the tail thins out
- * sharply above that — 42 gaps clear 400 ms, 21 clear 500 ms. So 400 ms is the
- * top fifth of gaps: a beat somebody left, not the join between two sentences.
+ * On the *corrected* silence, not the reported one:
+ * `ENDPOINTER_HANGOVER_MS` is subtracted in `TurnAssembler.pauseState`,
+ * because `speechEnd` arrives a measured median of 647 ms after the talking
+ * actually stopped. So this is milliseconds of quiet in the room, which is the
+ * only version of the number worth arguing about.
  *
- * It reads low because the instrument under-reports. The endpointer trims both
- * ends of a line, so the reported gap is consistently ~460 ms shorter than the
- * silence that is really in the audio — every scripted pause in
- * `moment-assumption` comes back 380–560 ms short, and `brainstorm`'s 1,600 and
- * 2,400 ms pauses came back as 1,084 and 1,944 ms (`fixtures/events/NOTES.md`).
- * 400 ms reported is therefore about 0.86 s of real quiet.
+ * 700 ms is the point at which a gap between turns stops being a handover and
+ * becomes a lapse somebody has to fill — comfortably past the ~200 ms that
+ * ordinary turn-taking leaves, and short enough to still be the pause the
+ * group is in rather than the next one.
  *
- * US-023 moved this, down from 1,500 ms, and 1,500 was the wrong number for a
- * measurable reason: only 6 of those 189 gaps reach it, and none of them falls
- * inside a planted moment's window after the observer has looked. 400 ms is the
- * lowest value that still discriminates; it is **not** enough to reach the
- * 0.7 recall gate, which is timing-bound rather than threshold-bound (see
- * `ralph/prd.json` US-023 for the measurement).
+ * US-023 arrived here from 1,500 ms via 400 ms, and both of those were
+ * thresholds on the *reported* gap, which is a different quantity: 400 ms
+ * reported is about 1.05 s of real quiet, and only 1 of the 6 planted moments
+ * has that much inside its window after the observer has looked, so recall was
+ * capped at 0.17 by the instrument rather than by the conversation. Every one
+ * of those windows does contain 0.93–1.61 s of real quiet
+ * (`npm run eval:ceiling`, and the WAVs themselves). See
+ * `ENDPOINTER_HANGOVER_MS` in `server/asr/turns.ts` for the measurement.
  */
-export const PAUSE_MS = 400;
+export const PAUSE_MS = 700;
 
 /** How long a candidate may wait for a pause before it is no longer about now. */
 export const STALE_MS = 90_000;

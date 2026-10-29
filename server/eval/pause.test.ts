@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TurnUpdate } from "../../shared/turns.js";
-import { TurnAssembler } from "../asr/turns.js";
+import { ENDPOINTER_HANGOVER_MS, TurnAssembler } from "../asr/turns.js";
 import { SimulatedClock } from "../clock.js";
 import { pauseAt, turnIntervals } from "./pause.js";
 
@@ -50,8 +50,15 @@ describe("pauseAt", () => {
   });
 
   it("counts silence from the end of the last turn to close", () => {
-    expect(pauseAt(intervals, 5_500)).toEqual({ speaking: false, silentForMs: 1_500 });
-    expect(pauseAt(intervals, 10_000)).toEqual({ speaking: false, silentForMs: 2_000 });
+    // Less the endpointer's hangover: the talking stopped that much earlier.
+    expect(pauseAt(intervals, 5_500)).toEqual({
+      speaking: false,
+      silentForMs: 1_500 + ENDPOINTER_HANGOVER_MS,
+    });
+    expect(pauseAt(intervals, 10_000)).toEqual({
+      speaking: false,
+      silentForMs: 2_000 + ENDPOINTER_HANGOVER_MS,
+    });
   });
 
   it("is speaking for the rest of the session once a turn never closes", () => {
@@ -67,7 +74,10 @@ describe("pauseAt", () => {
       turn({ turnId: "0:1", startMs: 3_500, endMs: 7_000, final: true }),
     ]);
     expect(pauseAt(overlapping, 4_500)).toEqual({ speaking: true, silentForMs: 0 });
-    expect(pauseAt(overlapping, 8_000)).toEqual({ speaking: false, silentForMs: 1_000 });
+    expect(pauseAt(overlapping, 8_000)).toEqual({
+      speaking: false,
+      silentForMs: 1_000 + ENDPOINTER_HANGOVER_MS,
+    });
   });
 });
 

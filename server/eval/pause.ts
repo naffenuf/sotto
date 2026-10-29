@@ -9,9 +9,11 @@
  *
  * It is the same rule {@link TurnAssembler.pauseState} applies, stated over
  * turns rather than over frames — somebody is talking while a turn has
- * started and not ended, and silence is counted from the last turn to end.
+ * started and not ended, and silence is counted from the last turn to end,
+ * less the endpointer's hangover ({@link ENDPOINTER_HANGOVER_MS}).
  */
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
+import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 
 /** One turn as an interval. `endMs` is `null` for a turn that never closed. */
 export interface TurnInterval {
@@ -53,12 +55,15 @@ export function pauseAt(
   atMs: number,
   startedAtMs = 0,
 ): PauseState {
-  let lastEndMs = startedAtMs;
+  let quietSinceMs = startedAtMs;
   for (const interval of intervals) {
     if (interval.startMs > atMs) continue;
     // Open at `atMs`: either still unclosed, or closing after it.
     if (interval.endMs === null || interval.endMs > atMs) return { speaking: true, silentForMs: 0 };
-    if (interval.endMs > lastEndMs) lastEndMs = interval.endMs;
+    // A turn's end is where the endpointer decided, not where the talking
+    // stopped; the assembler undoes the same hangover.
+    const quietFrom = interval.endMs - ENDPOINTER_HANGOVER_MS;
+    if (quietFrom > quietSinceMs) quietSinceMs = quietFrom;
   }
-  return { speaking: false, silentForMs: Math.max(0, atMs - lastEndMs) };
+  return { speaking: false, silentForMs: Math.max(0, atMs - quietSinceMs) };
 }

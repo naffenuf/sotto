@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parseAsrFrameRecords, type AsrFrameRecord } from "../../shared/asr.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { SimulatedClock } from "../clock.js";
-import { TurnAssembler, turnKey } from "./turns.js";
+import { ENDPOINTER_HANGOVER_MS, TurnAssembler, turnKey } from "./turns.js";
 
 const eventsDir = join(process.cwd(), "fixtures", "events");
 
@@ -240,6 +240,7 @@ describe("TurnAssembler", () => {
     const clock = new SimulatedClock();
     const assembler = new TurnAssembler({ clock, startedAtMs: 0 });
 
+    // Before the first turn there is no endpointer decision to undo.
     clock.advanceTo(500);
     expect(assembler.pauseState()).toEqual({ speaking: false, silentForMs: 500 });
 
@@ -247,11 +248,23 @@ describe("TurnAssembler", () => {
     clock.advanceTo(3_000);
     expect(assembler.pauseState()).toEqual({ speaking: true, silentForMs: 0 });
 
+    // The talking stopped ENDPOINTER_HANGOVER_MS before `speechEnd` said so,
+    // so silence is already that long at the instant the frame arrives.
     assembler.accept(speechEnd(3_000, 0));
     assembler.accept(speechComplete(3_010, 0, " Done. "));
+    expect(assembler.pauseState(3_000)).toEqual({
+      speaking: false,
+      silentForMs: ENDPOINTER_HANGOVER_MS,
+    });
     clock.advanceTo(4_600);
-    expect(assembler.pauseState()).toEqual({ speaking: false, silentForMs: 1_600 });
-    expect(assembler.pauseState(3_500)).toEqual({ speaking: false, silentForMs: 500 });
+    expect(assembler.pauseState()).toEqual({
+      speaking: false,
+      silentForMs: 1_600 + ENDPOINTER_HANGOVER_MS,
+    });
+    expect(assembler.pauseState(3_500)).toEqual({
+      speaking: false,
+      silentForMs: 500 + ENDPOINTER_HANGOVER_MS,
+    });
   });
 
   it("stays speaking until the last overlapping turn ends", () => {
@@ -262,7 +275,10 @@ describe("TurnAssembler", () => {
     expect(assembler.pauseState(300)).toEqual({ speaking: true, silentForMs: 0 });
 
     assembler.accept(speechEnd(400, 0));
-    expect(assembler.pauseState(900)).toEqual({ speaking: false, silentForMs: 500 });
+    expect(assembler.pauseState(900)).toEqual({
+      speaking: false,
+      silentForMs: 500 + ENDPOINTER_HANGOVER_MS,
+    });
   });
 
   it("ignores frames that carry no turn information", () => {
