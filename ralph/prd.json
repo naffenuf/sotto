@@ -496,8 +496,8 @@
         "Typecheck passes"
       ],
       "priority": 28,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done; all 6 criteria met. `npm run e2e` (scripts/e2e.ts) runs the four fixtures sequentially as ordinary `{kind:'wav'}` sessions and watches the same EventBus a browser watches, exactly as the eval harness does with captured events. MEASURED on commit 9c19795: 38/38 checks, 333 s of audio in 412 s of wall clock, 41 model calls, $0.4826 = $0.4659 of model + $0.0167 of transcription, exit 0. Latencies printed: wake -> headline 22.4 s / wake -> done 23.2 s (ask-search), 13.0 s / 13.4 s (ask-diagram), and budget-contradiction trigger -> delivery 7.9 s BEFORE the deadline — a live session gets real silence while the loops drain, which is why it lands in time here and `late` in an events replay. THE COST MARGIN IS 3.5%. Half the bill is reasoning tokens (56,915 output) and most of the input is the searching answer calls (56 pages searched on one). The gate is `MAX_RUN_COST_USD` in server/e2e/report.ts at the PRD's $0.50; a run that searched harder could exceed it. If it does, the waste to look at first is the observer look the drain fires over zero new turns after a board flush that changed nothing (visible in every fixture's log) — but that is US-012's behaviour, not this story's. Four checks are deliberately NOT what the eval does: 'caught' is structural (a delivered card whose decision type is the moment's and whose evidence cites a setup or trigger turn), not judged, so it comes out the same every run and costs nothing; wake triggers are counted off answers.jsonl rather than the indicator, which can bounce on a partial; the artifact is read off disk because the HTTP route only answers for the most recent session; and board shape is only held to US-014's numbers on brainstorm."
     }
   ]
 }

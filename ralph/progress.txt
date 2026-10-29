@@ -936,3 +936,50 @@
   for a drawn answer (two model rounds) versus ~19 s for a spoken one, and note that the artifact
   route only answers for the most recent session — an e2e run that starts a second fixture cannot
   read the first one's artifact back over HTTP afterwards.
+
+[2026-10-29 05:20] US-028 — completed — `npm run e2e`: four WAVs at real-time pace through the
+  real APIs, 38/38 checks, $0.4826 against a $0.50 budget.
+  US-023 SKIPPED A FOURTH TIME, for the arithmetic already in its own notes (recall 0.7 is out of
+  reach while the observer only looks after a board update, which PRD US-009 fixes at 4 final
+  turns). That is a PRD decision, so priority 28 was the next story to take. **US-028 was the last
+  story other than US-023**, which is now the only one left.
+  `fixtures/live-scripts/` is still untracked and still not mine.
+  WHAT IT IS. `scripts/e2e.ts` plus `server/e2e/`. It starts an ordinary `{kind:"wav"}` session per
+  fixture and watches the same `EventBus` a browser watches — no second pipeline, same move the
+  eval harness makes with captured events. The judging is three pure modules (`checks.ts`,
+  `latency.ts`, `report.ts`) covered by 51 unit tests in `server/e2e/e2e.test.ts`, so only
+  `live.ts` needs a key and `npm test` decides whether a record passes.
+  MEASURED (commit 9c19795). 333 s of audio in 412 s wall clock, 41 model calls, 179,206 input and
+  56,915 output tokens, $0.4659 model + $0.0167 transcription = $0.4826. brainstorm 9 points /
+  1 decision / 1 question / no interjections; moment-contradiction caught at `interject` ("The $20k
+  studio doesn't fit the $4k first-version budget"), 7.9 s after its trigger turn and BEFORE the
+  deadline; ask-search 3 citations; ask-diagram one 2.4 kB self-contained drawing.
+  A LIVE SESSION BEATS THE DEADLINE WHERE A REPLAY DOES NOT. `moment-contradiction` scores `late`
+  in `npm run eval` because the only pause it ever gets is `REPLAY_TRAILING_SILENCE_MS` after the
+  capture ends. Live, the WAV runs out and then the board/observer/verifier drain takes ~20 s of
+  *real* time, during which the policy's timers fire against growing real silence — so the card
+  goes out 7.9 s after the trigger, inside the window. Worth knowing before anyone tunes recall
+  off eval numbers alone: the replay is the pessimistic case.
+  THE COST MARGIN IS 3.5% AND THE GATE IS REAL. `MAX_RUN_COST_USD` (server/e2e/report.ts) is the
+  PRD's $0.50 and `runPassed` fails the run on it, so a run whose answers search harder than these
+  did could fail on price with every assertion holding. Half the bill is reasoning tokens; most of
+  the input is the two searching answer calls (one searched 56 pages). If it starts failing, the
+  first waste to look at is the observer look the drain fires over **zero** new turns after a board
+  flush that changed nothing — it happens in all four fixtures — but that is PRD US-012's "one look
+  per board update", not this story's to change.
+  FOUR CHECKS ARE DELIBERATELY NOT WHAT THE EVAL DOES, so this run is repeatable and cheap:
+  (1) "caught" is structural — a delivered card whose decision `type` is the moment's own and whose
+  `evidence` cites a setup or trigger turn — not a judge call; (2) wake triggers are counted off
+  `answers.jsonl` (`turnId !== null`), not off the wake indicator, which goes up on a partial and
+  can come back down; (3) the artifact is read off disk, because `GET /api/sessions/:id/artifacts/`
+  only answers for the *most recent* session and three more have run by then; (4) US-014's board
+  numbers are only required of `brainstorm` — the other three get "the loop ran and the items are
+  short and attributed".
+  TWO TIMELINES, ONE WALL CLOCK. A turn's `startMs`/`endMs` are positions in the audio stream; a
+  card's `createdAtMs` is read off the live `Clock`, whose origin is the *process*, not the session.
+  So `live.ts` stamps every bus event with `Date.now() - startedAt` and `latency.ts` maps a scripted
+  instant onto that wall by the median of `arrival - endMs` over the run's final turns (measured
+  700 ms, which is the API's reported processing lag). Do not subtract a card time from a turn time
+  directly in a live session.
+  Checked: npm run typecheck, npm test (656 / 47 files), npm run build, npm run fixtures:check,
+  npm run e2e (exit 0), npm run e2e -- --fixtures bogus (exit 1). Nothing human-only is pending.

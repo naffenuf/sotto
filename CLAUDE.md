@@ -648,3 +648,30 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   have written) rather than sanitised, and it answers only for the most recent session — the same
   session feedback and typed questions are addressed to. "Open full screen" is the `<figure>`'s,
   not the document's: a cross-origin iframe cannot request fullscreen for itself.
+- **A live session gets the pause a replay has to be handed.** `moment-contradiction` scores `late`
+  in `npm run eval` — its only quiet is `REPLAY_TRAILING_SILENCE_MS` after the capture ends — but in
+  `npm run e2e` the same fixture delivers **7.9 s after its trigger turn, before the deadline**,
+  because the WAV runs out and the board/observer/verifier drain then takes ~20 s of *real* time
+  while the policy's timers fire against growing real silence. The replay is the pessimistic case;
+  don't read a recall ceiling off it as though it were the live one.
+- **The end-to-end check stamps the wall clock because the pipeline has two timelines.** A turn's
+  `startMs`/`endMs` are positions in the audio stream, while a card's `createdAtMs` is read off the
+  live `Clock`, whose origin is the *process* — so in a live session those two cannot be subtracted.
+  `server/e2e/live.ts` stamps every bus event with `Date.now() - startedAt`, and
+  `server/e2e/latency.ts` maps a scripted instant onto that wall by the **median of
+  `arrival − endMs`** over the run's final turns (measured 700 ms, the API's processing lag).
+- **`npm run e2e` is 3.5% under its own budget.** Measured on the four fixtures: 333 s of audio in
+  412 s of wall clock, 41 model calls, $0.4659 of model + $0.0167 of transcription = **$0.4826**
+  against the PRD's $0.50, which `runPassed` gates on — so a run whose answers search harder can
+  fail on price with every assertion holding. Half the bill is reasoning tokens and most of the
+  input is the two searching answer calls (one searched 56 pages). The first waste to look at is
+  the observer look the drain fires over *zero* new turns after a board flush that changed nothing;
+  it happens in all four fixtures, and it is PRD US-012's "one look per board update".
+- **An end-to-end assertion must come out the same every run, so it reads the contracts, not a
+  judge.** `server/e2e/checks.ts` decides "the moment was caught" structurally — a delivered card
+  whose decision `type` is the moment's own and whose `evidence` cites a setup or trigger turn —
+  counts wake triggers off `answers.jsonl` (`turnId !== null`) rather than the indicator, which
+  goes up on a partial and can come back down, and reads an artifact off disk because
+  `GET /api/sessions/:id/artifacts/` only answers for the **most recent** session. All of it is
+  pure over two records (`E2eObserved` from the bus, `E2eFiles` from the folder), so `npm test`
+  covers the judgement and the API is only paid for the evidence.
