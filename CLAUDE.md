@@ -622,3 +622,29 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   the Stop response until the answer lands, so the header's Start/Stop stay disabled for the
   length of a model call. Harmless, but a Playwright check that screenshots straight after a
   post-Stop answer will catch the controls mid-wait — wait for Start to be enabled first.
+- **`web_search` and a function tool go in one request — the PRD's intent routing is dead code
+  that was never written.** The real Responses API accepts
+  `tools: [{type:"web_search"}, {type:"function", strict:true, …}]` together and completes
+  normally, so there is no classification call. What *does* need handling is that a round ending
+  in a `function_call` carries **no answer at all** — `reasoning`, a narration `message`, the
+  call, nothing else — so `MuseClient.prose` is a loop (`PROSE_MAX_ROUNDS` 3): run the handler,
+  push the `function_call` verbatim plus a `function_call_output`, ask again. Only the user
+  message and the call/result pairs are resent; `store: false` means the model's own reasoning and
+  narration are not kept anyway. The tools stay declared on the last round too — a request whose
+  input holds a `function_call` for an undeclared tool is a shape never probed here, and a 400
+  would lose the answer the withholding was meant to save.
+- **A tool handler never throws; it tells the model in words.** An unknown tool name, arguments
+  that are not JSON, a document that fails validation and a session with no folder all come back
+  as "… Answer in words instead." Losing a whole answer because a diagram did not render is the
+  worse outcome, and `SessionStore.writeArtifact` returns `string | null` for the same reason —
+  the one write whose failure is reported back rather than only warned about once.
+- **Nothing trusts an artifact's HTML, and nothing needs to.** `shared/artifacts.ts` never parses
+  or rewrites it: it is written verbatim and served by
+  `GET /api/sessions/:id/artifacts/:file` with `ARTIFACT_CSP` (`default-src 'none'` is the
+  load-bearing clause) plus `nosniff`, into an `<iframe sandbox="allow-scripts">` with **no**
+  `allow-same-origin` — an opaque origin with no network. "Self-contained" is a request in
+  `answer.md` and a guarantee in the headers, not a claim about the bytes. The route reads a file
+  name out of a URL, so it is gated on `ARTIFACT_FILE_PATTERN` (a name the server itself would
+  have written) rather than sanitised, and it answers only for the most recent session — the same
+  session feedback and typed questions are addressed to. "Open full screen" is the `<figure>`'s,
+  not the document's: a cross-origin iframe cannot request fullscreen for itself.

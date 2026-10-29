@@ -880,3 +880,59 @@
   FOR US-027 (artifacts). The typed path is the cheap way to drive an artifact without waiting for
   a wake line: `POST /api/ask {"question":"sketch the user flow as a diagram"}` reaches the same
   `AnswerAgent`, and `scripts/verify-ask.mjs` is the template for a browser check of one.
+
+[2026-10-29 05:10] US-027 — completed — HTML artifacts: the answer agent draws, the server
+  stores and serves, the card frames it in a sandbox.
+  US-023 SKIPPED AGAIN (third time), for the arithmetic in its own notes: recall 0.7 is out of
+  reach while the observer only looks after a board update, which PRD US-009 fixes at 4 final
+  turns. That is a PRD decision, so priority 27 was the next story to take.
+  WORKING TREE was dirty and it was this story — a cut-off iteration had written essentially the
+  whole of it. I reviewed every hunk rather than restarting, found one doc/code mismatch (the
+  PROSE_MAX_ROUNDS comment claimed the tools are withheld on the last round; the code never does
+  that) and fixed the comment rather than the code — see below. `fixtures/live-scripts/` is still
+  untracked and still not mine (US-028).
+  THE PRD'S FALLBACK IS NOT NEEDED. `web_search` and a strict `function` tool go in the SAME
+  Responses request and the API accepts them; `status: "completed"`, a `show_html` call with real
+  HTML. So there is no cheap classification call and no intent routing. Written up in
+  `fixtures/events/NOTES.md`, which criterion 5 asks for either way.
+  THE SHAPE THAT DID NEED HANDLING. A round that ends in a `function_call` carries no answer at
+  all — `reasoning`, a narration `message`, the `function_call`, nothing else. The answer only
+  exists after the result goes back as `function_call_output`, so `MuseClient.prose` is now a loop
+  (`PROSE_MAX_ROUNDS` = 3). The follow-up turn resends three items: the user message, the
+  `function_call` verbatim, the output. Reasoning and narration items are dropped (`store: false`,
+  so what is resent is all there is).
+  WHY THE TOOLS ARE NOT WITHHELD ON THE LAST ROUND. It would guarantee an answer, but a request
+  whose input holds a `function_call` for a tool that is no longer declared is a shape nobody here
+  has asked the API for, and a 400 would lose the whole answer. A model that draws on all three
+  rounds is a handled `ModelCallError` -> an error card instead. If a future iteration sees that
+  error in the wild, probe the withholding first rather than raising the round count.
+  NOTHING TRUSTS THE HTML. It is never parsed or rewritten — written verbatim, served with the
+  PRD's CSP (`default-src 'none'` is the load-bearing clause) plus `nosniff`/`no-store`, into an
+  `<iframe sandbox="allow-scripts">` with **no** `allow-same-origin`, which is what actually
+  denies it this origin's DOM, storage and cookies. "Self-contained" is a request in the prompt and
+  a guarantee in the headers, not a claim about the bytes. The route serves only the most recent
+  session and only file names matching `ARTIFACT_FILE_PATTERN` — a gate, not a sanitiser, because
+  it is reading a path out of a URL; `..%2F..%2F.env` and friends are unit-tested 404s.
+  FAILURE IS ALWAYS WORDS. `SessionStore.writeArtifact` returns `string | null` now (the one write
+  whose failure is reported back rather than only warned about), `AnswerAgent`'s handler never
+  throws, and every refusal — no folder, disk error, unusable document, unknown tool, bad JSON —
+  comes back to the model as "Answer in words instead." A diagram that fails must not cost the
+  answer. A diagram drawn before the words fail is kept on the error card.
+  "OPEN FULL SCREEN" PUTS THE FRAME FULL SCREEN, not the document: the iframe is a foreign origin
+  and cannot request it for itself, so the `<figure>` does and `.card__artifact:fullscreen` makes
+  the frame fill it.
+  MEASURED. Integration test `server/answer/artifact.integration.test.ts` (real API, 45 s, 3
+  tests): `ask-diagram` replayed at max gives exactly one artifact, on disk, containing `<svg` or
+  `<div`, with no remote `link`/`script`/`img`. `npm run verify:artifact` through `with_server.py`
+  drove a 1x replay to a real card: a 2.4 kB inline-CSS flow diagram, CSP byte-for-byte as
+  specified, 279 px of rendered content inside the frame, full screen confirmed, one file in
+  `artifacts/`, one line in `answers.jsonl`, zero console errors. Screenshots at
+  /tmp/sotto-shots/us027-artifact{,-fullscreen}.png — both looked right.
+  Checked: npm run typecheck, npm test (605 / 46 files), npm run build, npm run fixtures:check.
+  Nothing human-only is pending.
+  FOR US-028 (the e2e check). Its ask-diagram assertion is exactly this story's integration test
+  with a WAV source instead of an events one: one answer, one artifact, file on disk, `<svg` or
+  `<div`. `scripts/verify-artifact.mjs` already reads the session folder that way. Budget ~25–40 s
+  for a drawn answer (two model rounds) versus ~19 s for a spoken one, and note that the artifact
+  route only answers for the most recent session — an e2e run that starts a second fixture cannot
+  read the first one's artifact back over HTTP afterwards.
