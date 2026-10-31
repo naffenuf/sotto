@@ -77,6 +77,7 @@ export interface BoardUpdaterOptions {
   logger?: Logger;
   newTurnsPerUpdate?: number;
   intervalMs?: number;
+  onTiming?: (event: Record<string, unknown>) => void;
 }
 
 export class BoardUpdater {
@@ -87,10 +88,14 @@ export class BoardUpdater {
   private readonly logger: Logger;
   private readonly newTurnsPerUpdate: number;
   private readonly intervalMs: number;
+  private readonly onTiming: BoardUpdaterOptions["onTiming"];
+  private attemptCount = 0;
 
   private current: Board = emptyBoard();
   /** Every final turn so far, oldest first; the context window comes off the end. */
   private readonly turns: TurnUpdate[] = [];
+  /** Turns included in successful board updates. */
+  private readonly coveredTurnIds = new Set<string>();
   /** Final turns the board has not been shown yet. */
   private pending: TurnUpdate[] = [];
   /** The cycle that is running, or `undefined`. */
@@ -109,11 +114,17 @@ export class BoardUpdater {
     this.logger = options.logger ?? console;
     this.newTurnsPerUpdate = options.newTurnsPerUpdate ?? NEW_TURNS_PER_UPDATE;
     this.intervalMs = options.intervalMs ?? UPDATE_INTERVAL_MS;
+    this.onTiming = options.onTiming;
   }
 
   /** The board as the last update left it. */
   board(): Board {
     return this.current;
+  }
+
+  /** Final turns absent from the latest successfully applied board. */
+  uncoveredTurns(): readonly TurnUpdate[] {
+    return this.turns.filter((turn) => !this.coveredTurnIds.has(turn.turnId));
   }
 
   /** How many updates have been applied. */
@@ -183,6 +194,10 @@ export class BoardUpdater {
   private async runOnce(): Promise<void> {
     const newTurns = this.pending;
     this.pending = [];
+    const attempt = ++this.attemptCount;
+    const startedAtMs = this.clock.now();
+    const turnIds = newTurns.map((turn) => turn.turnId);
+    this.onTiming?.({ stage: "board_start", atMs: startedAtMs, attempt, turnIds });
     const context = this.turns.slice(0, this.turns.length - newTurns.length).slice(-CONTEXT_TURNS);
     this.onModelState?.("connecting", "updating the board");
 
@@ -191,6 +206,7 @@ export class BoardUpdater {
       ops = await this.requestOps(newTurns, context);
     } catch (error) {
       const detail = message(error);
+      this.onTiming?.({ stage: "board_error", atMs: this.clock.now(), attempt, durationMs: this.clock.now() - startedAtMs, turnIds, error: detail });
       this.logger.warn(`[board] update ${this.updateCount + 1} failed: ${detail}`);
       this.onModelState?.("error", detail);
       // The turns were never shown to the board, so they go back at the front
@@ -200,8 +216,10 @@ export class BoardUpdater {
     }
 
     const atMs = this.clock.now();
+    this.onTiming?.({ stage: "board_complete", atMs, attempt, durationMs: atMs - startedAtMs, turnIds });
     const result = applyOps(this.current, ops, atMs);
     this.current = result.board;
+    for (const turn of newTurns) this.coveredTurnIds.add(turn.turnId);
     for (const skipped of result.ignored) {
       this.logger.warn(
         `[board] ignored ${skipped.op.op}${skipped.id === undefined ? "" : ` ${skipped.id}`}: ${skipped.reason}`,

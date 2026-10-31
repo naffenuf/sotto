@@ -147,6 +147,18 @@ function boardWithConstraint(): Board {
 }
 
 describe("Observer", () => {
+  it("includes earlier unsummarized turns even after they were already observed", async () => {
+    const test = harness([candidates(), candidates()]);
+    const earlier = test.say(1);
+    test.observer.observe(emptyBoard(), earlier);
+    await test.observer.flush();
+    const latest = test.say(1);
+    test.observer.observe(emptyBoard(), [...earlier, ...latest]);
+    await test.observer.flush();
+    expect(test.model.calls[1]!.user).toContain("Earlier transcript not yet incorporated into the board");
+    expect(test.model.calls[1]!.user).toContain("[0:0]");
+    expect(test.model.calls[1]!.user).toContain("[0:1]");
+  });
   it("looks right after a board update, and sends the board, the new turns and the topic", async () => {
     const test = harness([candidates()]);
     test.say(5);

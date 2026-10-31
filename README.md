@@ -22,6 +22,23 @@ Full spec: [`tasks/prd-sotto-core.md`](tasks/prd-sotto-core.md).
 Meta APIs: `muse-voice-transcribe-1.0` for realtime diarized transcription,
 `muse-spark-1.3` for board updates, interjection candidates, answers and eval judging.
 
+The observer considers finalized turns without waiting for the notes update. It
+receives the latest completed notes and all finalized turns not covered by them;
+if another turn arrives while an observer call is running, the next look combines
+the pending turns. This can make more model calls than the notes-driven loop.
+
+Each new session also saves `timing.jsonl` alongside its transcript and candidate logs.
+It records transcription events and final turns, board and observer call starts and
+finishes (including empty and failed runs), verification, policy decisions, and answer
+and interjection card publication. Join events by turn ID, observer run, candidate ID,
+or answer ID. `atMs` uses the session's monotonic pipeline clock; compare differences,
+not its absolute value, with timestamps in `candidates.jsonl` and `answers.jsonl`.
+ASR `frameAtMs` and `audioProcessedMs` are stream-relative values, not the same clock.
+Speech-end events reflect the transcription service's endpoint detection, not an exact
+measurement of the last audible sound. Card publication is server-side and does not
+measure when a browser actually rendered it. Replay uses simulated time, so model-call
+durations there do not measure live API latency.
+
 ## Setup
 
 Requires Node 22+.

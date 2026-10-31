@@ -1,11 +1,10 @@
 /**
  * The observer: noticing things worth raising (PRD US-012).
  *
- * It runs **right after each board update** (US-009), because that is the
- * moment the conversation has just been organized: the board holds what the
- * group stated and decided, which is what a contradiction collides with and
- * where a dropped thread sits, so the observer gets the memory for free and
- * costs one model call per board update rather than one per turn.
+ * It is triggered by finalized turns, independently of the board update loop.
+ * Each look gets the latest completed board and the finalized turns not yet
+ * incorporated into it, so an in-flight or failed board update cannot leave
+ * a gap in its view of the conversation.
  *
  * Every candidate it gets back is written to `candidates.jsonl` before
  * anything decides what to do with it — the file is the record of what Sotto
@@ -66,6 +65,7 @@ export interface ObserverOptions {
   /** The model status dot, shared with the board loop. */
   onModelState?: (state: "connecting" | "active" | "error", detail: string) => void;
   logger?: Logger;
+  onTiming?: (event: Record<string, unknown>) => void;
 }
 
 export class Observer {
@@ -75,6 +75,8 @@ export class Observer {
   private readonly onCandidate: (candidate: Candidate) => void;
   private readonly onModelState: ObserverOptions["onModelState"];
   private readonly logger: Logger;
+  private readonly onTiming: ObserverOptions["onTiming"];
+  private attemptCount = 0;
 
   /** Every final turn so far, oldest first; the current topic is its tail. */
   private readonly turns: TurnUpdate[] = [];
@@ -82,8 +84,8 @@ export class Observer {
   private pending: TurnUpdate[] = [];
   /** Candidates already passed on, oldest first: the duplicate check's memory. */
   private readonly raised: Candidate[] = [];
-  /** The board as of the most recent update, waiting to be looked at. */
-  private nextBoard: Board | undefined;
+  /** The latest context waiting to be looked at. */
+  private nextBoard: { board: Board; uncovered: readonly TurnUpdate[] } | undefined;
   private running: Promise<void> | undefined;
   private stopped = false;
   private runCount = 0;
@@ -96,6 +98,7 @@ export class Observer {
     this.onCandidate = options.onCandidate;
     this.onModelState = options.onModelState;
     this.logger = options.logger ?? console;
+    this.onTiming = options.onTiming;
   }
 
   /** How many observer runs have completed. */
@@ -119,15 +122,14 @@ export class Observer {
   }
 
   /**
-   * Looks at the conversation, with the board as it stands after an update.
+   * Looks at the conversation using the latest completed board and uncovered turns.
    *
-   * Returns as soon as a cycle is under way — the board loop must not wait on
-   * the observer — but the call is tracked on the clock, so a `max`-speed
-   * replay does.
+   * Returns as soon as a cycle is under way. Calls are coalesced while a look
+   * is in flight and tracked on the clock, so a `max`-speed replay waits.
    */
-  observe(board: Board): void {
+  observe(board: Board, uncovered: readonly TurnUpdate[] = []): void {
     if (this.stopped) return;
-    this.nextBoard = board;
+    this.nextBoard = { board, uncovered: [...uncovered] };
     if (this.running !== undefined) return;
     this.running = this.clock.track(OBSERVER_TRACK_LABEL, this.cycle());
   }
@@ -142,22 +144,26 @@ export class Observer {
     this.stopped = true;
   }
 
-  /** Runs looks back to back for as long as board updates keep arriving. */
+  /** Runs looks back to back for as long as new turns keep arriving. */
   private async cycle(): Promise<void> {
     try {
       while (this.nextBoard !== undefined && !this.stopped) {
-        const board = this.nextBoard;
+        const { board, uncovered } = this.nextBoard;
         this.nextBoard = undefined;
-        await this.runOnce(board);
+        await this.runOnce(board, uncovered);
       }
     } finally {
       this.running = undefined;
     }
   }
 
-  private async runOnce(board: Board): Promise<void> {
+  private async runOnce(board: Board, uncovered: readonly TurnUpdate[]): Promise<void> {
     const newTurns = this.pending;
     this.pending = [];
+    const attempt = ++this.attemptCount;
+    const startedAtMs = this.clock.now();
+    const turnIds = newTurns.map((turn) => turn.turnId);
+    this.onTiming?.({ stage: "observer_start", atMs: startedAtMs, attempt, turnIds });
     // The current topic is the tail of the whole conversation, not of the new
     // turns: right after a slow stretch there may be only one new turn.
     const topic = this.turns.slice(-CURRENT_TOPIC_TURNS);
@@ -165,19 +171,21 @@ export class Observer {
 
     let candidates: ObserverCandidate[];
     try {
-      candidates = await this.request(board, newTurns, topic);
+      candidates = await this.request(board, newTurns, topic, uncovered);
     } catch (error) {
       const detail = message(error);
+      this.onTiming?.({ stage: "observer_error", atMs: this.clock.now(), attempt, durationMs: this.clock.now() - startedAtMs, turnIds, error: detail });
       this.logger.warn(`[observer] run ${this.runCount + 1} failed: ${detail}`);
       this.onModelState?.("error", detail);
       // Never looked at, so they go back at the front for the next board
-      // update to bring along.
+      // turn to bring along.
       this.pending = [...newTurns, ...this.pending];
       return;
     }
 
     this.runCount += 1;
     const atMs = this.clock.now();
+    this.onTiming?.({ stage: "observer_complete", atMs, attempt, run: this.runCount, durationMs: atMs - startedAtMs, turnIds, candidateCount: candidates.length });
     if (candidates.length > MAX_CANDIDATES_PER_RUN) {
       this.logger.warn(
         `[observer] run ${this.runCount} returned ${candidates.length} candidates; keeping the first ${MAX_CANDIDATES_PER_RUN}`,
@@ -256,11 +264,12 @@ export class Observer {
     board: Board,
     newTurns: readonly TurnUpdate[],
     topic: readonly TurnUpdate[],
+    uncovered: readonly TurnUpdate[],
   ): Promise<ObserverCandidate[]> {
     const reply = await this.model.structured({
       label: OBSERVER_TRACK_LABEL,
       system: loadPrompt(PROMPTS.observer),
-      user: renderObserverRequest(board, newTurns, topic, this.raised),
+      user: renderObserverRequest(board, newTurns, topic, this.raised, uncovered),
       schemaName: OBSERVER_SCHEMA_NAME,
       schema: observerCandidatesJsonSchema,
     });
@@ -348,6 +357,7 @@ export function renderObserverRequest(
   newTurns: readonly TurnUpdate[],
   topic: readonly TurnUpdate[],
   raised: readonly Candidate[],
+  uncovered: readonly TurnUpdate[] = [],
 ): string {
   const blocks = ["## The board right now", renderBoard(board)];
   if (raised.length > 0) {
@@ -360,6 +370,12 @@ export function renderObserverRequest(
         .join("\n"),
     );
   }
+  const newIds = new Set(newTurns.map((turn) => turn.turnId));
+  const earlierUncovered = uncovered.filter((turn) => !newIds.has(turn.turnId));
+  if (earlierUncovered.length > 0) blocks.push(
+    "## Earlier transcript not yet incorporated into the board",
+    earlierUncovered.map(renderTurn).join("\n"),
+  );
   blocks.push(
     "## The transcript since you last looked",
     newTurns.length === 0 ? "_nothing new_" : newTurns.map(renderTurn).join("\n"),

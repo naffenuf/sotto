@@ -7,8 +7,7 @@
  *                                                              v
  *                                                        board updater -> bus
  *                                                              |
- *                                                              v
- *                                                     observer -> verifier
+ *                                      final turns -> observer -> verifier
  *                                                              |
  *                                                              v
  *                                                     policy -> candidates.jsonl
@@ -62,6 +61,7 @@ import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import { WakeWatcher } from "../wakeWatcher.js";
+import { introducedName } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
@@ -476,6 +476,7 @@ export class SessionManager {
         .run({
           onFrame: (record) => {
             store.writer?.appendEvent(record);
+            if (record.frame["type"] === "speechEnd" || record.frame["type"] === "speechComplete") store.writer?.appendTiming?.({ stage: `asr_${record.frame["type"]}`, atMs: clock.now(), turnId: `${record.session}:${record.frame["turnId"]}`, audioProcessedMs: record.frame["audioProcessedMs"], frameAtMs: record.atMs });
             assembler.accept(record);
           },
           onEnd: () => {},
@@ -548,6 +549,7 @@ export class SessionManager {
           );
         }
         store.writer?.appendEvent(record);
+        if (record.frame["type"] === "speechEnd" || record.frame["type"] === "speechComplete") store.writer?.appendTiming?.({ stage: `asr_${record.frame["type"]}`, atMs: this.liveClock.now(), turnId: `${record.session}:${record.frame["turnId"]}`, audioProcessedMs: record.frame["audioProcessedMs"], frameAtMs: record.atMs });
         assembler.accept(record);
       },
       logger: this.logger,
@@ -579,7 +581,7 @@ export class SessionManager {
     store: StoreSlot,
     loops: ModelLoops,
   ): TurnAssembler {
-    const wake = this.wakeWatcher(info, loops);
+    const wake = this.wakeWatcher(info, loops, clock, store);
     return new TurnAssembler({
       clock,
       // Frame times are measured from the start of the stream on both paths —
@@ -588,12 +590,20 @@ export class SessionManager {
       startedAtMs: 0,
       logger: this.logger,
       onUpdate: (turn) => {
+        if (turn.final) store.writer?.appendTiming?.({ stage: "turn_final", atMs: clock.now(), turnId: turn.turnId, turnStartMs: turn.startMs, turnEndMs: turn.endMs });
         this.bus.publish({ type: "turn", turn });
         // Partials are dropped by all three of these; only final turns are
         // saved, and only final turns can trigger a board update.
         store.writer?.appendTurn(turn);
+        if (turn.final && turn.speaker !== null && !turn.speakerMappingUncertain && this.current?.info.id === info.id && this.bus.speakerNames()[turn.speaker] === undefined) {
+          const name = introducedName(turn.text);
+          if (name !== null) this.renameSpeaker(turn.speaker, name);
+        }
         loops.board?.acceptTurn(turn);
         loops.observer?.acceptTurn(turn);
+        if (turn.final && loops.board && loops.observer) {
+          loops.observer.observe(loops.board.board(), loops.board.uncoveredTurns());
+        }
         // The policy is the one that wants the partials too: a `speechEnd`
         // arrives as one, and it is what opens a pause (US-014).
         loops.policy?.acceptTurn(turn);
@@ -613,7 +623,7 @@ export class SessionManager {
    * interjections out of the way. The question goes to the answer agent
    * (US-018), which is `null` in that case, so nothing is answered.
    */
-  private wakeWatcher(info: SessionInfo, loops: ModelLoops): WakeWatcher {
+  private wakeWatcher(info: SessionInfo, loops: ModelLoops, clock: Clock, store: StoreSlot): WakeWatcher {
     const current = (): boolean => this.current?.info.id === info.id;
     return new WakeWatcher({
       onListening: (listening) => {
@@ -621,6 +631,7 @@ export class SessionManager {
         // not put the indicator back up. The bus takes it down on the
         // `session` event either way.
         if (!current()) return;
+        if (listening) store.writer?.appendTiming?.({ stage: "wake_listening", atMs: clock.now() });
         this.bus.setListening(listening);
         // Whoever is talking to Sotto has the floor for the courtesy window,
         // from the moment they start asking rather than when they finish.
@@ -628,6 +639,7 @@ export class SessionManager {
       },
       onQuestion: (trigger) => {
         if (!current()) return;
+        store.writer?.appendTiming?.({ stage: "wake_question", atMs: clock.now(), turnId: trigger.turnId });
         // Asking again refreshes the window; from here the answer agent holds
         // the floor itself, with `setAnswerThinking` (US-018).
         loops.policy?.wakePhraseDetected();
@@ -651,9 +663,9 @@ export class SessionManager {
    * session still transcribes and still saves, it just has no board, notices
    * nothing and answers nothing.
    *
-   * They form a chain. The board writes `board.json`/`board.md` and pushes
-   * the board to every attached browser; the observer looks at the
-   * conversation right after each update; a claim that looks wrong goes to
+   * The board writes `board.json`/`board.md` and pushes the board to every
+   * attached browser; the observer looks on finalized turns using the latest
+   * board plus uncovered turns. A claim that looks wrong goes to
    * the verifier first and everything else straight to the policy, which
    * decides whether and when it is worth saying. Every candidate, check and
    * decision lands in `candidates.jsonl` on the way past. The answer agent
@@ -691,21 +703,22 @@ export class SessionManager {
       if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
     };
     const deliveries = new Map<string, Delivered>();
+    const onTiming = (event: Record<string, unknown>): void => store.writer?.appendTiming?.(event);
     const policy = new InterjectionPolicy({
       clock,
       pauseState,
       chattiness: this.currentSettings.chattiness,
       logger: this.logger,
-      onRecord: (record) => store.writer?.appendCandidate(record),
+      onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "policy_decision", ...record }); },
       // The stage (US-015). The level the policy chose becomes the card's
       // variant, and the card is kept so a 👍 can find its way back to it.
-      onDeliver: (interjection) => this.deliver(info, deliveries, interjection),
+      onDeliver: (interjection) => { this.deliver(info, deliveries, interjection); onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id }); },
     });
     const verifier = new Verifier({
       clock,
       model,
       logger: this.logger,
-      onRecord: (record) => store.writer?.appendCandidate(record),
+      onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "verification_complete", ...record }); },
       // A claim that really is wrong has the correction in its detail by now,
       // and goes to the policy like any other candidate.
       onVerified: (candidate) => policy.accept(candidate),
@@ -719,15 +732,17 @@ export class SessionManager {
       // A claim that looks wrong is checked against the web before it can be
       // said to anyone (US-013); everything else goes straight to the policy.
       onCandidate: (candidate) => {
-        if (candidate.type === "factual_error") verifier.verify(candidate);
+        if (candidate.type === "factual_error") { onTiming({ stage: "verification_start", atMs: clock.now(), candidateId: candidate.id }); verifier.verify(candidate); }
         else policy.accept(candidate);
       },
       onModelState,
+      onTiming,
     });
     const board = new BoardUpdater({
       clock,
       model,
       logger: this.logger,
+      onTiming,
       onUpdate: (update) => {
         store.writer?.writeBoard(update.board, update.markdown);
         this.bus.publish({
@@ -736,10 +751,6 @@ export class SessionManager {
           changedIds: update.changedIds,
           updatedAtMs: update.atMs,
         });
-        // Right after each board update, while the board says what the group
-        // has stated and decided. Tracked on the clock inside, so the call is
-        // registered before this returns and `max` replay waits for it.
-        observer.observe(update.board);
       },
       onModelState,
     });
@@ -750,14 +761,16 @@ export class SessionManager {
       clock,
       model,
       logger: this.logger,
+      onTiming,
       board: () => board.board(),
       transcript,
       speakers: () => this.bus.speakerNames(),
       // Published while this session still owns the stage — which it does
       // until the next one starts, not only while it is running: a question
       // typed after Stop (US-019) must put its answer somewhere.
-      onCard: (card) => {
+      onCard: (card, answer) => {
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
+        onTiming({ stage: "answer_card", atMs: clock.now(), answerId: answer.id, status: answer.status, hasHeadline: answer.headline !== "", latencyMs: answer.latencyMs, published: this.last?.sessionId === info.id });
       },
       onRecord: (record) => store.writer?.appendAnswer(record),
       // Generated HTML goes into this session's folder and is served back

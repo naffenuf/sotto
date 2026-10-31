@@ -300,7 +300,7 @@ describe("SessionManager, board and observer", () => {
         candidates: [
           {
             type: "untested_assumption",
-            headline: `${ScriptedModel.subjects[(this.items - 1) % ScriptedModel.subjects.length]} is unchecked`,
+            headline: `${ScriptedModel.subjects[Math.max(0, this.items - 1) % ScriptedModel.subjects.length]} is unchecked`,
             detail: "The plan rests on it.",
             whyNow: "They are about to decide",
             evidenceTurnIds: ["0:0"],
@@ -312,7 +312,7 @@ describe("SessionManager, board and observer", () => {
     }
   }
 
-  it("looks for candidates after each board update and writes them to the folder", async () => {
+  it("looks for candidates as turns arrive without waiting for a board update", async () => {
     const bus = new EventBus(quiet);
     const model = new ScriptedModel();
     const logged: CandidateLogLine[] = [];
@@ -353,10 +353,9 @@ describe("SessionManager, board and observer", () => {
     const boardCalls = model.calls.filter((call) => call.label === "board");
     const observerCalls = model.calls.filter((call) => call.label === "observer");
     expect(boardCalls.length).toBeGreaterThan(1);
-    // One look per update, and each look happens after the update it follows:
-    // its request carries the item that update added.
-    expect(observerCalls).toHaveLength(boardCalls.length);
-    expect(observerCalls.at(-1)!.user).toContain(`[p${boardCalls.length}] point ${boardCalls.length}`);
+    expect(observerCalls.length).toBeGreaterThan(boardCalls.length);
+    expect(model.calls[0]?.label).toBe("observer");
+    expect(observerCalls[0]!.user).toContain("[0:0]");
 
     const candidates = logged.filter(
       (line): line is CandidateLogRecord => line.kind === "candidate",
@@ -365,8 +364,6 @@ describe("SessionManager, board and observer", () => {
     expect(candidates.map((record) => record.candidate.id)).toEqual(
       candidates.map((_, index) => `cand-${index + 1}`),
     );
-    // Different board items each time, so none of them is a repeat.
-    for (const record of candidates) expect(record.candidate.duplicateOf).toBeUndefined();
 
     // And the policy (US-014) decided about every one of them in the same
     // file. These score 0.6 × 0.5 × 0.9 × 0.7 = 0.19, under `normal`'s glow
@@ -375,7 +372,7 @@ describe("SessionManager, board and observer", () => {
       (line): line is DecisionLogRecord => line.kind === "decision",
     );
     expect(decisions.map((record) => record.candidateId)).toEqual(
-      candidates.map((record) => record.candidate.id),
+      candidates.filter((record) => record.candidate.duplicateOf === undefined).map((record) => record.candidate.id),
     );
     for (const record of decisions) {
       expect(record.decision).toBe("silent");
@@ -426,7 +423,7 @@ describe("SessionManager, board and observer", () => {
           candidates: [
             {
               type: "factual_error",
-              headline: claims[(this.items - 1) % claims.length]!,
+              headline: claims[Math.max(0, this.items - 1) % claims.length]!,
               detail: "The number they are costing this off is wrong.",
               whyNow: "They are about to commit to it",
               evidenceTurnIds: ["0:0"],
@@ -498,7 +495,7 @@ describe("SessionManager, board and observer", () => {
     expect(noticed.length).toBeGreaterThan(0);
     // Every candidate this model notices is a factual error, so every one of
     // them is checked — and nothing is checked that was not noticed first.
-    expect(checked).toHaveLength(noticed.length);
+    expect(checked).toHaveLength(noticed.filter((record) => record.candidate.duplicateOf === undefined).length);
     expect(model.calls.filter((label) => label === "verify")).toHaveLength(checked.length);
     for (const record of checked) {
       expect(record.outcome).toBe("verified");
@@ -1246,6 +1243,34 @@ describe("SessionManager, speaker names", () => {
     } satisfies SessionWriter;
     return { renames, writer };
   }
+
+  it("names a speaker from a final introduction and keeps a manual correction", async () => {
+    const bus = new EventBus(quiet);
+    const { renames, writer } = recordingWriter();
+    let emit: ((record: AsrFrameRecord) => void) | undefined;
+    const sessions = new SessionManager({
+      bus, apiKey: "test-key", logger: quiet, createStore: () => writer,
+      createModel: () => null,
+      createAsrClient: ({ onFrame }) => { emit = onFrame; return new FakeAsrClient(onFrame); },
+    });
+    sessions.start({ kind: "mic" });
+    const say = (id: number, text: string): void => {
+      for (const frame of [
+        { type: "speechStart", turnId: id, audioProcessedMs: id * 1000 },
+        { type: "speaker", label: "A", audioProcessedMs: id * 1000 + 100 },
+        { type: "speechEnd", turnId: id, audioProcessedMs: id * 1000 + 200 },
+        { type: "speechComplete", turnId: id, audioProcessedMs: id * 1000 + 200, transcript: text },
+      ]) emit?.({ atMs: frame.audioProcessedMs, session: 0, frame });
+    };
+    say(1, "I'm Alex, I coordinate the garden.");
+    expect(bus.speakerNames()).toEqual({ A: "Alex" });
+    expect(renames).toEqual([["A", "Alex"]]);
+    sessions.renameSpeaker("A", "Alexander");
+    say(2, "I'm Alex, and I agree.");
+    expect(bus.speakerNames()).toEqual({ A: "Alexander" });
+    expect(renames).toEqual([["A", "Alex"], ["A", "Alexander"]]);
+    await sessions.stop();
+  });
 
   it("sends a name to the bus and to the session folder", async () => {
     const bus = new EventBus(quiet);

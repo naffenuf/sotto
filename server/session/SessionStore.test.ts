@@ -227,6 +227,7 @@ describe("SessionStore files the later stories own", () => {
     saved.appendCandidate({ id: "c1", decision: "glow" });
     saved.appendFeedback({ id: "c1", verdict: "up" });
     saved.appendAnswer({ question: "what?", headline: "this" });
+    saved.appendTiming({ stage: "turn_final", atMs: 12, turnId: "0:1" });
 
     expect(JSON.parse(read(saved.dir, SESSION_FILES.board))).toEqual({ points: ["one"] });
     expect(read(saved.dir, SESSION_FILES.boardMarkdown)).toBe("# Board\n\n- one\n");
@@ -235,6 +236,7 @@ describe("SessionStore files the later stories own", () => {
     expect(read(saved.dir, SESSION_FILES.answers)).toBe(
       '{"question":"what?","headline":"this"}\n',
     );
+    expect(JSON.parse(read(saved.dir, SESSION_FILES.timing))).toEqual({ stage: "turn_final", atMs: 12, turnId: "0:1" });
   });
 
   it("writes artifacts under artifacts/ and never outside the folder", () => {

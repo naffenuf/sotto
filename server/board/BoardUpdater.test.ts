@@ -110,6 +110,24 @@ const add: BoardOp = { op: "add_point", text: "Start with an off-the-shelf API",
 const summary: BoardOp = { op: "set_summary", text: "Two engineers scoping a fridge app." };
 
 describe("BoardUpdater triggers", () => {
+  it("keeps in-flight and later turns uncovered until a successful update applies", async () => {
+    let resolve!: (value: unknown) => void;
+    const pending = new Promise<unknown>((done) => { resolve = done; });
+    const h = harness([() => pending]);
+    h.say(4);
+    expect(h.updater.uncoveredTurns().map((turn) => turn.turnId)).toEqual(["0:0", "0:1", "0:2", "0:3"]);
+    h.say(1);
+    resolve({ operations: [] });
+    await h.clock.settle();
+    expect(h.updater.uncoveredTurns().map((turn) => turn.turnId)).toEqual(["0:4"]);
+  });
+
+  it("keeps turns uncovered when an update fails", async () => {
+    const h = harness([() => Promise.reject(new Error("failed"))]);
+    h.say(4);
+    await h.clock.settle();
+    expect(h.updater.uncoveredTurns().map((turn) => turn.turnId)).toEqual(["0:0", "0:1", "0:2", "0:3"]);
+  });
   it("updates as soon as four new final turns have arrived", async () => {
     const h = harness([ops(add)]);
     h.say(NEW_TURNS_PER_UPDATE - 1);

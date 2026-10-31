@@ -146,6 +146,7 @@ export interface AnswerAgentOptions {
   onThinking?: (thinking: boolean) => void;
   /** The model status dot, shared with the board loop and the observer. */
   onModelState?: (state: "connecting" | "active" | "error", detail: string) => void;
+  onTiming?: (event: Record<string, unknown>) => void;
   logger?: Logger;
 }
 
@@ -215,6 +216,7 @@ export class AnswerAgent {
       latencyMs: 0,
     };
     this.logger.log(`[answer] ${answer.id} ${answer.askedBy} asked: ${question}`);
+    this.options.onTiming?.({ stage: "answer_queued", atMs: this.clock.now(), answerId: answer.id, turnId: asked.turnId });
     // Thinking goes up before anything is known, because the point of it is
     // that the group can see their question was heard.
     this.setThinking(true);
@@ -266,6 +268,7 @@ export class AnswerAgent {
   /** One answer, start to written-down finish. Never rejects. */
   private async answer(queued: Queued): Promise<void> {
     const { answer, asked } = queued;
+    this.options.onTiming?.({ stage: "answer_start", atMs: this.clock.now(), answerId: answer.id, turnId: asked.turnId });
     let pushedHeadline = "";
     // Filled in as the model draws (US-020), so a diagram can be on the stage
     // while the sentence under it is still being written.
