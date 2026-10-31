@@ -2,7 +2,7 @@
 
 Scripted two-speaker conversations used to test and measure Sotto without
 anyone talking into a microphone. The rendered audio is committed, so nothing
-downstream needs Chatterbox.
+downstream needs a text-to-speech key.
 
 ```
 fixtures/
@@ -11,8 +11,10 @@ fixtures/
   audio/<name>.timing.json     startMs / endMs of every line
   events/<name>.jsonl          every frame the transcription API sent back
   events/NOTES.md              what those frames actually look like
-  make_fixture.py              script -> wav + timings
+  voices.json                  which ElevenLabs voice speaks each speaker letter
 ```
+
+The renderer itself is `scripts/render-fixture.ts`.
 
 ## Script format
 
@@ -35,8 +37,7 @@ are 0-based indexes into `lines`.
 }
 ```
 
-- `speaker` is `A` or `B`. `A` is spoken with the cloned `maddie` voice,
-  `B` with Chatterbox's built-in voice.
+- `speaker` is `A` or `B`, mapped to a voice by `voices.json`.
 - `pauseAfterMs` is the silence inserted after the line.
 - `type` is `contradiction`, `factual_error`, `untested_assumption` or
   `dropped_thread`; `expectedLevel` is `glow` or `interject`.
@@ -46,19 +47,42 @@ are 0-based indexes into `lines`.
 
 ## Generating audio
 
-Chatterbox is not a dependency of this repo; run its virtualenv's Python
-directly.
-
 ```bash
-~/Developer/Chatterbox/venv/bin/python fixtures/make_fixture.py fixtures/scripts/<name>.json
+npm run fixture:render -- <name>
 ```
 
-This writes `fixtures/audio/<name>.wav` and `fixtures/audio/<name>.timing.json`.
-It takes roughly five times the length of the conversation on CPU; pass
-`--device mps` to use Metal, or set `CHATTERBOX_HOME` if Chatterbox lives
-somewhere other than `~/Developer/Chatterbox`.
+This calls ElevenLabs text-to-speech, one request per line, and writes
+`fixtures/audio/<name>.wav` and `fixtures/audio/<name>.timing.json`. It needs
+`ELEVENLABS_API_KEY` in `.env` and runs several times faster than real time
+(measured: 19.4 s of audio in 3.5 s). The default model is `eleven_flash_v2_5`,
+about half a credit per character.
 
-Commit both outputs.
+Which voice speaks which letter is `voices.json`:
+
+```json
+{
+  "model": "eleven_flash_v2_5",
+  "seed": 1234,
+  "voices": {
+    "A": { "name": "Rachel", "voiceId": "21m00Tcm4TlvDq8ikWAM" },
+    "B": { "name": "Adam", "voiceId": "pNInz6obpgDQGcFmaJgB" }
+  }
+}
+```
+
+Rachel and Adam are ElevenLabs library voices chosen to be obviously different
+so diarization separates them. Voice ids are configuration rather than
+something the renderer looks up: the API key is scoped to speech synthesis and
+cannot list voices.
+
+Each utterance comes back padded with a little near-silence (measured 54–91 ms
+at the head, 268–371 ms at the tail), which the renderer trims before inserting
+`pauseAfterMs`. The scripted pauses have to be honest — pause detection and the
+eval harness's windows both read a gap in the WAV as the gap the script wrote.
+
+Commit both outputs. **Don't re-render a fixture that already has a capture:**
+`fixtures/events/<name>.jsonl` is measured against the exact audio on disk, so a
+fresh render invalidates it.
 
 ## Capturing transcription events
 

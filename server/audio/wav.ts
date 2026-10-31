@@ -46,3 +46,34 @@ export function parseWav(buffer: Buffer): WavAudio {
 export function readWavFile(path: string): WavAudio {
   return parseWav(readFileSync(path));
 }
+
+/** Mono 16-bit PCM is the only thing Sotto writes, so the header is fixed but the rate is not. */
+export interface WavFormat {
+  channels: number;
+  sampleRate: number;
+  bitsPerSample: number;
+}
+
+/**
+ * Wraps raw little-endian PCM in RIFF framing — the inverse of
+ * {@link parseWav}, used by the fixture renderer.
+ */
+export function encodeWav(data: Buffer, format: WavFormat): Buffer {
+  const { channels, sampleRate, bitsPerSample } = format;
+  const bytesPerFrame = (bitsPerSample / 8) * channels;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0, "ascii");
+  header.writeUInt32LE(36 + data.length, 4);
+  header.write("WAVE", 8, "ascii");
+  header.write("fmt ", 12, "ascii");
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM, uncompressed
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * bytesPerFrame, 28);
+  header.writeUInt16LE(bytesPerFrame, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36, "ascii");
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
+}

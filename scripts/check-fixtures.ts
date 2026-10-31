@@ -107,7 +107,10 @@ function checkScript(name: string, problems: string[]): void {
     if (wav.bitsPerSample !== 16) fail(`${name}.wav is ${wav.bitsPerSample}-bit, expected 16-bit`);
     durationMs = Math.round((wav.data.length / 2) * (1000 / FIXTURE_SAMPLE_RATE));
   } catch (error) {
-    fail(`${name}.wav: ${(error as Error).message} — regenerate with make_fixture.py`);
+    fail(
+      `${name}.wav: ${(error as Error).message} — regenerate with ` +
+        `\`npm run fixture:render -- ${name}\``,
+    );
   }
 
   checkEvents(name, durationMs, problems);
@@ -125,7 +128,10 @@ function checkScript(name: string, problems: string[]): void {
       }
     }
   } catch (error) {
-    fail(`${name}.timing.json: ${(error as Error).message} — regenerate with make_fixture.py`);
+    fail(
+      `${name}.timing.json: ${(error as Error).message} — regenerate with ` +
+        `\`npm run fixture:render -- ${name}\``,
+    );
   }
 
   if (!timing) return;

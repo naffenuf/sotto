@@ -2,7 +2,7 @@
  * Schema for the scripted test conversations in `fixtures/`.
  *
  * A script (`fixtures/scripts/<name>.json`) is the source of truth: it drives
- * `fixtures/make_fixture.py`, which renders `fixtures/audio/<name>.wav` plus
+ * `npm run fixture:render`, which renders `fixtures/audio/<name>.wav` plus
  * `fixtures/audio/<name>.timing.json`, and it carries the planted moments the
  * eval harness measures Sotto against.
  *
@@ -130,7 +130,7 @@ export const FixtureScriptSchema = z
     });
   });
 
-/** Audio produced by `make_fixture.py` is always mono 16-bit PCM at this rate. */
+/** Audio produced by `npm run fixture:render` is always mono 16-bit PCM at this rate. */
 export const FIXTURE_SAMPLE_RATE = 24_000;
 
 /** Where each line landed in the rendered WAV. */
@@ -150,6 +150,24 @@ export const FixtureTimingSchema = z.object({
     .min(1),
 });
 
+/**
+ * Which ElevenLabs voice speaks each script letter, from `fixtures/voices.json`.
+ *
+ * Voice ids are configuration rather than something the renderer discovers:
+ * the API key Sotto ships with can synthesize speech but cannot list voices.
+ */
+export const FixtureVoicesSchema = z.object({
+  /** ElevenLabs model id for every line. */
+  model: z.string().trim().min(1),
+  /** Sampling seed, so a re-render of an unchanged script matches. */
+  seed: z.number().int().min(0).optional(),
+  /** One entry per speaker letter in {@link FixtureLineSchema}. */
+  voices: z.object({
+    A: z.object({ name: z.string().trim().min(1), voiceId: z.string().trim().min(1) }),
+    B: z.object({ name: z.string().trim().min(1), voiceId: z.string().trim().min(1) }),
+  }),
+});
+
 export type MomentType = (typeof momentTypes)[number];
 export type ExpectedLevel = (typeof expectedLevels)[number];
 export type FixtureLine = z.infer<typeof FixtureLineSchema>;
@@ -158,3 +176,5 @@ export type PlantedMoment = z.infer<typeof PlantedMomentSchema>;
 export type FixtureScript = z.infer<typeof FixtureScriptSchema>;
 export type FixtureTiming = z.infer<typeof FixtureTimingSchema>;
 export type FixtureLineTiming = FixtureTiming["lines"][number];
+export type FixtureVoices = z.infer<typeof FixtureVoicesSchema>;
+export type FixtureSpeaker = FixtureLine["speaker"];

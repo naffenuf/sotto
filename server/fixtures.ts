@@ -1,9 +1,9 @@
 /**
  * Which fixtures this checkout actually has, for the UI's source selector.
  *
- * A fixture only shows up as a WAV source once `make_fixture.py` has rendered
- * it, and only as an events source once `npm run capture` has recorded it, so
- * the list is read off the filesystem rather than hard-coded.
+ * A fixture only shows up as a WAV source once `npm run fixture:render` has
+ * rendered it, and only as an events source once `npm run capture` has recorded
+ * it, so the list is read off the filesystem rather than hard-coded.
  */
 import { readdirSync } from "node:fs";
 import type { FixtureListResponse } from "../shared/session.js";

@@ -35,3 +35,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   }
   return { modelApiKey, port };
 }
+
+export class MissingElevenLabsKeyError extends Error {
+  constructor() {
+    super(
+      "ELEVENLABS_API_KEY is missing. Copy .env.example to .env and set ELEVENLABS_API_KEY to your ElevenLabs API key.",
+    );
+    this.name = "MissingElevenLabsKeyError";
+  }
+}
+
+/**
+ * Loads `.env` and returns the ElevenLabs API key, which Sotto's voice (V2-003)
+ * and the fixture renderer (V2-001) both need. Separate from
+ * {@link loadConfig} because rendering test audio needs no model key.
+ * Throws {@link MissingElevenLabsKeyError} when the key is absent or blank.
+ */
+export function loadElevenLabsApiKey(env: NodeJS.ProcessEnv = process.env): string {
+  loadDotenv({ quiet: true });
+  const key = (env.ELEVENLABS_API_KEY ?? "").trim();
+  if (key === "") throw new MissingElevenLabsKeyError();
+  return key;
+}

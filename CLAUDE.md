@@ -35,16 +35,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
 - **Integration-test skip message.** Per-file `console.log` is swallowed when Vitest skips the file.
   The "MODEL_API_KEY is missing" notice is printed from a `globalSetup`
   (`server/test/integrationSetup.ts`), which runs outside that capture.
-- **Generating fixture audio.** `~/Developer/Chatterbox/venv/bin/python fixtures/make_fixture.py
-  fixtures/scripts/<name>.json --device mps`. Without `--device mps` it falls back per
-  `pick_device`, which already prefers MPS, so the flag is just explicit. Throughput has ranged from
-  **2.5x to 4.15x real time** (a 3-minute fixture took 809s wall clock), so budget ~4x, start the
-  render early and do other checks while it works — and don't pipe it through `tail`, which buffers
-  the whole run and hides progress. The script prints a `[n/total]` line per rendered line; read
-  progress with `tr '\r' '\n' < log | grep -v '^Sampling' | tail`, since the Sampling progress bars
-  use carriage returns. For script length, speech runs at **~3.4–3.8 words/second**:
-  `words / 3.8 + sum(pauseAfterMs) / 1000` is a floor (it under-predicted a 3-minute fixture by 16s),
-  so treat it as the low end of the range when aiming at a duration target.
+- **Generating fixture audio.** `npm run fixture:render -- <name>` (`scripts/render-fixture.ts`)
+  calls ElevenLabs once per line and runs **faster than real time**: 19.4 s of audio in 3.5 s on
+  `eleven_flash_v2_5`, against Chatterbox's old 2.5–4x *slower* than real time. So render, capture
+  and check in one iteration rather than starting a render and going off to do something else.
+  For script length, speech runs at **~3.4–3.8 words/second**:
+  `words / 3.8 + sum(pauseAfterMs) / 1000` is a floor (it under-predicted a 3-minute fixture by
+  16s), so treat it as the low end of the range when aiming at a duration target. Two things bite:
+  the key in `.env` is **scoped to synthesis** — it has neither `voices_read` nor `user_read`, so
+  nothing may list voices or check credits at runtime, which is why voice ids are configuration in
+  `fixtures/voices.json` (A = Rachel `21m00Tcm4TlvDq8ikWAM`, B = Adam `pNInz6obpgDQGcFmaJgB`,
+  deliberately far apart for diarization) — and **every utterance comes back padded with
+  near-silence** (measured 54–91 ms head, 268–371 ms tail), which `server/audio/renderScript.ts`
+  trims before inserting `pauseAfterMs`, because the scripted pauses are what pause detection and
+  the eval windows read off the WAV. Never re-render a fixture that already has a capture:
+  `fixtures/events/<name>.jsonl` is checked against the exact bytes on disk.
 - **Fixture invariants live in the schema, not the checker.** `FixtureScriptSchema` in
   `shared/fixtures.ts` carries the cross-field rules (`setupLines` < `triggerLine` <=
   `deadlineLine`, line indexes in range, unique moment ids) in a `superRefine`, so every reader

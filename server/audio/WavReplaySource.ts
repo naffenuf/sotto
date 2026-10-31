@@ -14,7 +14,7 @@ import {
   type AudioSource,
 } from "./AudioSource.js";
 
-/** Where `make_fixture.py` writes its rendered conversations. */
+/** Where `npm run fixture:render` writes its rendered conversations. */
 export const FIXTURE_AUDIO_DIR = fileURLToPath(new URL("../../fixtures/audio/", import.meta.url));
 
 /** Path to a fixture's WAV, by fixture name (e.g. `"brainstorm"`). */
@@ -25,7 +25,7 @@ export function fixtureAudioPath(name: string): string {
 export class UnsupportedWavFormatError extends Error {
   constructor(path: string, problem: string) {
     super(
-      `${path} is ${problem}. WAV replay needs mono 16-bit PCM at ${AUDIO_SAMPLE_RATE} Hz — regenerate it with fixtures/make_fixture.py.`,
+      `${path} is ${problem}. WAV replay needs mono 16-bit PCM at ${AUDIO_SAMPLE_RATE} Hz — regenerate it with \`npm run fixture:render\`.`,
     );
     this.name = "UnsupportedWavFormatError";
   }
