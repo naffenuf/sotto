@@ -82,3 +82,50 @@
   on the browser's final flushed-position report. The test route does not itself speak answers.
   Checked: npm run typecheck; npm test (723/723); npm run build; real ElevenLabs browser check with
   muted audio output. No real mic or audible speakers were used; human listening remains for V2-008.
+
+[2026-10-31 15:35] V2-005 — completed — spoken answers: two-half replies, a fast acknowledgment, sentence-by-sentence speech.
+  Working tree was clean at the start. The shape of an answer changed, which is the heart of it:
+  one prose reply now carries `Say this:` (sentences written to be heard, no word cap, no URLs)
+  then `Show this:` (the ≤90-char headline, the detail, the sources). splitSpokenAnswer in
+  shared/answers.ts separates them and is tolerant in the same way splitAnswer is — a reply with
+  no screen half falls back to screenFromSpoken, which makes the first spoken sentence the
+  headline, because an answer the room can hear but nobody can see is the worse failure.
+  The spoken half comes first so it can start being said at once: server/answer/sentences.ts
+  yields only sentences that are definitely finished (a terminator must be followed by
+  whitespace, so "$5.42" is never two sentences, and MIN_SENTENCE_CHARS 3 keeps "E." and "1."
+  out), and those go to the voice as they appear.
+  Two utterances, not one. The acknowledgment (server/answer/ack.ts) is its own, because opening
+  the answer's utterance is exactly what cuts it off — which is the PRD's "unless the answer's
+  first sentence is ready first", implemented rather than special-cased. ack.ts decides between
+  "Mm-hm." and "Let me check." on one question: is this about the conversation (we decided,
+  did we, recap, so far, open questions) or about the world? Anything it cannot tell gets
+  "Let me check.", because guessing quick wrongly leaves the room in silence.
+  The seam is server/voice/voiceOut.ts (VoiceOut / VoiceUtterance / VoiceSpoken). VoiceHub
+  implements it — new begin(), incremental append that also updates the stage's "what Sotto is
+  saying", firstAudioMs readable at any time, and a 500 ms bounded wait after a cancel for the
+  page's final `ended` report, which is the only thing that knows what was really heard.
+  nullSinkVoice is the same real ElevenLabs socket with the audio discarded: that is what the
+  integration test speaks through, and what V2-021 should use for "audio to a null sink".
+  Wiring: SessionManager takes `createVoice` (default none, so npm test never synthesizes) and
+  server/app.ts now builds the VoiceHub *before* the SessionManager and hands it in, so answers
+  speak through the same hub the browser's /ws/voice is attached to — the thing V2-004's notes
+  asked for. ackMs and firstAudioMs are measured on an injected wallClock, never the session
+  clock: a max replay's session clock does not move during a model call, which is why
+  latencyMs is 0 in a replay and these two are not.
+  Measured, real API + real ElevenLabs, ask-search at max: ackMs 461 ms (budget 1,500),
+  firstAudioMs 11,012 ms, 732 characters spoken, 6 integration tests green.
+  Checked: npm run typecheck; npm test (757/757); npm run build; npm run test:integration for
+  the answer file; npm run verify:voice (V2-004's browser check, still green through the
+  refactored hub); npm run verify:cards for the new "transcript of answer ▾" (screenshot
+  inspected — plain speech, no markdown, no links, 54 words).
+  Pre-existing and NOT fixed here: npm run verify:cards carries two stale assertions from before
+  V2-004 — it expects a dark body background (the theme is light, --bg #faf9f6) and a
+  `source-select` in the header (gone). Its layout block also *crashed* because the sidebar
+  shows the notes and the transcript as tabs now rather than stacked; that one line was repaired
+  so the check could run at all, and transcriptAboveBoard became panelsInSidebar. The two theme
+  and header assertions are still red.
+  For V2-006/V2-007: Answer.spokenText is what Sotto meant to say and Answer.spokenSoFar is what
+  the room heard before it was cut off (only written when it was) — both already in
+  answers.jsonl. VoiceHub.spokenSoFar() still answers for the last utterance Stop cut off.
+  A barge-in should go through VoiceHub.stop() exactly as the Stop button does; the agent's
+  SpokenAnswer.cancel() is there for the session-level case.

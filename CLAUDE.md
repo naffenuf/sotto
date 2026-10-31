@@ -752,3 +752,40 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   Mute is a session setting (`voiceMuted`). `SOTTO_DEV=1` (set by `npm run dev:server`) enables
   `POST /api/voice/test`; `npm run verify:voice` drives it through real ElevenLabs in a muted
   headless browser. Chrome needs a click or key press before audio can play.
+- **An answer is two pieces of writing, and the spoken one goes first.** `server/prompts/answer.md`
+  asks for `Say this:` (sentences written to be heard — no markdown, no URLs, no word cap) then
+  `Show this:` (the ≤90-char headline, the detail, the sources), and `splitSpokenAnswer` in
+  `shared/answers.ts` separates them out of the one streamed prose reply. The order is
+  load-bearing, not stylistic: the spoken half has to start being said while the screen half is
+  still being written. It is as tolerant as `splitAnswer` — a reply with no screen half falls back
+  to `screenFromSpoken`, which promotes the first spoken sentence to the headline, because an
+  answer the room can hear but nobody can see is the worse failure. Two parsing traps: a heading
+  on a line of its own must be **dropped**, not kept as the headline, and the spoken half is *not*
+  a growing prefix while the heading is still arriving (`Say thi` → `""` → the real text), so the
+  feeder guards on its own `startsWith` rather than trusting the parse.
+- **Sotto says two things, and the second one interrupts the first.** `server/answer/ack.ts` picks
+  "Mm-hm." or "Let me check." by one question — is this about the conversation or about the world?
+  — and `SpokenAnswer` (`server/answer/SpokenAnswer.ts`) speaks it as its **own utterance**, so
+  opening the answer's utterance is literally what cuts it off; the PRD's "unless the answer's
+  first sentence is ready first" is the mechanism rather than a special case. Everything runs on
+  one promise chain because `VoiceOut.begin()` is a socket and the model's text is synchronous.
+  Measured end to end on `ask-search` (real model, real ElevenLabs): **ackMs 461**, firstAudioMs
+  **11,012**, 732 characters spoken.
+- **`VoiceOut` is the seam, and `null` means "screen only".** `server/voice/voiceOut.ts` has the
+  three moves — `begin()`, `append()`, `finish()` — that `VoiceHub` and `nullSinkVoice` both
+  implement, so nothing upstream knows whether a browser, a discarded buffer or a mute is on the
+  other end. `begin()` resolving `null` is not an error. `nullSinkVoice` is the *real* ElevenLabs
+  socket with the audio thrown away, which is how an integration test measures `firstAudioMs`
+  without a page; `SessionManager` takes `createVoice` (default none, so `npm test` never
+  synthesizes) and `server/app.ts` builds the hub **before** the session manager so answers and
+  the dev route share one.
+- **The voice's latencies are read off real time, never the session clock.** `ackMs` and
+  `firstAudioMs` are what a person in the room felt, and a `max` replay's session clock does not
+  move while a model call is in flight — which is also why `latencyMs` is 0 in a replay and these
+  two are not. `AnswerAgent` therefore takes a `wallClock` (defaulting to `systemClock`) beside
+  its session `clock`.
+- **A cancelled utterance has to wait for the page before it knows what was heard.** `cancel` and
+  the browser's final `ended` report cross on the wire, and that report carries the flushed
+  playback position that `Speaker.spokenSoFar()` reads. So `VoiceHub`'s utterance `finish()`
+  waits up to `VOICE_FLUSH_WAIT_MS` (500) for it — and only on a cancel, and only when a page is
+  attached, so a page that has gone away costs nothing.
