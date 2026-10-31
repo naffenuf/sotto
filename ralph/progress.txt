@@ -6,3 +6,21 @@
 #
 # Codebase patterns and learnings worth keeping live in CLAUDE.md, not here.
 # The core loop's log (US-001..US-028) is archived in ralph/archive/2026-10-31-sotto-core/.
+
+[2026-10-31 11:35] V2-001 — completed — ElevenLabs renders fixture audio; Chatterbox and make_fixture.py are gone.
+  Working tree was clean at the start; branch ralph/sotto-v2 created from ralph/sotto-core.
+  Three pieces: scripts/render-fixture.ts (CLI, `npm run fixture:render -- <name>`),
+  server/audio/renderScript.ts (assembly — trimming, concatenation, timings; synth is a parameter,
+  so it is unit-tested offline) and server/voice/elevenlabs.ts (the one-shot TTS seam,
+  output_format=pcm_24000, injectable fetch). `encodeWav` joined the reader in server/audio/wav.ts;
+  `loadElevenLabsApiKey()` joined server/config.ts; FixtureVoicesSchema joined shared/fixtures.ts.
+  For V2-002: rendering is FASTER than real time (19.4s of audio in 3.5s), so render + capture +
+  fixtures:check all fit in one iteration — but `npm run capture` is still real-time, so a
+  2-3 minute fixture costs 2-3 minutes of wall clock each.
+  Gotcha for every later voice story: the ElevenLabs key in .env is SCOPED. It can synthesize
+  but has neither voices_read nor user_read, so nothing may list voices or check remaining credits
+  at runtime — V2-003's default voice has to be a hard-coded library id too, not a lookup.
+  Not part of the story but needed for "Tests pass": Vitest's testTimeout is now 15s in
+  vitest.config.ts. The brainstorm capture replay in SessionManager.test.ts and app.test.ts is
+  CPU-bound at 4.3-5.5s, either side of the old 5s default, so `npm test` was already failing at
+  random on the clean tree before this iteration started. Verified green twice afterwards (700/700).
