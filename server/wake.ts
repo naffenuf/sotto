@@ -96,6 +96,21 @@ export interface WakeMatch {
 
 const NOT_TRIGGERED: WakeMatch = { triggered: false, question: null };
 
+/** V2-007: an address alone is enough to yield the floor during playback. */
+export function detectsAddress(text: string): boolean {
+  const all = words(text);
+  return all.some((word, index) => {
+    if (!DEFAULT_WAKE_SPELLINGS.includes(word.lower)) return false;
+    const rest = text.slice(word.end);
+    if (/^['’]s\b/i.test(rest)) return false;
+    if (BLOCKED_FOLLOWING_WORDS.includes(words(rest)[0]?.lower ?? "")) return false;
+    const previous = all[index - 1];
+    const thanks = previous?.lower === "thanks" &&
+      /^[\s,]*$/.test(text.slice(previous.end, word.start));
+    return thanks || isAddressed(text, word, previous);
+  });
+}
+
 /**
  * Decides whether `text` addresses Sotto, and with what question.
  *

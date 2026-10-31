@@ -26,6 +26,7 @@ function setup(withModel = true) {
   const timing: unknown[] = [];
   const answers: unknown[] = [];
   const prompts: { label: string; text: string }[] = [];
+  let interrupts = 0;
   const writer: SessionWriter = {
     dir: "/tmp/unused-self-echo-test",
     appendEvent: (record) => raw.push(record),
@@ -43,6 +44,9 @@ function setup(withModel = true) {
   const model: ModelClient = {
     structured: async (call) => {
       prompts.push({ label: call.label, text: call.user });
+      if (call.label === "voice_command") {
+        return { command: "new_question", question: "What time is lunch tomorrow?" };
+      }
       return call.label === "board" ? { operations: [] } : { candidates: [] };
     },
     grounded: async () => {
@@ -70,7 +74,16 @@ function setup(withModel = true) {
     wallClock: clock,
     createStore: () => writer,
     createModel: () => withModel ? model : null,
-    createVoice: () => ({ begin: async () => null, playback: () => playback }),
+    createVoice: () => ({
+      begin: async () => null,
+      playback: () => playback,
+      interrupt: async () => {
+        interrupts += 1;
+        playback = { ...playback, playing: false };
+        bus.setVoice(silentVoice());
+        return 20;
+      },
+    }),
     createAsrClient: ({ onFrame }) => {
       emit = onFrame;
       return {
@@ -101,6 +114,7 @@ function setup(withModel = true) {
   };
   return {
     sessions, clock, bus, events, raw, turns, timing, answers, prompts, say, frame,
+    interrupts: () => interrupts,
     play: (text: string) => {
       playback = { playing: true, recent: [{ id: "speech", text }] };
       bus.setVoice({ speaking: true, playing: true, utteranceId: "speech", text });
@@ -113,6 +127,26 @@ function setup(withModel = true) {
 }
 
 describe("self-echo suppression throughout a session", () => {
+  it("routes a human partial through barge-in and classifies its final exactly once (V2-007)", async () => {
+    const t = setup();
+    t.play("The price is twelve dollars a seat.");
+    t.frame({ type: "speechStart", turnId: 99 });
+    t.frame({ type: "transcript", transcript: "Sotto", final: false });
+    expect(t.interrupts()).toBe(1);
+    expect(t.answers).toEqual([]);
+    expect(t.turns).toEqual([]);
+    t.frame({ type: "transcript", transcript: "Sotto what time is lunch tomorrow?", final: false });
+    t.frame({ type: "speaker", label: "A" });
+    t.frame({ type: "speechEnd", turnId: 99 });
+    t.frame({ type: "speechComplete", turnId: 99, transcript: "Sotto what time is lunch tomorrow?" });
+    await t.clock.settle();
+    expect(t.answers).toHaveLength(1);
+    expect(t.prompts.filter((prompt) => prompt.label === "voice_command")).toHaveLength(1);
+    expect(t.timing).toContainEqual(expect.objectContaining({ stage: "barge_in", flushMs: 20 }));
+    expect(t.turns.map((turn) => turn.text)).toEqual(["Sotto what time is lunch tomorrow?"]);
+    await t.sessions.stop();
+  });
+
   it("excludes echo from files, UI, introductions, board, observer, wake and answer context", async () => {
     const t = setup();
     const echo = "I'm Sotto. Sotto, what about the secret echo watermelon?";
@@ -126,10 +160,10 @@ describe("self-echo suppression throughout a session", () => {
       stage: "self_echo", selfEcho: true, text: echo,
     }));
 
-    t.say("Sotto, what time is lunch tomorrow?");
+    t.say("What time is lunch tomorrow?");
     t.say("Alex brings sandwiches for everyone.");
     expect(t.turns.map((turn) => turn.text)).toEqual([
-      "Sotto, what time is lunch tomorrow?", "Alex brings sandwiches for everyone.",
+      "What time is lunch tomorrow?", "Alex brings sandwiches for everyone.",
     ]);
     expect(t.events.some((event) => event.type === "wake" && event.listening)).toBe(false);
     expect(t.answers).toEqual([]);

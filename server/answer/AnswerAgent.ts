@@ -63,6 +63,7 @@ import type { VoiceOut } from "../voice/voiceOut.js";
 import { chooseAcknowledgment } from "./ack.js";
 import { splitSentences } from "./sentences.js";
 import { SpokenAnswer, type SpokenResult } from "./SpokenAnswer.js";
+import { classifyCommand } from "./command.js";
 
 /** The label an answer is tracked under on the clock, and in the model logs. */
 export const ANSWER_TRACK_LABEL = "answer";
@@ -129,6 +130,8 @@ export interface AskedQuestion {
   askedBy: string | null;
   /** The turn it was asked in, or `null` when it was typed. */
   turnId: string | null;
+  /** V2-007: continue resumes after heard text rather than repeating the original reply. */
+  resume?: boolean;
 }
 
 export interface AnswerAgentOptions {
@@ -208,6 +211,55 @@ export class AnswerAgent {
   /** Whether the courtesy hook has been told an answer is being written. */
   private thinking = false;
   private stopped = false;
+  /** Kept until playback completes, so barge-in can cancel even after model generation ends. */
+  private activeSpeech: SpokenAnswer | undefined;
+  /** The previous cut-off answer survives a stop command for later follow-ups. */
+  private interrupted: Answer | undefined;
+  /** Commands stay ordered even if classification finishes at different speeds. */
+  private commands: Promise<void> = Promise.resolve();
+  /** A newer interruption supersedes a command still being classified. */
+  private commandVersion = 0;
+
+  /** V2-007: yields the floor immediately, including during acknowledgment or socket opening. */
+  interrupt(): Promise<number | null> {
+    this.commandVersion += 1;
+    const flushed = this.options.voice?.interrupt?.() ?? Promise.resolve(null);
+    this.activeSpeech?.cancel();
+    return flushed;
+  }
+
+  /** Classifies only final human text, once cancellation has already happened. */
+  command(asked: AskedQuestion): void {
+    if (this.stopped) return;
+    // The acknowledgment may already have ended while the model is still
+    // thinking. A final stop in that silent gap must cancel the future speech too.
+    if (this.activeSpeech !== undefined) void this.interrupt();
+    const version = ++this.commandVersion;
+    this.commands = this.commands.then(async () => {
+      try {
+        const command = await classifyCommand(this.model, asked.question);
+        if (this.stopped || version !== this.commandVersion) return;
+        this.options.onTiming?.({
+          stage: "voice_command", atMs: this.clock.now(), turnId: asked.turnId,
+          command: command.command,
+        });
+        if (command.command === "stop") return;
+        // Let the interrupted answer finish recording its flushed position before
+        // rendering context for the follow-up. Its speech feeder stays cancelled.
+        if (this.running !== undefined) await this.running;
+        if (this.stopped || version !== this.commandVersion) return;
+        if (command.command === "continue") {
+          if (this.interrupted === undefined) return;
+          this.ask({ ...asked, question: "Continue from where you were cut off.", resume: true });
+        } else {
+          this.ask({ ...asked, question: command.question });
+        }
+      } catch (error) {
+        this.logger.warn(`[voice] could not classify command: ${message(error)}`);
+      }
+    });
+    void this.clock.track("voice_command", this.commands);
+  }
 
   constructor(options: AnswerAgentOptions) {
     this.clock = options.clock;
@@ -263,6 +315,7 @@ export class AnswerAgent {
 
   /** Waits for every answer asked for so far, including the queued ones. */
   async flush(): Promise<void> {
+    await this.commands;
     while (this.running !== undefined) await this.running;
   }
 
@@ -312,9 +365,10 @@ export class AnswerAgent {
     // while the sentence under it is still being written.
     const artifacts: Artifact[] = [];
     const speech = this.speech(queued);
+    this.activeSpeech = speech;
     // Out before the model has written a word: ten to twenty seconds of
     // silence after somebody says Sotto's name reads as "it didn't hear me".
-    speech?.acknowledge(chooseAcknowledgment(answer.question));
+    if (!asked.resume) speech?.acknowledge(chooseAcknowledgment(answer.question));
 
     /** True once the whole spoken half has gone to the voice. */
     let said = false;
@@ -352,7 +406,7 @@ export class AnswerAgent {
       const reply = await this.model.prose({
         label: ANSWER_TRACK_LABEL,
         system: loadPrompt(PROMPTS.answer),
-        user: this.render(answer),
+        user: this.render(answer, asked.resume === true),
         maxTokens: ANSWER_MAX_TOKENS,
         functions: this.functions(answer, artifacts, () => pushedHeadline, () => spokenText),
         onText: ({ itemId, text }) => {
@@ -426,6 +480,8 @@ export class AnswerAgent {
       this.failedSinceIdle = true;
       this.options.onModelState?.("error", detail);
       this.finish(failed, asked);
+    } finally {
+      if (this.activeSpeech === speech) this.activeSpeech = undefined;
     }
   }
 
@@ -499,6 +555,8 @@ export class AnswerAgent {
 
   /** The last push, and the one line in `answers.jsonl`. */
   private finish(answer: Answer, asked: AskedQuestion): void {
+    if (answer.spokenSoFar !== undefined) this.interrupted = answer;
+    else if (answer.status === "done") this.interrupted = undefined;
     this.finished += 1;
     this.push(answer);
     this.options.onRecord({ kind: "answer", ...answer, turnId: asked.turnId });
@@ -520,9 +578,17 @@ export class AnswerAgent {
   }
 
   /** The user message for one question. */
-  private render(answer: Answer): string {
+  private render(answer: Answer, resume: boolean): string {
     const turns = recentTurns(this.options.transcript(), this.clock.now());
-    return renderAnswerRequest(this.options.board(), turns, this.options.speakers(), answer);
+    const request = renderAnswerRequest(this.options.board(), turns, this.options.speakers(), answer);
+    if (this.interrupted === undefined) return request;
+    return `${request}\n\n## Your previous answer was cut off\n${JSON.stringify({
+      question: this.interrupted.question,
+      fullAnswer: this.interrupted.spokenText,
+      spokenSoFar: this.interrupted.spokenSoFar,
+    })}\n${resume
+      ? "Resume immediately after spokenSoFar, completing any interrupted sentence. Do not repeat what was heard."
+      : "The room heard only spokenSoFar. Use this context to answer the new request."}`;
   }
 
   /**

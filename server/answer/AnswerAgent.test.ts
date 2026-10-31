@@ -9,7 +9,7 @@ import { SimulatedClock } from "../clock.js";
 import type { SpeechEndReason } from "../voice/Speaker.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
 import { ACK_SEARCH } from "./ack.js";
-import type { ProseCall, ProseReply, ModelClient } from "../model/client.js";
+import type { ProseCall, ProseReply, ModelClient, StructuredCall } from "../model/client.js";
 import {
   ANSWER_CONTEXT_MS,
   ANSWER_ITEM_PREFIX,
@@ -33,11 +33,15 @@ function reply(overrides: Partial<ProseReply> & { text: string }): ProseReply {
 /** A model whose prose calls are answered from a script. */
 class FakeModel implements ModelClient {
   readonly calls: ProseCall[] = [];
+  readonly commands: unknown[] = [];
+  readonly classifications: StructuredCall[] = [];
 
   constructor(readonly replies: ((call: ProseCall) => Promise<ProseReply>)[]) {}
 
-  async structured(): Promise<never> {
-    throw new Error("the answer agent never makes a structured call");
+  async structured(call: StructuredCall): Promise<unknown> {
+    this.classifications.push(call);
+    if (this.commands.length === 0) throw new Error("unexpected structured call");
+    return this.commands.shift();
   }
 
   async grounded(): Promise<never> {
@@ -475,6 +479,85 @@ describe("AnswerAgent out loud (V2-005)", () => {
     const h = harness(replies, { voice, wall });
     return { h, voice };
   }
+
+  it("stops during the acknowledgment and never opens the answer's voice afterwards", async () => {
+    const { h, voice } = spoken([]);
+    const held = h.model.held();
+    h.agent.ask({ question: "What do rivals charge?", askedBy: "A", turnId: "0:1" });
+    await microtasks();
+    expect(voice.utterances).toHaveLength(1);
+    await h.agent.interrupt();
+    h.model.commands.push({ command: "stop", question: "" });
+    h.agent.command({ question: "thanks Sotto", askedBy: "B", turnId: "0:2" });
+    held.answer(reply({ text: STREAM.at(-1) as string }));
+    await h.clock.settle();
+    expect(voice.utterances).toHaveLength(1);
+    expect(h.records[0]?.spokenSoFar).toBe("");
+    expect(h.model.classifications[0]?.label).toBe("voice_command");
+    expect(h.model.calls).toHaveLength(1);
+  });
+
+  it.each(["continue", "new_question"])(
+    "uses the flushed heard prefix for %s after an interrupted answer", async (command) => {
+      const { h, voice } = spoken([]);
+      const held = h.model.held();
+      h.agent.ask({ question: "What do rivals charge?", askedBy: "A", turnId: "0:1" });
+      held.call()?.onText?.({ itemId: ANSWER_ITEM, text: STREAM[3] as string });
+      await microtasks();
+      const utterance = voice.utterances.at(-1)!;
+      utterance.heard = "They charge five to twenty";
+      await h.agent.interrupt();
+      h.model.commands.push({ command, question: command === "new_question" ? "What about annually?" : "" });
+      h.model.replies.push(async () => reply({ text: "Say this:\nMore detail.\nShow this:\nDetail" }));
+      h.agent.command({
+        question: command === "continue" ? "Sotto go on" : "Sotto, what about annually?",
+        askedBy: "B", turnId: "0:2",
+      });
+      held.answer(reply({ text: STREAM.at(-1) as string }));
+      await h.clock.settle();
+      expect(h.records[0]?.spokenSoFar).toBe("They charge five to twenty");
+      expect(h.model.calls[1]?.user).toContain('"spokenSoFar":"They charge five to twenty"');
+      expect(h.model.calls[1]?.user).toContain("previous answer was cut off");
+      if (command === "continue") {
+        expect(h.model.calls[1]?.user).toContain("Do not repeat what was heard");
+        expect(voice.utterances).toHaveLength(3);
+      }
+    },
+  );
+
+  it("accepts a new question after stop, without resuming the stopped speech", async () => {
+    const { h, voice } = spoken([]);
+    const held = h.model.held();
+    h.agent.ask({ question: "What do rivals charge?", askedBy: "A", turnId: "0:1" });
+    await microtasks();
+    // The fake acknowledgment is already finished. Stop must also work in
+    // the silent gap before the model has produced its first sentence.
+    h.model.commands.push({ command: "stop", question: "" });
+    h.agent.command({ question: "Sotto stop", askedBy: "A", turnId: "0:2" });
+    held.answer(reply({ text: STREAM.at(-1) as string }));
+    await h.clock.settle();
+    expect(voice.utterances).toHaveLength(1);
+    h.model.commands.push({ command: "new_question", question: "How about annual pricing?" });
+    h.model.replies.push(async () => reply({ text: "Say this:\nAnnual pricing.\nShow this:\nAnnual" }));
+    h.agent.command({ question: "Sotto how about annual pricing?", askedBy: "A", turnId: "0:3" });
+    await h.clock.settle();
+    expect(h.records.map((record) => record.question)).toEqual([
+      "What do rivals charge?", "How about annual pricing?",
+    ]);
+  });
+
+  it("stays silent on invalid classification or continue with no interrupted answer", async () => {
+    const { h, voice } = spoken([]);
+    h.model.commands.push({ command: "continue", question: "" });
+    h.agent.command({ question: "Sotto go on", askedBy: "A", turnId: "0:1" });
+    await h.clock.settle();
+    h.model.commands.push({ command: "invented" });
+    h.agent.command({ question: "Sotto stop", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+    expect(voice.utterances).toEqual([]);
+    expect(h.records).toEqual([]);
+    expect(h.warnings).toHaveLength(1);
+  });
 
   it("acknowledges the question before the answer exists, then says it sentence by sentence", async () => {
     const { h, voice } = spoken([

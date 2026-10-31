@@ -61,6 +61,7 @@ import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher } from "../wakeWatcher.js";
+import { BargeIn } from "../answer/BargeIn.js";
 import { introducedName } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 import { SessionTranscription } from "./SessionTranscription.js";
@@ -615,13 +616,28 @@ export class SessionManager {
     voice: VoiceOut | null,
   ): SessionTranscription {
     const wake = this.wakeWatcher(info, loops, clock, store);
+    const barge = new BargeIn({
+      clock,
+      speaking: () => voice?.playback?.().playing === true || this.bus.voiceState().speaking,
+      interrupt: () => loops.answers?.interrupt() ?? voice?.interrupt?.() ?? Promise.resolve(null),
+      command: (asked) => loops.answers?.command(asked),
+      onTiming: (record) => store.writer?.appendTiming?.(record),
+      onListening: (listening) => {
+        this.bus.setListening(listening);
+        if (listening) loops.policy?.wakePhraseDetected();
+      },
+    });
     return new SessionTranscription({
       clock,
       playback: () => voice?.playback?.() ?? { playing: false, recent: [] },
       logger: this.logger,
+      onHuman: (turn, record, duringPlayback) => {
+        if (this.current?.info.id === info.id) barge.accept(turn, record, duringPlayback);
+      },
       onEvent: (record) => store.writer?.appendEvent(record),
       onEcho: (turn) => {
         wake.ignoreTurn(turn.turnId);
+        if (barge.owns(turn.turnId)) this.bus.setListening(false);
         store.writer?.appendTiming?.({ stage: "self_echo", atMs: clock.now(), ...turn });
         // The last echo can close after playback ended. Re-read the pause
         // without counting Sotto as another human turn toward expiry.
@@ -647,9 +663,8 @@ export class SessionManager {
         loops.policy?.acceptTurn(turn);
         // And so does the wake phrase: the indicator is the point of reading
         // a partial at all (US-017).
-        // V2-006: side talk remains context, but cannot ask a question while
-        // Sotto is speaking (partial-turn barge-in belongs to V2-007).
-        if (suppressTriggers) wake.ignoreTurn(turn.turnId);
+        // V2-007 privately owns interrupted commands; ordinary side talk stays suppressed.
+        if (suppressTriggers || barge.owns(turn.turnId)) wake.ignoreTurn(turn.turnId);
         else wake.acceptTurn(turn);
       },
     });

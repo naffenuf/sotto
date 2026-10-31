@@ -24,6 +24,8 @@ export const PROMPTS = {
   verify: "verify",
   /** Answering a question somebody asked Sotto out loud (US-018). */
   answer: "answer",
+  /** Classifies a spoken interruption without answering it (V2-007). */
+  command: "command",
   /** Deciding whether a delivered card raises a planted moment (US-016). */
   judge: "judge",
 } as const;

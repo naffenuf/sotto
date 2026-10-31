@@ -40,7 +40,7 @@ export interface VoiceUtterance {
   readonly id: string;
   /** The next piece of text. Ignored once the utterance has ended. */
   append(text: string): void;
-  /** No more text; resolves once the voice has finished producing audio. */
+  /** No more text; playback voices resolve when heard or flushed, null sinks when synthesized. */
   finish(): Promise<VoiceSpoken>;
   /**
    * `begin()` to the first audio chunk, in real milliseconds, or `null` while
@@ -54,6 +54,8 @@ export interface VoiceUtterance {
 
 /** Where Sotto's speech goes. */
 export interface VoiceOut {
+  /** V2-007: stop synchronously, then report flush delay; null means no browser confirmation. */
+  interrupt?(): Promise<number | null>;
   /**
    * Actual sound and recently heard text for echo filtering (V2-006).
    * Optional because screen-only and null-sink voices cannot echo into a mic.

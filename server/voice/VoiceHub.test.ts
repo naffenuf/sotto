@@ -132,6 +132,37 @@ describe("voice playback transport", () => {
 });
 
 describe("an utterance fed a sentence at a time (V2-005)", () => {
+  it("records a barge-in even after synthesis completed, using the browser's flushed position", async () => {
+    const t = setup();
+    const utterance = (await t.hub.begin())!;
+    utterance.append("They charge twelve dollars per seat.");
+    t.socket.report({ type: "started", id: utterance.id });
+    const spoken = utterance.finish();
+    t.end();
+    await microtasks();
+    let recorded = false;
+    void spoken.then(() => { recorded = true; });
+    await microtasks();
+    expect(recorded).toBe(false);
+    const latency = t.hub.interrupt();
+    expect(JSON.parse(t.socket.sent.at(-1) as string)).toEqual({ type: "cancel", id: utterance.id });
+    t.wall.advanceBy(40);
+    t.hear("They charge twelve");
+    t.socket.report({ type: "ended", id: utterance.id, playedMs: 900, flushed: true });
+    await expect(latency).resolves.toBe(40);
+    await expect(spoken).resolves.toMatchObject({
+      reason: "cancelled", spokenSoFar: "They charge twelve",
+    });
+  });
+
+  it("does not report a measured silence when the browser never confirms its flush", async () => {
+    const t = setup();
+    await t.hub.begin();
+    const latency = t.hub.interrupt();
+    t.wall.advanceBy(VOICE_FLUSH_WAIT_MS);
+    await expect(latency).resolves.toBeNull();
+  });
+
   it("hands each piece straight on and shows what is being said", async () => {
     const t = setup();
     const utterance = await t.hub.begin();
@@ -145,6 +176,8 @@ describe("an utterance fed a sentence at a time (V2-005)", () => {
 
     const spoken = utterance!.finish();
     t.end();
+    await microtasks();
+    t.socket.report({ type: "ended", id: utterance!.id, playedMs: 500, flushed: false });
     await expect(spoken).resolves.toMatchObject({ reason: "complete", firstAudioMs: 299 });
     // The page is told no more audio is coming; it plays out what it has.
     expect(JSON.parse(t.socket.sent.at(-1) as string)).toEqual({

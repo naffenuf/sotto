@@ -62,6 +62,14 @@ export class VoiceHub implements VoiceOut {
 
   /** Resolves a cancelled utterance's wait for the page's last report. */
   private readonly flushWaiters = new Map<string, () => void>();
+  /** Playback, unlike synthesis, determines when an answer is safe to record (V2-007). */
+  private readonly playbackWaiters = new Map<string, () => void>();
+  /** Cancellation can follow synthesis completion, whose result still says complete. */
+  private readonly cutOff = new Set<string>();
+  /** Actual receipt times distinguish confirmed silence from a timed-out flush. */
+  private readonly flushedAt = new Map<string, number>();
+  /** Multiple observers share one bounded wait for the final browser position. */
+  private readonly flushPromises = new Map<string, Promise<void>>();
   /** Retain Speakers through the echo tail so a late flushed report still counts. */
   private readonly heard = new Map<string, { speaker: Speaker; endedAt: number | null }>();
 
@@ -180,22 +188,28 @@ export class VoiceHub implements VoiceOut {
       // arrives before the hub knows every character was sent.
       finish: (): Promise<VoiceSpoken> =>
         speaker.finish().then(
-          (result) => {
+          async (result) => {
             if (this.active === id) {
               this.synthesisDone = true;
               this.send({ type: "end", id, reason: result.reason });
             }
-            const spoken = (): VoiceSpoken => ({
-              reason: result.reason,
+            // Synthesis can complete long before the room hears the last word.
+            if (this.active === id) await this.awaitPlayback(id, result.audioMs);
+            if (this.cutOff.has(id)) await this.waitForFlush(id);
+            const spoken: VoiceSpoken = {
+              reason: this.cutOff.has(id) ? "cancelled" : result.reason,
               text: result.text,
               spokenSoFar: speaker.spokenSoFar(),
               firstAudioMs: result.firstAudioMs,
-            });
-            // Cut off: what the room heard is whatever the page managed to
-            // play, and only the page knows that.
-            return result.reason === "cancelled"
-              ? this.awaitFlush(id).then(spoken)
-              : spoken();
+            };
+            this.cutOff.delete(id);
+            // Keep the timestamp long enough for concurrent latency readers,
+            // but do not retain every utterance for a multi-hour session.
+            this.clock.setTimeout(() => {
+              this.flushedAt.delete(id);
+              this.flushPromises.delete(id);
+            }, SELF_ECHO_TAIL_MS);
+            return spoken;
           },
           (error: unknown) => {
             if (this.active === id) this.stop();
@@ -210,6 +224,7 @@ export class VoiceHub implements VoiceOut {
    * {@link VOICE_FLUSH_WAIT_MS}, whichever comes first.
    */
   private awaitFlush(id: string): Promise<void> {
+    if (this.flushedAt.has(id)) return Promise.resolve();
     const socket = this.socket;
     if (!socket || socket.readyState !== socket.OPEN) return Promise.resolve();
     return new Promise<void>((resolve) => {
@@ -234,10 +249,47 @@ export class VoiceHub implements VoiceOut {
   stop(): void {
     const id = this.active;
     if (!id) return;
+    this.cutOff.add(id);
     if (this.speaker) this.cancelled = { id, speaker: this.speaker };
     this.speaker?.cancel();
     this.send({ type: "cancel", id });
     this.finish(id);
+  }
+
+  /** Stops before returning; the promise measures the browser's confirmation, not synthesis. */
+  interrupt(): Promise<number | null> {
+    const id = this.active;
+    const startedAt = this.clock.now();
+    this.stop();
+    if (id === undefined) return Promise.resolve(null);
+    // Share one wait with finish(), which also needs the final playback position.
+    return this.waitForFlush(id).then(() => {
+      const endedAt = this.flushedAt.get(id);
+      return endedAt === undefined ? null : Math.max(0, endedAt - startedAt);
+    });
+  }
+
+  /** Multiple observers may need the same flush without replacing each other's resolver. */
+  private waitForFlush(id: string): Promise<void> {
+    const existing = this.flushPromises.get(id);
+    if (existing !== undefined) return existing;
+    const waiting = this.awaitFlush(id);
+    this.flushPromises.set(id, waiting);
+    return waiting;
+  }
+
+  private awaitPlayback(id: string, audioMs: number): Promise<void> {
+    if (this.active !== id) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const settle = (): void => {
+        cancelTimer();
+        this.playbackWaiters.delete(id);
+        resolve();
+      };
+      // A lost page report must not wedge the answer queue indefinitely.
+      const cancelTimer = this.clock.setTimeout(() => this.stop(), audioMs + 5_000);
+      this.playbackWaiters.set(id, settle);
+    });
   }
 
   /** What the room heard of the last utterance Stop cut off; "" if none was. */
@@ -267,6 +319,7 @@ export class VoiceHub implements VoiceOut {
     // The flushed position of an utterance Stop already closed.
     if (frame.type === "ended" && frame.id === this.cancelled?.id) {
       this.cancelled.speaker.notePlayedMs(frame.playedMs);
+      this.flushedAt.set(frame.id, this.clock.now());
       this.flushWaiters.get(frame.id)?.();
       return;
     }
@@ -297,6 +350,7 @@ export class VoiceHub implements VoiceOut {
     const heard = this.heard.get(id);
     if (heard) heard.endedAt = this.clock.now();
     this.active = undefined;
+    this.playbackWaiters.get(id)?.();
     this.speaker = undefined;
     this.bus.setVoice(silentVoice());
   }

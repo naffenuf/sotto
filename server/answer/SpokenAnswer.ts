@@ -143,6 +143,7 @@ export class SpokenAnswer {
   /** Stops speaking now — the Stop button, muting, the end of a session. */
   cancel(): void {
     this.stopped = true;
+    this.queued = "";
     this.ack?.utterance.cancel();
     this.answer?.utterance.cancel();
   }
@@ -154,7 +155,7 @@ export class SpokenAnswer {
       ackMs: this.latency(this.ack),
       firstAudioMs: this.latency(this.answer),
       spokenSoFar: this.result?.reason === "cancelled" ? this.result.spokenSoFar : "",
-      interrupted: this.result?.reason === "cancelled",
+      interrupted: this.stopped || this.result?.reason === "cancelled",
     };
   }
 
@@ -179,6 +180,11 @@ export class SpokenAnswer {
   private async open(): Promise<VoiceUtterance | null> {
     try {
       const utterance = await this.options.voice.begin();
+      // A barge-in can arrive while the socket is opening, before we own its handle.
+      if (this.stopped && utterance !== null) {
+        utterance.cancel();
+        return null;
+      }
       // Muted, or no page attached: the answer is a screen answer, which is
       // the core build's behaviour and not an error.
       if (utterance === null) this.silent = true;

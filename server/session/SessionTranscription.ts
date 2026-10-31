@@ -33,6 +33,8 @@ export interface SessionTranscriptionOptions {
   onEvent: (record: AsrFrameRecord) => void;
   /** Echo text has exactly one destination: timing.jsonl. */
   onEcho: (turn: TurnUpdate & { selfEcho: true }) => void;
+  /** Private V2-007 hook; never releases tentative echo text to public consumers. */
+  onHuman?: (turn: TurnUpdate, record: AsrFrameRecord, duringPlayback: boolean) => void;
 }
 
 /** Keeps echo out of every consumer, including answer context and raw captures. */
@@ -76,6 +78,10 @@ export class SessionTranscription {
     pending.duringPlayback ||= playback.playing;
     for (const speech of playback.recent) pending.speech.set(speech.id, speech.text);
     this.frames.push({ record, pending });
+
+    if (!isSelfEcho(turn.text, [...pending.speech.values()])) {
+      this.options.onHuman?.(turn, record, pending.duringPlayback);
+    }
 
     if (turn.final) {
       this.resolve(pending);
