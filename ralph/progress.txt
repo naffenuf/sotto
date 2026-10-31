@@ -129,3 +129,29 @@
   answers.jsonl. VoiceHub.spokenSoFar() still answers for the last utterance Stop cut off.
   A barge-in should go through VoiceHub.stop() exactly as the Stop button does; the agent's
   SpokenAnswer.cancel() is there for the session-level case.
+
+[2026-10-31 15:55] V2-006 — completed — Codex added playback-based self-echo filtering across the session pipeline.
+  Codex started with a clean tree on ralph/sotto-v2; the Ralph loop was confirmed stopped.
+  VoiceHub.playback() returns actual heard text from Speaker alignment and browser reports,
+  retaining it for 1,500 ms after playback ends on the hub's wall clock. Queued synthesis text
+  is excluded. The pure matcher uses token-multiset intersection / captured-token count >= 0.6,
+  preserving short excerpts of long answers while rejecting unrelated side talk.
+  SessionTranscription wraps TurnAssembler for both source paths. Echo-window partials wait
+  for the final turn; echoes are marked selfEcho and logged only to timing.jsonl, never to the
+  bus, transcript, board, observer, speaker introductions, wake watcher or answer context.
+  Raw frames also wait for classification and retain original order across overlapping turns.
+  Human side talk is kept, with wake suppression retained if its final arrives after playback.
+  Policy delivery waits for playback, even after generation finishes; playback end and a late
+  echo final both recheck the pause without treating Sotto as a human turn toward expiry.
+  Checked: npm run typecheck; npm test (59 files, 781 tests), including matcher cases,
+  playback-tail boundaries, cancelled/queued speech, overlapping ASR turns, late finals,
+  raw-file exclusion, all model contexts, wake suppression and held-card release.
+  The initial full suite exposed pre-existing real SDK construction with dummy test keys in
+  SessionManager/app helpers. Replaced those with the offline emptyModel seam so npm test
+  stays offline and avoids network retries. Local socket tests required sandbox escalation.
+  For V2-007: add a private partial-turn hook inside SessionTranscription for prompt barge-in;
+  do not release public transcript/raw-file partials before echo classification. Reuse
+  VoiceOut.playback() and VoiceHub.stop(); a side-talk final currently suppresses wake triggers.
+  Research does not exist yet: V2-012 must consult playback().playing before launching work.
+  No real API, microphone or audible playback verification was needed for this story;
+  human room/echo validation remains at V2-008.

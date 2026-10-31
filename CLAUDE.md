@@ -789,3 +789,19 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   playback position that `Speaker.spokenSoFar()` reads. So `VoiceHub`'s utterance `finish()`
   waits up to `VOICE_FLUSH_WAIT_MS` (500) for it — and only on a cancel, and only when a page is
   attached, so a page that has gone away costs nothing.
+- **Echo filtering belongs before every transcript consumer, including raw capture and answers.**
+  V2-006's `SessionTranscription` wraps `TurnAssembler` for both live and replay input. Its
+  `finalTurns()` is the human-only answer context; calling the raw assembler's would put echo
+  back in the model's memory. During the echo window it holds partials until final text decides,
+  because an echoed-looking prefix can grow into unrelated side talk. Raw frames wait in original
+  order too, so `events.jsonl` cannot leak what `transcript.md` excluded. Echo text is marked
+  `selfEcho` and goes only to `timing.jsonl`. `VoiceOut.playback()` is optional for silent/null
+  sinks; `VoiceHub` supplies it from actual alignment-backed playback, retaining each utterance
+  until 1,500 ms after playback ends on its real clock. Queued text is not heard text. A human
+  turn overlapping playback carries `suppressTriggers` even if its final arrives later. V2-007
+  needs a private partial-turn hook at this boundary for barge-in; keep public partials buffered.
+  Later research gates must consult `playback().playing`, as the policy's pause getter does.
+- **A dummy API key does not make a unit test offline.** Session and route plumbing tests now
+  inject `server/test/emptyModel.ts` instead of constructing `MuseClient` with `test-key`.
+  Those old tests attempted SDK calls and waited through network retries; the offline stub
+  exercises the same configured-model wiring with empty board operations and candidates.

@@ -106,8 +106,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed by Codex. V2-006 uses a pure token-multiset overlap matcher (>= 0.6) and VoiceOut.playback(), supplied by VoiceHub from actual Speaker playback/alignment reports, through playback plus a 1,500 ms wall-clock tail. SessionTranscription filters both live and replay input before UI turns, saved raw frames, transcript, introductions, board, observer, wake detection and answer context; echoes are marked selfEcho only in timing.jsonl. Partials inside the echo window wait for final text so a short matching prefix can still become human side talk. Raw frames are buffered and released in original order, including overlapping turns. Human side talk remains context but cannot trigger a wake question, even if it finalizes after playback ends; policy delivery is held through playback and rechecked on playback end or a late echo final. Checked npm run typecheck and npm test: 59 files, 781 tests pass. Fixed pre-existing dummy-key model calls in session/route unit-test helpers by injecting an offline emptyModel; no real API calls are needed for this story. For V2-007, add a private partial-turn barge-in hook inside SessionTranscription without exposing echo partials to UI or saved files. Research is not implemented yet; its later gate must also consult playback().playing. Human room/echo verification remains at V2-008."
     },
     {
       "id": "V2-007",
