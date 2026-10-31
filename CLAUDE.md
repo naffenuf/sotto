@@ -688,6 +688,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   a hunch. It reports 6/6 reachable at the shipped `PAUSE_MS` (700, on corrected silence), with
   margins of 754–1,137 ms; `--every N` reprices it at another observer cadence. Run it before
   paying for an eval run, and before blaming `observer.md`.
+- **A new fixture's planted moments have to be *measured* reachable, and that is free.**
+  `npm run eval:ceiling -- --fixtures <name>` replays a capture through the turn assembler
+  alone and lays the window, the observer's four-turn look and the real quiet on one timeline,
+  so authoring a fixture ends there rather than at `fixtures:check`. V2-002's first render put
+  two windows at 701 and 708 ms against `PAUSE_MS` 700 — reachable by a millisecond — and
+  widening the pauses took every margin to 780–1,453 ms. Two things decide that number: the
+  usable pauses in a window are the ones after lines `triggerLine`…`deadlineLine - 1` (the
+  pause after the deadline line is *outside* the window, so raising it buys nothing), and the
+  observer cannot look until the board update four final turns after the trigger, a median
+  12.6 s, which eats most of a short window.
+- **ElevenLabs reads a new script more slowly than it read the old ones.** The core fixtures
+  measure 3.4–3.8 words/second; V2-002's two came out at **3.06**, and the first render of
+  `research-business-idea` was 193.8 s against a predicted 178 s — over the PRD's three
+  minutes, so it had to be trimmed and re-rendered. Predict with `words / 3.1 + pauses` for a
+  new script, then believe the renderer, which prints the real duration in ~10 s.
 - **The eval's one remaining miss is the observer's, not the policy's.** Run
   `2026-10-29_053832` catches 5 of 6 planted moments, all in a pause and none late. The miss is
   `moment-mixed`/demo-deadline-contradiction, where nine looks produced no candidate for a

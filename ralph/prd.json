@@ -35,8 +35,8 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done. All 6 criteria met; npm run typecheck, npm test (706 tests) and npm run fixtures:check (11 fixtures) pass. research-business-idea is 175.2s (38 lines) and offsite-plan 167.5s (37 lines), both Craig (B = Adam) and EJ (A = Rachel) \u2014 a script carries no names, so the letters are the voices. Schema: momentTypes += unanswered_question, research_hook; expectedLevels += research, with a superRefine rule that research <-> research_hook (a research hook is caught by a research-ready card, never by the policy). score.ts's levelRank now ranks research above interject so an interjection matched to a research moment scores caught_low until V2-019 implements research matching; the two fixtures are NOT in the eval set yet (isEvalFixture only takes brainstorm, no-wake and moment-*), which is V2-019's first criterion. npm run eval:ceiling: 6/6 planted moments reachable at PAUSE_MS 700 with 780-1,453 ms of corrected quiet left in each window \u2014 the first render had two windows at 701/708 ms, so the in-window pauses were widened and both fixtures re-rendered and re-captured. Needed outside the stated criteria: `sato` added to DEFAULT_WAKE_SPELLINGS, because research-business-idea's wake line transcribes as \" Sato, what did you find on competitors? \" on two captures of two renders and would otherwise never trigger V2-005/V2-015. offsite-plan's wake line lost its comma and matches only on the surviving question mark. Both in events/NOTES.md."
     },
     {
       "id": "V2-003",

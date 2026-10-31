@@ -24,3 +24,24 @@
   vitest.config.ts. The brainstorm capture replay in SessionManager.test.ts and app.test.ts is
   CPU-bound at 4.3-5.5s, either side of the old 5s default, so `npm test` was already failing at
   random on the clean tree before this iteration started. Verified green twice afterwards (700/700).
+
+[2026-10-31 12:05] V2-002 — completed — research-business-idea and offsite-plan: scripts, audio, captures, live scripts.
+  Working tree was clean at the start. Two new fixtures, 175.2s and 167.5s, Craig and EJ
+  (a script has no names: A = Rachel = EJ, B = Adam = Craig, documented in fixtures/README.md).
+  Schema grew two moment types (unanswered_question, research_hook) and the `research`
+  expected level, with a cross-field rule that the two research things only appear together.
+  Measure before trusting a new fixture: the first render put two moment windows 1-8 ms above
+  PAUSE_MS (`npm run eval:ceiling`, free, no API calls), so the in-window pauses were widened
+  and both were re-rendered and re-captured — 780-1,453 ms of margin now. Two authoring facts
+  worth having: the usable pauses in a window are the ones after lines triggerLine..deadlineLine-1
+  (the pause after the deadline line is outside it), and ElevenLabs speech came out at
+  3.06 words/second here, not the 3.4-3.8 CLAUDE.md records for the core fixtures — the first
+  render of research-business-idea was 193.8s, over the PRD's 3 minutes, and had to be trimmed.
+  For V2-005/V2-015: both wake lines do trigger, but only after adding `sato` to
+  DEFAULT_WAKE_SPELLINGS — research-business-idea's "Sotto, what did you find on competitors?"
+  transcribes as " Sato, ... " every time. offsite-plan's kept `Sotto` but lost its comma, and
+  "can you" is an auxiliary, so it matches only because the question mark survived.
+  NOT done here, and V2-019's job: these two fixtures are not in the eval set
+  (server/eval/options.ts isEvalFixture), and server/eval/score.ts cannot match a research card
+  to a research moment yet — levelRank just ranks `research` above `interject`, so an
+  interjection the judge matches to a research hook scores caught_low.
