@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { silentVoice, type VoiceState } from "../../shared/voice.js";
 import type {
   Board,
   ServerEvent,
@@ -30,6 +31,7 @@ export const MAX_TURNS = 500;
 export const MAX_CARDS = 50;
 
 export interface SessionEventsState {
+  voice: VoiceState;
   /** True while `/ws/events` is open. */
   connected: boolean;
   /** The latest state of each dot, as the server reported it. */
@@ -87,6 +89,7 @@ function idle(channel: StatusChannel): StatusUpdate {
 }
 
 const initial: SessionEventsState = {
+  voice: silentVoice(),
   connected: false,
   statuses: { server: idle("server"), transcription: idle("transcription"), model: idle("model") },
   session: null,
@@ -155,6 +158,7 @@ export function useSessionEvents(): SessionEventsState {
 
 function apply(state: SessionEventsState, event: ServerEvent): SessionEventsState {
   switch (event.type) {
+    case "voice": return { ...state, voice: event.voice };
     case "status":
       return { ...state, statuses: { ...state.statuses, [event.status.channel]: event.status } };
     case "session":

@@ -275,14 +275,14 @@ describe("POST /api/session/settings", () => {
   it("sets the chattiness with nothing running and remembers it on the bus", async () => {
     const { app: server, bus } = await buildTestApp();
 
-    const response = await server.inject(change({ chattiness: "quiet" }));
+    const response = await server.inject(change({ chattiness: "quiet", voiceMuted: false }));
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ settings: { chattiness: "quiet" } });
-    expect(bus.settingsState()).toEqual({ chattiness: "quiet" });
+    expect(response.json()).toEqual({ settings: { chattiness: "quiet", voiceMuted: false } });
+    expect(bus.settingsState()).toEqual({ chattiness: "quiet", voiceMuted: false });
     // So a browser that attaches afterwards is caught up with it.
     expect(bus.snapshot()).toContainEqual({
       type: "settings",
-      settings: { chattiness: "quiet" },
+      settings: { chattiness: "quiet", voiceMuted: false },
     });
   });
 
@@ -637,7 +637,7 @@ describe("/ws/events", () => {
     const { app: server, bus } = await buildTestApp();
     bus.setStatus("transcription", "active", "replaying brainstorm events at max");
 
-    const { socket, events } = await open(server, (seen) => seen.length === 8);
+    const { socket, events } = await open(server, (seen) => seen.length === 9);
     const snapshot = await events;
     socket.close();
 
@@ -658,9 +658,10 @@ describe("/ws/events", () => {
       // Nothing has been said, so the board is empty rather than absent.
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
       // And Sotto is as talkative as it comes (US-014).
-      { type: "settings", settings: { chattiness: "normal" } },
+      { type: "settings", settings: { chattiness: "normal", voiceMuted: false } },
       // Nobody has said its name (US-017).
       { type: "wake", listening: false },
+      { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
     ]);
   });
 
@@ -695,13 +696,14 @@ describe("/ws/events", () => {
     // A real socket on a real local port: an injected one does not complete
     // the closing handshake, so the server would never hear about it.
     const { app: server, bus } = await buildTestApp();
+    const baselineListeners = bus.listenerCount;
     const address = await server.listen({ host: "127.0.0.1", port: 0 });
     const client = new WebSocket(`${address.replace("http", "ws")}/ws/events`);
     await new Promise((resolve, reject) => {
       client.on("open", resolve);
       client.on("error", reject);
     });
-    expect(bus.listenerCount).toBe(1);
+    expect(bus.listenerCount).toBe(baselineListeners + 1);
 
     await new Promise<void>((resolve) => {
       client.on("close", () => resolve());
@@ -709,7 +711,7 @@ describe("/ws/events", () => {
     });
     // The close has to reach the server before the subscription goes.
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(bus.listenerCount).toBe(0);
+    expect(bus.listenerCount).toBe(baselineListeners);
   });
 });
 

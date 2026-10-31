@@ -28,6 +28,8 @@ export interface SessionControlsProps {
   chattiness: Chattiness;
   /** Changes it mid-conversation: the policy picks it up at once. */
   onChattinessChange: (chattiness: Chattiness) => void;
+  voiceMuted: boolean;
+  onVoiceMutedChange: (muted: boolean) => void;
 }
 
 /** Source selector, chattiness and Start / Stop, in the header. */
@@ -38,6 +40,8 @@ export function SessionControls({
   onStop,
   chattiness,
   onChattinessChange,
+  voiceMuted,
+  onVoiceMutedChange,
 }: SessionControlsProps) {
   return (
     <div className="controls">
@@ -57,6 +61,7 @@ export function SessionControls({
           </option>
         ))}
       </select>
+      <label className="controls__label"><input type="checkbox" checked={voiceMuted} onChange={(event) => onVoiceMutedChange(event.target.checked)} /> Mute voice</label>
       <button
         type="button"
         className="controls__button"

@@ -20,6 +20,10 @@ import { EventBus } from "./events/bus.js";
 import { listFixtures } from "./fixtures.js";
 import { SessionManager, SessionStartError } from "./session/SessionManager.js";
 import { listHistory, readHistory } from "./session/history.js";
+import { VoiceTestRequestSchema } from "../shared/voice.js";
+import { loadElevenLabsApiKey, loadSottoVoiceId } from "./config.js";
+import { Speaker } from "./voice/Speaker.js";
+import { VoiceHub } from "./voice/VoiceHub.js";
 
 /** Close code for a socket that asked for something it may not have. */
 const WS_POLICY_VIOLATION = 1008;
@@ -44,6 +48,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   // The pipeline logs to the console with its own `[session]`/`[asr]` prefixes,
   // as the rest of the server does, rather than through Fastify's logger.
   const sessions = options.sessions ?? new SessionManager({ bus, apiKey: options.apiKey });
+  const voice = new VoiceHub(bus, (onAudio) => new Speaker({ apiKey: loadElevenLabsApiKey(), voiceId: loadSottoVoiceId(), onAudio }));
 
   await app.register(websocket);
 
@@ -74,9 +79,10 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
   });
 
-  app.post("/api/session/stop", async (): Promise<SessionStopResponse> => ({
-    stopped: await sessions.stop(),
-  }));
+  app.post("/api/session/stop", async (): Promise<SessionStopResponse> => {
+    voice.stop();
+    return { stopped: await sessions.stop() };
+  });
 
   // Naming a diarization label (US-007). The name is a property of the running
   // session, so it goes to the bus (every attached browser) and to the session
@@ -107,10 +113,27 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         error: `not a settings change: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
       } satisfies ApiError);
     }
-    return {
-      settings: sessions.setChattiness(parsed.data.chattiness),
-    } satisfies SessionSettingsResponse;
+    if (parsed.data.chattiness !== undefined) sessions.setChattiness(parsed.data.chattiness);
+    if (parsed.data.voiceMuted !== undefined) {
+      sessions.setVoiceMuted(parsed.data.voiceMuted);
+      if (parsed.data.voiceMuted) voice.stop();
+    }
+    return { settings: sessions.settings() } satisfies SessionSettingsResponse;
   });
+
+  app.post("/api/voice/stop", async () => { voice.stop(); return { utteranceId: null, speaking: false }; });
+  if (process.env.SOTTO_DEV === "1") {
+    app.post("/api/voice/test", async (request, reply) => {
+      const parsed = VoiceTestRequestSchema.safeParse(request.body ?? {});
+      if (!parsed.success) return reply.code(400).send({ error: "Invalid test utterance" });
+      try {
+        const utteranceId = await voice.speak(parsed.data.text ?? "Hello, I'm Sotto. I'm here to help your conversation.");
+        return { utteranceId, speaking: bus.voiceState().speaking };
+      } catch (error) {
+        return reply.code(503).send({ error: error instanceof Error ? error.message : String(error) });
+      }
+    });
+  }
 
   // The group's verdict on a card Sotto put up (US-015). The browser sends
   // only the card id: which candidate it was and what level it went out at
@@ -203,6 +226,10 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,
   // already converted by the browser. The session is started over HTTP first,
   // so by the time this opens there is a `MicSource` waiting for it.
+  app.get("/ws/voice", { websocket: true }, (socket) => {
+    if (!voice.attach(socket)) socket.close(WS_POLICY_VIOLATION, "voice playback is active in another tab");
+  });
+
   app.get("/ws/audio", { websocket: true }, (socket) => {
     const mic = sessions.micInput();
     if (mic === null) {
@@ -238,7 +265,10 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   });
 
   // Closing the server must not leave a transcription socket open.
+  const unsubscribeVoice = bus.subscribe((event) => { if (event.type === "session" && event.session === null) voice.stop(); });
   app.addHook("onClose", async () => {
+    unsubscribeVoice();
+    voice.stop();
     await sessions.stop();
   });
 

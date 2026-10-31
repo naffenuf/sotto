@@ -104,11 +104,12 @@ export interface FixtureListResponse {
 export interface SessionSettings {
   /** How talkative Sotto is being (US-014), set from the header. */
   readonly chattiness: Chattiness;
+  readonly voiceMuted: boolean;
 }
 
 /** Where a server starts, before the header has said anything. */
 export function defaultSettings(): SessionSettings {
-  return { chattiness: DEFAULT_CHATTINESS };
+  return { chattiness: DEFAULT_CHATTINESS, voiceMuted: false };
 }
 
 /**
@@ -116,8 +117,9 @@ export function defaultSettings(): SessionSettings {
  * too — the setting is the server's, and the next session inherits it.
  */
 export const SessionSettingsRequestSchema = z.object({
-  chattiness: ChattinessSchema,
-});
+  chattiness: ChattinessSchema.optional(),
+  voiceMuted: z.boolean().optional(),
+}).refine((value) => value.chattiness !== undefined || value.voiceMuted !== undefined);
 export type SessionSettingsRequest = z.infer<typeof SessionSettingsRequestSchema>;
 
 /** Response to it: the settings as they now stand. */

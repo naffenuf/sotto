@@ -15,11 +15,14 @@ import {
   renameSpeaker,
   sendFeedback,
   setChattiness,
+  setVoiceMuted,
+  stopVoice,
   startSession,
   stopSession,
 } from "./api.js";
 import { AskBox } from "./AskBox.js";
 import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCapture.js";
+import { useVoicePlayback } from "./audio/useVoicePlayback.js";
 import { BoardPanel } from "./BoardPanel.js";
 import { Backstage } from "./Backstage.js";
 import { SessionControls } from "./SessionControls.js";
@@ -38,6 +41,7 @@ export function App() {
   const [view, setView] = useState<"board" | "transcript" | "backstage">("board");
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  useVoicePlayback(setProblem);
   const [busy, setBusy] = useState(false);
   /** The microphone, while a `mic` session is running (US-012). */
   const mic = useRef<MicCapture | null>(null);
@@ -168,6 +172,8 @@ export function App() {
           onStop={onStop}
           chattiness={events.settings.chattiness}
           onChattinessChange={onChattinessChange}
+          voiceMuted={events.settings.voiceMuted}
+          onVoiceMutedChange={(muted) => { void setVoiceMuted(muted).catch((error: unknown) => setProblem(String(error))); }}
         />
         <StatusDots statuses={statuses} />
       </header>
@@ -209,6 +215,7 @@ export function App() {
           footer={<AskBox onAsk={onAsk} />}
           banner={
             <>
+              {events.voice.speaking && <div className="voice-status" role="status" data-testid="voice-speaking" data-playing={events.voice.playing}><span className="voice-status__dot" aria-hidden="true" />Sotto is speaking <button type="button" onClick={() => { void stopVoice().catch((error: unknown) => setProblem(String(error))); }}>Stop speaking</button></div>}
               {/* Somebody has said Sotto's name and is still asking (US-017).
                   It sits above the cards because the answer lands there. */}
               {events.listening && (

@@ -39,7 +39,7 @@ import type { StatusState } from "../../shared/events.js";
 import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
-import { describeSource, sourceSlug } from "../../shared/session.js";
+import { defaultSettings, describeSource, sourceSlug } from "../../shared/session.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import {
   EventReplaySource,
@@ -307,7 +307,7 @@ export class SessionManager {
     // manager was built with something else in mind.
     this.currentSettings = options.chattiness === undefined
       ? this.bus.settingsState()
-      : { chattiness: options.chattiness };
+      : { ...defaultSettings(), chattiness: options.chattiness };
     if (this.currentSettings.chattiness !== this.bus.settingsState().chattiness) {
       this.bus.setSettings(this.currentSettings);
     }
@@ -330,11 +330,18 @@ export class SessionManager {
    */
   setChattiness(chattiness: Chattiness): SessionSettings {
     if (chattiness !== this.currentSettings.chattiness) {
-      this.currentSettings = { chattiness };
+      this.currentSettings = { ...this.currentSettings, chattiness };
       this.bus.setSettings(this.currentSettings);
       this.current?.policy?.setChattiness(chattiness);
       this.current?.store.writer?.setSettings(this.currentSettings);
     }
+    return this.currentSettings;
+  }
+
+  setVoiceMuted(voiceMuted: boolean): SessionSettings {
+    this.currentSettings = { ...this.currentSettings, voiceMuted };
+    this.bus.setSettings(this.currentSettings);
+    this.current?.store.writer?.setSettings(this.currentSettings);
     return this.currentSettings;
   }
 

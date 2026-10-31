@@ -66,6 +66,11 @@ export function setChattiness(chattiness: Chattiness): Promise<SessionSettingsRe
   return call<SessionSettingsResponse>("/api/session/settings", { chattiness });
 }
 
+export function setVoiceMuted(voiceMuted: boolean): Promise<SessionSettingsResponse> {
+  return call<SessionSettingsResponse>("/api/session/settings", { voiceMuted });
+}
+export function stopVoice(): Promise<unknown> { return call("/api/voice/stop", {}); }
+
 /**
  * Files the group's verdict on a card Sotto put up (US-015). Only the card id
  * goes over the wire: the server knows which candidate it was and at what

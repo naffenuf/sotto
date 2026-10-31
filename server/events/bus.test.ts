@@ -36,8 +36,9 @@ describe("EventBus", () => {
       { type: "session", session: null },
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
-      { type: "settings", settings: { chattiness: "normal" } },
+      { type: "settings", settings: { chattiness: "normal", voiceMuted: false } },
       { type: "wake", listening: false },
+      { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
     ]);
   });
 
@@ -94,17 +95,17 @@ describe("EventBus", () => {
     const bus = new EventBus();
     const seen = collect(bus);
 
-    bus.setSettings({ chattiness: "active" });
-    expect(seen).toEqual([{ type: "settings", settings: { chattiness: "active" } }]);
-    expect(bus.settingsState()).toEqual({ chattiness: "active" });
+    bus.setSettings({ chattiness: "active", voiceMuted: false });
+    expect(seen).toEqual([{ type: "settings", settings: { chattiness: "active", voiceMuted: false } }]);
+    expect(bus.settingsState()).toEqual({ chattiness: "active", voiceMuted: false });
 
     // Turning Sotto up is meant for the next conversation too, unlike the
     // speaker names and the board.
     bus.setSession(session);
-    expect(bus.settingsState()).toEqual({ chattiness: "active" });
+    expect(bus.settingsState()).toEqual({ chattiness: "active", voiceMuted: false });
     expect(bus.snapshot()).toContainEqual({
       type: "settings",
-      settings: { chattiness: "active" },
+      settings: { chattiness: "active", voiceMuted: false },
     });
   });
 
@@ -127,8 +128,9 @@ describe("EventBus", () => {
       { type: "session", session },
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
-      { type: "settings", settings: { chattiness: "normal" } },
+      { type: "settings", settings: { chattiness: "normal", voiceMuted: false } },
       { type: "wake", listening: false },
+      { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
     ]);
     expect(bus.currentSession()).toEqual(session);
     expect(bus.status("transcription").state).toBe("active");

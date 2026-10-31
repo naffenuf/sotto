@@ -29,6 +29,7 @@ import {
   type StatusUpdate,
 } from "../../shared/events.js";
 import { defaultSettings, type SessionInfo, type SessionSettings } from "../../shared/session.js";
+import { silentVoice, type VoiceState } from "../../shared/voice.js";
 
 export type EventListener = (event: ServerEvent) => void;
 
@@ -68,6 +69,7 @@ export class EventBus {
   private listening = false;
   /** Server-wide, not per session: the next session inherits what is set. */
   private settings: SessionSettings = defaultSettings();
+  private voice: VoiceState = silentVoice();
 
   constructor(logger: Logger = console) {
     this.logger = logger;
@@ -85,6 +87,7 @@ export class EventBus {
     if (event.type === "card") this.rememberCard(event.card);
     if (event.type === "settings") this.settings = event.settings;
     if (event.type === "wake") this.listening = event.listening;
+    if (event.type === "voice") this.voice = event.voice;
     if (event.type === "session") {
       this.session = event.session;
       // Nobody is mid-question across the end of a session, whatever the
@@ -135,6 +138,9 @@ export class EventBus {
     this.publish({ type: "settings", settings });
   }
 
+  setVoice(voice: VoiceState): void { this.publish({ type: "voice", voice }); }
+  voiceState(): VoiceState { return this.voice; }
+
   /**
    * Publishes whether somebody is in the middle of addressing Sotto by name
    * (US-017), skipping it when nothing changed — the watcher only calls on a
@@ -174,6 +180,7 @@ export class EventBus {
       this.board,
       { type: "settings", settings: this.settings },
       { type: "wake", listening: this.listening },
+      { type: "voice", voice: this.voice },
       // One event per card, in the order they went up, rather than a second
       // shape for "all of them": a browser folds each one in the same way it
       // folds a live arrival, and a session that has said nothing adds none.

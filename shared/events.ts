@@ -12,6 +12,7 @@ import type { TurnUpdate } from "./turns.js";
 import type { SessionInfo, SessionSettings } from "./session.js";
 import type { Board } from "./board.js";
 import type { StageCard } from "./cards.js";
+import type { VoiceState } from "./voice.js";
 
 /**
  * The three things the header shows a dot for.
@@ -139,4 +140,5 @@ export type ServerEvent =
   | BoardEvent
   | SettingsEvent
   | CardEvent
-  | WakeEvent;
+  | WakeEvent
+  | { type: "voice"; voice: VoiceState };

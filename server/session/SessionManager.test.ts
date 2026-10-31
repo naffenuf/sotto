@@ -1001,9 +1001,9 @@ describe("SessionManager, chattiness", () => {
       createAsrClient: ({ onFrame }) => new FakeAsrClient(onFrame),
     });
 
-    expect(sessions.settings()).toEqual({ chattiness: "normal" });
-    expect(sessions.setChattiness("quiet")).toEqual({ chattiness: "quiet" });
-    expect(bus.settingsState()).toEqual({ chattiness: "quiet" });
+    expect(sessions.settings()).toEqual({ chattiness: "normal", voiceMuted: false });
+    expect(sessions.setChattiness("quiet")).toEqual({ chattiness: "quiet", voiceMuted: false });
+    expect(bus.settingsState()).toEqual({ chattiness: "quiet", voiceMuted: false });
 
     sessions.start({ kind: "wav", fixture: "brainstorm" });
     expect(sessions.interjectionPolicy()?.setting()).toBe("quiet");
@@ -1037,11 +1037,11 @@ describe("SessionManager, chattiness", () => {
 
     sessions.start({ kind: "wav", fixture: "brainstorm" });
     // The folder records the level the session started at.
-    expect(settings).toEqual([{ chattiness: "normal" }]);
+    expect(settings).toEqual([{ chattiness: "normal", voiceMuted: false }]);
 
     sessions.setChattiness("active");
     expect(sessions.interjectionPolicy()?.setting()).toBe("active");
-    expect(settings).toEqual([{ chattiness: "normal" }, { chattiness: "active" }]);
+    expect(settings).toEqual([{ chattiness: "normal", voiceMuted: false }, { chattiness: "active", voiceMuted: false }]);
     // Setting it to what it already is changes nothing and writes nothing.
     sessions.setChattiness("active");
     expect(settings).toHaveLength(2);
@@ -1049,7 +1049,7 @@ describe("SessionManager, chattiness", () => {
     await sessions.stop();
     expect(sessions.interjectionPolicy()).toBeNull();
     // And it outlives the session, for the next one to inherit.
-    expect(sessions.settings()).toEqual({ chattiness: "active" });
+    expect(sessions.settings()).toEqual({ chattiness: "active", voiceMuted: false });
   });
 });
 

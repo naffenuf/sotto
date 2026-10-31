@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "SOTTO_DEV=1 tsx watch server/index.ts",
     "dev:web": "vite",
     "build": "tsc -p tsconfig.server.json && mkdir -p dist/server/server/prompts && cp server/prompts/*.md dist/server/server/prompts/ && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -22,6 +22,7 @@
     "eval:ceiling": "tsx scripts/eval-ceiling.ts",
     "fixtures:check": "tsx scripts/check-fixtures.ts",
     "verify:ui": "node scripts/verify-ui.mjs",
+    "verify:voice": "node scripts/verify-voice.mjs",
     "verify:cards": "node scripts/verify-cards.mjs",
     "verify:mic": "node scripts/verify-mic.mjs",
     "verify:wake": "node scripts/verify-wake.mjs",
