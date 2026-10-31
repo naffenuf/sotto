@@ -819,3 +819,20 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   labelled wake-end estimate (ASR has no word timestamps), plus arrival lag and the browser's
   flush-confirmation delay. A missing confirmation leaves latency null. The live checkpoint,
   not a simulated-clock result, must establish the room's actual under-1.5-second behavior.
+- **Glimmer runs locally through Ollama, and its reasoning level decides everything.** Served as
+  `muse-glimmer:30b-q4_K_M` by the Ollama server (0.40.11; the Homebrew `ollama` client is 0.15.2,
+  so talk to the HTTP API, not the CLI). `.env` has `GLIMMER_BASE_URL=http://127.0.0.1:11434/v1`
+  and `GLIMMER_MODEL`. It takes 16 GB of memory on the GPU, with a default context of 32768, and
+  generates about 13 tokens/s on the M1 Max. The first call after a load took 44 s, and Ollama
+  unloads the model after 5 idle minutes, so send `keep_alive` (e.g. `"30m"`) or warm it at
+  session start. Measured on a four-probability gate prompt with json_schema output:
+  default (high) reasoning about 35 s, correct; `reasoning_effort: "low"` (/v1) or `think: "low"`
+  (/api/chat) 14–19 s, correct, and it rejects an already-raised point (new 0.05, worth 0.12);
+  thinking off (`think: false` / `reasoning_effort: "none"`) 2–3.5 s but **unusable for scores**:
+  noisy or all-zero results, and `<|eot|>` leaks into `content`, which breaks `JSON.parse`. Strip
+  it if thinking is ever off. Never send temperature 0 (Meta's docs: Glimmer must not run greedy).
+  On a 15-turn classification of whether Sotto was addressed, Glimmer with thinking off scored
+  13/15 and wobbled between runs, while Muse Spark at low reasoning scored 15/15 in about 2 s. So
+  use Glimmer where 15 s doesn't matter (research ideas, background judgment), and Spark where
+  someone is waiting. Untested speed-up: the `muse-glimmer:30b-q4_K_M-dflash` tag (20 GB,
+  speculative decoding).
