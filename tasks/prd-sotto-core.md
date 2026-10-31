@@ -1,5 +1,22 @@
 # PRD: Sotto Core — The AI That Knows When to Speak
 
+## Changes since this PRD (as of 2026-10-31)
+
+This PRD was the build spec for the first loop (`ralph/prd.json`, all 28 stories complete). The app has since moved on in the ways below. **Where this list and the rest of the PRD disagree, this list wins.** Later changes are recorded in [`tasks/decisions.md`](decisions.md), not by editing this spec.
+
+**Departures**
+1. **Observer timing (US-012).** The observer runs on each finalized turn, using the latest completed board plus the turns the board doesn't cover yet, instead of waiting for each board update. Board updates keep their original schedule (4 new final turns or 45 s). Reason: interjections arrive sooner.
+2. **Layout and source selector (US-011, US-003).** The discussion notes (board) are the default view, and the transcript sits behind a tab. The source selector is gone from the main interface; the backend still supports fixture audio and event replay for testing.
+3. **Theme (US-011).** Light mode by default instead of dark.
+4. **Past discussions (Non-Goals).** Discussion history and its Backstage view were added, although this PRD listed browsing past sessions as out of scope.
+
+**Additions** (extend the PRD; nothing in it rules them out)
+- Automatic speaker naming, alongside manual renaming (US-007)
+- Timing diagnostics per session (`timing.jsonl`)
+- Live conversation test scripts for mic trials
+
+**Open measurement.** The "full eval under $1" target in Technical Considerations is not enforced by any gate; the eval report only prints an estimate. The last report before the observer change (2026-10-29) estimated $1.05. The faster observer may make more model calls, so re-measure with `npm run eval` before treating the target as met or revising it.
+
 ## Introduction
 
 Sotto (codename) is a local web app that listens to a brainstorm between two or more people and contributes to the **whole group** only when it really matters. Notetakers (Otter, Granola, Fireflies) stay silent and summarize. Live coaches (Cluely, Zoom's Live Meeting Agent) whisper privately to one person. Voice agents talk constantly. None of them decide, on their own, that *this* is the moment to tell the group something useful.
