@@ -9,7 +9,34 @@ phone playing a voice as a stand-in, at the retest.
 
 RESULT: FAIL
 
-## What happened
+## Second run, 16:35, still on the old detector (`sessions/2026-10-31_1635-mic`)
+
+Sotto spoke this time, through a lucky wake match, a typed question and a barge-in.
+
+- **Echo: good.** None of Sotto's speech reached the transcript, and the self-echo filter logged
+  no matches. Chrome's echo cancellation seems to remove it before transcription.
+- **Barge-in: good.** "Soto I didn't give you…" during an answer went silent in 236 ms
+  (`wakeToSilenceMs`; flush confirmed in 3 ms) and was classified `new_question`. "Soto you can
+  resume…" was classified `continue`.
+- **Wake word: still poor.** Expected, since the classifier below hasn't been built yet.
+  "Soto give me the bull and bear case…", "Hey Soto give me…" and "…from Anthropic Sotto can you
+  tell me…" were all missed.
+- **NEW BUG, fix first: answers get an empty transcript in live sessions.** The first answer
+  asked "which IPO?" although "Anthropic IPO" had been said in a final turn 7 s earlier. Sotto later
+  explained that "nothing was transcribed". The cause is in `recentTurns()`
+  (`server/answer/AnswerAgent.ts`): it compares `clock.now()` with turn `startMs/endMs`. Live, the
+  clock is `systemClock` (`performance.now()`, i.e. server uptime: about 1,914,000 ms here), while
+  turn times are on the transcription-stream timeline (about 40,000 ms). So
+  `now - ANSWER_CONTEXT_MS` is later than every turn, and the answer sees **no conversation at
+  all** once the server has been up more than about 10 minutes. Replays use `SimulatedClock(0)`, so
+  the timelines agree and the tests pass. Fix: measure the window on the turn timeline (for
+  example, relative to the latest final turn's `endMs`) and add a test whose live clock is offset
+  from the stream timeline. Check that nothing else mixes the two timelines. The observer and
+  board pass turns directly and look fine.
+- **Minor:** "This is Craig…" didn't name speaker A, so Sotto called him "A". Look at why the
+  speaker-introduction detection missed it; it's not blocking.
+
+## What happened (first run, 16:18)
 
 Sotto never heard itself addressed. `timing.jsonl` has no wake events. Live speech is transcribed
 with almost no punctuation, and `server/wake.ts` (deliberately strict, tuned on fixtures with
