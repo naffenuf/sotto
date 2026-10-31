@@ -169,6 +169,11 @@ export class InterjectionPolicy {
     this.review();
   }
 
+  /** Playback can end without an ASR frame; reconsider its held cards (V2-006). */
+  playbackChanged(): void {
+    this.review();
+  }
+
   /**
    * The courtesy hook wake-phrase detection (US-017) calls: for the next
    * {@link COURTESY_MS} the floor belongs to whoever just addressed Sotto.

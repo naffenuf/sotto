@@ -5,6 +5,7 @@ import { SimulatedClock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
 import type { Speaker, SpeechResult } from "./Speaker.js";
 import { VoiceHub, VOICE_FLUSH_WAIT_MS } from "./VoiceHub.js";
+import { SELF_ECHO_TAIL_MS } from "./selfEcho.js";
 
 class Socket extends EventEmitter {
   readonly OPEN = 1;
@@ -45,6 +46,42 @@ function setup() {
 }
 
 describe("voice playback transport", () => {
+  it("exposes only heard text, from playback start through the 1.5-second echo tail", async () => {
+    const t = setup();
+    const id = await t.hub.speak("Heard words. Queued words nobody has heard.");
+    expect(t.hub.playback()).toEqual({ playing: false, recent: [] });
+    t.socket.report({ type: "started", id });
+    expect(t.hub.playback()).toEqual({ playing: true, recent: [{ id, text: "" }] });
+    t.hear("Heard words.");
+    t.socket.report({ type: "position", id, playedMs: 500 });
+    expect(t.hub.playback().recent).toEqual([{ id, text: "Heard words." }]);
+    t.hub.stop();
+    // The late browser flush can extend heard text even after stop().
+    t.hear("Heard words. Queued");
+    t.socket.report({ type: "ended", id, playedMs: 650, flushed: true });
+    t.wall.advanceBy(SELF_ECHO_TAIL_MS);
+    expect(t.hub.playback()).toEqual({
+      playing: false,
+      recent: [{ id, text: "Heard words. Queued" }],
+    });
+    t.wall.advanceBy(1);
+    expect(t.hub.playback()).toEqual({ playing: false, recent: [] });
+  });
+
+  it("retains a completed utterance in the echo tail without extending it on reads", async () => {
+    const t = setup();
+    const id = await t.hub.speak("Hello");
+    t.socket.report({ type: "started", id });
+    t.hear("Hello");
+    t.end();
+    await Promise.resolve();
+    t.socket.report({ type: "ended", id, playedMs: 500, flushed: false });
+    t.wall.advanceBy(1_000);
+    expect(t.hub.playback()).toEqual({ playing: false, recent: [{ id, text: "Hello" }] });
+    t.wall.advanceBy(501);
+    expect(t.hub.playback().recent).toEqual([]);
+  });
+
   it("forwards audio and uses browser reports until playback finishes", async () => {
     const t = setup();
     const id = await t.hub.speak("Hello");

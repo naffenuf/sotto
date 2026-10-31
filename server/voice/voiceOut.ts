@@ -16,6 +16,7 @@
  * spoken-so-far tracking are real, only the speakers are missing.
  */
 import type { SpeechEndReason, Speaker } from "./Speaker.js";
+import type { SpeechPlayback } from "./selfEcho.js";
 
 /** What one utterance came to, as whoever was talking sees it. */
 export interface VoiceSpoken {
@@ -53,6 +54,11 @@ export interface VoiceUtterance {
 
 /** Where Sotto's speech goes. */
 export interface VoiceOut {
+  /**
+   * Actual sound and recently heard text for echo filtering (V2-006).
+   * Optional because screen-only and null-sink voices cannot echo into a mic.
+   */
+  playback?(): SpeechPlayback;
   /**
    * Opens an utterance, stopping whatever was being said, or resolves `null`
    * when nothing would be heard — muted, or nowhere to play it.

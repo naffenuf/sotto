@@ -27,6 +27,7 @@ import type {
 } from "../model/client.js";
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
+import { emptyModel } from "../test/emptyModel.js";
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
 
@@ -122,6 +123,7 @@ function harness(options: { apiKey?: string; client?: (c: FakeAsrClient) => void
     apiKey: options.apiKey,
     logger: quiet,
     createStore: () => null,
+    createModel: () => options.apiKey ? emptyModel : null,
     replaySpeed: "max",
     wallClock: instantWallClock(),
     createAsrClient: ({ onFrame }) => {
@@ -1072,6 +1074,7 @@ describe("SessionManager, live audio", () => {
       apiKey: "test-key",
       logger: quiet,
       createStore: () => null,
+      createModel: () => emptyModel,
       liveClock: clock,
       createAsrClient: ({ onFrame }) => {
         client = new FakeAsrClient(onFrame);

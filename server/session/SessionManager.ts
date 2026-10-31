@@ -47,7 +47,6 @@ import {
   type ReplaySpeed,
 } from "../asr/EventReplaySource.js";
 import { RealtimeTranscriptionClient } from "../asr/realtimeClient.js";
-import { TurnAssembler } from "../asr/turns.js";
 import type { AudioSource } from "../audio/AudioSource.js";
 import { MicSource } from "../audio/MicSource.js";
 import { WavReplaySource } from "../audio/WavReplaySource.js";
@@ -64,6 +63,7 @@ import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher } from "../wakeWatcher.js";
 import { introducedName } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
+import { SessionTranscription } from "./SessionTranscription.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
 
@@ -242,7 +242,7 @@ export type AskOutcome = "asked" | "no-session" | "no-model";
 
 interface RunningSession {
   info: SessionInfo;
-  assembler: TurnAssembler;
+  assembler: SessionTranscription;
   store: StoreSlot;
   /** Where `/ws/audio` delivers, for a `mic` session; `undefined` otherwise. */
   mic: MicSource | undefined;
@@ -315,6 +315,11 @@ export class SessionManager {
           ? null
           : new MuseClient({ apiKey: this.apiKey, logger: this.logger }));
     this.createVoice = options.createVoice ?? ((): VoiceOut | null => null);
+    // V2-006: playback can end after generation, with no new ASR frame to
+    // re-check held cards. The bus has already folded the voice state here.
+    this.bus.subscribe((event) => {
+      if (event.type === "voice") this.current?.policy?.playbackChanged();
+    });
     this.liveClock = options.liveClock ?? systemClock;
     this.wallClock = options.wallClock ?? systemClock;
     this.replaySpeed = options.replaySpeed ?? "1x";
@@ -461,14 +466,16 @@ export class SessionManager {
     // The policy asks the assembler whether anybody is talking, and the
     // assembler is built from the loops, so the getter closes over the
     // `const` below. It is only ever called once `start()` has returned.
+    const voice = this.createVoice();
     const loops = this.modelLoops(
       info,
       clock,
       store,
       () => assembler.pauseState(),
       () => assembler.finalTurns(),
+      voice,
     );
-    const assembler = this.assembler(info, clock, store, loops);
+    const assembler = this.assembler(info, clock, store, loops, voice);
     let source: EventReplaySource;
     try {
       source = EventReplaySource.forFixture(fixture, {
@@ -493,12 +500,10 @@ export class SessionManager {
       transcription: ["active", `replaying ${fixture} events at ${this.replaySpeed}`],
       model: modelStatus(loops.board),
       stop: () => source.stop(),
-      // Not `assemblerSink`: a saved session records every raw frame first,
-      // so `events.jsonl` is a capture of the stream the assembler saw.
+      // V2-006: raw frames pass through the same echo boundary as turns.
       done: source
         .run({
           onFrame: (record) => {
-            store.writer?.appendEvent(record);
             if (record.frame["type"] === "speechEnd" || record.frame["type"] === "speechComplete") store.writer?.appendTiming?.({ stage: `asr_${record.frame["type"]}`, atMs: clock.now(), turnId: `${record.session}:${record.frame["turnId"]}`, audioProcessedMs: record.frame["audioProcessedMs"], frameAtMs: record.atMs });
             assembler.accept(record);
           },
@@ -509,6 +514,7 @@ export class SessionManager {
         // session is declared over. The capture runs out a few milliseconds
         // after the last word, so the silence the conversation really ended
         // in is handed to the policy before it accounts for what is left.
+        .finally(() => assembler.finish())
         .then(() => drainLoops(loops, () => clock.advanceBy(REPLAY_TRAILING_SILENCE_MS))),
       stopRequested: false,
     };
@@ -548,14 +554,16 @@ export class SessionManager {
     }
 
     // As in `startReplay`: the pause getter reads the assembler built below.
+    const voice = this.createVoice();
     const loops = this.modelLoops(
       info,
       this.liveClock,
       store,
       () => assembler.pauseState(),
       () => assembler.finalTurns(),
+      voice,
     );
-    const assembler = this.assembler(info, this.liveClock, store, loops);
+    const assembler = this.assembler(info, this.liveClock, store, loops, voice);
     const client = this.createAsrClient({
       apiKey,
       clock: this.liveClock,
@@ -571,7 +579,6 @@ export class SessionManager {
             `transcribing ${describeSource(info.source)}`,
           );
         }
-        store.writer?.appendEvent(record);
         if (record.frame["type"] === "speechEnd" || record.frame["type"] === "speechComplete") store.writer?.appendTiming?.({ stage: `asr_${record.frame["type"]}`, atMs: this.liveClock.now(), turnId: `${record.session}:${record.frame["turnId"]}`, audioProcessedMs: record.frame["audioProcessedMs"], frameAtMs: record.atMs });
         assembler.accept(record);
       },
@@ -593,7 +600,9 @@ export class SessionManager {
       ],
       model: modelStatus(loops.board),
       stop: () => client.stop(),
-      done: client.run(audio).then(() => drainLoops(loops)),
+      done: client.run(audio)
+        .finally(() => assembler.finish())
+        .then(() => drainLoops(loops)),
       stopRequested: false,
     };
   }
@@ -603,16 +612,22 @@ export class SessionManager {
     clock: Clock,
     store: StoreSlot,
     loops: ModelLoops,
-  ): TurnAssembler {
+    voice: VoiceOut | null,
+  ): SessionTranscription {
     const wake = this.wakeWatcher(info, loops, clock, store);
-    return new TurnAssembler({
+    return new SessionTranscription({
       clock,
-      // Frame times are measured from the start of the stream on both paths —
-      // the realtime client subtracts its own start, a replay sets the clock
-      // to the capture's `atMs` — so the assembler's timeline begins at 0.
-      startedAtMs: 0,
+      playback: () => voice?.playback?.() ?? { playing: false, recent: [] },
       logger: this.logger,
-      onUpdate: (turn) => {
+      onEvent: (record) => store.writer?.appendEvent(record),
+      onEcho: (turn) => {
+        wake.ignoreTurn(turn.turnId);
+        store.writer?.appendTiming?.({ stage: "self_echo", atMs: clock.now(), ...turn });
+        // The last echo can close after playback ended. Re-read the pause
+        // without counting Sotto as another human turn toward expiry.
+        loops.policy?.playbackChanged();
+      },
+      onUpdate: (turn, suppressTriggers) => {
         if (turn.final) store.writer?.appendTiming?.({ stage: "turn_final", atMs: clock.now(), turnId: turn.turnId, turnStartMs: turn.startMs, turnEndMs: turn.endMs });
         this.bus.publish({ type: "turn", turn });
         // Partials are dropped by all three of these; only final turns are
@@ -632,7 +647,10 @@ export class SessionManager {
         loops.policy?.acceptTurn(turn);
         // And so does the wake phrase: the indicator is the point of reading
         // a partial at all (US-017).
-        wake.acceptTurn(turn);
+        // V2-006: side talk remains context, but cannot ask a question while
+        // Sotto is speaking (partial-turn barge-in belongs to V2-007).
+        if (suppressTriggers) wake.ignoreTurn(turn.turnId);
+        else wake.acceptTurn(turn);
       },
     });
   }
@@ -707,6 +725,7 @@ export class SessionManager {
     store: StoreSlot,
     pauseState: () => PauseState,
     transcript: () => readonly TurnUpdate[],
+    voice: VoiceOut | null,
   ): ModelLoops {
     const model = this.createModel();
     if (model === null) {
@@ -780,7 +799,6 @@ export class SessionManager {
     // Its own queue, on purpose: an answer must not wait behind a board
     // update, and the group must not wait for the board loop to let go of the
     // model (US-018).
-    const voice = this.createVoice();
     const answers = new AnswerAgent({
       clock,
       model,

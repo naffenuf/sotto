@@ -25,6 +25,7 @@ import {
   type SessionStoreFactory,
 } from "./session/SessionManager.js";
 import { SessionStore } from "./session/SessionStore.js";
+import { emptyModel } from "./test/emptyModel.js";
 
 let app: FastifyInstance | undefined;
 
@@ -74,7 +75,7 @@ async function buildTestApp(
     replaySpeed: options.speed ?? "max",
     // A live source (`mic`, `wav`) must not reach the real API from here.
     createAsrClient: () => audio,
-    ...(options.model === undefined ? {} : { createModel: () => options.model as ModelClient }),
+    createModel: () => options.model ?? (options.apiKey === "" ? null : emptyModel),
   });
   app = await buildApp({ bus, sessions });
   return { app, bus, audio, sessions };

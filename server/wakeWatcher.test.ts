@@ -32,6 +32,16 @@ function watch(): Watched {
 }
 
 describe("WakeWatcher", () => {
+  it("clears an ignored partial without clearing another speaker's wake", () => {
+    const { watcher, listening, questions } = watch();
+    watcher.acceptTurn(turn("0:3", "Sotto, what time is lunch?"));
+    watcher.ignoreTurn("0:4");
+    expect(watcher.listening).toBe(true);
+    watcher.ignoreTurn("0:3");
+    expect(listening).toEqual([true, false]);
+    expect(questions).toEqual([]);
+  });
+
   it("lights the indicator on the partial and emits the question on the final", () => {
     const { watcher, listening, questions } = watch();
 

@@ -59,6 +59,11 @@ export class WakeWatcher {
     return this.listeningFor !== null;
   }
 
+  /** A turn held by playback must also clear any earlier partial wake (V2-006). */
+  ignoreTurn(turnId: string): void {
+    this.setListening(null, turnId);
+  }
+
   /**
    * Reads one snapshot of a turn, partial or final, and emits whatever it
    * implies. Safe to call with every update the assembler produces.

@@ -28,6 +28,7 @@ import { systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
 import type { Speaker } from "./Speaker.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "./voiceOut.js";
+import { SELF_ECHO_TAIL_MS, type SpeechPlayback } from "./selfEcho.js";
 
 /** Builds the Speaker for one utterance; tests pass a fake. */
 export type SpeakerFactory = (onAudio: (chunk: Buffer) => void) => Speaker;
@@ -61,6 +62,8 @@ export class VoiceHub implements VoiceOut {
 
   /** Resolves a cancelled utterance's wait for the page's last report. */
   private readonly flushWaiters = new Map<string, () => void>();
+  /** Retain Speakers through the echo tail so a late flushed report still counts. */
+  private readonly heard = new Map<string, { speaker: Speaker; endedAt: number | null }>();
 
   constructor(
     private readonly bus: EventBus,
@@ -242,6 +245,24 @@ export class VoiceHub implements VoiceOut {
     return this.cancelled?.speaker.spokenSoFar() ?? "";
   }
 
+  /**
+   * Echoes match what playback reports say was heard, never text queued for
+   * synthesis. This uses the hub's real clock even during a max-speed replay.
+   */
+  playback(): SpeechPlayback {
+    const recent: { id: string; text: string }[] = [];
+    let playing = false;
+    for (const [id, entry] of this.heard) {
+      if (entry.endedAt !== null && this.clock.now() - entry.endedAt > SELF_ECHO_TAIL_MS) {
+        this.heard.delete(id);
+        continue;
+      }
+      if (entry.endedAt === null) playing = true;
+      recent.push({ id, text: entry.speaker.spokenSoFar() });
+    }
+    return { playing, recent };
+  }
+
   private onReport(frame: VoiceClientFrame): void {
     // The flushed position of an utterance Stop already closed.
     if (frame.type === "ended" && frame.id === this.cancelled?.id) {
@@ -252,6 +273,8 @@ export class VoiceHub implements VoiceOut {
     if (frame.id !== this.active) return;
     switch (frame.type) {
       case "started":
+        if (this.speaker) this.heard.set(frame.id, { speaker: this.speaker, endedAt: null });
+        this.playback();
         this.bus.setVoice({ ...this.bus.voiceState(), playing: true });
         return;
       case "position":
@@ -271,6 +294,8 @@ export class VoiceHub implements VoiceOut {
 
   private finish(id: string): void {
     if (this.active !== id) return;
+    const heard = this.heard.get(id);
+    if (heard) heard.endedAt = this.clock.now();
     this.active = undefined;
     this.speaker = undefined;
     this.bus.setVoice(silentVoice());
