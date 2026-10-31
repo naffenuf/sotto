@@ -37,6 +37,13 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     exit 0
   fi
   NEXT=$(jq -r '[.userStories[] | select(.passes == false)] | sort_by(.priority) | .[0].id' "$PRD_FILE")
+  # Human checkpoint: a story with a "checkpoint" file waits until a human has written that file
+  CHECKPOINT=$(jq -r '[.userStories[] | select(.passes == false)] | sort_by(.priority) | .[0].checkpoint // empty' "$PRD_FILE")
+  if [ -n "$CHECKPOINT" ] && [ ! -f "$PROJECT_DIR/$CHECKPOINT" ]; then
+    echo "Next story $NEXT is a human checkpoint: waiting for $CHECKPOINT. Stopping."
+    echo "[$(date '+%Y-%m-%d %H:%M')] stopped at checkpoint $NEXT (waiting for $CHECKPOINT)" >> "$LOG_FILE"
+    exit 0
+  fi
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($PERMISSION_MODE) - next: $NEXT"

@@ -1,5 +1,7 @@
 # PRD: Sotto Core — The AI That Knows When to Speak
 
+> **Superseded in part by [`prd-sotto-v2.md`](prd-sotto-v2.md)**, which adds voice, background research, a local Glimmer gate and a digest. Where they disagree, v2 wins.
+
 ## Changes since this PRD (as of 2026-10-31)
 
 This PRD was the build spec for the first loop (`ralph/prd.json`, all 28 stories complete). The app has since moved on in the ways below. **Where this list and the rest of the PRD disagree, this list wins.** Later changes are recorded in [`tasks/decisions.md`](decisions.md), not by editing this spec.
