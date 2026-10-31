@@ -710,3 +710,32 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   hardest of the four types, and the board carries the deadline as a constraint but not the sum.
   938 ms of real quiet was available in its window, so a candidate would have been delivered in
   time. That is the next thing to sharpen in `observer.md` if 6/6 is wanted.
+- **Sotto's voice is a socket, and two of its frames are nearly the same frame.**
+  `server/voice/Speaker.ts` is one utterance (single-use): `await start()`, `append(sentence)` as
+  the model writes it, `await finish()`, or `cancel()`. The REST seam beside it
+  (`server/voice/elevenlabs.ts`) is for rendering fixtures, not for speaking. Three protocol facts
+  carry the design: **`{text:""}` ends the stream while `{text:" "}` keeps it alive**, so `flush()`
+  sends a space with `flush: true` and the handshake's text is a space; the credential rides the
+  `xi-api-key` **HTTP upgrade header**, not the init JSON, so the key is in no message a log line
+  could ever print (a unit test asserts that); and `chunk_length_schedule`'s first threshold (50
+  chars, the API minimum) is what would otherwise hold a short opening sentence in the server's
+  buffer — hence `append()` flushing on the **first** call only, which is what makes "speech starts
+  before the full text exists" true rather than aspirational. Measured on the real API with
+  `eleven_flash_v2_5` + `pcm_24000`: first audio chunk **299 ms** after `start()`, a 2.65 s
+  utterance delivered whole in **398 ms** across 3 chunks.
+- **"What had Sotto said when it was cut off?" is the alignment's answer, not the audio's.**
+  `sync_alignment=true` attaches `chars`/`charStartTimesMs`/`charDurationsMs` to every audio frame
+  (the durations array is spelled `charsDurationsMs` in some of ElevenLabs' docs, so `readAlignment`
+  takes either), and `Speaker.spokenSoFar()` is the characters whose sound had *finished* by the
+  last playback position the browser reported. With no report it is deliberately `""`: audio having
+  been generated is not the same as anybody having heard it, and V2-007's `continue` resumes from
+  what was heard. `/stream-input` numbers those times from the start of the whole stream, while its
+  dialogue siblings restart at zero per frame, so `absorbAlignment` treats a frame as chunk-relative
+  exactly when it would otherwise run backwards into text already spoken.
+- **A default voice id is configuration, and it can be probed but not listed.** The `.env` key is
+  scoped to synthesis, so nothing may enumerate voices — but a one-off `synthesizeSpeech` of three
+  characters tells you whether an id works. Sotto speaks as the **River** library voice
+  (`SAz9YHcvj6GT2YYXdXww`, via `loadSottoVoiceId`), chosen calm and deliberately apart from
+  `fixtures/voices.json`'s Rachel and Adam so a replayed conversation never has Sotto sounding like
+  one of the people in it. Also probed valid with this key: Sarah `EXAVITQu4vr4xnSDxMaL`, Charlotte
+  `XB0fDUnXU5powFXDhCwa`, Lily `pFZP5JQG7iQjIQuC4Bku`.

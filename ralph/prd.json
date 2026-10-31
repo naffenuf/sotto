@@ -54,8 +54,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Speaker is single-use (one per utterance): start() -> append(text) -> finish(), or cancel(). Auth rides the xi-api-key upgrade header, never a message. Real API measured: first audio chunk 299 ms after start(), 2.65 s utterance in 398 ms. spokenSoFar() needs notePlayedMs()/notePlayedAll() from the browser (V2-004) - with no playback report it is deliberately empty. Default voice: River SAz9YHcvj6GT2YYXdXww (probed valid with this key, as are Sarah EXAVITQu4vr4xnSDxMaL, Charlotte XB0fDUnXU5powFXDhCwa, Lily pFZP5JQG7iQjIQuC4Bku)."
     },
     {
       "id": "V2-004",

@@ -45,3 +45,25 @@
   (server/eval/options.ts isEvalFixture), and server/eval/score.ts cannot match a research card
   to a research moment yet — levelRank just ranks `research` above `interject`, so an
   interjection the judge matches to a research hook scores caught_low.
+
+[2026-10-31 12:10] V2-003 — completed — server/voice/Speaker.ts: ElevenLabs input-streaming socket, incremental text, instant cancel, char-level spoken-so-far.
+  - One Speaker is one utterance (single-use, like RealtimeTranscriptionClient): `await start()`,
+    `append(sentence)` as the model writes, `await finish()` -> SpeechResult, or `cancel()`.
+    `onAudio(chunk)` gets raw PCM16 mono 24 kHz exactly as the server frames it (no reframing).
+  - Protocol facts recorded in the file's header and in CLAUDE.md. The two that bite: `{text:""}`
+    ENDS the stream while `{text:" "}` keeps it alive (so flush() sends a space with flush:true),
+    and the credential goes in the `xi-api-key` HTTP upgrade header, not in the init JSON — a unit
+    test asserts the key appears in no message.
+  - `append()` flushes on the FIRST call by default so the opening sentence is spoken without
+    waiting for chunk_length_schedule's 50-char threshold; later calls don't (prosody).
+  - spokenSoFar() is alignment-driven and needs playback reports from the browser
+    (`notePlayedMs` / `notePlayedAll`, V2-004). With no report it is "" on purpose: audio having
+    been generated is not the same as anybody having heard it.
+  - Real API (npm run test:integration): first audio chunk 299 ms after start(); a 2.65 s utterance
+    arrived whole in 398 ms in 3 chunks; alignment covered every character of both sentences.
+    Cancel mid-stream kept "Let me run th" as spoken-so-far and emitted nothing afterwards.
+  - Default voice is the River library voice SAz9YHcvj6GT2YYXdXww via loadSottoVoiceId()
+    (ELEVENLABS_VOICE_ID overrides). Probed valid with this key: River, Sarah
+    EXAVITQu4vr4xnSDxMaL, Charlotte XB0fDUnXU5powFXDhCwa, Lily pFZP5JQG7iQjIQuC4Bku.
+  - Next: V2-004 forwards these chunks to the browser over /ws/voice and reports playback position
+    back, which is what makes spokenSoFar() meaningful.
