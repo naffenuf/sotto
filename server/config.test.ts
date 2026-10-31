@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PORT, HOST, loadConfig, MissingApiKeyError } from "./config.js";
+import {
+  DEFAULT_PORT,
+  HOST,
+  loadConfig,
+  loadSottoVoiceId,
+  MissingApiKeyError,
+} from "./config.js";
+import { DEFAULT_SOTTO_VOICE_ID } from "./voice/Speaker.js";
 
 describe("loadConfig", () => {
   it("returns the key and the default port", () => {
@@ -28,5 +35,16 @@ describe("loadConfig", () => {
 
   it("binds to loopback only", () => {
     expect(HOST).toBe("127.0.0.1");
+  });
+});
+
+describe("loadSottoVoiceId", () => {
+  it("falls back to the documented default voice", () => {
+    expect(loadSottoVoiceId({})).toBe(DEFAULT_SOTTO_VOICE_ID);
+    expect(loadSottoVoiceId({ ELEVENLABS_VOICE_ID: "  " })).toBe(DEFAULT_SOTTO_VOICE_ID);
+  });
+
+  it("honours ELEVENLABS_VOICE_ID", () => {
+    expect(loadSottoVoiceId({ ELEVENLABS_VOICE_ID: "custom-voice" })).toBe("custom-voice");
   });
 });

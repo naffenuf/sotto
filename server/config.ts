@@ -1,4 +1,5 @@
 import { config as loadDotenv } from "dotenv";
+import { DEFAULT_SOTTO_VOICE_ID } from "./voice/Speaker.js";
 
 /** Server-side configuration. The model API key never leaves this process. */
 export interface ServerConfig {
@@ -56,4 +57,15 @@ export function loadElevenLabsApiKey(env: NodeJS.ProcessEnv = process.env): stri
   const key = (env.ELEVENLABS_API_KEY ?? "").trim();
   if (key === "") throw new MissingElevenLabsKeyError();
   return key;
+}
+
+/**
+ * The ElevenLabs voice Sotto speaks with: `ELEVENLABS_VOICE_ID` when set,
+ * otherwise {@link DEFAULT_SOTTO_VOICE_ID}. A voice id is configuration rather
+ * than something to discover, because the key in `.env` is scoped to synthesis
+ * and may not list voices.
+ */
+export function loadSottoVoiceId(env: NodeJS.ProcessEnv = process.env): string {
+  loadDotenv({ quiet: true });
+  return (env.ELEVENLABS_VOICE_ID ?? "").trim() || DEFAULT_SOTTO_VOICE_ID;
 }
