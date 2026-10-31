@@ -67,3 +67,18 @@
     EXAVITQu4vr4xnSDxMaL, Charlotte XB0fDUnXU5powFXDhCwa, Lily pFZP5JQG7iQjIQuC4Bku.
   - Next: V2-004 forwards these chunks to the browser over /ws/voice and reports playback position
     back, which is what makes spokenSoFar() meaningful.
+
+[2026-10-31 14:48] V2-004 — completed — browser PCM playback, speaking state, stop and mute.
+  Started with the untracked shared/voice.ts from the interrupted iteration; kept it and built on it.
+  VoiceHub owns one browser playback socket and one utterance, forwards PCM, tracks started/position/ended
+  reports, and sends cancel on stop/mute. Web Audio schedules chunks back-to-back on the page that owns
+  mic capture. Mute is a session setting stored in session.json and reflected to all tabs.
+  The dev-only POST /api/voice/test is enabled by SOTTO_DEV=1 (npm run dev:server sets it); it uses
+  real ElevenLabs. npm run verify:voice uses a muted headless browser, triggers the route, verifies
+  actual playback, Stop, mute across reload, and normal completion; screenshot inspected.
+  V2-005: VoiceHub is currently created in server/app.ts for the dev route; inject/expose that same hub
+  to the session's answer pipeline to speak real answers. It owns a single playback browser, so another
+  tab cannot become a second speaker. spokenSoFar() retains the last cancelled Speaker and updates it
+  on the browser's final flushed-position report. The test route does not itself speak answers.
+  Checked: npm run typecheck; npm test (723/723); npm run build; real ElevenLabs browser check with
+  muted audio output. No real mic or audible speakers were used; human listening remains for V2-008.

@@ -20,7 +20,7 @@
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Done. All 9 criteria met; npm run typecheck, npm test (700 tests), npm run fixtures:check (9 fixtures, all unchanged) and the real-API integration test all pass. Renderer is scripts/render-fixture.ts -> server/audio/renderScript.ts (assembly, unit-tested with a fake synth) -> server/voice/elevenlabs.ts (the TTS seam, output_format=pcm_24000). Measured 19.4s of audio in 3.5s on eleven_flash_v2_5 \u2014 faster than real time, so V2-002 can render, capture and check in one iteration. The ElevenLabs key in .env is scoped to synthesis: no voices_read and no user_read, so voice ids are configuration in fixtures/voices.json (A=Rachel, B=Adam) rather than looked up. Each utterance comes back padded with near-silence (54-91ms head, 268-371ms tail), trimmed before pauseAfterMs is inserted. Also raised Vitest's testTimeout to 15s: the brainstorm capture replay in SessionManager.test.ts and app.test.ts takes 4.3-5.5s, either side of the old 5s default, and npm test was already red at random on the clean tree before this story."
+      "notes": "Done. All 9 criteria met; npm run typecheck, npm test (700 tests), npm run fixtures:check (9 fixtures, all unchanged) and the real-API integration test all pass. Renderer is scripts/render-fixture.ts -> server/audio/renderScript.ts (assembly, unit-tested with a fake synth) -> server/voice/elevenlabs.ts (the TTS seam, output_format=pcm_24000). Measured 19.4s of audio in 3.5s on eleven_flash_v2_5 — faster than real time, so V2-002 can render, capture and check in one iteration. The ElevenLabs key in .env is scoped to synthesis: no voices_read and no user_read, so voice ids are configuration in fixtures/voices.json (A=Rachel, B=Adam) rather than looked up. Each utterance comes back padded with near-silence (54-91ms head, 268-371ms tail), trimmed before pauseAfterMs is inserted. Also raised Vitest's testTimeout to 15s: the brainstorm capture replay in SessionManager.test.ts and app.test.ts takes 4.3-5.5s, either side of the old 5s default, and npm test was already red at random on the clean tree before this story."
     },
     {
       "id": "V2-002",
@@ -28,15 +28,15 @@
       "description": "As a developer, I need test conversations that exercise research hooks, unanswered questions and dependency-style contradictions.",
       "acceptanceCriteria": [
         "Fixture schema moment types add unanswered_question and research_hook; expectedLevel adds research (a research-ready card must appear within the window)",
-        "research-business-idea (2\u20133 min, speakers Craig and EJ, natural back-and-forth): two people brainstorm a meeting tool; moments: research_hook (market size / who's funded), research_hook (top competitors and gaps), contradiction ('smaller teams' vs 'enterprise clinics'); near the end one asks 'Sotto, what did you find on competitors?'",
-        "offsite-plan (2\u20133 min, Craig and EJ): moments: contradiction (Alex free Thursday afternoon, then can't do Thursday at all), unanswered_question ('who's handling food?' never answered), research_hook (drive time / venue availability); ends with a dependency-list request",
+        "research-business-idea (2–3 min, speakers Craig and EJ, natural back-and-forth): two people brainstorm a meeting tool; moments: research_hook (market size / who's funded), research_hook (top competitors and gaps), contradiction ('smaller teams' vs 'enterprise clinics'); near the end one asks 'Sotto, what did you find on competitors?'",
+        "offsite-plan (2–3 min, Craig and EJ): moments: contradiction (Alex free Thursday afternoon, then can't do Thursday at all), unanswered_question ('who's handling food?' never answered), research_hook (drive time / venue availability); ends with a dependency-list request",
         "Both rendered with npm run fixture:render, captured with npm run capture, and committed; npm run fixtures:check passes",
         "Same two conversations added as human-readable live scripts fixtures/live-scripts/05-research-business-idea.md and 06-offsite-plan.md",
         "Typecheck passes"
       ],
       "priority": 2,
       "passes": true,
-      "notes": "Done. All 6 criteria met; npm run typecheck, npm test (706 tests) and npm run fixtures:check (11 fixtures) pass. research-business-idea is 175.2s (38 lines) and offsite-plan 167.5s (37 lines), both Craig (B = Adam) and EJ (A = Rachel) \u2014 a script carries no names, so the letters are the voices. Schema: momentTypes += unanswered_question, research_hook; expectedLevels += research, with a superRefine rule that research <-> research_hook (a research hook is caught by a research-ready card, never by the policy). score.ts's levelRank now ranks research above interject so an interjection matched to a research moment scores caught_low until V2-019 implements research matching; the two fixtures are NOT in the eval set yet (isEvalFixture only takes brainstorm, no-wake and moment-*), which is V2-019's first criterion. npm run eval:ceiling: 6/6 planted moments reachable at PAUSE_MS 700 with 780-1,453 ms of corrected quiet left in each window \u2014 the first render had two windows at 701/708 ms, so the in-window pauses were widened and both fixtures re-rendered and re-captured. Needed outside the stated criteria: `sato` added to DEFAULT_WAKE_SPELLINGS, because research-business-idea's wake line transcribes as \" Sato, what did you find on competitors? \" on two captures of two renders and would otherwise never trigger V2-005/V2-015. offsite-plan's wake line lost its comma and matches only on the surviving question mark. Both in events/NOTES.md."
+      "notes": "Done. All 6 criteria met; npm run typecheck, npm test (706 tests) and npm run fixtures:check (11 fixtures) pass. research-business-idea is 175.2s (38 lines) and offsite-plan 167.5s (37 lines), both Craig (B = Adam) and EJ (A = Rachel) — a script carries no names, so the letters are the voices. Schema: momentTypes += unanswered_question, research_hook; expectedLevels += research, with a superRefine rule that research <-> research_hook (a research hook is caught by a research-ready card, never by the policy). score.ts's levelRank now ranks research above interject so an interjection matched to a research moment scores caught_low until V2-019 implements research matching; the two fixtures are NOT in the eval set yet (isEvalFixture only takes brainstorm, no-wake and moment-*), which is V2-019's first criterion. npm run eval:ceiling: 6/6 planted moments reachable at PAUSE_MS 700 with 780-1,453 ms of corrected quiet left in each window — the first render had two windows at 701/708 ms, so the in-window pauses were widened and both fixtures re-rendered and re-captured. Needed outside the stated criteria: `sato` added to DEFAULT_WAKE_SPELLINGS, because research-business-idea's wake line transcribes as \" Sato, what did you find on competitors? \" on two captures of two renders and would otherwise never trigger V2-005/V2-015. offsite-plan's wake line lost its comma and matches only on the surviving question mark. Both in events/NOTES.md."
     },
     {
       "id": "V2-003",
@@ -71,15 +71,15 @@
         "Verify in browser using webapp-testing skill (Playwright: trigger test utterance, see speaking indicator and Stop, click Stop, indicator clears)"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed. VoiceHub forwards PCM over /ws/voice, receives browser playback reports and publishes voice state; Web Audio schedules playback on the microphone page. Stop and session-persisted mute cancel playback. Dev-only POST /api/voice/test is enabled by SOTTO_DEV=1. Verified typecheck, build, 723 unit tests, and a real ElevenLabs muted-headless browser check with screenshot, including Stop, mute across reload, and normal completion. V2-005 must share the VoiceHub currently created in server/app.ts with the answer pipeline. Human audio/echo verification remains at V2-008."
     },
     {
       "id": "V2-005",
       "title": "Spoken answers",
       "description": "As a user, when I ask Sotto something, I want a spoken answer that starts fast and is as long as it needs to be.",
       "acceptanceCriteria": [
-        "On a wake question, a short pre-synthesized acknowledgment ('Mm-hm.', 'Let me check.' \u2014 chosen by whether search is likely) plays within 1.5 s unless the answer's first sentence is ready first",
+        "On a wake question, a short pre-synthesized acknowledgment ('Mm-hm.', 'Let me check.' — chosen by whether search is likely) plays within 1.5 s unless the answer's first sentence is ready first",
         "server/prompts/answer.md asks for a spoken reply of whatever length suits the question in a meeting (NO word cap), written to be heard (no markdown, no URLs read aloud), plus on-screen material: headline <= 90 chars, optional detail, sources",
         "Spoken text streams from Muse Spark into the Speaker sentence by sentence; speech starts before the full answer is generated",
         "Answer card still appears with headline, detail, sources; the spoken text is viewable as 'transcript of answer'",
@@ -213,7 +213,7 @@
       "title": "Research runner and packets",
       "description": "As the system, I want each approved research idea turned into a short, sourced packet ready to present.",
       "acceptanceCriteria": [
-        "Runner calls the Responses API (Muse Spark, web_search, plus show_html when a visual helps) producing ResearchPacket { id, ideaId, title, teaser (1\u20132 sentences), keyPoints[], sources[{url,title}], visual?{title,path}, createdAtMs, latencyMs }",
+        "Runner calls the Responses API (Muse Spark, web_search, plus show_html when a visual helps) producing ResearchPacket { id, ideaId, title, teaser (1–2 sentences), keyPoints[], sources[{url,title}], visual?{title,path}, createdAtMs, latencyMs }",
         "Packets with zero sources are discarded and logged as unsourced",
         "Saved to research/<id>.json and research/<id>.md in the session folder; visuals in artifacts/",
         "Runs in its own queue; never blocks answers, board updates or the observer",
@@ -262,7 +262,7 @@
       "title": "Glimmer as the judgment gate",
       "description": "As the system, I want candidate interjections scored locally by Glimmer instead of trusting the proposing model's own scores.",
       "acceptanceCriteria": [
-        "Observer (Muse Spark) still proposes; Glimmer scores each candidate on four questions \u2014 true (supported by transcript), new (not already said or on the board), worth saying (would a thoughtful participant raise it), still relevant (conversation hasn't moved on) \u2014 each a 0\u20131 probability via structured output; prompt server/prompts/gate.md",
+        "Observer (Muse Spark) still proposes; Glimmer scores each candidate on four questions — true (supported by transcript), new (not already said or on the board), worth saying (would a thoughtful participant raise it), still relevant (conversation hasn't moved on) — each a 0–1 probability via structured output; prompt server/prompts/gate.md",
         "The policy score uses Glimmer scores when present (mapping documented in server/interject/policy.ts), replacing observer relevance/novelty/importance/confidence",
         "candidates.jsonl records observer scores, Glimmer scores and gate: glimmer | spark-fallback",
         "npm run eval -- --gate spark|glimmer runs either; the report shows recall, precision, false interjects and median gate latency",

@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+**V2-004 voice playback:** `VoiceHub` in `server/voice/VoiceHub.ts` owns one playback browser via
+`/ws/voice`, sends PCM16 at 24 kHz, and consumes started/position/ended reports. The browser schedules
+audio in `web/src/audio/useVoicePlayback.ts`, in the mic page; do not change its echo-cancellation
+constraints. Voice mute is in session settings. `SOTTO_DEV=1` enables `POST /api/voice/test`;
+`npm run verify:voice` tests real synthesis in a headless browser with muted output. The hub is built
+in `server/app.ts` for this story; V2-005 must share/inject it into the answer pipeline. On Stop the
+hub preserves the cancelled Speaker and accepts the final browser position for `spokenSoFar()`.
+
 Sotto: a local web app that listens to a group brainstorm and contributes only when it matters. Built during the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026). Full spec: `tasks/prd-sotto-core.md`. Loop state: `ralph/prd.json`, `ralph/progress.txt`.
 
 ## Stack
