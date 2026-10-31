@@ -24,13 +24,27 @@ import {
   type VoiceClientFrame,
   type VoiceServerFrame,
 } from "../../shared/voice.js";
+import { systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
 import type { Speaker } from "./Speaker.js";
+import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "./voiceOut.js";
 
 /** Builds the Speaker for one utterance; tests pass a fake. */
 export type SpeakerFactory = (onAudio: (chunk: Buffer) => void) => Speaker;
 
-export class VoiceHub {
+/**
+ * How long a cancelled utterance waits for the page's last word on what it
+ * managed to play.
+ *
+ * `cancel` and the final `ended` report cross on the wire, and that report is
+ * the only thing that knows how much of the buffered audio was actually heard
+ * — which is the whole of `spokenSoFar`. Half a second is far more than the
+ * round trip to a page on the same machine, and a page that has gone away
+ * simply never answers, so it is also a ceiling and not a cost.
+ */
+export const VOICE_FLUSH_WAIT_MS = 500;
+
+export class VoiceHub implements VoiceOut {
   private socket: WebSocket | undefined;
   private speaker: Speaker | undefined;
   private nextId = 0;
@@ -45,9 +59,14 @@ export class VoiceHub {
    */
   private cancelled: { id: string; speaker: Speaker } | undefined;
 
+  /** Resolves a cancelled utterance's wait for the page's last report. */
+  private readonly flushWaiters = new Map<string, () => void>();
+
   constructor(
     private readonly bus: EventBus,
     private readonly makeSpeaker: SpeakerFactory,
+    /** Real time, for {@link VOICE_FLUSH_WAIT_MS}; never the session clock. */
+    private readonly clock: Clock = systemClock,
   ) {}
 
   /**
@@ -81,51 +100,127 @@ export class VoiceHub {
   }
 
   /**
-   * Starts saying `text`, stopping anything already being said. Resolves with
-   * the utterance id once ElevenLabs has the text, or with `null` when nothing
-   * would be heard — voice is muted, or no page is attached to play it. Null
-   * is not an error: a muted Sotto answers on screen only (V2-005), so callers
-   * carry on without speech rather than catching.
+   * Opens an utterance and hands it back to be fed text (V2-005).
+   *
+   * Resolves `null` when nothing would be heard — voice is muted, or no page
+   * is attached to play it — which is not an error: a muted Sotto answers on
+   * screen only, so callers carry on without speech rather than catching.
    */
-  async speak(text: string): Promise<string | null> {
+  async begin(): Promise<VoiceUtterance | null> {
     if (this.bus.settingsState().voiceMuted) return null;
     if (!this.socket || this.socket.readyState !== this.socket.OPEN) return null;
     this.stop();
     const id = `voice-${++this.nextId}`;
     this.active = id;
     this.synthesisDone = false;
+    const speaker = this.makeSpeaker((chunk) => {
+      // Audio from an utterance that has since been stopped is dropped here,
+      // so a late ElevenLabs frame can never restart a voice the room cut off.
+      const socket = this.socket;
+      if (this.active === id && socket && socket.readyState === socket.OPEN) socket.send(chunk);
+    });
+    this.speaker = speaker;
+    this.bus.setVoice({ speaking: true, playing: false, utteranceId: id, text: "" });
+    this.send({ type: "utterance", id, sampleRate: VOICE_SAMPLE_RATE, text: "" });
     try {
-      const speaker = this.makeSpeaker((chunk) => {
-        // Audio from an utterance that has since been stopped is dropped here,
-        // so a late ElevenLabs frame can never restart a voice the room cut off.
-        const socket = this.socket;
-        if (this.active === id && socket && socket.readyState === socket.OPEN) socket.send(chunk);
-      });
-      this.speaker = speaker;
-      this.bus.setVoice({ speaking: true, playing: false, utteranceId: id, text });
-      this.send({ type: "utterance", id, sampleRate: VOICE_SAMPLE_RATE, text });
       await speaker.start();
-      // Stopped while the ElevenLabs socket was still opening.
-      if (this.active !== id) {
-        speaker.cancel();
-        return id;
-      }
-      speaker.append(text);
-      void speaker
-        .finish()
-        .then((result) => {
-          if (this.active !== id) return;
-          this.synthesisDone = true;
-          this.send({ type: "end", id, reason: result.reason });
-        })
-        .catch(() => {
-          if (this.active === id) this.stop();
-        });
-      return id;
     } catch (error) {
       if (this.active === id) this.stop();
       throw error;
     }
+    // Stopped while the ElevenLabs socket was still opening. The handle is
+    // still handed back: every one of its methods is a no-op on a cancelled
+    // utterance, which is simpler for the caller than a second null.
+    if (this.active !== id) speaker.cancel();
+    return this.utterance(id, speaker);
+  }
+
+  /**
+   * Says one whole line, for a caller with nothing left to write — the dev
+   * test route (V2-004), and the opening hello (V2-009). Resolves with the
+   * utterance id, or `null` when nothing would be heard.
+   */
+  async speak(text: string): Promise<string | null> {
+    const utterance = await this.begin();
+    if (utterance === null) return null;
+    utterance.append(text);
+    void utterance.finish().catch(() => {});
+    return utterance.id;
+  }
+
+  /**
+   * The handle one open utterance is driven through.
+   *
+   * Everything on it is guarded on the utterance still being the open one, so
+   * a model still streaming into speech the room has already cut off is
+   * harmless — the same rule the audio callback above follows.
+   */
+  private utterance(id: string, speaker: Speaker): VoiceUtterance {
+    /** Everything appended, so the stage can show what is being said. */
+    let said = "";
+    return {
+      id,
+      append: (text: string): void => {
+        if (this.active !== id || text.trim() === "") return;
+        speaker.append(text);
+        said = said === "" ? text.trim() : `${said} ${text.trim()}`;
+        const voice = this.bus.voiceState();
+        if (voice.utteranceId === id) this.bus.setVoice({ ...voice, text: said });
+      },
+      cancel: (): void => {
+        if (this.active === id) this.stop();
+        else speaker.cancel();
+      },
+      firstAudioMs: (): number | null => speaker.firstAudioMs,
+      // One `.then`, not an `await`: the `end` frame has to reach the page in
+      // the same microtask the synthesis finished in, or a report racing it
+      // arrives before the hub knows every character was sent.
+      finish: (): Promise<VoiceSpoken> =>
+        speaker.finish().then(
+          (result) => {
+            if (this.active === id) {
+              this.synthesisDone = true;
+              this.send({ type: "end", id, reason: result.reason });
+            }
+            const spoken = (): VoiceSpoken => ({
+              reason: result.reason,
+              text: result.text,
+              spokenSoFar: speaker.spokenSoFar(),
+              firstAudioMs: result.firstAudioMs,
+            });
+            // Cut off: what the room heard is whatever the page managed to
+            // play, and only the page knows that.
+            return result.reason === "cancelled"
+              ? this.awaitFlush(id).then(spoken)
+              : spoken();
+          },
+          (error: unknown) => {
+            if (this.active === id) this.stop();
+            throw error;
+          },
+        ),
+    };
+  }
+
+  /**
+   * Waits for a cancelled utterance's final `ended` report, or
+   * {@link VOICE_FLUSH_WAIT_MS}, whichever comes first.
+   */
+  private awaitFlush(id: string): Promise<void> {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== socket.OPEN) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const settle = (): void => {
+        if (settled) return;
+        settled = true;
+        this.flushWaiters.delete(id);
+        cancelTimer();
+        resolve();
+      };
+      const cancelTimer = this.clock.setTimeout(settle, VOICE_FLUSH_WAIT_MS);
+      this.flushWaiters.set(id, settle);
+    });
   }
 
   /**
@@ -151,6 +246,7 @@ export class VoiceHub {
     // The flushed position of an utterance Stop already closed.
     if (frame.type === "ended" && frame.id === this.cancelled?.id) {
       this.cancelled.speaker.notePlayedMs(frame.playedMs);
+      this.flushWaiters.get(frame.id)?.();
       return;
     }
     if (frame.id !== this.active) return;

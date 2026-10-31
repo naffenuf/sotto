@@ -732,9 +732,16 @@ describe("SessionManager, answers", () => {
       this.questions.push(call.user);
       // As the real API does: narration first, under an id of its own.
       call.onText?.({ itemId: "rs_1", text: "I'll look that up." });
-      call.onText?.({ itemId: "msg_1", text: "Rivals charge $5-$25 a seat\n" });
+      // The spoken half first, then the screen half (V2-005): the headline
+      // only reaches the stage once the screen heading's first line is whole.
+      call.onText?.({
+        itemId: "msg_1",
+        text: "Say this:\nThey charge five to twenty-five dollars a seat.\n\nShow this:\nRivals charge $5-$25 a seat\n",
+      });
       return {
-        text: "Rivals charge $5-$25 a seat\n\n- Notion $12 a seat",
+        text:
+          "Say this:\nThey charge five to twenty-five dollars a seat.\n\n" +
+          "Show this:\nRivals charge $5-$25 a seat\n\n- Notion $12 a seat",
         citations: [{ url: "https://example.com/prices", title: "Prices" }],
         searchedUrls: ["https://example.com/prices"],
         searched: true,

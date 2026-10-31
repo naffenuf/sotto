@@ -60,6 +60,7 @@ import { InterjectionPolicy, type Interjection } from "../interject/Interjection
 import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
+import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher } from "../wakeWatcher.js";
 import { introducedName } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
@@ -112,6 +113,13 @@ export type AsrClientFactory = (options: AsrClientOptions) => AsrClient;
 export type SessionStoreFactory = (info: SessionInfo) => SessionWriter | null;
 
 /**
+ * Hands a session the voice its answers are spoken with (V2-005), or returns
+ * `null` to run a session that only ever answers on screen — which is what
+ * the unit tests do, so `npm test` neither synthesizes nor makes a sound.
+ */
+export type VoiceFactory = () => VoiceOut | null;
+
+/**
  * Builds the model client a session's board, observer and answers call, or
  * returns `null` to run a session with no model at all — which is what
  * happens without `MODEL_API_KEY`, and what the unit tests do so `npm test`
@@ -140,6 +148,12 @@ export interface SessionManagerOptions {
   createStore?: SessionStoreFactory;
   /** Makes the model client. Defaults to Muse Spark when there is an API key. */
   createModel?: ModelClientFactory;
+  /**
+   * The voice answers are spoken with (V2-005). Defaults to none, so a
+   * SessionManager built without one answers on screen only; `server/app.ts`
+   * passes the one {@link VoiceHub} the browser's `/ws/voice` is attached to.
+   */
+  createVoice?: VoiceFactory;
   /** Clock for live sessions; a replay brings its own simulated one. */
   liveClock?: Clock;
   /** Real time that a `1x` replay paces itself against. */
@@ -265,6 +279,7 @@ export class SessionManager {
   private readonly createAsrClient: AsrClientFactory;
   private readonly createStore: SessionStoreFactory;
   private readonly createModel: ModelClientFactory;
+  private readonly createVoice: VoiceFactory;
   private readonly liveClock: Clock;
   private readonly wallClock: Clock;
   private readonly replaySpeed: ReplaySpeed;
@@ -299,6 +314,7 @@ export class SessionManager {
         this.apiKey === undefined || this.apiKey === ""
           ? null
           : new MuseClient({ apiKey: this.apiKey, logger: this.logger }));
+    this.createVoice = options.createVoice ?? ((): VoiceOut | null => null);
     this.liveClock = options.liveClock ?? systemClock;
     this.wallClock = options.wallClock ?? systemClock;
     this.replaySpeed = options.replaySpeed ?? "1x";
@@ -764,11 +780,19 @@ export class SessionManager {
     // Its own queue, on purpose: an answer must not wait behind a board
     // update, and the group must not wait for the board loop to let go of the
     // model (US-018).
+    const voice = this.createVoice();
     const answers = new AnswerAgent({
       clock,
       model,
       logger: this.logger,
       onTiming,
+      // Said out loud as well as shown (V2-005). A hub with no page attached,
+      // or a muted session, turns every utterance into `null` on its own, so
+      // there is nothing to check here.
+      ...(voice === null ? {} : { voice }),
+      // Real time: `ackMs` and `firstAudioMs` are latencies the room felt,
+      // and a `max` replay's session clock stands still during a model call.
+      wallClock: this.wallClock,
       board: () => board.board(),
       transcript,
       speakers: () => this.bus.speakerNames(),

@@ -6,6 +6,9 @@ import type { SpeakerNames } from "../../shared/events.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import type { Artifact, ShowHtmlArgs } from "../../shared/artifacts.js";
 import { SimulatedClock } from "../clock.js";
+import type { SpeechEndReason } from "../voice/Speaker.js";
+import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
+import { ACK_SEARCH } from "./ack.js";
 import type { ProseCall, ProseReply, ModelClient } from "../model/client.js";
 import {
   ANSWER_CONTEXT_MS,
@@ -16,6 +19,7 @@ import {
   cardForAnswer,
   recentTurns,
   renderAnswerRequest,
+  screenFromSpoken,
 } from "./AnswerAgent.js";
 
 /** The answer item's id, which is the only one a headline is taken from. */
@@ -63,6 +67,75 @@ class FakeModel implements ModelClient {
   }
 }
 
+/** One utterance, remembering everything it was handed. */
+class FakeUtterance implements VoiceUtterance {
+  readonly said: string[] = [];
+  reason: SpeechEndReason = "complete";
+  heard = "";
+  finished = false;
+
+  constructor(
+    readonly id: string,
+    private readonly toFirstAudioMs: number | null,
+  ) {}
+
+  append(text: string): void {
+    this.said.push(text);
+  }
+
+  firstAudioMs(): number | null {
+    return this.said.length === 0 ? null : this.toFirstAudioMs;
+  }
+
+  cancel(): void {
+    if (this.finished) return;
+    this.reason = "cancelled";
+  }
+
+  finish(): Promise<VoiceSpoken> {
+    this.finished = true;
+    return Promise.resolve({
+      reason: this.reason,
+      text: this.said.join(" "),
+      spokenSoFar: this.reason === "cancelled" ? this.heard : this.said.join(" "),
+      firstAudioMs: this.firstAudioMs(),
+    });
+  }
+
+  /** Everything it was handed, as one line. */
+  text(): string {
+    return this.said.join(" ");
+  }
+}
+
+/**
+ * A voice that records rather than speaks. Each `begin()` moves the wall clock
+ * on by a second, so the latencies a test reads back are distinguishable.
+ */
+class FakeVoice implements VoiceOut {
+  readonly utterances: FakeUtterance[] = [];
+  /** Null means "nothing would be heard" — muted, or no page attached. */
+  available = true;
+  /** Set to throw from `begin()`, as a bad ElevenLabs key would. */
+  failure: Error | undefined;
+
+  constructor(
+    private readonly wall: SimulatedClock,
+    private readonly toFirstAudioMs: number | null = 300,
+  ) {}
+
+  async begin(): Promise<VoiceUtterance | null> {
+    if (this.failure !== undefined) throw this.failure;
+    if (!this.available) return null;
+    this.wall.advanceBy(1_000);
+    // A new utterance stops the last one, as the real hub does.
+    this.utterances.at(-1)?.cancel();
+    const utterance = new FakeUtterance(`u${this.utterances.length + 1}`, this.toFirstAudioMs);
+    this.utterances.push(utterance);
+    return utterance;
+  }
+}
+
 interface Harness {
   clock: SimulatedClock;
   model: FakeModel;
@@ -77,6 +150,10 @@ interface Harness {
   thinking: boolean[];
   states: [state: string, detail: string][];
   warnings: string[];
+  /** Real time, which is what the voice latencies are measured on. */
+  wall: SimulatedClock;
+  /** Present only when the harness was given one. */
+  voice: FakeVoice | undefined;
 }
 
 function harness(
@@ -87,9 +164,14 @@ function harness(
     turns?: TurnUpdate[];
     /** Absent means `show_html` is never offered (US-020). */
     onArtifact?: (artifact: ShowHtmlArgs) => Artifact | null;
+    /** Absent means the answer is never spoken (V2-005). */
+    voice?: FakeVoice;
+    /** The real-time clock the voice latencies are read off. */
+    wall?: SimulatedClock;
   } = {},
 ): Harness {
   const clock = new SimulatedClock(0);
+  const wall = options.wall ?? new SimulatedClock(0);
   const model = new FakeModel(replies);
   const cards: StageCard[] = [];
   const pushes: Answer[] = [];
@@ -109,6 +191,8 @@ function harness(
     },
     onRecord: (record) => records.push(record),
     ...(options.onArtifact === undefined ? {} : { onArtifact: options.onArtifact }),
+    wallClock: wall,
+    ...(options.voice === undefined ? {} : { voice: options.voice }),
     onThinking: (value) => thinking.push(value),
     onModelState: (state, detail) => states.push([state, detail]),
     logger: {
@@ -116,7 +200,19 @@ function harness(
       warn: (line: string) => warnings.push(line),
     },
   });
-  return { clock, model, agent, cards, pushes, records, thinking, states, warnings };
+  return {
+    clock,
+    model,
+    agent,
+    cards,
+    pushes,
+    records,
+    thinking,
+    states,
+    warnings,
+    wall,
+    voice: options.voice,
+  };
 }
 
 /** Lets everything already queued as a microtask run, and nothing else. */
@@ -135,6 +231,22 @@ function turn(overrides: Partial<TurnUpdate> & { turnId: string }): TurnUpdate {
     ...overrides,
   };
 }
+
+/** The spoken half of {@link STREAM}, which is what the voice is handed. */
+const SAID = "They charge five to twenty-five dollars a seat.";
+
+/**
+ * One answer arriving the way the real stream delivers it: the spoken half
+ * sentence by sentence, then the screen heading, then the headline, then the
+ * detail. Each entry is the whole text so far, as `onText` reports it.
+ */
+const STREAM = [
+  "Say this:\nThey charge five to twenty",
+  `Say this:\n${SAID}`,
+  `Say this:\n${SAID}\n`,
+  `Say this:\n${SAID}\n\nShow this:\nRivals charge $5-$25 a seat`,
+  `Say this:\n${SAID}\n\nShow this:\nRivals charge $5-$25 a seat\n\n- Notion $12`,
+];
 
 describe("AnswerAgent", () => {
   it("puts a thinking card up before the call goes out", () => {
@@ -195,18 +307,15 @@ describe("AnswerAgent", () => {
     expect(call?.user).toContain("what do rivals charge?");
   });
 
-  it("pushes the headline as soon as line 1 is complete, and ignores the narration", async () => {
+  it("pushes the spoken half a sentence at a time and the headline when it is whole", async () => {
     const h = harness([
       async (call) => {
         // The model narrates first, in items of its own (measured).
         call.onText?.({ itemId: "rs_01", text: "I'll look up current pricing." });
         call.onText?.({ itemId: "rs_01", text: "I'll look up current pricing.\nthen read it" });
-        // Then the answer, a piece at a time.
-        call.onText?.({ itemId: ANSWER_ITEM, text: "Rivals charge $5" });
-        call.onText?.({ itemId: ANSWER_ITEM, text: "Rivals charge $5-$25 a seat" });
-        call.onText?.({ itemId: ANSWER_ITEM, text: "Rivals charge $5-$25 a seat\n" });
-        call.onText?.({ itemId: ANSWER_ITEM, text: "Rivals charge $5-$25 a seat\n\n- Notion $12" });
-        return reply({ text: "Rivals charge $5-$25 a seat\n\n- Notion $12" });
+        // Then the answer, a piece at a time: the spoken half first.
+        for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text: STREAM.at(-1) as string });
       },
     ]);
     h.clock.advanceBy(1_500);
@@ -215,12 +324,16 @@ describe("AnswerAgent", () => {
 
     expect(h.cards.map((card) => [card.state, card.headline])).toEqual([
       ["thinking", ""],
+      // A finished sentence of the spoken half, before any headline exists.
+      ["thinking", ""],
       ["thinking", "Rivals charge $5-$25 a seat"],
       ["ready", "Rivals charge $5-$25 a seat"],
     ]);
     // One card id throughout, so the stage replaces it rather than stacking.
     expect(new Set(h.cards.map((card) => card.id))).toEqual(new Set(["card-ans-1"]));
-    expect(h.cards[2]?.detailMd).toBe("- Notion $12");
+    expect(h.cards[1]?.spokenText).toBe(SAID);
+    expect(h.cards[3]?.detailMd).toBe("- Notion $12");
+    expect(h.cards[3]?.spokenText).toBe(SAID);
     expect(h.pushes[0]?.createdAtMs).toBe(1_500);
   });
 
@@ -354,6 +467,174 @@ describe("AnswerAgent", () => {
   });
 });
 
+describe("AnswerAgent out loud (V2-005)", () => {
+  /** A harness with a voice, and the fake voice beside it. */
+  function spoken(replies: ((call: ProseCall) => Promise<ProseReply>)[]) {
+    const wall = new SimulatedClock(0);
+    const voice = new FakeVoice(wall);
+    const h = harness(replies, { voice, wall });
+    return { h, voice };
+  }
+
+  it("acknowledges the question before the answer exists, then says it sentence by sentence", async () => {
+    const { h, voice } = spoken([
+      async (call) => {
+        // The acknowledgment is already out: it was queued before the call.
+        await microtasks();
+        expect(voice.utterances[0]?.text()).toBe(ACK_SEARCH);
+        for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    // Two utterances: the acknowledgment, then the answer itself. The answer
+    // is a second utterance rather than more text on the first, which is what
+    // makes opening it stop the acknowledgment mid-word.
+    expect(voice.utterances.map((one) => one.text())).toEqual([ACK_SEARCH, SAID]);
+    // The screen half is never spoken: no headline, no detail, no URL.
+    expect(voice.utterances[1]?.text()).not.toContain("$5-$25");
+  });
+
+  it("records what it said, when the room first heard it, and how long the ack took", async () => {
+    const { h } = spoken([
+      async (call) => {
+        for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    const record = h.records[0];
+    expect(record?.spokenText).toBe(SAID);
+    // The acknowledgment was asked for the moment the question landed and
+    // took 300 ms to be heard; the answer's own utterance opened a second
+    // later, once its first sentence existed.
+    expect(record?.ackMs).toBe(300);
+    expect(record?.firstAudioMs).toBe(1_300);
+    // Nothing cut it off, so there is no partial to record.
+    expect(record?.spokenSoFar).toBeUndefined();
+    // And the card carries the spoken half for "transcript of answer".
+    expect(h.cards.at(-1)?.spokenText).toBe(SAID);
+  });
+
+  it("records what the room actually heard when speech was cut off", async () => {
+    const { h, voice } = spoken([
+      async (call) => {
+        call.onText?.({ itemId: ANSWER_ITEM, text: STREAM[3] as string });
+        await microtasks();
+        const spoke = voice.utterances[1];
+        if (spoke === undefined) throw new Error("the answer was never spoken");
+        // The Stop button, mid-sentence.
+        spoke.heard = "They charge five to twenty";
+        spoke.cancel();
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    const record = h.records[0];
+    expect(record?.spokenText).toBe(SAID);
+    expect(record?.spokenSoFar).toBe("They charge five to twenty");
+    // Still a finished answer on the stage: only the sound stopped.
+    expect(record?.status).toBe("done");
+  });
+
+  it("says each sentence exactly once, however the stream is chopped up", async () => {
+    const whole = STREAM.at(-1) as string;
+    const { h, voice } = spoken([
+      async (call) => {
+        // One character at a time, which is the worst case the parser sees.
+        for (let at = 1; at <= whole.length; at += 1) {
+          call.onText?.({ itemId: ANSWER_ITEM, text: whole.slice(0, at) });
+        }
+        return reply({ text: whole });
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(voice.utterances[1]?.text()).toBe(SAID);
+    expect(h.records[0]?.spokenText).toBe(SAID);
+  });
+
+  it("answers on screen only when nothing would be heard", async () => {
+    const { h, voice } = spoken([async () => reply({ text: STREAM.at(-1) as string })]);
+    voice.available = false;
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(voice.utterances).toHaveLength(0);
+    const record = h.records[0];
+    // The card is exactly the card the core build showed.
+    expect(record?.status).toBe("done");
+    expect(record?.headline).toBe("Rivals charge $5-$25 a seat");
+    expect(record?.detailMd).toBe("- Notion $12");
+    // The words it would have said are still written down.
+    expect(record?.spokenText).toBe(SAID);
+    expect(record?.ackMs).toBeNull();
+    expect(record?.firstAudioMs).toBeNull();
+  });
+
+  it("still answers when the voice itself fails, and says so in the log", async () => {
+    const { h, voice } = spoken([async () => reply({ text: STREAM.at(-1) as string })]);
+    voice.failure = new Error("voice handshake was refused with HTTP 401");
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.records[0]?.status).toBe("done");
+    expect(h.records[0]?.firstAudioMs).toBeNull();
+    expect(h.warnings.join(" ")).toContain("401");
+  });
+
+  it("keeps the sentences it had already said when the call fails", async () => {
+    const { h, voice } = spoken([
+      async (call) => {
+        call.onText?.({ itemId: ANSWER_ITEM, text: STREAM[3] as string });
+        await microtasks();
+        throw new Error("the response came back incomplete");
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(voice.utterances[1]?.text()).toBe(SAID);
+    expect(h.records[0]).toMatchObject({ status: "error", spokenText: SAID });
+  });
+
+  it("takes its headline from the first spoken sentence when no screen half arrives", async () => {
+    const { h, voice } = spoken([
+      async () =>
+        reply({ text: "Say this:\nThey charge $12 a seat. Evernote is $25." }),
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.records[0]?.headline).toBe("They charge $12 a seat.");
+    expect(h.records[0]?.detailMd).toBe("Evernote is $25.");
+    expect(voice.utterances[1]?.text()).toBe("They charge $12 a seat. Evernote is $25.");
+  });
+});
+
+describe("screenFromSpoken", () => {
+  it("clips an over-long first sentence to the headline limit", () => {
+    const long = `${"a very long opening clause ".repeat(6)}ends here. And more.`;
+    const screen = screenFromSpoken(long);
+    expect(screen.headline.length).toBeLessThanOrEqual(90);
+    expect(screen.detailMd).toBe("And more.");
+  });
+
+  it("leaves no detail when the whole answer is one sentence", () => {
+    expect(screenFromSpoken("It is $12 a seat.")).toMatchObject({
+      headline: "It is $12 a seat.",
+      detailMd: "",
+    });
+  });
+});
+
 describe("recentTurns", () => {
   it("keeps the last ten minutes of conversation and drops what came before", () => {
     const turns = [
@@ -433,6 +714,9 @@ function cardAnswer(overrides: Partial<Answer>): Answer {
     status: "thinking",
     createdAtMs: 0,
     latencyMs: 0,
+    spokenText: "",
+    ackMs: null,
+    firstAudioMs: null,
     ...overrides,
   };
 }

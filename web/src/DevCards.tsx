@@ -23,12 +23,22 @@ The cheapest *comparable* bundle is therefore about $15 a seat. See the
 [pricing comparison](https://example.com/pricing) for the full table, or run
 \`npm run pricing\` on the sheet we exported.`;
 
+/** What Sotto said out loud for the same answer, behind "transcript of answer". */
+const SPOKEN_TEXT =
+  "Three of them publish a per-seat price, and they sit between eleven and" +
+  " eighteen dollars. Notely is fourteen a month with a two-seat minimum," +
+  " Huddleboard is eleven but charges four more for analytics, and Scratchpad" +
+  " is free for two people and eighteen after that. So the cheapest comparable" +
+  " bundle is about fifteen a seat.";
+
 /** The sample cards, built fresh so the glow's age is relative to this load. */
 function samples(now: number): { title: string; note: string; card: StageCard }[] {
   return [
     {
       title: "answer — ready",
-      note: "Question and asker in small text, headline ≥ 28 px, details ▾, numbered sources.",
+      note:
+        "Question and asker in small text, headline ≥ 28 px, details ▾," +
+        " transcript of answer ▾, numbered sources.",
       card: {
         id: "a-ready",
         variant: "answer",
@@ -38,6 +48,7 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
         askedBy: "Craig",
         headline: "Competitors sit between $11 and $18 a seat, bundling analytics at the top tier",
         detailMd: DETAIL_MD,
+        spokenText: SPOKEN_TEXT,
         citations: [
           { url: "https://example.com/notely-pricing", title: "Notely — Pricing" },
           { url: "https://example.com/huddleboard", title: "Huddleboard pricing and add-ons" },

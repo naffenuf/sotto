@@ -45,10 +45,15 @@ export interface AppOptions {
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false });
   const bus = options.bus ?? new EventBus();
+  // Built before the session manager, which speaks its answers through it
+  // (V2-005). One hub for the whole server: it owns the single browser page
+  // that plays Sotto's voice, so a second one would be an echo.
+  const voice = new VoiceHub(bus, (onAudio) => new Speaker({ apiKey: loadElevenLabsApiKey(), voiceId: loadSottoVoiceId(), onAudio }));
   // The pipeline logs to the console with its own `[session]`/`[asr]` prefixes,
   // as the rest of the server does, rather than through Fastify's logger.
-  const sessions = options.sessions ?? new SessionManager({ bus, apiKey: options.apiKey });
-  const voice = new VoiceHub(bus, (onAudio) => new Speaker({ apiKey: loadElevenLabsApiKey(), voiceId: loadSottoVoiceId(), onAudio }));
+  const sessions =
+    options.sessions ??
+    new SessionManager({ bus, apiKey: options.apiKey, createVoice: () => voice });
 
   await app.register(websocket);
 

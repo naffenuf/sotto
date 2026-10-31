@@ -21,13 +21,26 @@
  * While an answer is being written the interjection policy (US-014) holds
  * whatever it was going to say: Sotto talking over its own answer is the one
  * thing worse than Sotto staying quiet.
+ *
+ * V2-005 gave it a voice, which changes the shape of the reply rather than
+ * adding a step after it. The model now writes **two halves** — the sentences
+ * Sotto says out loud, then the headline and detail the stage shows
+ * ({@link splitSpokenAnswer}) — and the spoken half comes first precisely so
+ * that it can be read out a sentence at a time while the screen half is still
+ * being written. An acknowledgment covers the ten to twenty seconds before
+ * the first sentence exists ({@link chooseAcknowledgment}), and a muted Sotto
+ * skips all of it and behaves exactly as the core build did.
  */
 import {
+  SCREEN_HEADING_TEXT,
+  SPOKEN_HEADING_TEXT,
   TYPED_ASKER,
   splitAnswer,
+  splitSpokenAnswer,
   type Answer,
   type AnswerLogRecord,
   type AnswerText,
+  type SpokenAnswerText,
 } from "../../shared/answers.js";
 import {
   SHOW_HTML_TOOL,
@@ -41,11 +54,15 @@ import type { Citation, StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { renderBoardMarkdown } from "../board/markdown.js";
-import type { Clock } from "../clock.js";
+import { systemClock, type Clock } from "../clock.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
 import { searchedIndex, resolveCitation } from "../interject/Verifier.js";
 import { citationTitle, type FunctionTool, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
+import type { VoiceOut } from "../voice/voiceOut.js";
+import { chooseAcknowledgment } from "./ack.js";
+import { splitSentences } from "./sentences.js";
+import { SpokenAnswer, type SpokenResult } from "./SpokenAnswer.js";
 
 /** The label an answer is tracked under on the clock, and in the model logs. */
 export const ANSWER_TRACK_LABEL = "answer";
@@ -146,6 +163,18 @@ export interface AnswerAgentOptions {
   onThinking?: (thinking: boolean) => void;
   /** The model status dot, shared with the board loop and the observer. */
   onModelState?: (state: "connecting" | "active" | "error", detail: string) => void;
+  /**
+   * Where the answer is said out loud (V2-005). Absent means screen only,
+   * which is also what a muted or unattended voice resolves to at `begin()`.
+   */
+  voice?: VoiceOut;
+  /**
+   * Real time, for `ackMs` and `firstAudioMs`. Defaults to {@link systemClock}
+   * and is never the session clock: a `max`-speed replay's session clock does
+   * not move while a model call is in flight, so it would report zero for
+   * speech that really did take a second.
+   */
+  wallClock?: Clock;
   onTiming?: (event: Record<string, unknown>) => void;
   logger?: Logger;
 }
@@ -154,10 +183,13 @@ export interface AnswerAgentOptions {
 interface Queued {
   answer: Answer;
   asked: AskedQuestion;
+  /** When it arrived, in real time, which is what the voice latencies count from. */
+  askedAtWallMs: number;
 }
 
 export class AnswerAgent {
   private readonly clock: Clock;
+  private readonly wallClock: Clock;
   private readonly model: ModelClient;
   private readonly options: AnswerAgentOptions;
   private readonly logger: Logger;
@@ -179,6 +211,7 @@ export class AnswerAgent {
 
   constructor(options: AnswerAgentOptions) {
     this.clock = options.clock;
+    this.wallClock = options.wallClock ?? systemClock;
     this.model = options.model;
     this.options = options;
     this.logger = options.logger ?? console;
@@ -214,6 +247,9 @@ export class AnswerAgent {
       status: "thinking",
       createdAtMs: this.clock.now(),
       latencyMs: 0,
+      spokenText: "",
+      ackMs: null,
+      firstAudioMs: null,
     };
     this.logger.log(`[answer] ${answer.id} ${answer.askedBy} asked: ${question}`);
     this.options.onTiming?.({ stage: "answer_queued", atMs: this.clock.now(), answerId: answer.id, turnId: asked.turnId });
@@ -221,7 +257,7 @@ export class AnswerAgent {
     // that the group can see their question was heard.
     this.setThinking(true);
     this.push(answer);
-    this.queue.push({ answer, asked });
+    this.queue.push({ answer, asked, askedAtWallMs: this.wallClock.now() });
     this.pump();
   }
 
@@ -270,33 +306,82 @@ export class AnswerAgent {
     const { answer, asked } = queued;
     this.options.onTiming?.({ stage: "answer_start", atMs: this.clock.now(), answerId: answer.id, turnId: asked.turnId });
     let pushedHeadline = "";
+    /** The spoken half as far as it has been handed to the voice. */
+    let spokenText = "";
     // Filled in as the model draws (US-020), so a diagram can be on the stage
     // while the sentence under it is still being written.
     const artifacts: Artifact[] = [];
+    const speech = this.speech(queued);
+    // Out before the model has written a word: ten to twenty seconds of
+    // silence after somebody says Sotto's name reads as "it didn't hear me".
+    speech?.acknowledge(chooseAcknowledgment(answer.question));
+
+    /** True once the whole spoken half has gone to the voice. */
+    let said = false;
+    /**
+     * Hands the voice every sentence of the spoken half that is finished, and
+     * says whether anything new went over — which is also when the card is
+     * worth pushing again, so the transcript of the answer fills in a
+     * sentence at a time rather than a token at a time.
+     */
+    const feed = (halves: SpokenAnswerText): boolean => {
+      if (said) return false;
+      if (!halves.spoken.startsWith(spokenText)) {
+        // The first line only became a heading once its colon arrived. Carry
+        // on from here: saying a sentence twice is worse than losing one.
+        this.logger.warn(`[answer] ${answer.id} re-read the start of its spoken half`);
+        spokenText = halves.spoken;
+        return false;
+      }
+      const rest = halves.spoken.slice(spokenText.length);
+      if (halves.spokenComplete) {
+        said = true;
+        spokenText = halves.spoken;
+        const tail = rest.trim();
+        if (tail !== "") speech?.say(tail);
+        return tail !== "";
+      }
+      const { sentences, tail } = splitSentences(rest);
+      if (sentences.length === 0) return false;
+      for (const sentence of sentences) speech?.say(sentence);
+      spokenText = halves.spoken.slice(0, halves.spoken.length - tail.length);
+      return true;
+    };
+
     try {
       const reply = await this.model.prose({
         label: ANSWER_TRACK_LABEL,
         system: loadPrompt(PROMPTS.answer),
         user: this.render(answer),
         maxTokens: ANSWER_MAX_TOKENS,
-        functions: this.functions(answer, artifacts, () => pushedHeadline),
+        functions: this.functions(answer, artifacts, () => pushedHeadline, () => spokenText),
         onText: ({ itemId, text }) => {
           // Narration, not the answer: see ANSWER_ITEM_PREFIX.
           if (!itemId.startsWith(ANSWER_ITEM_PREFIX)) return;
-          const partial = splitAnswer(text);
-          // Only a *complete* first line goes out: a headline still being
-          // typed must not reach the stage half-said.
-          if (!partial.headlineComplete || partial.headline === pushedHeadline) return;
-          pushedHeadline = partial.headline;
+          const halves = splitSpokenAnswer(text);
+          const spoke = feed(halves);
+          // Only a *complete* first line of the screen half goes out: a
+          // headline still being typed must not reach the stage half-said.
+          const partial = halves.screen === "" ? undefined : splitAnswer(halves.screen);
+          const headline =
+            partial !== undefined && partial.headlineComplete && partial.headline !== pushedHeadline;
+          if (headline) pushedHeadline = partial.headline;
+          if (!spoke && !headline) return;
           this.push({
             ...answer,
-            headline: partial.headline,
+            headline: pushedHeadline,
+            spokenText,
             artifacts: [...artifacts],
             latencyMs: this.elapsed(answer),
           });
         },
       });
-      const text = splitAnswer(reply.text);
+      const halves = splitSpokenAnswer(reply.text);
+      // Whatever the stream never completed a sentence of: the reply is
+      // finished now, so the rest of it is sayable.
+      feed({ ...halves, spokenComplete: true });
+      const text = halves.screen === "" ? screenFromSpoken(halves.spoken) : splitAnswer(halves.screen);
+      const spoken = await speech?.done();
       const done: Answer = {
         ...answer,
         headline: text.headline,
@@ -305,16 +390,25 @@ export class AnswerAgent {
         artifacts: [...artifacts],
         status: "done",
         latencyMs: this.elapsed(answer),
+        spokenText,
+        ...voiceTimings(spoken),
       };
       this.finish(done, asked);
       this.logger.log(
         `[answer] ${done.id} answered in ${done.latencyMs} ms` +
           ` (${done.citations.length} citation(s)${reply.searched ? "" : ", no search"}` +
-          `${done.artifacts.length === 0 ? "" : `, ${done.artifacts.length} artifact(s)`})` +
+          `${done.artifacts.length === 0 ? "" : `, ${done.artifacts.length} artifact(s)`}` +
+          `${spoken?.spoke === true ? `, spoken after ${done.firstAudioMs ?? "?"} ms` : ", on screen only"}` +
+          `${spoken?.interrupted === true ? ", cut off" : ""})` +
           `: ${done.headline}`,
       );
     } catch (error) {
       const detail = message(error);
+      // Whatever has already been said is still being said: the words that
+      // reached the room were true when they were spoken, and cutting the
+      // voice off mid-sentence would be the only audible sign of a failure
+      // the card is about to explain anyway.
+      const spoken = await speech?.done();
       const failed: Answer = {
         ...answer,
         // Whatever reached the stage stays there — including a diagram that
@@ -324,6 +418,8 @@ export class AnswerAgent {
         artifacts: [...artifacts],
         status: "error",
         latencyMs: this.elapsed(answer),
+        spokenText,
+        ...voiceTimings(spoken),
         error: detail,
       };
       this.logger.warn(`[answer] ${answer.id} failed: ${detail}`);
@@ -331,6 +427,24 @@ export class AnswerAgent {
       this.options.onModelState?.("error", detail);
       this.finish(failed, asked);
     }
+  }
+
+  /**
+   * The voice for one answer, or `undefined` when there is none configured.
+   *
+   * A {@link SpokenAnswer} is built per answer rather than per session: it
+   * holds the two utterances and the latencies of exactly one reply, and the
+   * next question starts again from silence.
+   */
+  private speech(queued: Queued): SpokenAnswer | undefined {
+    const voice = this.options.voice;
+    if (voice === undefined) return undefined;
+    return new SpokenAnswer({
+      voice,
+      wallClock: this.wallClock,
+      askedAtMs: queued.askedAtWallMs,
+      logger: this.logger,
+    });
   }
 
   /**
@@ -345,6 +459,7 @@ export class AnswerAgent {
     answer: Answer,
     artifacts: Artifact[],
     headline: () => string,
+    spokenText: () => string,
   ): FunctionTool[] {
     const save = this.options.onArtifact;
     if (save === undefined) return [];
@@ -372,6 +487,7 @@ export class AnswerAgent {
           this.push({
             ...answer,
             headline: headline(),
+            spokenText: spokenText(),
             artifacts: [...artifacts],
             latencyMs: this.elapsed(answer),
           });
@@ -442,6 +558,38 @@ export class AnswerAgent {
   }
 }
 
+/**
+ * The voice's part of one answer record, for whichever of the two paths out of
+ * {@link AnswerAgent.answer} got there. `spokenSoFar` is only written when the
+ * answer really was cut off: on a complete one it would just repeat
+ * `spokenText`, and on a muted one it would claim the room heard nothing,
+ * which is true but is already said by `firstAudioMs` being null.
+ */
+function voiceTimings(spoken: SpokenResult | undefined): Partial<Answer> {
+  if (spoken === undefined) return { ackMs: null, firstAudioMs: null };
+  return {
+    ackMs: spoken.ackMs,
+    firstAudioMs: spoken.firstAudioMs,
+    ...(spoken.interrupted ? { spokenSoFar: spoken.spokenSoFar } : {}),
+  };
+}
+
+/**
+ * The screen half of a reply that never wrote one.
+ *
+ * Nothing enforces the shape `server/prompts/answer.md` asks for, and an
+ * answer the group can hear but cannot see would be a worse failure than a
+ * headline that reads like speech. So the first sentence becomes the headline
+ * and the rest becomes the detail, through the same clipping every other
+ * answer goes through.
+ */
+export function screenFromSpoken(spoken: string): AnswerText {
+  const { sentences } = splitSentences(`${spoken}\n`);
+  const headline = sentences[0] ?? spoken.trim();
+  const rest = spoken.slice(headline.length).trim();
+  return splitAnswer(rest === "" ? headline : `${headline}\n\n${rest}`);
+}
+
 /** The card id one answer gets, so the stage replaces it in place. */
 export function answerCardId(answerId: string): string {
   return `${CARD_ID_PREFIX}${answerId}`;
@@ -464,6 +612,7 @@ export function cardForAnswer(answer: Answer): StageCard {
     question: answer.question,
     askedBy: answer.askedBy,
     ...(answer.detailMd.trim() === "" ? {} : { detailMd: answer.detailMd }),
+    ...(answer.spokenText.trim() === "" ? {} : { spokenText: answer.spokenText }),
     ...(answer.citations.length === 0 ? {} : { citations: answer.citations }),
     ...(answer.artifacts.length === 0
       ? {}
@@ -517,7 +666,8 @@ export function renderAnswerRequest(
       ? "## Somebody just typed this question to you"
       : `## ${answer.askedBy} just asked you, out loud`,
     answer.question,
-    "Answer it: the headline on line 1, then the detail, then the pages you used.",
+    `Answer it out loud under "${SPOKEN_HEADING_TEXT}", then put the headline,` +
+      ` the detail and the pages you used under "${SCREEN_HEADING_TEXT}".`,
   ];
   return blocks.join("\n\n");
 }

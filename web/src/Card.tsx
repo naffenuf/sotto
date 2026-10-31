@@ -102,6 +102,7 @@ export function Card({
           <Evidence card={card} onQuoteClick={onQuoteClick} />
           <Artifacts card={card} />
           <Details card={card} />
+          <Spoken card={card} />
           <Sources card={card} />
         </>
       )}
@@ -356,6 +357,38 @@ function Details({ card }: { card: StageCard }) {
         <div className="card__markdown" data-testid="card-details">
           <Markdown source={detail} />
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What Sotto said out loud, for anybody who missed it (V2-005).
+ *
+ * Folded away like the detail, and for the same reason: the room already heard
+ * this, so it is there to be gone back to rather than read. It is plain text,
+ * not markdown — the spoken half is written to be heard, so there is no
+ * markdown in it to parse.
+ */
+function Spoken({ card }: { card: StageCard }) {
+  const [open, setOpen] = useState(false);
+  const spoken = card.spokenText ?? "";
+  if (spoken.trim() === "") return null;
+  return (
+    <div className="card__details">
+      <button
+        type="button"
+        className="card__details-toggle"
+        data-testid="card-spoken-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((shown) => !shown)}
+      >
+        transcript of answer <span aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <p className="card__spoken" data-testid="card-spoken">
+          {spoken}
+        </p>
       )}
     </div>
   );

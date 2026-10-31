@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
 import type WebSocket from "ws";
+import { SimulatedClock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
 import type { Speaker, SpeechResult } from "./Speaker.js";
-import { VoiceHub } from "./VoiceHub.js";
+import { VoiceHub, VOICE_FLUSH_WAIT_MS } from "./VoiceHub.js";
 
 class Socket extends EventEmitter {
   readonly OPEN = 1;
@@ -16,19 +17,31 @@ class Socket extends EventEmitter {
 function setup() {
   const bus = new EventBus();
   const socket = new Socket();
+  const wall = new SimulatedClock(0);
   let audio: ((chunk: Buffer) => void) | undefined;
   let finish!: (result: SpeechResult) => void;
   const positions: number[] = [];
+  const said: string[] = [];
   let cancelled = false;
+  let heard = "";
   const speaker = {
-    start: async () => {}, append: () => {},
+    start: async () => {}, append: (text: string) => said.push(text),
     finish: () => new Promise<SpeechResult>((resolve) => { finish = resolve; }),
     cancel: () => { cancelled = true; },
+    firstAudioMs: 299,
+    spokenSoFar: () => heard,
     notePlayedMs: (ms: number) => positions.push(ms), notePlayedAll: () => positions.push(-1),
   } as unknown as Speaker;
-  const hub = new VoiceHub(bus, (onAudio) => { audio = onAudio; return speaker; });
+  const hub = new VoiceHub(bus, (onAudio) => { audio = onAudio; return speaker; }, wall);
   hub.attach(socket as unknown as WebSocket);
-  return { bus, socket, hub, positions, emitAudio: (bytes: Buffer) => audio?.(bytes), end: () => finish({ reason: "complete", text: "Hello", spokenSoFar: "", audioBytes: 2, audioMs: 1, firstAudioMs: 1 }), cancelled: () => cancelled };
+  return {
+    bus, socket, hub, positions, said, wall,
+    emitAudio: (bytes: Buffer) => audio?.(bytes),
+    end: (overrides: Partial<SpeechResult> = {}) =>
+      finish({ reason: "complete", text: "Hello", spokenSoFar: "", audioBytes: 2, audioMs: 1, firstAudioMs: 299, ...overrides }),
+    hear: (text: string) => { heard = text; },
+    cancelled: () => cancelled,
+  };
 }
 
 describe("voice playback transport", () => {
@@ -80,3 +93,77 @@ describe("voice playback transport", () => {
     expect(built).toBe(false);
   });
 });
+
+describe("an utterance fed a sentence at a time (V2-005)", () => {
+  it("hands each piece straight on and shows what is being said", async () => {
+    const t = setup();
+    const utterance = await t.hub.begin();
+    expect(utterance).not.toBeNull();
+    utterance!.append("Let me check.");
+    utterance!.append("They charge $12 a seat.");
+    expect(t.said).toEqual(["Let me check.", "They charge $12 a seat."]);
+    // The stage shows the answer as it is spoken, not only once it is over.
+    expect(t.bus.voiceState().text).toBe("Let me check. They charge $12 a seat.");
+    expect(utterance!.firstAudioMs()).toBe(299);
+
+    const spoken = utterance!.finish();
+    t.end();
+    await expect(spoken).resolves.toMatchObject({ reason: "complete", firstAudioMs: 299 });
+    // The page is told no more audio is coming; it plays out what it has.
+    expect(JSON.parse(t.socket.sent.at(-1) as string)).toEqual({
+      type: "end", id: utterance!.id, reason: "complete",
+    });
+  });
+
+  it("drops text appended after the room cut it off", async () => {
+    const t = setup();
+    const utterance = await t.hub.begin();
+    utterance!.append("They charge");
+    t.hub.stop();
+    utterance!.append("and the rest of it");
+    expect(t.said).toEqual(["They charge"]);
+    expect(t.cancelled()).toBe(true);
+  });
+
+  it("waits for the page's last word on what it managed to play", async () => {
+    const t = setup();
+    const utterance = await t.hub.begin();
+    utterance!.append("They charge $12 a seat.");
+    const spoken = utterance!.finish();
+    t.hub.stop();
+    t.end({ reason: "cancelled" });
+    await microtasks();
+    // The flushed position arrives after the cancel, and it is the only thing
+    // that knows how much was heard.
+    t.hear("They charge");
+    t.socket.report({ type: "ended", id: utterance!.id, playedMs: 410, flushed: true });
+    await expect(spoken).resolves.toMatchObject({
+      reason: "cancelled",
+      spokenSoFar: "They charge",
+    });
+  });
+
+  it("gives up waiting for a page that never answers", async () => {
+    const t = setup();
+    const utterance = await t.hub.begin();
+    utterance!.append("They charge $12 a seat.");
+    const spoken = utterance!.finish();
+    t.hub.stop();
+    t.end({ reason: "cancelled" });
+    await microtasks();
+    t.wall.advanceBy(VOICE_FLUSH_WAIT_MS);
+    await expect(spoken).resolves.toMatchObject({ reason: "cancelled" });
+  });
+
+  it("is a no-op all the way through when nothing would be heard", async () => {
+    const t = setup();
+    t.bus.setSettings({ ...t.bus.settingsState(), voiceMuted: true });
+    expect(await t.hub.begin()).toBeNull();
+    expect(t.socket.sent).toHaveLength(0);
+  });
+});
+
+/** Lets everything already queued as a microtask run, and nothing else. */
+async function microtasks(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}

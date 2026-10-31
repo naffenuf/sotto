@@ -872,6 +872,18 @@ body {
   color: var(--ink);
 }
 
+/* What Sotto said out loud (V2-005): plain text, set apart so it reads as a
+   quotation of speech rather than as more of the card's own writing. */
+.card__spoken {
+  margin: 0.5rem 0 0;
+  padding-left: 0.625rem;
+  border-left: 2px solid #d5cec2;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+  white-space: pre-wrap;
+}
+
 .md__p {
   margin: 0 0 0.625rem;
 }

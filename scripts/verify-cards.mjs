@@ -143,6 +143,18 @@ const details = await answer.getByTestId("card-details").evaluate((node) => ({
   html: node.innerHTML.includes("<script"),
 }));
 const detailsToggleAfter = (await answer.getByTestId("card-details-toggle").textContent())?.trim();
+
+// "transcript of answer ▾" opens what Sotto said out loud (V2-005): plain
+// speech, with none of the markdown or links the detail carries.
+await answer.getByTestId("card-spoken-toggle").click();
+await page.waitForSelector(
+  '[data-testid="dev-case"][data-case="a-ready"] [data-testid="card-spoken"]',
+);
+const spoken = await answer.getByTestId("card-spoken").evaluate((node) => ({
+  words: node.textContent.trim().split(/\s+/).length,
+  markdown: /[*_`#]|https?:/.test(node.textContent),
+  links: node.querySelectorAll("a").length,
+}));
 await page.screenshot({ path: openShot, fullPage: true });
 
 // ---- The app's layout (US-011's first criterion) ----
@@ -151,16 +163,27 @@ app.on("console", (m) => m.type() === "error" && consoleErrors.push(`[app] ${m.t
 app.on("pageerror", (e) => consoleErrors.push(`[app] ${e}`));
 await app.goto(url, { waitUntil: "networkidle" });
 await app.waitForSelector('[data-testid="stage"]');
-const layout = await app.evaluate(() => {
+// The sidebar shows the notes and the transcript as tabs rather than stacked,
+// so the transcript has to be asked for before it can be measured.
+const boardBox = await app
+  .locator('[data-testid="board"]')
+  .evaluate((node) => node.getBoundingClientRect().toJSON());
+await app.locator(".discussion-tabs button", { hasText: "Transcript" }).click();
+await app.waitForSelector('[data-testid="transcript"]');
+const layout = await app.evaluate((board) => {
   const width = document.querySelector(".layout").getBoundingClientRect().width;
   const sidebar = document.querySelector(".sidebar").getBoundingClientRect();
   const stage = document.querySelector('[data-testid="stage"]').getBoundingClientRect();
   const transcript = document.querySelector(".transcript").getBoundingClientRect();
-  const board = document.querySelector('[data-testid="board"]').getBoundingClientRect();
   return {
     sidebarPct: Math.round((sidebar.width / width) * 100),
     stagePct: Math.round((stage.width / width) * 100),
-    transcriptAboveBoard: transcript.bottom <= board.top + 1,
+    // Both panels live in the sidebar, one tab each.
+    panelsInSidebar:
+      transcript.left >= sidebar.left - 1 &&
+      transcript.right <= sidebar.right + 1 &&
+      board.left >= sidebar.left - 1 &&
+      board.right <= sidebar.right + 1,
     stageRightOfSidebar: stage.left >= sidebar.right - 1,
     header: {
       source: document.querySelector('[data-testid="source-select"]') !== null,
@@ -171,7 +194,7 @@ const layout = await app.evaluate(() => {
     },
     placeholder: document.querySelector('[data-testid="session-state"]')?.textContent?.trim(),
   };
-});
+}, boardBox);
 await app.screenshot({ path: layoutShot });
 
 await browser.close();
@@ -188,6 +211,7 @@ const report = {
   openedGlow,
   details,
   detailsToggleAfter,
+  spoken,
   layout,
   consoleErrors,
 };
@@ -332,6 +356,11 @@ if (details.links[0] !== "https://example.com/pricing") {
 }
 if (details.html) problems.push("the markdown renderer let a <script> through");
 
+// What Sotto said out loud (V2-005): the words, and nothing meant for the eye.
+if (spoken.words < 20) problems.push(`the transcript of the answer is ${spoken.words} words`);
+if (spoken.markdown) problems.push("the spoken half carries markdown or a URL");
+if (spoken.links !== 0) problems.push(`the spoken half rendered ${spoken.links} links`);
+
 // The layout.
 if (layout.sidebarPct < 20 || layout.sidebarPct > 30) {
   problems.push(`the sidebar is ${layout.sidebarPct}% wide, not about 25`);
@@ -339,7 +368,7 @@ if (layout.sidebarPct < 20 || layout.sidebarPct > 30) {
 if (layout.stagePct < 70 || layout.stagePct > 80) {
   problems.push(`the stage is ${layout.stagePct}% wide, not about 75`);
 }
-if (!layout.transcriptAboveBoard) problems.push("the board is not below the transcript");
+if (!layout.panelsInSidebar) problems.push("the transcript and the notes are not both in the sidebar");
 if (!layout.stageRightOfSidebar) problems.push("the stage is not to the right of the sidebar");
 if (!layout.header.source || !layout.header.start) problems.push("the header lost its controls");
 if (layout.header.dots.length !== 3) {

@@ -5,6 +5,7 @@ import {
   ASK_QUESTION_MAX_CHARS,
   AskRequestSchema,
   splitAnswer,
+  splitSpokenAnswer,
 } from "./answers.js";
 
 describe("splitAnswer", () => {
@@ -128,5 +129,62 @@ describe("AskRequestSchema", () => {
     expect(() =>
       AskRequestSchema.parse({ question: "x".repeat(ASK_QUESTION_MAX_CHARS) }),
     ).not.toThrow();
+  });
+});
+
+describe("splitSpokenAnswer", () => {
+  const reply = [
+    "Say this:",
+    "They charge twelve dollars a seat. Evernote is twenty-five.",
+    "",
+    "Show this:",
+    "Notion $12, Evernote $25 a seat",
+    "",
+    "- Confluence is cheapest at $5.42",
+    "",
+    "Sources:",
+    "- Notion pricing - https://example.com/notion",
+  ].join("\n");
+
+  it("splits the half that is said from the half that is shown", () => {
+    const halves = splitSpokenAnswer(reply);
+    expect(halves.spoken).toBe(
+      "They charge twelve dollars a seat. Evernote is twenty-five.",
+    );
+    expect(halves.spokenComplete).toBe(true);
+    // The screen half goes through splitAnswer exactly as before.
+    const screen = splitAnswer(halves.screen);
+    expect(screen.headline).toBe("Notion $12, Evernote $25 a seat");
+    expect(screen.detailMd).toBe("- Confluence is cheapest at $5.42");
+    expect(screen.sources).toEqual([
+      { title: "Notion pricing", url: "https://example.com/notion" },
+    ]);
+  });
+
+  it("never reads a URL out loud: the sources are in the screen half", () => {
+    expect(splitSpokenAnswer(reply).spoken).not.toContain("http");
+  });
+
+  it("says the spoken half is unfinished until the screen heading arrives", () => {
+    const halfway = splitSpokenAnswer("Say this:\nThey charge twelve dollars a seat.");
+    expect(halfway.spoken).toBe("They charge twelve dollars a seat.");
+    expect(halfway.spokenComplete).toBe(false);
+    expect(halfway.screen).toBe("");
+  });
+
+  it("takes either heading with its text on the same line", () => {
+    const halves = splitSpokenAnswer("Say this: It is twelve dollars.\nShow this: $12 a seat");
+    expect(halves.spoken).toBe("It is twelve dollars.");
+    expect(halves.screen).toBe("$12 a seat");
+  });
+
+  it("reads a reply with no headings at all as all spoken", () => {
+    const halves = splitSpokenAnswer("It is twelve dollars a seat.");
+    expect(halves.spoken).toBe("It is twelve dollars a seat.");
+    expect(halves.screen).toBe("");
+  });
+
+  it("is empty, not undefined, for a reply that has not started", () => {
+    expect(splitSpokenAnswer("")).toEqual({ spoken: "", spokenComplete: false, screen: "" });
   });
 });

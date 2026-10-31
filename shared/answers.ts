@@ -93,6 +93,34 @@ export interface Answer {
   /** How long the answer took, so far. */
   latencyMs: number;
   /**
+   * The words Sotto says out loud, as far as they have been written (V2-005).
+   *
+   * Not a rendering of the card: the spoken half and the screen half are two
+   * different pieces of writing, and the model is asked for both. This is the
+   * one the room hears, and the card shows it under "transcript of answer".
+   * It is filled in even when voice is muted — the answer was still written
+   * to be heard, and the record should say what would have been said.
+   */
+  spokenText: string;
+  /**
+   * The question arriving to the acknowledgment's first audio, in **real**
+   * milliseconds; `null` when nothing was acknowledged out loud.
+   *
+   * Real time, not the session clock, because these two are latencies a
+   * person in the room feels: a `max`-speed replay's session clock does not
+   * move while a model call is in flight (see `CLAUDE.md`), so measuring the
+   * voice on it would report zero for speech that really did take a second.
+   */
+  ackMs: number | null;
+  /** The question arriving to the first audio of the answer itself, in real ms. */
+  firstAudioMs: number | null;
+  /**
+   * What the room actually heard, when speech was cut off before the end
+   * (the Stop button, V2-004; a barge-in, V2-007). Absent when all of it was
+   * spoken, or when none of it was.
+   */
+  spokenSoFar?: string;
+  /**
    * `status: "error"`: the short line shown in place of the answer.
    *
    * Not in the PRD's field list, which stops at `status` — but a status of
@@ -125,6 +153,87 @@ export interface AnswerText {
   sources: ListedSource[];
   /** Whether a complete first line has arrived, i.e. whether a line 2 exists. */
   headlineComplete: boolean;
+}
+
+/**
+ * The two headings one reply is written under (V2-005).
+ *
+ * An answer is two pieces of writing, not one text rendered twice: the spoken
+ * half is sentences meant to be heard, of whatever length the question
+ * deserves, and the screen half is a headline somebody glances at from across
+ * a table. So the model writes them in that order, under these headings, and
+ * the spoken half comes first for one reason — it is the half that has to
+ * start being said while the rest is still being written.
+ */
+export const SPOKEN_HEADING_TEXT = "Say this:";
+export const SCREEN_HEADING_TEXT = "Show this:";
+
+/** The spoken heading, on its own line or with the first sentence after it. */
+const SPOKEN_HEADING =
+  /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(?:say(?:\s+this)?|spoken|say\s+out\s+loud|out\s+loud|aloud)\s*:?\s*(?:\*\*|__)?\s*$/i;
+const SPOKEN_INLINE =
+  /^\s*(?:\*\*|__)?\s*(?:say(?:\s+this)?|spoken|say\s+out\s+loud|out\s+loud|aloud)\s*:\s*(?:\*\*|__)?\s*(?=\S)/i;
+
+/** The screen heading, which is also the end of the spoken half. */
+const SCREEN_HEADING =
+  /^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(?:show(?:\s+this)?|on\s*[- ]?screen|screen)\s*:?\s*(?:\*\*|__)?\s*$/i;
+const SCREEN_INLINE =
+  /^\s*(?:\*\*|__)?\s*(?:show(?:\s+this)?|on\s*[- ]?screen|screen)\s*:\s*(?:\*\*|__)?\s*(?=\S)/i;
+
+/** What {@link splitSpokenAnswer} made of a reply, whole or half-written. */
+export interface SpokenAnswerText {
+  /** The words to say, without the heading. */
+  spoken: string;
+  /**
+   * Whether the screen heading has arrived, i.e. whether the spoken half is
+   * finished. Until it has, the last sentence may still be growing — which is
+   * what stops half a word being handed to the voice.
+   */
+  spokenComplete: boolean;
+  /** The screen half, for {@link splitAnswer}; empty until the heading arrives. */
+  screen: string;
+}
+
+/**
+ * Splits a reply into the half that is said and the half that is shown.
+ *
+ * Tolerant in the same way {@link splitAnswer} is, and for the same reason:
+ * the shape is asked for in `server/prompts/answer.md` and enforced by
+ * nothing. A reply with no screen heading at all is read as all spoken, which
+ * is the safe way round — the card can take its headline from the first
+ * sentence, whereas speaking the screen half would read a URL out loud.
+ */
+export function splitSpokenAnswer(text: string): SpokenAnswerText {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const at = lines.findIndex(
+    (line) => SCREEN_HEADING.test(line) || SCREEN_INLINE.test(line),
+  );
+  const spokenLines = at === -1 ? lines : lines.slice(0, at);
+  const spoken = stripHeading(spokenLines, SPOKEN_HEADING, SPOKEN_INLINE);
+  if (at === -1) return { spoken, spokenComplete: false, screen: "" };
+  const heading = lines[at] as string;
+  // A heading on a line of its own goes; a heading with the headline after it
+  // keeps what follows the colon.
+  const rest = SCREEN_HEADING.test(heading)
+    ? lines.slice(at + 1)
+    : [heading.replace(SCREEN_INLINE, ""), ...lines.slice(at + 1)];
+  return { spoken, spokenComplete: true, screen: rest.join("\n").trim() };
+}
+
+/** `lines` without the heading they may begin with, joined and trimmed. */
+function stripHeading(
+  lines: readonly string[],
+  heading: RegExp,
+  inline: RegExp,
+): string {
+  const first = lines.findIndex((line) => line.trim() !== "");
+  if (first === -1) return "";
+  const head = lines[first] as string;
+  if (heading.test(head)) return lines.slice(first + 1).join("\n").trim();
+  if (inline.test(head)) {
+    return [head.replace(inline, ""), ...lines.slice(first + 1)].join("\n").trim();
+  }
+  return lines.slice(first).join("\n").trim();
 }
 
 /**

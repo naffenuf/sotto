@@ -74,6 +74,17 @@ export interface StageCard {
   askedBy?: string;
   /** Markdown, behind "details ▾". */
   detailMd?: string;
+  /**
+   * `answer`: the words Sotto said out loud, behind "transcript of answer ▾"
+   * (V2-005).
+   *
+   * Not the same writing as {@link detailMd}: the spoken half is sentences
+   * meant to be heard and the screen half is meant to be glanced at. It is
+   * present even when voice was muted — the answer was still written to be
+   * heard, and somebody reading the card should be able to see what would
+   * have been said.
+   */
+  spokenText?: string;
   /** `interject`/`glow`: why this is worth saying now (US-012). */
   whyNow?: string;
   /** `interject`/`glow`: what in the conversation it rests on. */

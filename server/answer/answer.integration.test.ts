@@ -10,9 +10,15 @@
  * with the headline, the detail and the sources as the group saw them.
  *
  * What is really under test is `server/prompts/answer.md` plus
- * `MuseClient.prose`: the model has to search, answer in the shape the stage
- * expects (a headline of at most 90 characters, then markdown), and name
- * pages it actually read.
+ * `MuseClient.prose`: the model has to search, answer in **two halves**
+ * (V2-005) — sentences written to be heard, then the headline and detail the
+ * stage shows — and name pages it actually read.
+ *
+ * The speech is real too, through a null sink: the ElevenLabs socket, the
+ * streaming and the latencies are the live ones and nothing comes out of a
+ * speaker, which is what lets `firstAudioMs` and `ackMs` be measured in a test
+ * (`nullSinkVoice`). With no `ELEVENLABS_API_KEY` the replay still runs and
+ * only the spoken assertions are skipped.
  */
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -28,12 +34,16 @@ import type { StageCard } from "../../shared/cards.js";
 import { EventBus } from "../events/bus.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { SESSION_FILES, SessionStore } from "../session/SessionStore.js";
+import { loadSottoVoiceId } from "../config.js";
+import { Speaker } from "../voice/Speaker.js";
+import { nullSinkVoice } from "../voice/voiceOut.js";
 
 // `globalSetup` loads `.env` in the main process; a test file runs in a worker
 // and has to load it for itself.
 loadDotenv({ quiet: true });
 
 const apiKey = (process.env.MODEL_API_KEY ?? "").trim();
+const voiceKey = (process.env.ELEVENLABS_API_KEY ?? "").trim();
 
 /** Board calls, an observer look each, and one searching answer. */
 const REPLAY_TIMEOUT_MS = 10 * 60_000;
@@ -60,6 +70,13 @@ async function replay(root: string, name: string): Promise<Replayed> {
     logger: quiet,
     replaySpeed: "max",
     createStore: (info) => SessionStore.create(info, { root, logger: quiet }),
+    // Real synthesis, no speakers. A missing key means screen only.
+    createVoice: () =>
+      voiceKey === ""
+        ? null
+        : nullSinkVoice(
+            () => new Speaker({ apiKey: voiceKey, voiceId: loadSottoVoiceId(), logger: quiet }),
+          ),
   });
 
   const ended = new Promise<void>((resolve) => {
@@ -142,6 +159,46 @@ describe.skipIf(apiKey === "")(`the answer agent after replaying ${fixture}`, ()
     expect(new Set(answer.citations.map((one) => one.url)).size).toBe(answer.citations.length);
   });
 
+  // Speech is only exercised when there is an ElevenLabs key to synthesize
+  // with; the rest of the replay runs either way.
+  it.skipIf(voiceKey === "")("speaks the answer, and the words it said are written to be heard", () => {
+    const answer = result.answers[0]!;
+    expect(answer.status, answer.error ?? "no error recorded").toBe("done");
+    expect(answer.spokenText.trim(), "nothing was written to be said").not.toBe("");
+    // Written for the ear: no markdown, no links, no citation markers.
+    expect(answer.spokenText).not.toContain("http");
+    expect(answer.spokenText).not.toMatch(/[*_`#]/);
+    expect(answer.spokenText.toLowerCase()).not.toContain("sources:");
+    // The two halves are different pieces of writing, not one text twice.
+    expect(answer.spokenText).not.toBe(answer.detailMd);
+  });
+
+  it.skipIf(voiceKey === "")("logs when the room first heard the acknowledgment and the answer", () => {
+    const answer = result.answers[0]!;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[spoken] ackMs=${answer.ackMs} firstAudioMs=${answer.firstAudioMs}` +
+        ` latencyMs=${answer.latencyMs} spoken=${answer.spokenText.length} chars`,
+    );
+    expect(answer.ackMs, "the acknowledgment never reached the room").not.toBeNull();
+    // The PRD's budget: heard within a second and a half of the question.
+    expect(answer.ackMs!).toBeLessThanOrEqual(1_500);
+    expect(answer.firstAudioMs, "the answer was never spoken").not.toBeNull();
+    // It can only follow the acknowledgment, and only after the model wrote it.
+    expect(answer.firstAudioMs!).toBeGreaterThan(answer.ackMs!);
+    // Nothing cut it off, so there is no partial to record.
+    expect(answer.spokenSoFar).toBeUndefined();
+  });
+
+  it.skipIf(voiceKey === "")("still puts the headline, the detail and the sources on the card", () => {
+    const answer = result.answers[0]!;
+    expect(answer.headline.length).toBeLessThanOrEqual(ANSWER_HEADLINE_MAX_CHARS);
+    expect(answer.headline).not.toContain("\n");
+    expect(answer.citations, "no citations on a searched answer").not.toHaveLength(0);
+    // And the stage can show what was said, under "transcript of answer".
+    expect(result.cards.at(-1)?.spokenText).toBe(answer.spokenText);
+  });
+
   it("streams the answer onto the stage under one card id", () => {
     const answers = result.cards.filter((card) => card.variant === "answer");
     expect(answers.length, "no answer card reached the stage").toBeGreaterThanOrEqual(2);
@@ -156,3 +213,4 @@ describe.skipIf(apiKey === "")(`the answer agent after replaying ${fixture}`, ()
     expect(last.citations).toEqual(result.answers[0]?.citations);
   });
 });
+
