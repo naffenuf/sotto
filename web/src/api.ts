@@ -11,6 +11,7 @@ import type {
   SessionStopResponse,
   SpeakerRenameResponse,
 } from "../../shared/index.js";
+import type { HistoryDetail, HistoryEntry } from "../../shared/history.js";
 
 /** A route answered with a 4xx or 5xx; the message is meant to be shown. */
 export class ApiCallError extends Error {
@@ -39,6 +40,9 @@ async function call<T>(url: string, body?: unknown): Promise<T> {
   }
   return (await response.json()) as T;
 }
+
+export function fetchHistory(): Promise<HistoryEntry[]> { return call("/api/history"); }
+export function fetchDiscussion(folder: string): Promise<HistoryDetail> { return call(`/api/history/${encodeURIComponent(folder)}`); }
 
 /** Which fixtures this checkout can replay. */
 export function fetchFixtures(): Promise<FixtureListResponse> {

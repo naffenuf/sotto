@@ -2,17 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Chattiness,
   FeedbackVerdict,
-  FixtureListResponse,
-  SessionSource,
   StageCard,
   StatusChannel,
   StatusUpdate,
 } from "../../shared/index.js";
-import { describeSource } from "../../shared/index.js";
+import { describeSource, emptyBoard } from "../../shared/index.js";
 import {
   ApiCallError,
   askSotto,
-  fetchFixtures,
+  fetchHistory,
+  fetchDiscussion,
   renameSpeaker,
   sendFeedback,
   setChattiness,
@@ -22,20 +21,22 @@ import {
 import { AskBox } from "./AskBox.js";
 import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCapture.js";
 import { BoardPanel } from "./BoardPanel.js";
-import { SessionControls, parseSourceValue, sourceValue } from "./SessionControls.js";
+import { Backstage } from "./Backstage.js";
+import { SessionControls } from "./SessionControls.js";
+import type { HistoryDetail, HistoryEntry } from "../../shared/history.js";
 import { Stage } from "./Stage.js";
 import { StatusDots } from "./StatusDots.js";
 import { TranscriptPanel, type TurnHighlight } from "./TranscriptPanel.js";
 import { useServerStatus } from "./useServerStatus.js";
 import { useSessionEvents } from "./useSessionEvents.js";
 
-const NO_FIXTURES: FixtureListResponse = { wav: [], events: [] };
-
 export function App() {
   const health = useServerStatus();
   const events = useSessionEvents();
-  const [fixtures, setFixtures] = useState<FixtureListResponse>(NO_FIXTURES);
-  const [selected, setSelected] = useState("");
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [discussion, setDiscussion] = useState<HistoryDetail | null>(null);
+  const [view, setView] = useState<"board" | "transcript" | "backstage">("board");
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** The microphone, while a `mic` session is running (US-012). */
@@ -48,22 +49,10 @@ export function App() {
     mic.current = null;
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchFixtures()
-      .then((list) => {
-        if (cancelled) return;
-        setFixtures(list);
-        const first = defaultSource(list);
-        if (first !== null) setSelected(sourceValue(first));
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setProblem(error instanceof Error ? error.message : String(error));
-      });
-    return () => {
-      cancelled = true;
-    };
+  const refreshHistory = useCallback(() => {
+    void fetchHistory().then((items) => { setHistory(items); setHistoryError(null); }).catch(() => setHistoryError("Could not load previous discussions."));
   }, []);
+  useEffect(() => { refreshHistory(); }, [refreshHistory]);
 
   const statuses = useMemo(
     (): Record<StatusChannel, StatusUpdate> => ({
@@ -76,8 +65,9 @@ export function App() {
   );
 
   const onStart = useCallback(() => {
-    const source = parseSourceValue(selected);
-    if (source === null) return;
+    const source = { kind: "mic" } as const;
+    setDiscussion(null);
+    setView("board");
     setProblem(null);
     setBusy(true);
     void (async () => {
@@ -96,7 +86,7 @@ export function App() {
         setBusy(false);
       }
     })();
-  }, [selected]);
+  }, []);
 
   const onStop = useCallback(() => {
     setBusy(true);
@@ -107,8 +97,8 @@ export function App() {
       .catch((error: unknown) =>
         setProblem(error instanceof ApiCallError ? error.message : String(error)),
       )
-      .finally(() => setBusy(false));
-  }, [stopMic]);
+      .finally(() => { setBusy(false); refreshHistory(); });
+  }, [stopMic, refreshHistory]);
 
   // The server owns the setting and pushes it back on `/ws/events`, so there
   // is nothing to remember here: the selector shows what came back.
@@ -122,6 +112,8 @@ export function App() {
   // A fresh object every click, so clicking the same quote twice scrolls back
   // to it twice rather than being seen as the same request.
   const onQuoteClick = useCallback((turnId: string) => {
+    setDiscussion(null);
+    setView("transcript");
     setCited({ turnId, at: Date.now() });
   }, []);
 
@@ -159,8 +151,8 @@ export function App() {
   // A session can also end on its own — the capture runs out, the stream
   // fails — and the microphone must not stay on when it does.
   useEffect(() => {
-    if (session === null) stopMic();
-  }, [session, stopMic]);
+    if (session === null) { stopMic(); refreshHistory(); }
+  }, [session, stopMic, refreshHistory]);
 
   // And neither should navigating away.
   useEffect(() => stopMic, [stopMic]);
@@ -170,9 +162,6 @@ export function App() {
       <header className="header">
         <h1 className="brand">Sotto</h1>
         <SessionControls
-          fixtures={fixtures}
-          value={selected}
-          onChange={setSelected}
           running={session !== null}
           busy={busy}
           onStart={onStart}
@@ -184,21 +173,34 @@ export function App() {
       </header>
       <div className="layout">
         <aside className="sidebar">
-          <TranscriptPanel
-            turns={events.turns}
-            speakers={events.speakers}
-            onRename={onRenameSpeaker}
-            highlight={cited}
-          />
-          <BoardPanel
-            board={events.board}
-            changedIds={events.boardChangedIds}
-            updatedAt={events.boardReceivedAtMs}
+          <div className="discussion-header">
+            <span className="discussion-eyebrow">{discussion ? "PREVIOUS DISCUSSION" : "CURRENT DISCUSSION"}</span>
+            {discussion && <button className="discussion-return" onClick={() => { setDiscussion(null); setView("board"); }}>← Back to current</button>}
+            <div className="discussion-tabs" aria-label="Discussion view">
+              <button aria-pressed={view === "board"} onClick={() => setView("board")}>Discussion notes</button>
+              <button aria-pressed={view === "transcript"} onClick={() => setView("transcript")}>Transcript</button>
+              {discussion && <button aria-pressed={view === "backstage"} onClick={() => setView("backstage")}>Backstage</button>}
+            </div>
+          </div>
+          {view === "backstage" && discussion ? <Backstage log={discussion.candidateLog ?? []} /> : view === "transcript" ? discussion ? (
+            <section className="history-transcript"><h2 className="panel__title">Transcript</h2><pre>{discussion.transcript.replaceAll("**", "") || "No transcript saved."}</pre></section>
+          ) : <TranscriptPanel turns={events.turns} speakers={events.speakers} onRename={onRenameSpeaker} highlight={cited} /> : <BoardPanel
+            board={discussion ? discussion.board ?? emptyBoard() : events.board}
+            changedIds={discussion ? [] : events.boardChangedIds}
+            updatedAt={discussion ? 0 : events.boardReceivedAtMs}
+            historical={discussion !== null}
             // The model dot goes `connecting` for exactly as long as a board
             // update is out (`BoardUpdater.onModelState`), so it is also the
             // panel's spinner.
-            updating={statuses.model.state === "connecting"}
-          />
+            updating={!discussion && statuses.model.state === "connecting"}
+          />}
+          {discussion && view !== "backstage" && discussion.contributions.length > 0 && <section className="history-contributions"><h2 className="panel__title">Sotto’s contributions</h2>{discussion.contributions.map((item, index) => <article key={index}><small>{item.kind}</small><strong>{item.headline}</strong><p>{item.detail}</p></article>)}</section>}
+          <section className="history-list" aria-label="Previous discussions">
+            <h2 className="panel__title">Previous discussions</h2>
+            {historyError && <p>{historyError}</p>}
+            {!historyError && history.length === 0 && <p>No previous discussions yet.</p>}
+            {history.map((item) => <button key={item.folder} className="history-item" aria-current={discussion?.folder === item.folder ? "true" : undefined} onClick={() => { void fetchDiscussion(item.folder).then((value) => { setDiscussion(value); setView("board"); setHistoryError(null); }).catch(() => setHistoryError("Could not open that discussion.")); }}><span>{item.title}</span><time>{new Date(item.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></button>)}
+          </section>
         </aside>
         <Stage
           cards={events.cards}
@@ -219,6 +221,7 @@ export function App() {
                   </span>
                 </p>
               )}
+              {discussion && <p className="history-stage-note">The stage shows the current discussion. The selected previous discussion is shown on the left.</p>}
               {problem !== null && (
                 <p className="stage__problem" data-testid="session-problem" role="alert">
                   {problem}
@@ -243,13 +246,6 @@ export function App() {
  * What the selector starts on: the brainstorm replay, which needs no API key
  * and no waiting; failing that, whatever this checkout has.
  */
-function defaultSource(fixtures: FixtureListResponse): SessionSource | null {
-  if (fixtures.events.includes("brainstorm")) return { kind: "events", fixture: "brainstorm" };
-  const events = fixtures.events[0];
-  if (events !== undefined) return { kind: "events", fixture: events };
-  const wav = fixtures.wav[0];
-  return wav === undefined ? null : { kind: "wav", fixture: wav };
-}
 
 /** The server dot: the events socket first, the health poll as the fallback. */
 function serverStatus(

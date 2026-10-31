@@ -1,4 +1,4 @@
-import type { Chattiness, FixtureListResponse, SessionSource } from "../../shared/index.js";
+import type { Chattiness, SessionSource } from "../../shared/index.js";
 import { chattinessLevels } from "../../shared/index.js";
 
 /**
@@ -19,9 +19,6 @@ export function parseSourceValue(value: string): SessionSource | null {
 }
 
 export interface SessionControlsProps {
-  fixtures: FixtureListResponse;
-  value: string;
-  onChange: (value: string) => void;
   /** True while a session is running, which is what the buttons key off. */
   running: boolean;
   busy: boolean;
@@ -35,9 +32,6 @@ export interface SessionControlsProps {
 
 /** Source selector, chattiness and Start / Stop, in the header. */
 export function SessionControls({
-  fixtures,
-  value,
-  onChange,
   running,
   busy,
   onStart,
@@ -47,33 +41,6 @@ export function SessionControls({
 }: SessionControlsProps) {
   return (
     <div className="controls">
-      <label className="controls__label" htmlFor="source">
-        Source
-      </label>
-      <select
-        id="source"
-        className="controls__select"
-        data-testid="source-select"
-        value={value}
-        disabled={running}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <optgroup label="Audio (live transcription)">
-          {fixtures.wav.map((fixture) => (
-            <option key={`wav:${fixture}`} value={`wav:${fixture}`}>
-              {fixture}
-            </option>
-          ))}
-          <option value="mic">Microphone</option>
-        </optgroup>
-        <optgroup label="Captured events (replayed at 1x)">
-          {fixtures.events.map((fixture) => (
-            <option key={`events:${fixture}`} value={`events:${fixture}`}>
-              Replay events: {fixture}
-            </option>
-          ))}
-        </optgroup>
-      </select>
       <label className="controls__label" htmlFor="chattiness">
         Chattiness
       </label>
@@ -94,7 +61,7 @@ export function SessionControls({
         type="button"
         className="controls__button"
         data-testid="start-session"
-        disabled={running || busy || value === ""}
+        disabled={running || busy}
         onClick={onStart}
       >
         Start

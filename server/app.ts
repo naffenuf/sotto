@@ -19,6 +19,7 @@ import {
 import { EventBus } from "./events/bus.js";
 import { listFixtures } from "./fixtures.js";
 import { SessionManager, SessionStartError } from "./session/SessionManager.js";
+import { listHistory, readHistory } from "./session/history.js";
 
 /** Close code for a socket that asked for something it may not have. */
 const WS_POLICY_VIOLATION = 1008;
@@ -49,6 +50,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.get("/api/health", async (): Promise<HealthResponse> => ({ ok: true }));
 
   app.get("/api/fixtures", async (): Promise<FixtureListResponse> => listFixtures());
+
+  app.get("/api/history", async () => listHistory());
+  app.get<{ Params: { folder: string } }>("/api/history/:folder", async (request, reply) => {
+    const history = await readHistory(request.params.folder);
+    return history ?? reply.code(404).send({ error: "Discussion not found" });
+  });
 
   app.post("/api/session/start", async (request, reply) => {
     const parsed = SessionStartRequestSchema.safeParse(request.body);

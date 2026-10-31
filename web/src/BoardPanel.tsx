@@ -35,9 +35,10 @@ export interface BoardPanelProps {
   updatedAt: number;
   /** True while an update is in flight, so the header shows a spinner. */
   updating: boolean;
+  historical?: boolean;
 }
 
-export function BoardPanel({ board, changedIds, updatedAt, updating }: BoardPanelProps) {
+export function BoardPanel({ board, changedIds, updatedAt, updating, historical = false }: BoardPanelProps) {
   const highlighted = useHighlight(changedIds, updatedAt);
   const [showDropped, setShowDropped] = useState(false);
   const dropped = droppedCount(board);
@@ -51,15 +52,15 @@ export function BoardPanel({ board, changedIds, updatedAt, updating }: BoardPane
   return (
     <section className="board" data-testid="board">
       <div className="board__header">
-        <h2 className="panel__title">Board</h2>
-        <BoardFreshness updatedAt={updatedAt} updating={updating} />
+        <h2 className="panel__title">Summary</h2>
+        {!historical && <BoardFreshness updatedAt={updatedAt} updating={updating} />}
       </div>
       <div className="board__body">
         {boardIsEmpty(board) ? (
           <p className="board__empty" data-testid="board-empty">
             {updating
               ? "Reading the conversation…"
-              : "Nothing on the board yet. It fills in as the group talks."}
+              : "Notes will appear as the group talks."}
           </p>
         ) : (
           <>
