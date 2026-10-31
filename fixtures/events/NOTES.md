@@ -15,6 +15,12 @@ frame the server sent. Handshake used for all of these captures:
 }
 ```
 
+The per-turn statistics below (n = 198) were measured over the nine captures the core
+build shipped with. `offsite-plan` and `research-business-idea` (v2 V2-002) came later
+and are consistent with every one of them — same frame order, same lag, same endpointer
+hangover (medians 736 ms and 578 ms against the 647 ms over the nine) — so the numbers
+were left as they were measured rather than silently restated.
+
 ## File format
 
 One JSON object per line (`shared/asr.ts` → `AsrFrameRecordSchema`):
@@ -119,7 +125,7 @@ talking stopped** by:
 |---|---|---|---|---|---|---|---|
 | `speechEnd.audioProcessedMs` − true end of the line | 375 ms | 506 ms | **647 ms** | 841 ms | 1,155 ms | −140 ms | 2,296 ms |
 
-n = 198 (every captured turn). Per fixture the median runs 472–735 ms. So `speechEnd` is
+n = 198 (every turn in the nine core captures). Per fixture the median runs 472–735 ms. So `speechEnd` is
 not an observation of silence starting, it is a *decision* taken after a hangover, and the
 reported gap between two turns understates the real pause by that much. The spread is wide
 and does **not** scale with the pause being eaten, so the only correction available at
@@ -159,10 +165,18 @@ mid-conversation.
 | `moment-fact` | 112.8 s | 1790 | 24 | A/B | yes | 2,194 ms ✅ |
 | `moment-mixed` | 194.7 s | 3063 | 41 | A/B | yes | 1,646 ms ✅ |
 | `no-wake` | 44.9 s | 729 | 12 | A/B | yes | 433 ms |
+| `offsite-plan` | 167.5 s | 2629 | 37 | A/B | yes | 803 ms |
+| `research-business-idea` | 175.2 s | 2719 | 38 | A/B | yes | 1,115 ms |
 
 `longest silence` is the largest `speechEnd → speechStart` gap on arrival times — the
 longest pause the pipeline can actually see. ✅ marks the fixtures that clear the 1.5 s
 threshold US-006's `pauseState` test wants.
+
+The two v2 fixtures do not, and that is not a problem: `speechEnd` is a median 650 ms
+late (below), so `server/asr/turns.ts` adds `ENDPOINTER_HANGOVER_MS` back and the
+threshold a delivery is actually measured against is `PAUSE_MS` (700) on *corrected*
+silence. `npm run eval:ceiling` reads the two captures as 6/6 planted moments reachable,
+with 780–1,453 ms of corrected quiet left inside each window.
 
 ## How "Sotto" came out
 
@@ -174,6 +188,16 @@ punctuation**, and that matters for the wake-phrase matcher (US-024):
 |---|---|---|
 | `ask-search` | `Sotto, what do the main competitors charge per month?` | `" Sotto what do the main competitors charge per month. "` |
 | `ask-diagram` | `Sotto, can you sketch the user flow we just described as a diagram?` | `" Sotto, can you sketch the user flow we just described as a diagram? "` |
+| `research-business-idea` | `Sotto, what did you find on competitors?` | `" Sato, what did you find on competitors? "` |
+| `offsite-plan` | `Sotto, can you list what depends on what here, so we know what to lock first?` | `" Sotto can you list what depends on what here so we know what to lock first? "` |
+
+The two v2 captures add a spelling and take away the last comma. **`Sato` is a real
+spelling of the wake word**, not a near-miss worth ignoring: `research-business-idea`'s
+wake line came back that way on two captures of two separate renders, while
+`offsite-plan`'s — the same voice, Adam, in both — kept `Sotto`. It is in
+`DEFAULT_WAKE_SPELLINGS` for that reason. `offsite-plan`'s wake line also lost its comma and
+opens with an auxiliary ("can you"), so it only matches because the question mark
+survived: with neither the comma nor the mark nor a wh-word, nothing would have fired.
 
 So **a wake-phrase rule that requires a comma or a question mark after the wake word
 would miss `ask-search` entirely.** Treat the punctuation as optional: match the wake
@@ -192,8 +216,8 @@ spelling as the wake word**, so position and the following word both matter:
 | "So to speak." (turn on its own) | `" Whoa to speak "` | Mis-transcribed; no look-alike left to match |
 
 Taken together: of the configurable spellings US-024 defaults to (`sotto`, `soto`,
-`sota`), only `sotto` and `soto` actually appeared, `sota` never did, and both of the
-ones that appeared also appear in `no-wake` as non-wake words.
+`sato`, `sota`), `sotto`, `soto` and `sato` have all actually appeared, `sota` never has,
+and `sotto` and `soto` also appear in `no-wake` as non-wake words.
 
 ## Close codes
 

@@ -12,6 +12,7 @@ fixtures/
   events/<name>.jsonl          every frame the transcription API sent back
   events/NOTES.md              what those frames actually look like
   voices.json                  which ElevenLabs voice speaks each speaker letter
+  live-scripts/<nn>-<name>.md  the same conversations for people to read aloud
 ```
 
 The renderer itself is `scripts/render-fixture.ts`.
@@ -39,8 +40,12 @@ are 0-based indexes into `lines`.
 
 - `speaker` is `A` or `B`, mapped to a voice by `voices.json`.
 - `pauseAfterMs` is the silence inserted after the line.
-- `type` is `contradiction`, `factual_error`, `untested_assumption` or
-  `dropped_thread`; `expectedLevel` is `glow` or `interject`.
+- `type` is `contradiction`, `factual_error`, `untested_assumption`,
+  `dropped_thread`, `unanswered_question` or `research_hook`; `expectedLevel` is
+  `glow`, `interject` or `research`. A `research_hook` is the one type the
+  interjection policy never delivers — it is caught by a research-ready card
+  (v2 PRD V2-014) — so `research` and `research_hook` only ever appear
+  together, which the schema enforces.
 - A catch counts if it is delivered after `triggerLine` ends and before
   `deadlineLine` ends. Every `setupLines` entry must come before `triggerLine`,
   and `triggerLine` must be at or before `deadlineLine`.
@@ -74,6 +79,11 @@ Rachel and Adam are ElevenLabs library voices chosen to be obviously different
 so diarization separates them. Voice ids are configuration rather than
 something the renderer looks up: the API key is scoped to speech synthesis and
 cannot list voices.
+
+A script has no names in it — `A` and `B` are all the schema carries — so where
+the speakers call each other something, the letters are the voices: in the two
+v2 fixtures `A` (Rachel) is EJ and `B` (Adam) is Craig, which is how
+`live-scripts/05-…` and `06-…` read them back.
 
 Each utterance comes back padded with a little near-silence (measured 54–91 ms
 at the head, 268–371 ms at the tail), which the renderer trims before inserting
@@ -125,3 +135,5 @@ WAV and insists on the `final: true` frame the server only sends after
 | `ask-search` | Pricing discussion containing "Sotto, what do the main competitors charge per month?" |
 | `ask-diagram` | User-flow walkthrough containing "Sotto, can you sketch the user flow we just described as a diagram?" |
 | `no-wake` | Wake-phrase look-alikes ("so to speak", "Soto's restaurant", "sotto voce"). No wake phrase, no moments. |
+| `research-business-idea` | Three minutes, Craig and EJ on a meeting tool: an unbacked market-size claim and a request for competitor gaps (both `research`), and an audience that moves from "smaller teams" to enterprise clinics (`interject`). Ends with "Sotto, what did you find on competitors?" |
+| `offsite-plan` | Nearly three minutes of offsite planning: drive time and venue availability nobody has checked (`research`), "who's handling food?" asked and dropped (`glow`), and a Thursday slot the group keeps planning around after it was withdrawn (`interject`). Ends with a request for a dependency list. |

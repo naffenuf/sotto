@@ -1,0 +1,237 @@
+{
+  "lines": [
+    {
+      "speaker": "B",
+      "text": "Okay, EJ. A tool that sits in the meeting and only speaks when it has something worth saying.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Only when it matters. That's the hard part, Craig. Everything in this space talks constantly.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Which is why nobody keeps them on.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "So who is it for? One group, the first one.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "Smaller teams. Five to fifteen people, no dedicated note taker, meetings that actually decide things.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "A",
+      "text": "Five to fifteen. So a founding team, or a small agency.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Exactly. They feel the pain, and they can say yes in a week.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "And what does it do while we're talking?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "It keeps a board. What's been stated, what's been decided, what's still open.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "And when does it open its mouth?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "When somebody contradicts something from ten minutes ago, or when a question quietly dies.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "That happens constantly and nobody notices for weeks. Is there a business underneath it?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "I think the meeting software market is somewhere north of two billion a year, and I don't think anyone in this exact niche has raised serious money yet.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Two billion. Where does that number come from?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Honestly, a conference talk I half remember.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "We should find the real number before we put it in front of anyone.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "And who's funded. If somebody raised thirty million last year, that changes the plan.",
+      "pauseAfterMs": 1700
+    },
+    {
+      "speaker": "A",
+      "text": "It changes whether we're early or late.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "What exists today, though?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Otter, Fireflies, the ones bolted into the video calls.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "All of them transcribe. None of them ever changed a meeting.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "So the gap is the speaking part, not the listening.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "That's my bet. But I want the top three competitors and where each one actually falls short, written down.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "Not their marketing copy. What people complain about.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "The reviews, the threads, the reasons people cancel.",
+      "pauseAfterMs": 1700
+    },
+    {
+      "speaker": "A",
+      "text": "If all three fall short in the same place, that's the product.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "B",
+      "text": "Agreed. Now, the thing I keep circling.",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "A",
+      "text": "Who we sell to first.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Our first customers should be enterprise clinics. Three hundred staff, a compliance department, every meeting recorded by policy.",
+      "pauseAfterMs": 2100
+    },
+    {
+      "speaker": "A",
+      "text": "Clinics. That's a nine month sales cycle.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "It is, but the budget is real and the compliance angle sells itself.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "Hm. Let me sit with that for a second.",
+      "pauseAfterMs": 1900
+    },
+    {
+      "speaker": "B",
+      "text": "Either way, the first build is mostly the same.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "A",
+      "text": "Mostly. Enterprise means audit logs and a procurement review.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Fair. We don't have to settle it today.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "One more thing before we stop. We never actually looked at the competition.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Sotto, what did you find on competitors?",
+      "pauseAfterMs": 2200
+    },
+    {
+      "speaker": "A",
+      "text": "Let's hear it, then we'll decide who we're building for.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [
+    {
+      "line": 36,
+      "question": "what did you find on competitors?"
+    }
+  ],
+  "moments": [
+    {
+      "id": "market-size-research-hook",
+      "type": "research_hook",
+      "setupLines": [
+        11
+      ],
+      "triggerLine": 12,
+      "deadlineLine": 17,
+      "expectedLevel": "research",
+      "description": "At line 12 Craig puts the meeting software market at \"north of two billion a year\" and guesses nobody in the niche is funded, and at line 14 admits the number came from a half-remembered conference talk. Lines 15 and 16 ask out loud for the real figure and for who has raised money: an outside lookup would settle it."
+    },
+    {
+      "id": "competitor-gaps-research-hook",
+      "type": "research_hook",
+      "setupLines": [
+        19,
+        20
+      ],
+      "triggerLine": 22,
+      "deadlineLine": 27,
+      "expectedLevel": "research",
+      "description": "They name Otter, Fireflies and the built-in note takers (line 19) and agree all of them only transcribe (line 20). At line 22 Craig asks for the top three competitors and where each actually falls short, from complaints rather than marketing copy (lines 23 and 24)."
+    },
+    {
+      "id": "audience-contradiction",
+      "type": "contradiction",
+      "setupLines": [
+        4,
+        6
+      ],
+      "triggerLine": 28,
+      "deadlineLine": 33,
+      "expectedLevel": "interject",
+      "description": "The one group to build for first is smaller teams, five to fifteen people with no note taker, who can say yes in a week (lines 4 and 6). At line 28 Craig says the first customers should be enterprise clinics with three hundred staff and a compliance department, and lines 29 to 33 plan around that without anyone noticing the audience changed."
+    }
+  ]
+}

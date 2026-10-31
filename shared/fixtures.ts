@@ -16,10 +16,18 @@ export const momentTypes = [
   "factual_error",
   "untested_assumption",
   "dropped_thread",
+  "unanswered_question",
+  "research_hook",
 ] as const;
 
-/** Levels a planted moment can expect; `silent` is never an expectation. */
-export const expectedLevels = ["glow", "interject"] as const;
+/**
+ * Levels a planted moment can expect; `silent` is never an expectation.
+ *
+ * `research` is not a level the interjection policy can choose: it means a
+ * research-ready card has to appear inside the window (v2 PRD V2-014), which
+ * is the only thing a `research_hook` can be caught by.
+ */
+export const expectedLevels = ["glow", "interject", "research"] as const;
 
 const lineIndex = z.number().int().min(0);
 
@@ -120,6 +128,19 @@ export const FixtureScriptSchema = z
           message: `line ${moment.deadlineLine} does not exist (last line is ${lastLine})`,
         });
       }
+
+      const expectsResearch = moment.expectedLevel === "research";
+      const isResearchHook = moment.type === "research_hook";
+      if (expectsResearch !== isResearchHook) {
+        ctx.addIssue({
+          code: "custom",
+          path: at("expectedLevel"),
+          message: isResearchHook
+            ? 'a research_hook is caught by a research card, so expectedLevel must be "research"'
+            : `expectedLevel "research" only applies to a research_hook, not a ${moment.type}`,
+        });
+      }
+
       if (moment.deadlineLine < moment.triggerLine) {
         ctx.addIssue({
           code: "custom",

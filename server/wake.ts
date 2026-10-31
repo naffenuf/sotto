@@ -24,11 +24,14 @@
 
 /**
  * The spellings the transcription model has been seen to produce for the wake
- * word, plus the near-misses worth catching. `sotto` and `soto` both appear
- * in the captures; `sota` never has, and is here because it is the obvious
- * third way to hear the word.
+ * word, plus the near-misses worth catching. `sotto`, `soto` and `sato` all
+ * appear in the captures — `research-business-idea`'s one wake line came back
+ * as `" Sato, what did you find on competitors? "` on two captures of two
+ * renders, while `offsite-plan`'s, in the same voice, kept `Sotto` — and
+ * `sota` never has, and is here because it is the obvious fourth way to hear
+ * the word.
  */
-export const DEFAULT_WAKE_SPELLINGS: readonly string[] = ["sotto", "soto", "sota"];
+export const DEFAULT_WAKE_SPELLINGS: readonly string[] = ["sotto", "soto", "sato", "sota"];
 
 /** Words that may introduce the wake word: "hey Sotto", "okay Sotto, …". */
 export const ADDRESS_WORDS: readonly string[] = ["hey", "okay", "ok"];

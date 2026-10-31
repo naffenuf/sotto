@@ -28,6 +28,7 @@ import type {
   JudgeMatchRecord,
   MomentRecord,
 } from "../../shared/eval.js";
+import type { ExpectedLevel } from "../../shared/fixtures.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
 
 /** The gate: below this, `npm run eval` exits non-zero. */
@@ -51,9 +52,17 @@ function outcomeRank(outcome: MomentOutcome): number {
   return momentOutcomes.indexOf(outcome);
 }
 
-/** `glow` < `interject`: "the expected level or higher" in one number. */
-function levelRank(level: DeliveredLevel): number {
-  return level === "interject" ? 1 : 0;
+/**
+ * `glow` < `interject` < `research`: "the expected level or higher" in one
+ * number.
+ *
+ * `research` is a level a *moment* can expect and a policy delivery can never
+ * have: a `research_hook` is caught by a research-ready card (v2 PRD V2-014),
+ * so an interjection the judge matches to one scores `caught_low` until
+ * V2-019 teaches the harness to match research cards.
+ */
+function levelRank(level: DeliveredLevel | ExpectedLevel): number {
+  return level === "research" ? 2 : level === "interject" ? 1 : 0;
 }
 
 /** One planted moment, scored. */

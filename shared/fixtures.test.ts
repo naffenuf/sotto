@@ -66,4 +66,32 @@ describe("FixtureScriptSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts a research_hook expecting a research card", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, type: "research_hook", expectedLevel: "research" }],
+    });
+    expect(messages(result)).toEqual([]);
+  });
+
+  it("rejects a research_hook expecting an interjection", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, type: "research_hook" }],
+    });
+    expect(messages(result)).toContainEqual(
+      expect.stringContaining('expectedLevel must be "research"'),
+    );
+  });
+
+  it("rejects a research expectation on a moment the policy delivers", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, type: "unanswered_question", expectedLevel: "research" }],
+    });
+    expect(messages(result)).toContainEqual(
+      expect.stringContaining("only applies to a research_hook"),
+    );
+  });
 });

@@ -1,0 +1,235 @@
+{
+  "name": "research-business-idea",
+  "sampleRate": 24000,
+  "durationMs": 175165,
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "B",
+      "startMs": 0,
+      "endMs": 5119
+    },
+    {
+      "index": 1,
+      "speaker": "A",
+      "startMs": 5719,
+      "endMs": 12311
+    },
+    {
+      "index": 2,
+      "speaker": "B",
+      "startMs": 12911,
+      "endMs": 14668
+    },
+    {
+      "index": 3,
+      "speaker": "A",
+      "startMs": 15268,
+      "endMs": 18743
+    },
+    {
+      "index": 4,
+      "speaker": "B",
+      "startMs": 19243,
+      "endMs": 25940
+    },
+    {
+      "index": 5,
+      "speaker": "A",
+      "startMs": 27240,
+      "endMs": 31952
+    },
+    {
+      "index": 6,
+      "speaker": "B",
+      "startMs": 32552,
+      "endMs": 35371
+    },
+    {
+      "index": 7,
+      "speaker": "A",
+      "startMs": 36171,
+      "endMs": 37963
+    },
+    {
+      "index": 8,
+      "speaker": "B",
+      "startMs": 38463,
+      "endMs": 42743
+    },
+    {
+      "index": 9,
+      "speaker": "A",
+      "startMs": 43343,
+      "endMs": 45133
+    },
+    {
+      "index": 10,
+      "speaker": "B",
+      "startMs": 45633,
+      "endMs": 50370
+    },
+    {
+      "index": 11,
+      "speaker": "A",
+      "startMs": 51570,
+      "endMs": 57280
+    },
+    {
+      "index": 12,
+      "speaker": "B",
+      "startMs": 57980,
+      "endMs": 66179
+    },
+    {
+      "index": 13,
+      "speaker": "A",
+      "startMs": 67679,
+      "endMs": 70041
+    },
+    {
+      "index": 14,
+      "speaker": "B",
+      "startMs": 70641,
+      "endMs": 72748
+    },
+    {
+      "index": 15,
+      "speaker": "A",
+      "startMs": 73348,
+      "endMs": 76539
+    },
+    {
+      "index": 16,
+      "speaker": "B",
+      "startMs": 77939,
+      "endMs": 82554
+    },
+    {
+      "index": 17,
+      "speaker": "A",
+      "startMs": 84254,
+      "endMs": 86408
+    },
+    {
+      "index": 18,
+      "speaker": "B",
+      "startMs": 87308,
+      "endMs": 88603
+    },
+    {
+      "index": 19,
+      "speaker": "A",
+      "startMs": 89203,
+      "endMs": 92778
+    },
+    {
+      "index": 20,
+      "speaker": "B",
+      "startMs": 93478,
+      "endMs": 96602
+    },
+    {
+      "index": 21,
+      "speaker": "A",
+      "startMs": 97802,
+      "endMs": 100895
+    },
+    {
+      "index": 22,
+      "speaker": "B",
+      "startMs": 101595,
+      "endMs": 107749
+    },
+    {
+      "index": 23,
+      "speaker": "A",
+      "startMs": 109349,
+      "endMs": 112662
+    },
+    {
+      "index": 24,
+      "speaker": "B",
+      "startMs": 113362,
+      "endMs": 116341
+    },
+    {
+      "index": 25,
+      "speaker": "A",
+      "startMs": 118041,
+      "endMs": 121675
+    },
+    {
+      "index": 26,
+      "speaker": "B",
+      "startMs": 123275,
+      "endMs": 125489
+    },
+    {
+      "index": 27,
+      "speaker": "A",
+      "startMs": 125989,
+      "endMs": 127211
+    },
+    {
+      "index": 28,
+      "speaker": "B",
+      "startMs": 127811,
+      "endMs": 135402
+    },
+    {
+      "index": 29,
+      "speaker": "A",
+      "startMs": 137502,
+      "endMs": 140138
+    },
+    {
+      "index": 30,
+      "speaker": "B",
+      "startMs": 140838,
+      "endMs": 144475
+    },
+    {
+      "index": 31,
+      "speaker": "A",
+      "startMs": 146075,
+      "endMs": 148556
+    },
+    {
+      "index": 32,
+      "speaker": "B",
+      "startMs": 150456,
+      "endMs": 152646
+    },
+    {
+      "index": 33,
+      "speaker": "A",
+      "startMs": 154446,
+      "endMs": 158599
+    },
+    {
+      "index": 34,
+      "speaker": "B",
+      "startMs": 159199,
+      "endMs": 161422
+    },
+    {
+      "index": 35,
+      "speaker": "A",
+      "startMs": 162222,
+      "endMs": 166646
+    },
+    {
+      "index": 36,
+      "speaker": "B",
+      "startMs": 167246,
+      "endMs": 169142
+    },
+    {
+      "index": 37,
+      "speaker": "A",
+      "startMs": 171342,
+      "endMs": 174265
+    }
+  ]
+}

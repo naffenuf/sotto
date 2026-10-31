@@ -90,7 +90,14 @@ describe("detect", () => {
     expect(detect("Sotto, what time is it?", { spellings: ["jarvis"] }).triggered).toBe(false);
   });
 
+  it("catches the `Sato` the research-business-idea capture produced", () => {
+    expect(detect(" Sato, what did you find on competitors? ")).toEqual({
+      triggered: true,
+      question: "what did you find on competitors?",
+    });
+  });
+
   it("defaults to the spellings the transcription model produces", () => {
-    expect(DEFAULT_WAKE_SPELLINGS).toEqual(["sotto", "soto", "sota"]);
+    expect(DEFAULT_WAKE_SPELLINGS).toEqual(["sotto", "soto", "sato", "sota"]);
   });
 });

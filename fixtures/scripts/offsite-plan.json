@@ -1,0 +1,232 @@
+{
+  "lines": [
+    {
+      "speaker": "B",
+      "text": "So, the offsite. I want a date, a place, and who's doing what.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Then start with the date, Craig. The date is what always kills it.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Six of us, one full day, somewhere we can drive to and back.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "I asked everyone last week. Alex said he's free Thursday afternoon, and Priya is out Monday and Tuesday.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "Thursday afternoon only, or Thursday generally?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "A",
+      "text": "Thursday afternoon. He's got clinic calls every morning this month.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "Okay, so Thursday is alive and the start of the week is out.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Which leaves Wednesday and Thursday, and Wednesday the board call is that morning.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Thursday it probably is, then. Let's hold that loosely.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Held loosely. Now, where?",
+      "pauseAfterMs": 500
+    },
+    {
+      "speaker": "B",
+      "text": "There's that farmhouse place about an hour and a half out. Big room, terrible coffee.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "An hour and a half each way is three hours in a car.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Is it an hour and a half? I might be remembering summer traffic.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "And I have no idea whether they have a Thursday free this month.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "Somebody should check the drive properly and whether the place is even open that week.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "Before we promise anyone anything, yes.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Alright. What's the shape of the day?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Morning is the year in review, afternoon is the three things we're not doing.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "I like the afternoon a great deal more than the morning.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "Everyone does. You need the morning to earn the afternoon.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Fair. And who's handling food?",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "Good question. Oh, did we ever sort out the projector?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "There's a screen in the big room. We'd bring an adapter.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Bring two. Somebody always has the wrong laptop.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Noted. Two adapters.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "And then the drive home in the dark, which nobody loves.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "Right. Back to the date. I want to lock Thursday and send the invite.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Hold on. I talked to Alex after standup, and he can't do Thursday at all now.",
+      "pauseAfterMs": 2100
+    },
+    {
+      "speaker": "B",
+      "text": "Then we move the heavy part to the afternoon and he joins us for that.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "A",
+      "text": "That could work. He's better in the afternoon anyway.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "B",
+      "text": "So Thursday afternoon, with the review in the morning for the rest of us.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "And we tell Priya the agenda shifted.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "B",
+      "text": "I'll put the invite out tonight so nobody books over it.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "A",
+      "text": "I want to see this laid out, because everything hangs off the date.",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "B",
+      "text": "Sotto, can you list what depends on what here, so we know what to lock first?",
+      "pauseAfterMs": 2200
+    },
+    {
+      "speaker": "A",
+      "text": "Venue, food, the agenda, the drive. If the date moves, what moves with it?",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "B",
+      "text": "That's exactly it. Let's see it written down before we send anything.",
+      "pauseAfterMs": 900
+    }
+  ],
+  "wakeQuestions": [
+    {
+      "line": 34,
+      "question": "can you list what depends on what here, so we know what to lock first?"
+    }
+  ],
+  "moments": [
+    {
+      "id": "venue-logistics-research-hook",
+      "type": "research_hook",
+      "setupLines": [
+        10,
+        11
+      ],
+      "triggerLine": 12,
+      "deadlineLine": 18,
+      "expectedLevel": "research",
+      "description": "The farmhouse venue is \"about an hour and a half out\", which EJ points out is three hours of the day in a car (lines 10 and 11). At line 12 Craig doubts his own figure, at line 13 nobody knows whether the place has a Thursday free, and at line 14 they agree somebody should check both the drive and the availability."
+    },
+    {
+      "id": "food-unanswered",
+      "type": "unanswered_question",
+      "setupLines": [
+        20
+      ],
+      "triggerLine": 24,
+      "deadlineLine": 29,
+      "expectedLevel": "glow",
+      "description": "Craig asks directly who is handling food (line 20). EJ says \"good question\" and immediately switches to the projector; by line 24 the group has settled the adapters and moved on to the drive home, and food is never raised again."
+    },
+    {
+      "id": "thursday-contradiction",
+      "type": "contradiction",
+      "setupLines": [
+        5,
+        27
+      ],
+      "triggerLine": 28,
+      "deadlineLine": 33,
+      "expectedLevel": "interject",
+      "description": "EJ reports Alex free on Thursday afternoon (lines 3 and 5), then at line 27 that Alex cannot do Thursday at all any more. From line 28 the group plans the heavy part for Thursday afternoon so Alex can join it, and by line 32 Craig is sending the invite out on the strength of the slot Alex just withdrew."
+    }
+  ]
+}
