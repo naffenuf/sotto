@@ -36,6 +36,24 @@ Sotto spoke this time, through a lucky wake match, a typed question and a barge-
 - **Minor:** "This is Craig…" didn't name speaker A, so Sotto called him "A". Look at why the
   speaker-introduction detection missed it; it's not blocking.
 
+## Third run, 16:44, old detector (`sessions/2026-10-31_1644-mic`)
+
+The wake word worked only because the transcription happened to keep commas ("Hey, Soto, can
+you…", "Soto, stop."). The classifier fix is still required. Barge-in went silent in 98 ms and
+163 ms. Mentions while Sotto spoke ("I guess Soto doesn't want to give me that") were correctly
+ignored. Two more items:
+
+- **Fix: answers still lean short.** Sotto opened with "the short version is…" when the user
+  wanted the full case. Product decision: **no artificial length limits.** Spoken answers should be
+  as long as the question deserves. Review `server/prompts/answer.md` and anything else that pushes
+  toward brevity in the spoken part (keep the 90-character card headline). Add a test or eval note
+  that a "give me the case for X" question isn't truncated to a summary.
+- **Measure only, don't build yet: slow first sentence.** The acknowledgment played at 0.26–0.4 s,
+  but the first real sentence came 15 s (search question) and 9 s (follow-up) later. Record in
+  progress.txt where those seconds go (web search vs. generation before the first sentence) and
+  propose an approach. Speaking a first line before the search returns is the likely one; that
+  becomes a later story.
+
 ## What happened (first run, 16:18)
 
 Sotto never heard itself addressed. `timing.jsonl` has no wake events. Live speech is transcribed
