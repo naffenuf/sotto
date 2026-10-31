@@ -155,3 +155,28 @@
   Research does not exist yet: V2-012 must consult playback().playing before launching work.
   No real API, microphone or audible playback verification was needed for this story;
   human room/echo validation remains at V2-008.
+
+[2026-10-31 16:04] V2-007 — completed — Codex added partial-turn barge-in and classified spoken follow-ups.
+  Codex started with a clean tree on ralph/sotto-v2 and confirmed the Ralph loop was stopped.
+  SessionTranscription privately exposes non-echo partials to BargeIn while retaining the
+  public echo boundary. An address cancels speech immediately, including during acknowledgment
+  and socket opening; final commands use validated structured output for stop/new_question/
+  continue. Ordinary wake detection skips these turns, so a final produces one action only.
+  SpokenAnswer's feeder stays cancelled even as the original model finishes writing the card.
+  Follow-up context includes the interrupted answer and flushed spokenSoFar; continue resumes
+  after what was heard and skips the acknowledgment. Stop also works in the silent gap between
+  acknowledgment and answer. Superseded classifications cannot restart stale speech.
+  VoiceHub.finish now waits for playback, not just synthesis, with a bounded missing-report
+  timeout. This fixes interruption after all audio was generated but before it was heard.
+  timing.jsonl records barge_in with flushMs, flushConfirmed and wakeToSilenceMs. The wake end
+  is explicitly estimated using the first matching partial's audioProcessedMs, since ASR has
+  no per-word timestamps. No browser confirmation means null latency, not a successful sample.
+  Optional ducking was omitted. No UI changes or real API calls were required by this story.
+  Checked: npm run typecheck; npm test (61 files, 801 tests); git diff --check. Simulated-clock
+  checks cover partial cancellation, echo/side-talk exclusion, each command, acknowledgment and
+  opening races, interruption after synthesis, stop then new question, missing flush reports,
+  and actual SessionManager routing without duplicate answers. Updated the old V2-006 side-talk
+  test to use an unaddressed question; a separate V2-007 test now asserts addressed barge-in.
+  NEXT: V2-008 is a human checkpoint and tasks/checkpoint-voice.md is absent. Do not start it
+  until the human records the 10-minute room test and RESULT: PASS/FAIL. Actual acoustic latency,
+  echo leakage and false barge-ins remain human verification; simulated latency is not that test.

@@ -805,3 +805,17 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   inject `server/test/emptyModel.ts` instead of constructing `MuseClient` with `test-key`.
   Those old tests attempted SDK calls and waited through network retries; the offline stub
   exercises the same configured-model wiring with empty board operations and candidates.
+- **An answer is not finished until its playback is finished.** V2-007 makes `VoiceHub`'s
+  utterance `finish()` wait for the browser's `ended` report, or a bounded playback timeout,
+  before returning heard text. Synthesis can already be complete when a barge-in arrives;
+  cancellation therefore has its own state rather than trusting the synthesis result's reason.
+  `AnswerAgent.interrupt()` cancels both the hub and the `SpokenAnswer` feeder, including an
+  acknowledgment whose answer has not opened yet. Stopping only the hub would let a later
+  model sentence open another utterance. The private `SessionTranscription.onHuman` hook feeds
+  `BargeIn` without publishing tentative partials; final commands are classified through
+  `PROMPTS.command`, and the ordinary wake watcher skips owned turns. Follow-up prompts carry
+  the interrupted answer and its flushed `spokenSoFar`; continue omits an acknowledgment.
+  `barge_in` timing uses the first matching partial's `audioProcessedMs` as an explicitly
+  labelled wake-end estimate (ASR has no word timestamps), plus arrival lag and the browser's
+  flush-confirmation delay. A missing confirmation leaves latency null. The live checkpoint,
+  not a simulated-clock result, must establish the room's actual under-1.5-second behavior.

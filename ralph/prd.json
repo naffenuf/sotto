@@ -123,8 +123,8 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed by Codex. Private non-echo partials reach BargeIn before public transcript release; an addressed partial immediately cancels the active Speaker, flushes browser audio and permanently stops that answer's speech feeder, including acknowledgment/socket-opening races. Final commands use validated Muse Spark structured output for stop, new_question and continue, with no duplicate wake question. Interrupted answers retain spokenSoFar; follow-ups receive the full interrupted answer plus the heard prefix, and continue skips acknowledgment and resumes after that prefix. VoiceHub now waits for playback or cancellation before recording an answer, so interruption after synthesis completion is captured too. timing.jsonl records browser-confirmed flushMs and wakeToSilenceMs; the wake end is explicitly estimated from the first matching partial's audioProcessedMs because ASR provides no per-word timestamps. Missing flush confirmation produces null latency, never a claimed success. Optional ducking omitted. npm run typecheck and npm test pass: 61 files, 801 tests, all offline. Real-room latency and echo behavior remain for V2-008; tasks/checkpoint-voice.md is absent, so the next iteration must stop for the human checkpoint."
     },
     {
       "id": "V2-008",
