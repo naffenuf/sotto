@@ -180,3 +180,52 @@
   NEXT: V2-008 is a human checkpoint and tasks/checkpoint-voice.md is absent. Do not start it
   until the human records the 10-minute room test and RESULT: PASS/FAIL. Actual acoustic latency,
   echo leakage and false barge-ins remain human verification; simulated latency is not that test.
+
+[2026-10-31 18:29] V2-008 — blocked — Codex fixed the failed live-voice checkpoint; human retest required.
+  Codex started with a clean tree on ralph/sotto-v2 and confirmed Ralph was stopped, again before commit.
+  tasks/checkpoint-voice.md existed with RESULT: FAIL and three live runs; no interrupted work to recover.
+  Fixed the live transcript window first: recentTurns anchors the last ten minutes to the latest final
+  turn, not server uptime. The timeline audit found a second mismatch in live pause detection:
+  SessionTranscription now projects elapsed clock time onto record.atMs before asking the assembler
+  for silence. Offset-clock regressions cover both, while replay keeps its existing stream timestamps.
+  AddressWatcher now raises listening on any whole-word Sotto/Soto/Sato/Sota partial, retaining the
+  possessive and voce exclusions. Spark classifies final intent with four named previous turns,
+  low reasoning and 2,000 tokens through the existing finish_reason-checked structured seam.
+  name_only arms that speaker for eight seconds from final arrival; queued finals preserve ordering
+  and expiry eligibility. Six seconds of real time aborts transport and falls back to unchanged detect().
+  address and address_fallback are logged in timing.jsonl. Stop cancels arms and pending intent;
+  session drain awaits address work before answers. Barge-in owns playback turns and stop/continue
+  controls for an existing answer; normal questions return to addressing without duplicate classification.
+  Whole-word checking deliberately yields the floor even for a mid-turn mention during playback,
+  as the checkpoint requests. The human retest must evaluate that broader interruption behavior.
+  Removed the spoken prompt's short-paragraph/monologue pressure; retained screen limits. A long
+  spoken-answer regression confirms speech is not clipped to the card budget. The real full-case
+  probe produced 657 spoken words. Introductions now recognize 'This is Craig'; the old regex omitted it.
+  Checked: npm run typecheck; npm test (62 files, 825 tests); npm run build; git diff --check.
+  Real API: address.integration + answer.integration + artifact.integration passed all 30 checks,
+  including all 15 exact checkpoint classifications, no fallback on all five captures, zero no-wake
+  answer cards, and the original ask-search/ask-diagram answers. The strengthened no-wake test also
+  passed separately with no model errors. Two first-sentence latency probes passed. ElevenLabs used
+  only the existing null sink. No real microphone, audible output or model downloads were used.
+  Browser: extended npm run verify:wake to hold listening through the eight-second name-only window;
+  screenshot /tmp/sotto-v2-008-wake.png inspected. Used the developer's existing 5173/8787 servers;
+  neither was stopped. No test processes remain. Initial sandbox API DNS failures and a later local
+  socket EPERM run were rerun successfully with escalation; these were environment failures.
+  LATENCY (measure only): the old 16:44 log shows first spoken sentences on cards at 14,727/8,911 ms,
+  first audio at 15,072/9,152 ms, ack at 404/255 ms. Thus speech synthesis added about 345/241 ms;
+  those historical logs cannot separate search from model generation. Fresh instrumented Responses
+  probe: full bull/bear case first text 11,750 ms, first sentence 11,938 ms, completion 15,593 ms.
+  Search intervals were [1593,2137], [2622,3600], [2750,3601], [2991,3601], [6267,6761],
+  [8940,9383] ms. Their union is 2,460 ms (sum 3,920 double-counts parallel searches), leaving
+  9,478 ms outside observed search intervals before the first sentence, including model reasoning,
+  generation and transport. Client event timing does not expose the provider's internal breakdown.
+  Conversation-only budget question: no searches, first text 3,126 ms, first sentence 3,161 ms,
+  completion 3,312 ms. Address classification is an additional stage before answer/ack timing.
+  LATER STORY PROPOSAL: produce a short, useful first line grounded only in the conversation while
+  the separate searched continuation runs; carry one cancellation token/utterance sequence across both,
+  avoid speculative facts, and measure name-to-first-audio including classification. Not implemented.
+  Vitest suppresses passing console output by default here; --disableConsoleIntercept exposes the
+  latency harness's measurements. The repeated latency probe was needed to recover those numbers.
+  NEXT: archived the human report as tasks/checkpoint-voice-fail-1.md, unchanged. V2-008 stays false.
+  Do not start V2-009 until a human writes tasks/checkpoint-voice.md after the ten-minute, two-person
+  room retest (echo leakage, barge-in latency, false barge-ins, side talk and RESULT: PASS/FAIL).

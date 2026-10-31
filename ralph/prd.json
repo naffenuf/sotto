@@ -139,7 +139,7 @@
       ],
       "priority": 8,
       "passes": false,
-      "notes": ""
+      "notes": "Codex fixed checkpoint attempt 1: Spark address classification (15/15 real cases), instant lexical listening/barge-in, speaker-specific 8-second name-only arming, 6-second abortable fallback and timing logs; live answer context and pause-clock timeline fixes; unrestricted spoken-answer depth; 'This is Craig' introductions. Typecheck, 825 unit tests, build, 30 relevant integration checks plus 2 latency probes, and Playwright listening verification pass. First sentence measured at 11.938 s with search (2.460 s union of observed search intervals) and 3.161 s for conversation-only; early speech is a later story. Archived tasks/checkpoint-voice-fail-1.md. Still awaiting the human 10-minute, two-person room retest recorded in tasks/checkpoint-voice.md with RESULT: PASS/FAIL; do not proceed to V2-009."
     },
     {
       "id": "V2-009",

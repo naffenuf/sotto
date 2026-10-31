@@ -836,3 +836,19 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   use Glimmer where 15 s doesn't matter (research ideas, background judgment), and Spark where
   someone is waiting. Untested speed-up: the `muse-glimmer:30b-q4_K_M-dflash` tag (20 GB,
   speculative decoding).
+
+- **Live ASR time and server uptime have different origins.** V2-008 fixes answer context by
+  anchoring `recentTurns` to the latest final turn, never `clock.now()`. The same error affected
+  silence: `SessionTranscription.pauseState` now projects elapsed clock time from the most recent
+  `record.atMs` before asking `TurnAssembler` about the pause. Keep stream timestamps on turns and
+  compare them only to stream time; cards and model durations use the session clock. Regression
+  tests must offset live uptime by more than the ten-minute answer window, since replay starts at 0.
+- **A lexical name hint is not a request.** V2-008's `detectsAddress` accepts whole-word wake
+  spellings anywhere (except possessives/voce), so partial listening and barge-in stay instant.
+  `AddressWatcher` classifies final intent through Spark with four named previous turns; `detect`
+  remains the unchanged fallback. A name-only final arms only that speaker for eight seconds.
+  Finals are serialized, so a fast follow-up can arrive while the name is still being classified;
+  eligibility uses arrival time even if processing finishes after expiry. The six-second timeout
+  uses the wall clock and an AbortSignal, never an awaited replay timer. Track the whole address
+  queue for replay, drain it before answers, and stop it with the session. Playback commands are
+  owned by BargeIn and never get a second address classification.
