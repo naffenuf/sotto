@@ -8,7 +8,12 @@ translations below. `CLAUDE.md` holds the project's conventions and learnings; r
 ## Before you start
 
 - **Never run alongside the Ralph loop.** If `pgrep -f ralph/ralph.sh` finds anything, stop
-  and say so. Never edit files another agent is editing.
+  and say so. That includes a loop sleeping off a usage limit: it will wake up and start
+  editing. The developer stops it (Ctrl-C) before handing over to you.
+- **A dirty tree is normal at handover.** It means Claude hit its limit partway through a story.
+  Follow ITERATION.md step 3: work out which story the changes belong to (usually the
+  lowest-priority failing one), continue from them rather than starting over, and say in
+  progress.txt what you found.
 - Do **one** story: the lowest-`priority` story in `ralph/prd.json` with `passes: false`.
   If it has a `checkpoint` field and that file doesn't exist, **stop**: it's a human checkpoint.
 - If a dev server is already listening on 5173/8787, it's the developer's. Use it, don't kill it.
