@@ -60,7 +60,9 @@ import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
-import { WakeWatcher } from "../wakeWatcher.js";
+import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
+import { AddressWatcher } from "../answer/AddressWatcher.js";
+import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { introducedName } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
@@ -186,6 +188,10 @@ interface StoreSlot {
 
 /** The model-driven loops a session runs, or nulls when it has no model. */
 interface ModelLoops {
+  /** Shared Spark client for final-turn addressing (V2-008). */
+  modelClient: ModelClient | null;
+  /** Retired with the session so late classifications cannot restart speech. */
+  address?: AddressWatcher;
   board: BoardUpdater | null;
   observer: Observer | null;
   verifier: Verifier | null;
@@ -242,6 +248,8 @@ export type FeedbackOutcome = "recorded" | "no-cards" | "unknown-card";
 export type AskOutcome = "asked" | "no-session" | "no-model";
 
 interface RunningSession {
+  /** V2-008: final-turn addressing has its own bounded asynchronous work. */
+  address?: AddressWatcher;
   info: SessionInfo;
   assembler: SessionTranscription;
   store: StoreSlot;
@@ -448,6 +456,7 @@ export class SessionManager {
     const running = this.current;
     if (running === undefined) return false;
     running.stopRequested = true;
+    running.address?.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
     running.stop();
@@ -619,6 +628,7 @@ export class SessionManager {
     const barge = new BargeIn({
       clock,
       speaking: () => voice?.playback?.().playing === true || this.bus.voiceState().speaking,
+      answering: () => (loops.answers?.pending() ?? 0) > 0,
       interrupt: () => loops.answers?.interrupt() ?? voice?.interrupt?.() ?? Promise.resolve(null),
       command: (asked) => loops.answers?.command(asked),
       onTiming: (record) => store.writer?.appendTiming?.(record),
@@ -664,8 +674,12 @@ export class SessionManager {
         // And so does the wake phrase: the indicator is the point of reading
         // a partial at all (US-017).
         // V2-007 privately owns interrupted commands; ordinary side talk stays suppressed.
-        if (suppressTriggers || barge.owns(turn.turnId)) wake.ignoreTurn(turn.turnId);
-        else wake.acceptTurn(turn);
+        if (suppressTriggers || barge.owns(turn.turnId)) {
+          wake.ignoreTurn(turn.turnId);
+          loops.address?.remember(turn);
+        } else {
+          wake.acceptTurn(turn);
+        }
       },
     });
   }
@@ -679,9 +693,14 @@ export class SessionManager {
    * interjections out of the way. The question goes to the answer agent
    * (US-018), which is `null` in that case, so nothing is answered.
    */
-  private wakeWatcher(info: SessionInfo, loops: ModelLoops, clock: Clock, store: StoreSlot): WakeWatcher {
+  private wakeWatcher(
+    info: SessionInfo,
+    loops: ModelLoops,
+    clock: Clock,
+    store: StoreSlot,
+  ): WakeWatcher | AddressWatcher {
     const current = (): boolean => this.current?.info.id === info.id;
-    return new WakeWatcher({
+    const effects: WakeWatcherOptions = {
       onListening: (listening) => {
         // As with the transcription dot: a frame that lands after Stop must
         // not put the indicator back up. The bus takes it down on the
@@ -708,7 +727,19 @@ export class SessionManager {
           turnId: trigger.turnId,
         });
       },
+    };
+    const model = loops.modelClient;
+    if (model === null) return new WakeWatcher(effects);
+    const address = new AddressWatcher({
+      ...effects,
+      clock,
+      wallClock: this.wallClock,
+      classify: (input, signal) => classifyAddress(model, input, signal),
+      speakers: () => this.bus.speakerNames(),
+      onTiming: (record) => store.writer?.appendTiming?.(record),
     });
+    loops.address = address;
+    return address;
   }
 
   /**
@@ -748,6 +779,7 @@ export class SessionManager {
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
       );
       return {
+        modelClient: null,
         board: null,
         observer: null,
         verifier: null,
@@ -844,7 +876,7 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { board, observer, verifier, policy, answers, deliveries };
+    return { modelClient: model, board, observer, verifier, policy, answers, deliveries };
   }
 
   /**
@@ -1016,6 +1048,7 @@ export class SessionManager {
     running.observer?.stop();
     running.verifier?.stop();
     running.policy?.stop();
+    running.address?.stop();
     // Not `running.answers`: a question typed after Stop is answered against
     // the conversation that just ended (US-019), so the agent is only
     // retired when the next session supersedes it.
@@ -1071,6 +1104,7 @@ export class SessionManager {
  * the policy's own last look, which is what that silence is for.
  */
 async function drainLoops(loops: ModelLoops, beforePolicy?: () => void): Promise<void> {
+  await loops.address?.flush();
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();

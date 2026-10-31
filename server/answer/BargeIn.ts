@@ -7,13 +7,15 @@
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import type { Clock } from "../clock.js";
-import { detect, detectsAddress } from "../wake.js";
+import { detectsAddress } from "../wake.js";
 import type { AskedQuestion } from "./AnswerAgent.js";
 
 /** Effects stay injectable so partial-to-silence timing can be tested without a microphone. */
 export interface BargeInOptions {
   clock: Clock;
   speaking: () => boolean;
+  /** V2-008: stop still applies in the silent gap between acknowledgment and answer. */
+  answering?: () => boolean;
   interrupt: () => Promise<number | null>;
   command: (asked: AskedQuestion) => void;
   onTiming: (record: Record<string, unknown>) => void;
@@ -59,8 +61,11 @@ export class BargeIn {
     if (this.interrupted.has(turn.turnId)) this.options.onListening(false);
     if (!addressed) return;
     const control = /\b(stop|thanks|go on|continue|resume|carry on)\b/i.test(turn.text);
-    if (!duringPlayback && !this.hasInterrupted && !control) return;
-    if (!duringPlayback && !this.owns(turn.turnId) && !control && !detect(turn.text).triggered) return;
+    // Outside playback, only an existing answer can receive a control command.
+    // Ordinary requests (including "thanks Soto ... can you ...") belong to
+    // V2-008's address classifier, even after an earlier interruption.
+    const followUpControl = control && (this.hasInterrupted || this.options.answering?.() === true);
+    if (!duringPlayback && !this.owns(turn.turnId) && !followUpControl) return;
     this.commands.add(turn.turnId);
     this.options.command({ question: turn.text, askedBy: turn.speaker, turnId: turn.turnId });
   }

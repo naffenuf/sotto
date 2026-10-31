@@ -26,6 +26,8 @@ export const PROMPTS = {
   answer: "answer",
   /** Classifies a spoken interruption without answering it (V2-007). */
   command: "command",
+  /** Distinguishes a spoken request from a mention despite missing punctuation (V2-008). */
+  address: "address",
   /** Deciding whether a delivered card raises a planted moment (US-016). */
   judge: "judge",
 } as const;

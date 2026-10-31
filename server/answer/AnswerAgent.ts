@@ -579,7 +579,7 @@ export class AnswerAgent {
 
   /** The user message for one question. */
   private render(answer: Answer, resume: boolean): string {
-    const turns = recentTurns(this.options.transcript(), this.clock.now());
+    const turns = recentTurns(this.options.transcript());
     const request = renderAnswerRequest(this.options.board(), turns, this.options.speakers(), answer);
     if (this.interrupted === undefined) return request;
     return `${request}\n\n## Your previous answer was cut off\n${JSON.stringify({
@@ -694,13 +694,18 @@ export function cardForAnswer(answer: Answer): StageCard {
   };
 }
 
-/** The final turns from the last {@link ANSWER_CONTEXT_MS} of conversation. */
+/**
+ * V2-008: measure conversation against its latest final turn, never server uptime.
+ * Live ASR timestamps start at stream zero; the injected live clock does not.
+ * This also keeps the last conversation available to questions typed after Stop.
+ */
 export function recentTurns(
   turns: readonly TurnUpdate[],
-  nowMs: number,
 ): readonly TurnUpdate[] {
-  const from = nowMs - ANSWER_CONTEXT_MS;
-  return turns.filter((turn) => (turn.endMs ?? turn.startMs) >= from);
+  const finals = turns.filter((turn) => turn.final);
+  const latestMs = finals.reduce((latest, turn) => Math.max(latest, turn.endMs ?? turn.startMs), 0);
+  const from = latestMs - ANSWER_CONTEXT_MS;
+  return finals.filter((turn) => (turn.endMs ?? turn.startMs) >= from);
 }
 
 /**

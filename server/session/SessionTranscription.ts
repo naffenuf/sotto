@@ -44,8 +44,12 @@ export class SessionTranscription {
   private readonly pending = new Map<string, PendingTurn>();
   /** Shared pending objects allow overlapping turns to resolve independently. */
   private frames: { record: AsrFrameRecord; pending: PendingTurn | null }[] = [];
+  /** V2-008: project elapsed live time onto ASR's stream timeline for pause detection. */
+  private streamAtMs = 0;
+  private sampledAtMs: number;
 
   constructor(private readonly options: SessionTranscriptionOptions) {
+    this.sampledAtMs = options.clock.now();
     this.assembler = new TurnAssembler({
       clock: options.clock,
       startedAtMs: 0,
@@ -55,6 +59,8 @@ export class SessionTranscription {
 
   /** Applies the same boundary to live transcription and event replay. */
   accept(record: AsrFrameRecord): void {
+    this.streamAtMs = record.atMs;
+    this.sampledAtMs = this.options.clock.now();
     const turn = this.assembler.accept(record);
     if (turn === null) {
       this.frames.push({ record, pending: null });
@@ -104,7 +110,8 @@ export class SessionTranscription {
   /** Playback holds deliveries even when the model has finished generating. */
   pauseState(): PauseState {
     if (this.options.playback().playing) return { speaking: true, silentForMs: 0 };
-    return this.assembler.pauseState();
+    const streamNow = this.streamAtMs + this.options.clock.now() - this.sampledAtMs;
+    return this.assembler.pauseState(streamNow);
   }
 
   /** A truncated stream must not strand raw human frames behind an open turn. */

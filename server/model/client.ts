@@ -61,6 +61,10 @@ export interface StructuredCall {
   schema: object;
   /** Reasoning + output budget. Defaults to {@link DEFAULT_MAX_TOKENS}. */
   maxTokens?: number;
+  /** V2-008: addressing should spend little time reasoning while the room waits. */
+  reasoningEffort?: "low" | "medium" | "high";
+  /** Cancels a timed-out classification instead of leaving an API request running. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -268,6 +272,7 @@ export interface ModelClient {
 export interface ChatCompletions {
   create(
     body: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+    options?: { signal: AbortSignal },
   ): Promise<OpenAI.Chat.Completions.ChatCompletion>;
 }
 
@@ -362,6 +367,7 @@ export class MuseClient implements ModelClient {
     const completion = await this.completions.create({
       model: this.model,
       max_tokens: call.maxTokens ?? DEFAULT_MAX_TOKENS,
+      ...(call.reasoningEffort === undefined ? {} : { reasoning_effort: call.reasoningEffort }),
       messages: [
         { role: "system", content: call.system },
         { role: "user", content: call.user },
@@ -374,7 +380,7 @@ export class MuseClient implements ModelClient {
           schema: call.schema as Record<string, unknown>,
         },
       },
-    });
+    }, call.signal === undefined ? undefined : { signal: call.signal });
 
     const choice = completion.choices[0];
     const reasoning = completion.usage?.completion_tokens_details?.reasoning_tokens;

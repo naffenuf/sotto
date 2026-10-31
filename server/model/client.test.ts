@@ -107,6 +107,25 @@ describe("MuseClient", () => {
     expect((fake.bodies[0] as Params).max_tokens).toBe(8_192);
   });
 
+  it("passes low reasoning and cancellation through for bounded address classification", async () => {
+    const controller = new AbortController();
+    const { fake } = client(choice("{}"));
+    let receivedSignal: AbortSignal | undefined;
+    const model = new MuseClient({
+      logger: { log: () => {}, warn: () => {} },
+      completions: {
+        create: (body, options) => {
+          receivedSignal = options?.signal;
+          return fake.create(body);
+        },
+      },
+    });
+    await model.structured({ ...call, reasoningEffort: "low", maxTokens: 2_000, signal: controller.signal });
+    expect(fake.bodies[0]?.reasoning_effort).toBe("low");
+    expect(fake.bodies[0]?.max_tokens).toBe(2_000);
+    expect(receivedSignal).toBe(controller.signal);
+  });
+
   /**
    * The failure that costs an afternoon: a reasoning model out of budget
    * answers 200 with no content and `finish_reason: "length"`.

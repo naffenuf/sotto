@@ -54,6 +54,27 @@ function setup() {
 const speech = { playing: true, recent: [{ id: "hello", text: "I'm Sotto. Use the garden gate." }] };
 
 describe("the session's echo boundary", () => {
+  it("measures live silence on the stream timeline even when server uptime is much larger", () => {
+    const clock = new SimulatedClock(1_914_000);
+    const transcription = new SessionTranscription({
+      clock,
+      playback: () => ({ playing: false, recent: [] }),
+      logger: { warn: () => {} },
+      onUpdate: () => {},
+      onEvent: () => {},
+      onEcho: () => {},
+    });
+    expect(transcription.pauseState().silentForMs).toBe(0);
+    transcription.accept({ session: 0, atMs: 1_000,
+      frame: { type: "speechStart", turnId: 0, audioProcessedMs: 900 } });
+    clock.advanceBy(2_000);
+    transcription.accept({ session: 0, atMs: 3_000,
+      frame: { type: "speechEnd", turnId: 0, audioProcessedMs: 2_900 } });
+    expect(transcription.pauseState()).toEqual({ speaking: false, silentForMs: 650 });
+    clock.advanceBy(50);
+    expect(transcription.pauseState()).toEqual({ speaking: false, silentForMs: 700 });
+  });
+
   it("keeps every echo partial and raw frame out, and marks only timing", () => {
     const t = setup();
     t.playback(speech);

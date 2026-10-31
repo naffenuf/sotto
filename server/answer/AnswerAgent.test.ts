@@ -11,7 +11,6 @@ import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js
 import { ACK_SEARCH } from "./ack.js";
 import type { ProseCall, ProseReply, ModelClient, StructuredCall } from "../model/client.js";
 import {
-  ANSWER_CONTEXT_MS,
   ANSWER_ITEM_PREFIX,
   ANSWER_MAX_TOKENS,
   ANSWER_TRACK_LABEL,
@@ -688,6 +687,21 @@ describe("AnswerAgent out loud (V2-005)", () => {
     expect(h.records[0]).toMatchObject({ status: "error", spokenText: SAID });
   });
 
+  it("speaks the full case even when it exceeds the screen detail budget", async () => {
+    const fullCase = "The bull case depends on durable demand and distribution. ".repeat(30) +
+      "The bear case depends on costs and competition. ".repeat(30);
+    const { h, voice } = spoken([async (call) => {
+      const text = `Say this:\n${fullCase}\n\nShow this:\nDemand versus costs\n\n${fullCase}`;
+      call.onText?.({ itemId: ANSWER_ITEM, text });
+      return reply({ text });
+    }]);
+    h.agent.ask({ question: "Give me the full bull and bear case for X", askedBy: "A", turnId: "0:1" });
+    await h.agent.flush();
+    expect(h.records[0]?.spokenText).toBe(fullCase.trim());
+    expect(voice.utterances.at(-1)?.text()).toBe(fullCase.trim());
+    expect(h.model.calls[0]?.system).toContain("Do not substitute a summary");
+  });
+
   it("takes its headline from the first spoken sentence when no screen half arrives", async () => {
     const { h, voice } = spoken([
       async () =>
@@ -725,14 +739,19 @@ describe("recentTurns", () => {
       turn({ turnId: "0:2", startMs: 9 * 60_000, endMs: 9 * 60_000 + 2_000 }),
       turn({ turnId: "0:3", startMs: 12 * 60_000, endMs: null }),
     ];
-    // Twenty minutes in, only the turn from minute 12 is inside the window.
-    expect(recentTurns(turns, 20 * 60_000).map((one) => one.turnId)).toEqual(["0:3"]);
-    // Ten minutes in, the window reaches back to the start of the session.
-    expect(recentTurns(turns, ANSWER_CONTEXT_MS).map((one) => one.turnId)).toEqual([
-      "0:1",
-      "0:2",
-      "0:3",
-    ]);
+    expect(recentTurns(turns).map((one) => one.turnId)).toEqual(["0:2", "0:3"]);
+    expect(recentTurns([])).toEqual([]);
+  });
+
+  it("keeps live conversation context when server uptime is far ahead of the audio stream", async () => {
+    const h = harness([async () => reply({ text: "The Anthropic case\n\nHere is the case." })], {
+      turns: [turn({ turnId: "0:1", text: "We are discussing the Anthropic IPO", startMs: 33_000, endMs: 40_000 })],
+    });
+    h.clock.advanceTo(1_914_000);
+    h.agent.ask({ question: "Give me the bull and bear case", askedBy: "A", turnId: "0:2" });
+    await h.agent.flush();
+    expect(h.model.calls[0]?.user).toContain("We are discussing the Anthropic IPO");
+    expect(h.model.calls[0]?.user).not.toContain("nothing has been transcribed");
   });
 });
 

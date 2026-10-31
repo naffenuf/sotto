@@ -718,6 +718,9 @@ describe("SessionManager, answers", () => {
 
     async structured(call: StructuredCall): Promise<unknown> {
       this.labels.push(call.label);
+      if (call.label === "address") {
+        return { kind: "request", question: "what do the main competitors charge per month?" };
+      }
       if (call.label === "board") {
         return { operations: [{ op: "set_summary", text: "Pricing a note app." }] };
       }
@@ -796,6 +799,7 @@ describe("SessionManager, answers", () => {
     // One answer, pushed as it arrived: thinking, then the headline, then all
     // of it — every push under the same card id.
     expect(model.labels.filter((label) => label === "answer")).toHaveLength(1);
+    expect(model.labels.filter((label) => label === "address")).toHaveLength(1);
     expect(new Set(cards.map((card) => card.id))).toEqual(new Set(["card-ans-1"]));
     expect(cards.map((card) => card.state)).toEqual(["thinking", "thinking", "ready"]);
     const last = cards.at(-1)!;

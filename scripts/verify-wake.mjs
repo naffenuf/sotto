@@ -12,6 +12,8 @@
  *     --server "npm run dev" --port 5173 -- node scripts/verify-wake.mjs /tmp/shot.png
  *
  * Writes the listening state to the path given as the first argument.
+ * V2-008 also holds it through a name-only arm: only the server's next event,
+ * not a client-side partial-turn timer, may take the indicator down.
  */
 import { chromium } from "playwright";
 
@@ -56,6 +58,11 @@ if ((await indicator.count()) !== 0) {
 // The partial that first matches: "Sotto what do…" is still being said.
 push({ type: "wake", listening: true });
 await indicator.waitFor({ state: "visible", timeout: 5_000 });
+
+// A name-only final keeps listening up while that speaker finishes the request.
+// Server-side arming/expiry is tested with the real watcher under an injected clock.
+await page.waitForTimeout(8_000);
+if (!(await indicator.isVisible())) throw new Error("name-only listening disappeared before the server cleared it");
 
 const shown = await page.evaluate(() => {
   const node = document.querySelector('[data-testid="wake-listening"]');

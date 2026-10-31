@@ -9,9 +9,9 @@ import { detectsAddress } from "../wake.js";
 import { BargeIn } from "./BargeIn.js";
 import type { AskedQuestion } from "./AnswerAgent.js";
 
-function setup() {
+function setup(playingInitially = true, answering = false) {
   const clock = new SimulatedClock(0);
-  let playing = true;
+  let playing = playingInitially;
   let stops = 0;
   const commands: AskedQuestion[] = [];
   const timing: Record<string, unknown>[] = [];
@@ -20,6 +20,7 @@ function setup() {
   const watcher = new BargeIn({
     clock,
     speaking: () => playing,
+    answering: () => answering,
     interrupt: () => {
       stops += 1;
       playing = false;
@@ -86,25 +87,43 @@ describe("barge-in at the transcription boundary", () => {
     expect(t.publicText).toEqual(["Alex needs parking directions"]);
   });
 
-  it("handles thanks Sotto and a later question after playback has stopped", () => {
+  it("handles thanks Sotto but leaves later questions to the address classifier", () => {
     const t = setup();
     t.start(1, "thanks Sotto");
     t.end(1, "thanks Sotto");
     t.start(2, "Sotto, what about the annual plan?");
     t.end(2, "Sotto, what about the annual plan?");
     expect(t.commands.map((asked) => asked.question)).toEqual([
-      "thanks Sotto", "Sotto, what about the annual plan?",
+      "thanks Sotto",
     ]);
     expect(t.stops()).toBe(1);
   });
 
-  it.each(["Sotto", "hey Sato", "Okay, Soto, go on", "thanks Sotto"])(
+  it("leaves thanks plus a request to the address classifier when nothing is being answered", () => {
+    const t = setup(false);
+    const request = "thanks Soto that was helpful can you also check the weather for Saturday";
+    t.start(1, request);
+    t.end(1, request);
+    expect(t.commands).toEqual([]);
+  });
+
+  it("still routes stop in the silent gap between acknowledgment and answer", () => {
+    const t = setup(false, true);
+    t.start(1, "Soto stop");
+    t.end(1, "Soto stop");
+    expect(t.commands.map((asked) => asked.question)).toEqual(["Soto stop"]);
+  });
+
+  it.each([
+    "Sotto", "hey Sato", "Okay, Soto, go on", "thanks Sotto",
+    "I was wondering Soto can you help", "I think Sotto is helpful",
+  ])(
     "accepts the address %s without waiting for a question", (text) => {
       expect(detectsAddress(text)).toBe(true);
     },
   );
 
-  it.each(["Sotto voce", "Soto's restaurant", "I think Sotto is helpful", "Sottovoce"])(
+  it.each(["Sotto voce", "Soto's restaurant", "Sottovoce", "Sotto2", "_Sotto", "Sotto_"])(
     "rejects the non-address %s", (text) => {
       expect(detectsAddress(text)).toBe(false);
     },

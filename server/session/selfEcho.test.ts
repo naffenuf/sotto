@@ -142,6 +142,7 @@ describe("self-echo suppression throughout a session", () => {
     await t.clock.settle();
     expect(t.answers).toHaveLength(1);
     expect(t.prompts.filter((prompt) => prompt.label === "voice_command")).toHaveLength(1);
+    expect(t.prompts.filter((prompt) => prompt.label === "address")).toHaveLength(0);
     expect(t.timing).toContainEqual(expect.objectContaining({ stage: "barge_in", flushMs: 20 }));
     expect(t.turns.map((turn) => turn.text)).toEqual(["Sotto what time is lunch tomorrow?"]);
     await t.sessions.stop();
