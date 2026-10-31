@@ -1,13 +1,5 @@
 # CLAUDE.md
 
-**V2-004 voice playback:** `VoiceHub` in `server/voice/VoiceHub.ts` owns one playback browser via
-`/ws/voice`, sends PCM16 at 24 kHz, and consumes started/position/ended reports. The browser schedules
-audio in `web/src/audio/useVoicePlayback.ts`, in the mic page; do not change its echo-cancellation
-constraints. Voice mute is in session settings. `SOTTO_DEV=1` enables `POST /api/voice/test`;
-`npm run verify:voice` tests real synthesis in a headless browser with muted output. The hub is built
-in `server/app.ts` for this story; V2-005 must share/inject it into the answer pipeline. On Stop the
-hub preserves the cancelled Speaker and accepts the final browser position for `spokenSoFar()`.
-
 Sotto: a local web app that listens to a group brainstorm and contributes only when it matters. Built during the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026). Full spec: `tasks/prd-sotto-core.md`. Loop state: `ralph/prd.json`, `ralph/progress.txt`.
 
 ## Stack
@@ -747,3 +739,16 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `fixtures/voices.json`'s Rachel and Adam so a replayed conversation never has Sotto sounding like
   one of the people in it. Also probed valid with this key: Sarah `EXAVITQu4vr4xnSDxMaL`, Charlotte
   `XB0fDUnXU5powFXDhCwa`, Lily `pFZP5JQG7iQjIQuC4Bku`.
+- **One page plays Sotto's voice, and it must be the page with the microphone.** `VoiceHub`
+  (`server/voice/VoiceHub.ts`) takes the first `/ws/voice` socket as the playback page and refuses
+  others until it closes; `web/src/audio/useVoicePlayback.ts` schedules the PCM back-to-back on one
+  AudioContext in the same page as `micCapture.ts`, which is what lets Chrome's echo cancellation
+  subtract it — never move playback elsewhere or change the mic's processing constraints.
+  `speaking` comes down on the page's `ended` report, not when ElevenLabs finishes (synthesis is
+  faster than real time). `speak()` resolves `null` when muted or no page is attached — callers
+  (V2-005) treat that as "screen only", not an error. On Stop the hub keeps the cancelled Speaker
+  so the page's final flushed position still feeds `spokenSoFar()`. The hub is built in
+  `server/app.ts`; V2-005 must share that instance with the answer pipeline, not build another.
+  Mute is a session setting (`voiceMuted`). `SOTTO_DEV=1` (set by `npm run dev:server`) enables
+  `POST /api/voice/test`; `npm run verify:voice` drives it through real ElevenLabs in a muted
+  headless browser. Chrome needs a click or key press before audio can play.

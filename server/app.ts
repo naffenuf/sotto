@@ -20,7 +20,7 @@ import { EventBus } from "./events/bus.js";
 import { listFixtures } from "./fixtures.js";
 import { SessionManager, SessionStartError } from "./session/SessionManager.js";
 import { listHistory, readHistory } from "./session/history.js";
-import { VoiceTestRequestSchema } from "../shared/voice.js";
+import { VoiceTestRequestSchema, type VoiceActionResponse } from "../shared/voice.js";
 import { loadElevenLabsApiKey, loadSottoVoiceId } from "./config.js";
 import { Speaker } from "./voice/Speaker.js";
 import { VoiceHub } from "./voice/VoiceHub.js";
@@ -121,16 +121,29 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     return { settings: sessions.settings() } satisfies SessionSettingsResponse;
   });
 
-  app.post("/api/voice/stop", async () => { voice.stop(); return { utteranceId: null, speaking: false }; });
+  // The stage's Stop button (V2-004). Stopping when nothing is being said is
+  // not an error: the click and the end of the utterance can cross.
+  app.post("/api/voice/stop", async (): Promise<VoiceActionResponse> => {
+    voice.stop();
+    return { utteranceId: null, speaking: false };
+  });
+
+  // Dev only (`npm run dev:server` sets SOTTO_DEV=1): speaks a test line
+  // through real ElevenLabs, so playback can be checked without asking Sotto
+  // anything. `npm run verify:voice` drives it.
   if (process.env.SOTTO_DEV === "1") {
     app.post("/api/voice/test", async (request, reply) => {
       const parsed = VoiceTestRequestSchema.safeParse(request.body ?? {});
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid test utterance" });
+      if (!parsed.success) return reply.code(400).send({ error: "Invalid test utterance" } satisfies ApiError);
       try {
         const utteranceId = await voice.speak(parsed.data.text ?? "Hello, I'm Sotto. I'm here to help your conversation.");
-        return { utteranceId, speaking: bus.voiceState().speaking };
+        if (utteranceId === null) {
+          const error = bus.settingsState().voiceMuted ? "Voice is muted" : "No page is attached to play voice";
+          return reply.code(409).send({ error } satisfies ApiError);
+        }
+        return { utteranceId, speaking: bus.voiceState().speaking } satisfies VoiceActionResponse;
       } catch (error) {
-        return reply.code(503).send({ error: error instanceof Error ? error.message : String(error) });
+        return reply.code(503).send({ error: error instanceof Error ? error.message : String(error) } satisfies ApiError);
       }
     });
   }
@@ -223,13 +236,15 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     },
   );
 
-  // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,
-  // already converted by the browser. The session is started over HTTP first,
-  // so by the time this opens there is a `MicSource` waiting for it.
+  // Sotto's voice (V2-004): PCM out, playback reports back. One page plays it
+  // — the first to connect — so a second tab is turned away until it closes.
   app.get("/ws/voice", { websocket: true }, (socket) => {
     if (!voice.attach(socket)) socket.close(WS_POLICY_VIOLATION, "voice playback is active in another tab");
   });
 
+  // Microphone audio (US-012): PCM16 mono 24 kHz in 80 ms binary messages,
+  // already converted by the browser. The session is started over HTTP first,
+  // so by the time this opens there is a `MicSource` waiting for it.
   app.get("/ws/audio", { websocket: true }, (socket) => {
     const mic = sessions.micInput();
     if (mic === null) {
@@ -264,8 +279,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     socket.on("error", unsubscribe);
   });
 
+  // A session ending, however it ends, ends whatever Sotto was saying in it.
+  const unsubscribeVoice = bus.subscribe((event) => {
+    if (event.type === "session" && event.session === null) voice.stop();
+  });
+
   // Closing the server must not leave a transcription socket open.
-  const unsubscribeVoice = bus.subscribe((event) => { if (event.type === "session" && event.session === null) voice.stop(); });
   app.addHook("onClose", async () => {
     unsubscribeVoice();
     voice.stop();

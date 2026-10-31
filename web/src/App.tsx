@@ -113,6 +113,21 @@ export function App() {
     );
   }, []);
 
+  // Same as chattiness: the server owns it and the checkbox shows what came
+  // back. Muting also stops whatever Sotto is saying (V2-004).
+  const onVoiceMutedChange = useCallback((muted: boolean) => {
+    setProblem(null);
+    void setVoiceMuted(muted).catch((error: unknown) =>
+      setProblem(error instanceof ApiCallError ? error.message : String(error)),
+    );
+  }, []);
+
+  const onStopVoice = useCallback(() => {
+    void stopVoice().catch((error: unknown) =>
+      setProblem(error instanceof ApiCallError ? error.message : String(error)),
+    );
+  }, []);
+
   // A fresh object every click, so clicking the same quote twice scrolls back
   // to it twice rather than being seen as the same request.
   const onQuoteClick = useCallback((turnId: string) => {
@@ -173,7 +188,7 @@ export function App() {
           chattiness={events.settings.chattiness}
           onChattinessChange={onChattinessChange}
           voiceMuted={events.settings.voiceMuted}
-          onVoiceMutedChange={(muted) => { void setVoiceMuted(muted).catch((error: unknown) => setProblem(String(error))); }}
+          onVoiceMutedChange={onVoiceMutedChange}
         />
         <StatusDots statuses={statuses} />
       </header>
@@ -215,7 +230,22 @@ export function App() {
           footer={<AskBox onAsk={onAsk} />}
           banner={
             <>
-              {events.voice.speaking && <div className="voice-status" role="status" data-testid="voice-speaking" data-playing={events.voice.playing}><span className="voice-status__dot" aria-hidden="true" />Sotto is speaking <button type="button" onClick={() => { void stopVoice().catch((error: unknown) => setProblem(String(error))); }}>Stop speaking</button></div>}
+              {/* Sotto is talking (V2-004), with the way to make it stop
+                  right next to it. Muting is in the header. */}
+              {events.voice.speaking && (
+                <div
+                  className="voice-status"
+                  role="status"
+                  data-testid="voice-speaking"
+                  data-playing={events.voice.playing}
+                >
+                  <span className="voice-status__dot" aria-hidden="true" />
+                  Sotto is speaking
+                  <button type="button" onClick={onStopVoice}>
+                    Stop speaking
+                  </button>
+                </div>
+              )}
               {/* Somebody has said Sotto's name and is still asking (US-017).
                   It sits above the cards because the answer lands there. */}
               {events.listening && (

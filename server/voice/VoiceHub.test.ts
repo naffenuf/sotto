@@ -62,10 +62,21 @@ describe("voice playback transport", () => {
     expect(t.positions).toEqual([375]);
   });
 
-  it("does not synthesize when muted", async () => {
+  it("does not synthesize when muted, and says so with null rather than an error", async () => {
     const t = setup();
     t.bus.setSettings({ ...t.bus.settingsState(), voiceMuted: true });
-    await expect(t.hub.speak("Hello")).rejects.toThrow("muted");
+    await expect(t.hub.speak("Hello")).resolves.toBeNull();
     expect(t.socket.sent).toHaveLength(0);
+    expect(t.bus.voiceState().speaking).toBe(false);
+  });
+
+  it("does not synthesize with no page attached to play it", async () => {
+    let built = false;
+    const hub = new VoiceHub(new EventBus(), () => {
+      built = true;
+      return {} as Speaker;
+    });
+    await expect(hub.speak("Hello")).resolves.toBeNull();
+    expect(built).toBe(false);
   });
 });

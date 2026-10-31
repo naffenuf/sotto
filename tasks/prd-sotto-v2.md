@@ -149,6 +149,8 @@ Ordered by dependency. Each should fit in one loop iteration.
 - [ ] A human runs a 10-minute live session with laptop speakers and at least two people, and records in `tasks/checkpoint-voice.md`: whether Sotto's voice leaked into the transcript, barge-in latency observations, false barge-ins, and PASS or FAIL with notes
 - [ ] On FAIL, the notes become the next iteration's fix list before V2-009 starts
 
+**Setup:** keep exactly one Sotto tab open, and start the mic in it. The first tab to connect owns playback, so with two tabs the voice can play from a page that is not capturing the mic, and echo cancellation will not remove it. Click the page once before the first answer: Chrome blocks audio until it has had a click or key press.
+
 ### V2-009: Opening hello and introductions
 **Description:** As a group, we want Sotto to introduce itself and learn who's here, so it feels like a participant and not a hidden recorder.
 

@@ -5,6 +5,8 @@
 # Step mode (default on, RALPH_STEP=0 to disable): pauses after every story and asks
 # whether to continue, so you can check your usage before spending more.
 # With step mode off, a usage limit sleeps RALPH_LIMIT_SLEEP seconds (default 1800) and retries.
+# Model and effort are pinned (RALPH_MODEL, default opus; RALPH_EFFORT, default high) so the loop
+# never inherits whatever the global Claude Code default happens to be.
 
 set -e
 
@@ -12,6 +14,8 @@ MAX_ITERATIONS=10
 if [[ "${1:-}" =~ ^[0-9]+$ ]]; then MAX_ITERATIONS="$1"; fi
 
 PERMISSION_MODE="${RALPH_PERMISSION_MODE:-auto}"
+MODEL="${RALPH_MODEL:-opus}"
+EFFORT="${RALPH_EFFORT:-high}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 PRD_FILE="$SCRIPT_DIR/prd.json"
@@ -29,7 +33,7 @@ remaining() {
   jq '[.userStories[] | select(.passes == false)] | length' "$PRD_FILE"
 }
 
-echo "Starting Ralph - Mode: $PERMISSION_MODE - Max iterations: $MAX_ITERATIONS - Remaining: $(remaining)"
+echo "Starting Ralph - Mode: $PERMISSION_MODE - Model: $MODEL ($EFFORT effort) - Max iterations: $MAX_ITERATIONS - Remaining: $(remaining)"
 
 for i in $(seq 1 "$MAX_ITERATIONS"); do
   if [ "$(remaining)" -eq 0 ]; then
@@ -52,7 +56,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
   HEAD_BEFORE=$(git rev-parse HEAD 2>/dev/null || echo none)
   STARTED=$(date +%s)
-  OUTPUT=$(env -u ANTHROPIC_API_KEY -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT claude --permission-mode "$PERMISSION_MODE" --print < "$PROMPT_FILE" 2>&1 | tee /dev/stderr) || true
+  OUTPUT=$(env -u ANTHROPIC_API_KEY -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT claude --permission-mode "$PERMISSION_MODE" --model "$MODEL" --effort "$EFFORT" --print < "$PROMPT_FILE" 2>&1 | tee /dev/stderr) || true
   ELAPSED=$(( $(date +%s) - STARTED ))
   # Keep each iteration's final report (stdout); progress.txt has the details, this has the summary
   printf "%s\n" "$OUTPUT" > "$ITER_DIR/$(date +%Y%m%d-%H%M)-iter$i-$NEXT.md"

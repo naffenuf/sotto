@@ -125,6 +125,16 @@ export interface WakeEvent {
   listening: boolean;
 }
 
+/**
+ * Whether Sotto is speaking (V2-004): up when an utterance opens, `playing`
+ * once the page reports sound, and down when the page has played it out or
+ * somebody stopped it. What the stage's speaking indicator and Stop show.
+ */
+export interface VoiceEvent {
+  type: "voice";
+  voice: VoiceState;
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -141,4 +151,4 @@ export type ServerEvent =
   | SettingsEvent
   | CardEvent
   | WakeEvent
-  | { type: "voice"; voice: VoiceState };
+  | VoiceEvent;
