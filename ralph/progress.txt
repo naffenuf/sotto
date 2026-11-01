@@ -174,3 +174,48 @@ and closes the loop when nothing comes back.
   frequency setting avoids it (`often` is still a 90 s cooldown). If V3-016's shadow run finds that
   costly, the lever is a **separate cooldown for answers to the room's own questions** — the
   precedent is V2-014's `researchCardCooldownMs` — and it is a PRD change, not a threshold tweak.
+
+[2026-11-01 08:40] V3-006 — completed — the room steers the frequency by talking to Sotto, or by talking over it.
+
+- **One module, two ways in.** `server/session/Steering.ts` is built per session in
+  `modelLoops` (so it is `null` with no model client, like everything beside it) and it moves
+  **only the frequency**, never the boldness: a group saying "not now" is asking for *less*, not
+  for a higher bar. Every change goes through `SessionManager.setPolicySettings`, which is what
+  makes the header's `<select>`, both rationed loops and `session.json` pick it up exactly as a
+  click would — the criterion about the header reflecting it was free. A numbered `notice` card
+  (`NOTICE_CARD_IDS.steering`) says what changed; nothing is ever said out loud, because
+  answering "all right, I'll keep quiet" would be one more unprompted contribution in the one
+  moment the room has just asked for fewer.
+- **Out loud.** `prompts/command.md` + `CommandSchema` gained `quieter` and `louder` (V2-007's
+  classifier was already the one an addressed turn reaches mid-contribution). `AnswerAgent`
+  reports both — and a bare `stop` — through a new `onSteer`, because whether a stop is about
+  *this answer* or about Sotto's behaviour is a question only the caller can answer, and the
+  answer is `Steering.inWindow()`.
+- **The routing was the real work.** A "Sotto, not now" lands in the *quiet after* the line it
+  is about, where `duringPlayback` is false and nothing owns the turn, so `BargeIn` would have
+  dropped it. It now takes an `unprompted()` getter, and inside that window a control word or
+  `STEER_SHAPE` routes the turn to the command classifier. The pre-filter is load-bearing: the
+  command classifier has **no `mention` kind**, so routing *every* addressed turn in the window
+  would read "that's the thing Sotto picked up" as a request.
+- **Silently.** `Steering.observe(record)` reads the `spoken_contribution` lines `Reservations`
+  already writes: `spoken: true` opens the 15 s window, `yielded: true` counts towards the hint.
+  Two inside ten minutes step the frequency down and **reset the counter** — being talked over
+  five times is the same message as twice. Yields during an answer to a direct question never
+  arrive, because only `Reservations` reports them and everything it says is unprompted.
+- **"Stops speech" needed no code.** The barge-in has already cancelled playback by the time the
+  command is classified, and a queued answer waiting for a gap is stopped by the *consequence*:
+  `rare` is a 300 s cooldown and the last contribution was seconds ago, so `allowed()` says
+  `cooldown` and the card is the only sign.
+- **What has no offline test, and why.** The SessionManager glue for a spoken "not now": no
+  capture says it (checked — the fixtures' only Sotto lines are the four wake questions and
+  `Sotto voce`), and a `max` replay **cannot** produce a yield at all, because
+  `EventReplaySource.run` awaits `clock.settle()` before every frame and a claim's whole
+  utterance is tracked — so no human frame can arrive while `Reservations.opening` is true. That
+  is also why the V3-015 pipeline test asserts `yielded: false`. V3-011's checkpoint tests both
+  live ("tell Sotto 'not now' once, talk over it twice to see the frequency drop").
+- **Measured.** `command.integration.test.ts` (new): real Spark reads all nine phrases correctly
+  first try, 25 s for the file. `npm test` 1,335 tests, typecheck clean.
+- **One edge left on purpose.** An interjection or research card delivered < 15 s before a direct
+  question's answer leaves the window open, so a `stop` during that answer would read as
+  `quieter`. A card *is* an unprompted contribution, so this is the PRD's rule applied literally;
+  if it bites, the fix is to open the window only for *spoken* contributions.

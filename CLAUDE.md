@@ -1477,3 +1477,29 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   it. Worth knowing before reading a quiet run as a bug, and before V3-016: the lever, if it proves
   costly, is a cooldown of its own for answers to the room's own questions (V2-014's
   `researchCardCooldownMs` is the precedent), which is a PRD change rather than a threshold tweak.
+
+- **The room steers the frequency, and the hard part is reaching the classifier.** V3-006's
+  `server/session/Steering.ts` moves **only** `frequency` — a group saying "not now" is asking for
+  less, not for a higher bar — and always through `SessionManager.setPolicySettings`, which is what
+  makes the header's `<select>`, both rationed loops and `session.json` follow for free. Two ways
+  in. Out loud: `prompts/command.md` and `CommandSchema` gained `quieter`/`louder`, and
+  `AnswerAgent.onSteer` hands those *and a bare `stop`* over, because whether a stop means "enough
+  of this answer" or "contribute less" is answered only by `Steering.inWindow()` —
+  `STEER_WINDOW_MS`, 15 s after the last unprompted contribution. But that turn lands in the
+  **quiet after** the line it is about, where `duringPlayback` is false and nothing owns the turn,
+  so `BargeIn` took an `unprompted()` getter plus `STEER_SHAPE`: the pre-filter is load-bearing,
+  because the command classifier has **no `mention` kind** and routing every addressed turn in the
+  window would read "that's the thing Sotto picked up" as a request. Silently:
+  `Steering.observe(record)` reads the `spoken_contribution` lines `Reservations` already writes
+  (`spoken` opens the window, `yielded` counts), two yields in ten minutes step down and the
+  counter **resets** — five times talked over is the same message as twice. Nothing is spoken
+  about any of it; the note is a numbered `notice` card. Real Spark reads all nine phrases of
+  `command.integration.test.ts` correctly.
+- **A `max` replay cannot produce a yield, so V3-006's two-yields rule has no pipeline test.**
+  `EventReplaySource.run` awaits `clock.settle()` before every frame and a claim's whole utterance
+  is `clock.track`ed, so no human frame can arrive while `Reservations.opening` is true — which is
+  also why V3-015's pipeline test asserts `yielded: false`. The rule is tested against *real*
+  `Reservations` records instead (`Reservations.test.ts` wires a real `Steering` to them), and the
+  live path is V3-011's checkpoint. Same family as the `instantWallClock` and
+  "tracked work always beats a pause timer" lessons: the fake clock decides which branch a test is
+  really on.

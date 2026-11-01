@@ -107,8 +107,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "server/session/Steering.ts is the module; both ways in meet there. Out loud: prompts/command.md + CommandSchema gained `quieter`/`louder`, AnswerAgent reports them (and a bare `stop`) through onSteer, and BargeIn's new `unprompted()` gate + STEER_SHAPE pre-filter route an addressed turn to that classifier in the quiet after an unprompted line. Silently: Steering.observe counts yields off the spoken_contribution records Reservations already writes; two inside 10 min step down, one step per run. Every change goes through setPolicySettings (header, both rationed loops, session.json) plus a numbered `notice` card; every verdict is a `steering` line in timing.jsonl. The frequency change is server-wide (V2-017's rule), which is the PRD's \"rest of the session\" and more. 12 Steering tests, 3 BargeIn routing tests, 3 AnswerAgent onSteer tests, 3 Reservations tests incl. the two-yields rule against real records. command.integration.test.ts: real Spark reads all 9 phrases correctly. No offline test of the SessionManager glue for a spoken \"not now\" - no fixture says it, and a max replay cannot produce a yield (the replay settles tracked speech before the next frame). V3-011's checkpoint covers both live."
     },
     {
       "id": "V3-012",
