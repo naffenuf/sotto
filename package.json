@@ -16,6 +16,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "capture": "tsx scripts/capture-events.ts",
     "fixture:render": "tsx scripts/render-fixture.ts",
+    "hello:measure": "tsx scripts/measure-hello.ts",
     "e2e": "tsx scripts/e2e.ts",
     "eval": "tsx scripts/eval.ts",
     "eval:report": "tsx scripts/eval-report.ts",
