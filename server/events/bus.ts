@@ -10,14 +10,15 @@
  * It remembers the state an event implies — the four status dots, the running
  * session, the speaker names the user has given (US-007), the board (US-009),
  * the settings (US-014), whether somebody is addressing Sotto by name
- * (US-017) and the cards Sotto has put on the stage (US-015) —
- * so a browser that attaches mid-session can be caught up with
- * {@link EventBus.snapshot} instead of asking. Turns are deliberately not
+ * (US-017), what the policy has held back (V3-016) and the cards Sotto has put
+ * on the stage (US-015) — so a browser that attaches mid-session can be caught
+ * up with {@link EventBus.snapshot} instead of asking. Turns are deliberately not
  * remembered: a transcript is the session folder's job, not the bus's. A card
  * is the opposite case — there are a handful of them in a conversation and
  * each one is the whole point of the app, so a reload must not lose them.
  */
 import { emptyBoard } from "../../shared/board.js";
+import type { SuppressedCandidate } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
 import {
   statusChannels,
@@ -70,6 +71,8 @@ export class EventBus {
   private cards: StageCard[] = [];
   /** True while a partial turn is addressing Sotto by name (US-017). */
   private listening = false;
+  /** What the policy has held back this session, best first (V3-016). */
+  private suppressed: SuppressedCandidate[] = [];
   /** Server-wide, not per session: the next session inherits what is set. */
   private settings: SessionSettings = defaultSettings();
   private voice: VoiceState = silentVoice();
@@ -90,6 +93,7 @@ export class EventBus {
     if (event.type === "card") this.rememberCard(event.card);
     if (event.type === "settings") this.settings = event.settings;
     if (event.type === "wake") this.listening = event.listening;
+    if (event.type === "suppressed") this.suppressed = event.suppressed;
     if (event.type === "voice") this.voice = event.voice;
     if (event.type === "session") {
       this.session = event.session;
@@ -106,6 +110,10 @@ export class EventBus {
       if (event.session !== null) {
         this.board = initialBoard();
         this.cards = [];
+        // What was held back belongs to one conversation, unlike the cards:
+        // the tray says "this session", and the policy's reasons are about
+        // turns the next session will not have heard.
+        this.suppressed = [];
       }
     }
     for (const listener of [...this.listeners]) {
@@ -154,6 +162,17 @@ export class EventBus {
     this.publish({ type: "wake", listening });
   }
 
+  /**
+   * Publishes what the policy has held back so far (V3-016), skipping it when
+   * the list has not changed — it is recomputed from the digest on every
+   * candidate line, and most of those change nothing about it.
+   */
+  setSuppressed(suppressed: readonly SuppressedCandidate[]): void {
+    const next = [...suppressed];
+    if (JSON.stringify(next) === JSON.stringify(this.suppressed)) return;
+    this.publish({ type: "suppressed", suppressed: next });
+  }
+
   /** Publishes the session that is now running, or `null` when it ends. */
   setSession(session: SessionInfo | null): void {
     this.publish({ type: "session", session });
@@ -184,6 +203,7 @@ export class EventBus {
       { type: "settings", settings: this.settings },
       { type: "wake", listening: this.listening },
       { type: "voice", voice: this.voice },
+      { type: "suppressed", suppressed: [...this.suppressed] },
       // One event per card, in the order they went up, rather than a second
       // shape for "all of them": a browser folds each one in the same way it
       // folds a live arrival, and a session that has said nothing adds none.
@@ -214,6 +234,11 @@ export class EventBus {
   /** True while somebody is addressing Sotto by name. */
   listeningState(): boolean {
     return this.listening;
+  }
+
+  /** What the policy has held back this session, best first (V3-016). */
+  suppressedState(): readonly SuppressedCandidate[] {
+    return this.suppressed;
   }
 
   /** The cards on the stage, oldest first. */

@@ -408,6 +408,28 @@ export function DevCards() {
     },
   ];
 
+  /**
+   * What the policy held back (V3-016). A real conversation produces these
+   * only when it produces a candidate the policy turns down, which is exactly
+   * the kind of state this page exists for.
+   */
+  const almostSaid = [
+    {
+      candidateId: "cand-7",
+      headline: "Nobody has said who owns the migration",
+      type: "unanswered_question" as const,
+      score: 0.58,
+      reason: "below threshold",
+    },
+    {
+      candidateId: "cand-9",
+      headline: "Two weeks plus four is six — the hard wall is three",
+      type: "contradiction" as const,
+      score: 0.71,
+      reason: "cooldown",
+    },
+  ];
+
   const hand = useRaisedHand(stageCards);
 
   return (
@@ -425,10 +447,15 @@ export function DevCards() {
       <section className="dev__section">
         <h2 className="dev__heading">On the stage</h2>
         <p className="dev__note">
-          Newest on top. Glows older than two minutes have collapsed into the tray.
+          Newest on top. Glows older than two minutes have collapsed into the tray,
+          and what the policy held back is collapsed under both (V3-016).
         </p>
         <div className="dev__stage" data-testid="dev-stage">
-          <Stage cards={stageCards} onOpen={(card) => hand.open(card.id)} />
+          <Stage
+            cards={stageCards}
+            almostSaid={almostSaid}
+            onOpen={(card) => hand.open(card.id)}
+          />
         </div>
       </section>
       <section className="dev__section">

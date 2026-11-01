@@ -105,6 +105,7 @@ export {
   showHtmlJsonSchema,
 } from "./artifacts.js";
 export type { Artifact, ShowHtmlArgs } from "./artifacts.js";
+export type { CandidateType, SuppressedCandidate } from "./candidates.js";
 export { statusChannels, statusStates } from "./events.js";
 export type {
   BoardEvent,
@@ -118,6 +119,7 @@ export type {
   StatusEvent,
   StatusState,
   StatusUpdate,
+  SuppressedEvent,
   TurnEvent,
   WakeEvent,
 } from "./events.js";

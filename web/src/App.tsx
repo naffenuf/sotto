@@ -241,6 +241,8 @@ export function App() {
         </aside>
         <Stage
           cards={events.cards}
+          // V3-016: what Sotto noticed and held back, under the cards.
+          almostSaid={events.suppressed}
           onQuoteClick={onQuoteClick}
           onFeedback={onFeedback}
           onOpen={(card) => hand.open(card.id)}

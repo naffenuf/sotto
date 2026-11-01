@@ -39,6 +39,7 @@ import {
   type CandidateLogLine,
   type CandidateType,
   type DecisionLogRecord,
+  type SuppressedCandidate,
   type VerificationLogRecord,
 } from "../../shared/candidates.js";
 import { TYPED_ASKER, type AnswerLogRecord } from "../../shared/answers.js";
@@ -89,17 +90,6 @@ export interface DigestSpoken {
   error?: string;
 }
 
-/** One candidate Sotto held back, with the reason it did. */
-export interface DigestSuppressed {
-  candidateId: string;
-  headline: string;
-  type: CandidateType;
-  /** 0–1, as the policy or the gate scored it. */
-  score: number;
-  /** The policy's reason in words: "below threshold", "cooldown", … */
-  reason: string;
-}
-
 /** One candidate that reached the stage. */
 export interface DigestDelivered {
   headline: string;
@@ -115,7 +105,7 @@ export interface DigestInput {
   board: Board | null;
   spoken: readonly DigestSpoken[];
   delivered: readonly DigestDelivered[];
-  suppressed: readonly DigestSuppressed[];
+  suppressed: readonly SuppressedCandidate[];
   packets: readonly ResearchPacket[];
   /** Searches that came back with nothing usable, by outcome (V2-013). */
   discarded: { unsourced: number; failed: number };
@@ -204,6 +194,18 @@ export class SessionDigest {
     return renderDigest(this.input());
   }
 
+  /**
+   * What Sotto has held back so far, best first (V3-016).
+   *
+   * The same list the digest's "What Sotto almost said" renders, which is the
+   * point: the stage's "almost said" tray shows restraint while the
+   * conversation is still going, so the list is published as it changes
+   * rather than only written down at the end.
+   */
+  almostSaid(): SuppressedCandidate[] {
+    return this.suppressed();
+  }
+
   /** The short spoken wrap-up ("Sotto, wrap us up"). */
   spokenSummary(): string {
     return spokenSummary(this.input());
@@ -228,8 +230,8 @@ export class SessionDigest {
   }
 
   /** The top {@link MAX_SUPPRESSED} candidates Sotto held back, best first. */
-  private suppressed(): DigestSuppressed[] {
-    const list: DigestSuppressed[] = [];
+  private suppressed(): SuppressedCandidate[] {
+    const list: SuppressedCandidate[] = [];
     for (const [id, candidate] of this.candidates) {
       // A hook was never for the stage (V2-011): it went to the research
       // pipeline, and what became of it is in "Research produced".

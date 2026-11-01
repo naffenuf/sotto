@@ -41,6 +41,9 @@ describe("EventBus", () => {
       { type: "settings", settings: { frequency: "normal", boldness: "normal", voiceMuted: false } },
       { type: "wake", listening: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
+      // V3-016: the "almost said" tray's list, empty until the policy has
+      // decided against something.
+      { type: "suppressed", suppressed: [] },
     ]);
   });
 
@@ -134,6 +137,7 @@ describe("EventBus", () => {
       { type: "settings", settings: { frequency: "normal", boldness: "normal", voiceMuted: false } },
       { type: "wake", listening: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
+      { type: "suppressed", suppressed: [] },
     ]);
     expect(bus.currentSession()).toEqual(session);
     expect(bus.status("transcription").state).toBe("active");
@@ -246,6 +250,31 @@ describe("EventBus", () => {
     bus.setSession({ ...session, id: "events-brainstorm-2" });
     expect(bus.cardState()).toEqual([]);
     expect(bus.snapshot().some((event) => event.type === "card")).toBe(false);
+  });
+
+  it("remembers what the policy held back, and clears it with a new session", () => {
+    const bus = new EventBus();
+    bus.setSession(session);
+    const seen = collect(bus);
+    const held = [
+      { candidateId: "cand-1", headline: "Six sheds, or one?", type: "contradiction" as const, score: 0.61, reason: "below threshold" },
+    ];
+
+    bus.setSuppressed(held);
+    // The same list again changes nothing: it is recomputed on every candidate
+    // line, and most of those leave it exactly as it was.
+    bus.setSuppressed([...held]);
+
+    expect(seen).toEqual([{ type: "suppressed", suppressed: held }]);
+    expect(bus.suppressedState()).toEqual(held);
+    expect(bus.snapshot()).toContainEqual({ type: "suppressed", suppressed: held });
+
+    // Like the cards: a session ending leaves the tray up to read, a session
+    // starting clears it.
+    bus.setSession(null);
+    expect(bus.suppressedState()).toEqual(held);
+    bus.setSession({ ...session, id: "events-brainstorm-2" });
+    expect(bus.suppressedState()).toEqual([]);
   });
 
   it("keeps the newest cards when a runaway loop produces too many", () => {

@@ -3,6 +3,7 @@ import { silentVoice, type VoiceState } from "../../shared/voice.js";
 import type {
   Board,
   ServerEvent,
+  SuppressedCandidate,
   SessionInfo,
   SessionSettings,
   SpeakerNames,
@@ -82,6 +83,12 @@ export interface SessionEventsState {
    * selector shows this rather than its own last click, so two tabs agree.
    */
   settings: SessionSettings;
+  /**
+   * What the policy has held back this session, best first (V3-016) — the
+   * same list `digest.md`'s "What Sotto almost said" is rendered from, which
+   * the stage shows in a collapsed tray under the cards.
+   */
+  suppressed: SuppressedCandidate[];
 }
 
 function idle(channel: StatusChannel): StatusUpdate {
@@ -108,12 +115,13 @@ const initial: SessionEventsState = {
   turnCount: 0,
   listening: false,
   settings: defaultSettings(),
+  suppressed: [],
 };
 
 /**
  * Follows `/ws/events`: the status dots, the running session, the turns, the
  * speaker names, the board, the settings, whether somebody is addressing
- * Sotto by name, and the cards on the stage.
+ * Sotto by name, what it is holding back, and the cards on the stage.
  *
  * The server sends its remembered state the moment the socket opens, so a
  * reload mid-session catches up without asking, and a dropped socket is
@@ -185,6 +193,10 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
             cards: [],
             turnCount: 0,
             listening: false,
+            // Held-back candidates belong to one conversation, as the bus
+            // has it: a session starting clears them, one ending leaves the
+            // tray up to read.
+            suppressed: [],
           };
     case "speakers":
       return { ...state, speakers: event.speakers };
@@ -200,6 +212,8 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
       };
     case "card":
       return { ...state, cards: withCard(state.cards, event.card) };
+    case "suppressed":
+      return { ...state, suppressed: event.suppressed };
     case "board":
       return {
         ...state,

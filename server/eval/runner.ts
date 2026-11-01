@@ -47,6 +47,7 @@ import { candidateScore, inPause } from "../interject/policy.js";
 import type {
   GlimmerClientFactory,
   ModelClientFactory,
+  ReplaySourceFactory,
   VoiceFactory,
 } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
@@ -86,6 +87,12 @@ export interface ReplayOptions {
    * call; `npm run e2e` is where real speech is paid for.
    */
   createVoice?: VoiceFactory;
+  /**
+   * Where the frames come from. Defaults to the fixture capture named by
+   * {@link ReplayOptions.fixture}; the shadow run (V3-016) points it at a
+   * past session folder's `events.jsonl` instead.
+   */
+  createReplaySource?: ReplaySourceFactory;
   logger?: Logger;
 }
 
@@ -130,6 +137,9 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     ...(options.createModel === undefined ? {} : { createModel: options.createModel }),
     ...(options.createGlimmer === undefined ? {} : { createGlimmer: options.createGlimmer }),
     createVoice: options.createVoice ?? (() => transcriptOnlyVoice()),
+    ...(options.createReplaySource === undefined
+      ? {}
+      : { createReplaySource: options.createReplaySource }),
     logger,
     replaySpeed: "max",
     settings: options.settings,

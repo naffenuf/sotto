@@ -13,6 +13,7 @@ import type {
   CandidateLogLine,
   CandidateLogRecord,
   DecisionLogRecord,
+  SuppressedCandidate,
 } from "../../shared/candidates.js";
 import { MAX_JOBS_PER_WINDOW } from "../../shared/research.js";
 import type {
@@ -379,8 +380,11 @@ describe("SessionManager, board and observer", () => {
       wallClock: instantWallClock(),
     });
 
+    // V3-016: the "almost said" tray's list, as the policy fills it in.
+    const trays: SuppressedCandidate[][] = [];
     const ended = new Promise<void>((resolve) => {
       const off = bus.subscribe((event) => {
+        if (event.type === "suppressed") trays.push(event.suppressed);
         if (event.type === "session" && event.session === null) {
           off();
           resolve();
@@ -420,6 +424,21 @@ describe("SessionManager, board and observer", () => {
       expect(record.settings).toEqual({ frequency: "normal", boldness: "normal" });
       expect(record.score).toBeCloseTo(0.189, 3);
     }
+
+    // And every one of them reached the stage's "almost said" tray (V3-016),
+    // with the policy's own reason rather than a guess — the same list the
+    // digest ends with, published as it was decided.
+    const held = trays.at(-1) ?? [];
+    expect(held.length).toBeGreaterThan(0);
+    // Either the policy turned it down or the observer had said it already;
+    // both are reasons a reader can read, and neither is a guess.
+    for (const one of held) {
+      expect(one.reason === "below threshold" || one.reason.startsWith("duplicate of")).toBe(true);
+    }
+    expect(held.some((one) => one.reason === "below threshold")).toBe(true);
+    expect(held[0]?.score).toBeCloseTo(0.189, 3);
+    const noticed = new Set(candidates.map((record) => record.candidate.headline));
+    for (const one of held) expect(noticed.has(one.headline)).toBe(true);
   });
 
   /**

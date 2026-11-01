@@ -432,6 +432,24 @@ export type CandidateLogLine =
 /** Re-exported so a reader of a log line has the vocabulary to hand. */
 export type { Decision, DecisionReason };
 
+/**
+ * One candidate Sotto held back, with the reason it did.
+ *
+ * What the digest's "What Sotto almost said" is made of (V2-018), and since
+ * V3-016 also what the stage's "almost said" tray shows and what the shadow
+ * report ends with — three readers of one record, which is why it is here
+ * rather than in `server/session/digest.ts` where it is computed.
+ */
+export interface SuppressedCandidate {
+  candidateId: string;
+  headline: string;
+  type: CandidateType;
+  /** 0–1, as the policy or the gate scored it. */
+  score: number;
+  /** The policy's reason in words: "below threshold", "cooldown", … */
+  reason: string;
+}
+
 /** The `json_schema.name` an observer request sends. */
 export const OBSERVER_SCHEMA_NAME = "observer_candidates";
 

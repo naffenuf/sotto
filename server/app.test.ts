@@ -662,7 +662,7 @@ describe("/ws/events", () => {
     const { app: server, bus } = await buildTestApp();
     bus.setStatus("transcription", "active", "replaying brainstorm events at max");
 
-    const { socket, events } = await open(server, (seen) => seen.length === 10);
+    const { socket, events } = await open(server, (seen) => seen.length === 11);
     const snapshot = await events;
     socket.close();
 
@@ -692,15 +692,17 @@ describe("/ws/events", () => {
       // Nobody has said its name (US-017).
       { type: "wake", listening: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
+      // And it has held nothing back, because nothing has been noticed (V3-016).
+      { type: "suppressed", suppressed: [] },
     ]);
   });
 
   it("pushes turns and status changes while a session runs", async () => {
     const { app: server } = await buildTestApp();
-    // The ten snapshot events, then the session's own, ending back at null.
+    // The eleven snapshot events, then the session's own, ending back at null.
     const { socket, events } = await open(server, (seen) => {
       const last = seen.at(-1);
-      return seen.length > 10 && last?.type === "session" && last.session === null;
+      return seen.length > 11 && last?.type === "session" && last.session === null;
     });
 
     await server.inject({

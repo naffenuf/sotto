@@ -15,3 +15,8 @@ eval/cache/
 
 # End-to-end check output: one session folder per fixture, per run.
 e2e/sessions/
+
+# Shadow runs (V3-016): one session folder and one run record per replay. The
+# report in tasks/ is what is committed; `--report` rebuilds it from the record.
+shadow/sessions/
+shadow/runs/

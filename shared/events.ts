@@ -5,9 +5,10 @@
  * attached socket gets the events as JSON lines. A socket that attaches part
  * way through a session is caught up first with the bus's remembered state
  * (the four statuses, the running session, the speaker names, the board, the
- * settings, whether somebody is addressing Sotto, and every card it has put
- * up), so the UI never has to poll.
+ * settings, whether somebody is addressing Sotto, what it is holding back,
+ * and every card it has put up), so the UI never has to poll.
  */
+import type { SuppressedCandidate } from "./candidates.js";
 import type { TurnUpdate } from "./turns.js";
 import type { SessionInfo, SessionSettings } from "./session.js";
 import type { Board } from "./board.js";
@@ -141,6 +142,19 @@ export interface VoiceEvent {
   voice: VoiceState;
 }
 
+/**
+ * What the policy has held back this session (V3-016).
+ *
+ * The same list `digest.md`'s "What Sotto almost said" is rendered from, sent
+ * as it changes so the stage can show restraint while the conversation is
+ * still going. The whole list goes out every time, like the board's and the
+ * speakers': it is short, and a browser must never have to accumulate it.
+ */
+export interface SuppressedEvent {
+  type: "suppressed";
+  suppressed: SuppressedCandidate[];
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -157,4 +171,5 @@ export type ServerEvent =
   | SettingsEvent
   | CardEvent
   | WakeEvent
-  | VoiceEvent;
+  | VoiceEvent
+  | SuppressedEvent;

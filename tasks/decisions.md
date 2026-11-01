@@ -364,3 +364,44 @@ calls in total (`brainstorm`'s "decided then, photo to three suggestions",
 `moment-assumption`'s "let's do pricing today", `moment-contradiction`'s "let's
 just say that out loud"), every one of them a group really settling something.
 `brainstorm` goes from 2 of 24 turns to 3 — still well inside V3-002's quarter.
+
+## 2026-11-01 — the shadow run, and what two real conversations produced
+
+**What changed:** `npm run shadow -- <session folder>` (V3-016) replays a past
+`mic` session's `events.jsonl` through the whole v3 pipeline at `max` speed,
+with Sotto's voice on V2-021's null sink and the hello suppressed (an `events`
+session never builds a `Greeting`), and writes `tasks/shadow-<session>.md` for a
+human to mark up before the V3-011 live checkpoint. The replay itself is
+`replayFixture` — the eval's — with one new seam,
+`SessionManager.createReplaySource`, so the only difference from an eval run is
+which file the frames come off. Every run is also saved to
+`shadow/runs/<session>.json`, so `--report` rebuilds the markdown for nothing.
+
+**Measured, `2026-10-30_0919-mic`** (a real two-person product conversation, 24
+turns, 3:58; 42 model calls, $0.62) at `normal/normal`: **nothing would have
+been said out loud**, which is the designed answer rather than a gap — at the
+default settings Sotto speaks unasked only for an `open_question` it can look
+up (V3-002/V3-004), a read-back at frequency `often` (V3-013) or a verified
+factual error at boldness `bold` (V3-008). Four classifications (2 `decision`,
+1 `rhetorical`, 1 `none`; no `open_question`), two turns addressed Sotto by
+name, and four cards — two research packets, one answer and one interject
+("We said one garden first — where does launching in all six fit?").
+
+**Measured, `2026-10-30_2141-mic`** (11 turns, 4:20; 34 calls, $0.39) at
+`often/bold`: one read-back said ("Got it: human bingo, two-hour event, book
+$900 caterer") and a glow holding the thing that matters — "The $900 caterer —
+how does that fit within the $500 budget?" — against a budget stated four
+minutes earlier. Three `decision` verdicts, two of them `closing`.
+
+**What a `max` shadow run cannot tell you**, and the report says so: simulated
+time does not move inside a tracked call, so "from the trigger turn" reads 0.0 s
+and the pause reconstruction says the room was not quiet. Judge the judgement in
+a shadow report and leave the timing to V3-011, which is the only clock that
+charges for it.
+
+**The stage's "almost said" tray** is the same list, live: `SessionDigest.
+almostSaid()` is published on `/ws/events` as a `suppressed` event from the one
+place every candidate line is already written down, so the bus snapshot is
+**eleven** events plus one per card. Neither of the two real runs held anything
+back at the end — every candidate was either delivered or a duplicate — so the
+tray's own look is checked on `/dev/cards`.

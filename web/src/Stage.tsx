@@ -6,15 +6,24 @@
  * age out of the stack into a tray rather than being dismissed, so the stage
  * stays calm without anything being lost — {@link arrangeCards} decides which
  * are which and `nextTrayDueAt` means the timer only runs while one is ageing.
+ *
+ * Under both of those sits the "almost said" tray (V3-016): the things that
+ * never became cards at all.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AlmostSaid } from "./AlmostSaid.js";
 import { Card } from "./Card.js";
 import type { StageCardView } from "./stageView.js";
 import { arrangeCards, nextTrayDueAt, trayLabel } from "./stageView.js";
-import type { FeedbackVerdict, StageCard } from "../../shared/index.js";
+import type { FeedbackVerdict, StageCard, SuppressedCandidate } from "../../shared/index.js";
 
 export interface StageProps {
   cards: readonly StageCardView[];
+  /**
+   * What the policy held back this session (V3-016), shown collapsed under
+   * the cards. Restraint is part of what the stage is reporting.
+   */
+  almostSaid?: readonly SuppressedCandidate[];
   /** Shown while Sotto has contributed nothing yet. */
   placeholder?: ReactNode;
   /** Shown above the cards, whatever else is on the stage. */
@@ -34,6 +43,7 @@ export interface StageProps {
 
 export function Stage({
   cards,
+  almostSaid = [],
   placeholder,
   banner,
   footer,
@@ -90,6 +100,10 @@ export function Stage({
             )}
           </div>
         )}
+        {/* V3-016: below the cards and below the tray, because it is the
+            quietest thing on the stage — what Sotto noticed and kept to
+            itself, with the policy's own reason. */}
+        <AlmostSaid held={almostSaid} />
       </main>
       {footer}
     </section>

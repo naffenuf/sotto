@@ -21,6 +21,7 @@
     "eval": "tsx scripts/eval.ts",
     "eval:report": "tsx scripts/eval-report.ts",
     "eval:ceiling": "tsx scripts/eval-ceiling.ts",
+    "shadow": "tsx scripts/shadow.ts",
     "fixtures:check": "tsx scripts/check-fixtures.ts",
     "verify:ui": "node scripts/verify-ui.mjs",
     "verify:voice": "node scripts/verify-voice.mjs",

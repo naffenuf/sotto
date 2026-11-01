@@ -54,7 +54,7 @@ import { defaultSettings, describeSource, sourceSlug } from "../../shared/sessio
 import { isSottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
 import {
   EventReplaySource,
-  fixtureEventsPath,
+  type EventReplayOptions,
   type ReplaySpeed,
 } from "../asr/EventReplaySource.js";
 import { RealtimeTranscriptionClient } from "../asr/realtimeClient.js";
@@ -172,6 +172,19 @@ export type ModelClientFactory = () => ModelClient | null;
  */
 export type GlimmerClientFactory = () => GlimmerClient | null;
 
+/**
+ * Builds the source an `events` session replays (US-006).
+ *
+ * Defaults to {@link EventReplaySource.forFixture}, which reads
+ * `fixtures/events/<name>.jsonl`. The shadow run (V3-016) passes its own, so a
+ * past session folder's `events.jsonl` goes through the pipeline exactly as a
+ * fixture capture does — the frames are the same shape, only the path differs.
+ */
+export type ReplaySourceFactory = (
+  fixture: string,
+  options: EventReplayOptions,
+) => EventReplaySource;
+
 /** A start that can't happen, with the HTTP status the route should answer. */
 export class SessionStartError extends Error {
   constructor(
@@ -212,6 +225,11 @@ export interface SessionManagerOptions {
   wallClock?: Clock;
   /** Replay speed for `events` sources. `1x` for the UI, `max` for tests. */
   replaySpeed?: ReplaySpeed;
+  /**
+   * Where an `events` session's frames come from. Defaults to a fixture
+   * capture; `npm run shadow` (V3-016) points it at a past session folder.
+   */
+  createReplaySource?: ReplaySourceFactory;
   /**
    * How often and how boldly the policy starts out (US-014, split in two by
    * V2-017). The header changes both live.
@@ -473,6 +491,7 @@ export class SessionManager {
   private readonly liveClock: Clock;
   private readonly wallClock: Clock;
   private readonly replaySpeed: ReplaySpeed;
+  private readonly createReplaySource: ReplaySourceFactory;
   private readonly gateMode: GateMode;
 
   private current: RunningSession | undefined;
@@ -521,6 +540,9 @@ export class SessionManager {
     this.liveClock = options.liveClock ?? systemClock;
     this.wallClock = options.wallClock ?? systemClock;
     this.replaySpeed = options.replaySpeed ?? "1x";
+    this.createReplaySource =
+      options.createReplaySource ??
+      ((fixture, replay) => EventReplaySource.forFixture(fixture, replay));
     this.gateMode = options.gate ?? DEFAULT_GATE_MODE;
     // The bus is where the settings a browser is caught up with are
     // remembered, so they start from there and are only published when this
@@ -713,14 +735,16 @@ export class SessionManager {
     const assembler = this.assembler(info, clock, store, loops, voice, null, wrapUp);
     let source: EventReplaySource;
     try {
-      source = EventReplaySource.forFixture(fixture, {
+      source = this.createReplaySource(fixture, {
         clock,
         speed: this.replaySpeed,
         wallClock: this.wallClock,
       });
     } catch (error) {
       throw new SessionStartError(
-        `cannot replay events fixture "${fixture}" (${fixtureEventsPath(fixture)}): ${message(error)}`,
+        // Not necessarily a fixture path since V3-016: the shadow run's
+        // factory reads a past session folder, and its own error says where.
+        `cannot replay events for "${fixture}": ${message(error)}`,
         400,
       );
     }
@@ -1250,6 +1274,12 @@ export class SessionManager {
     const recordCandidate = (record: CandidateLogLine): void => {
       store.writer?.appendCandidate(record);
       store.digest.candidate(record);
+      // V3-016: and a third place, the stage's "almost said" tray — the same
+      // list, live, so restraint is visible before the digest is written.
+      // Against `last` rather than `current`, like an answer card: the
+      // policy's final look into the trailing silence happens after Stop, and
+      // it is where most of what was held back is accounted for.
+      if (this.last?.sessionId === info.id) this.bus.setSuppressed(store.digest.almostSaid());
     };
     // V3-006: the room steering how much Sotto says, by talking to it. Built
     // before everything that feeds it — the policy's deliveries, the

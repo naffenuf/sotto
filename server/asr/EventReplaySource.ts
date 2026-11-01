@@ -106,10 +106,19 @@ export class EventReplaySource {
 
   /** Replays `fixtures/events/<name>.jsonl`. */
   static forFixture(name: string, options: EventReplayOptions): EventReplaySource {
-    return new EventReplaySource(
-      parseAsrFrameRecords(readFileSync(fixtureEventsPath(name), "utf8")),
-      options,
-    );
+    return EventReplaySource.forPath(fixtureEventsPath(name), options);
+  }
+
+  /**
+   * Replays any capture, by path.
+   *
+   * A past session folder's `events.jsonl` is the same file in the same
+   * format as a fixture capture — `SessionStore` writes the frames it was
+   * handed — so the shadow run (V3-016) replays a real conversation through
+   * the pipeline with nothing but a different path.
+   */
+  static forPath(path: string, options: EventReplayOptions): EventReplaySource {
+    return new EventReplaySource(parseAsrFrameRecords(readFileSync(path, "utf8")), options);
   }
 
   /** How many frames have been delivered so far. */

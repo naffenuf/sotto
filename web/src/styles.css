@@ -582,6 +582,45 @@ body {
   border-color: #d5cec2;
 }
 
+/* What Sotto noticed and kept to itself (V3-016). It reuses the tray's
+   toggle, and the list under it is deliberately the plainest thing on the
+   stage: a record rather than a contribution. */
+.almost-said {
+  width: 100%;
+  max-width: 46rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.almost-said__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.almost-said__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid #e5e0d8;
+  font-size: 0.875rem;
+}
+
+.almost-said__headline {
+  color: var(--ink-dim);
+}
+
+.almost-said__reason {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+  opacity: 0.75;
+}
+
 /* A question typed instead of said (US-019). It is the quietest thing on the
    screen until it has focus: the stage belongs to the cards. */
 .ask {
