@@ -589,3 +589,44 @@
   NEXT: V2-016 (Glimmer as the judgment gate) — JudgmentRouter.client() is already the
   seam the research gate uses, so the interjection gate is the same move one layer up.
   6 stories left.
+
+[2026-11-01 01:50] V2-016 — completed — the observer no longer marks its own homework: Glimmer answers the four questions and its answers replace the observer's scores.
+  WHAT IS NEW:
+  - server/interject/CandidateGate.ts: one call per candidate through
+    JudgmentRouter.client() (local Glimmer, else Spark, recorded as
+    `glimmer`/`spark-fallback`), concurrent and clock.track-registered like the
+    verifier's checks, flushed in drainLoops after the verifier. `mode: "spark"`
+    hands the candidate on *synchronously* and makes no call at all.
+  - scoresFromGate in server/interject/policy.ts is the mapping and the
+    documentation of it: true->confidence, new->novelty, worthSaying->importance,
+    stillRelevant->relevance. The formula and the chattiness thresholds are
+    untouched, so the gate changes who answers, not what the answer means.
+  - shared/candidates.ts: GateScores, candidateGates, gateModes/DEFAULT_GATE_MODE,
+    CandidateGateReplySchema + candidateGateJsonSchema, and the kind:"gate" line
+    in candidates.jsonl (observerScores, gateScores, gate, scores, score,
+    latencyMs, error). Candidate gains observerScores + gate.
+  - server/prompts/gate.md. Eval: --gate glimmer|spark (glimmer default),
+    EvalRunRecord.gate, FixtureRunRecord.gateCalls, scoreGate/GateScore in
+    score.ts and the "judgment gate (<mode>)" headline in the report.
+  MEASURED (real one-fixture runs, moment-contradiction):
+  - --gate glimmer: the call ran on local Glimmer in 26.4 s, scored the planted
+    contradiction true .95 / new .90 / worth .90 / relevant .95 = 0.75 against the
+    observer's own 0.95; still interjected, caught in a pause. All four gates PASS.
+    eval/reports/2026-11-01_014212.md + -notes.md.
+  - --gate spark: that replay's observer worded the same contradiction differently
+    and scored it 0.55, so it went out as a glow (caught low). Observer variance,
+    not evidence about the gate — n=1 each.
+  WATCH OUT:
+  - A `max` replay spends NO session-clock time on a tracked call, so the gate's
+    26 s is free in the eval's timing and the report's median gate latency is the
+    only place its cost on a live moment shows. 26 s against a planted window of
+    11.8-20.6 s is the number V2-020 has to reckon with.
+  - scripts/eval.ts passes glimmerFromEnv into the replay; server/eval/runner.ts
+    still defaults createGlimmer to none, so `npm test` never dials the local
+    server. Without that wiring `--gate glimmer` silently measured Spark (the
+    first attempt did).
+  - The integration suite was not re-run; the two eval runs exercise the same
+    SessionManager wiring against real Spark and real Glimmer.
+  NEXT: V2-017 (frequency and boldness controls) — chattiness becomes two settings;
+  the eval's --chattiness goes with it and old reports must still render, which
+  score.ts already does for a missing `gate`. 5 stories left.

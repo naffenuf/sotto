@@ -1138,3 +1138,32 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   stack. `foldCard` moved from `useSessionEvents` into `stageView.ts` to be unit-tested.
   A brought-forward card spends none of the research-card budget and never starts its
   cooldown: the budget is about *unsolicited* cards.
+
+- **The second opinion is cheap to add and expensive to wait for.** V2-016's
+  `server/interject/CandidateGate.ts` sits at the one place every candidate but a
+  `research_hook` passes through on its way to the policy, so turning it on cost three edits:
+  the gate, `scoresFromGate` in `server/interject/policy.ts` (`true`→`confidence`,
+  `new`→`novelty`, `worthSaying`→`importance`, `stillRelevant`→`relevance`, chosen so the
+  formula and the chattiness thresholds mean exactly what they meant), and routing
+  `onVerified`/`onCandidate` at it instead of at `policy.accept`. Nothing else branches on it
+  — a gated candidate is a `Candidate` with different numbers in `scores`, the observer's kept
+  in `observerScores`. The load-bearing difference from the research gate: a call that does
+  not come back **keeps the observer's scores** rather than dropping the candidate, because
+  losing the gate should cost judgment, not speech. Measured on local Glimmer: **26.4 s** a
+  call at `low` effort, which scored a planted contradiction 0.75 where the observer had said
+  0.95 and still interjected.
+- **A `max` replay cannot measure what a gate costs a moment.** Simulated time does not move
+  during a `clock.track`ed call, so the gate's 26 s — like the verifier's 10–15 — is *free* in
+  the eval's timing and only the judgment is being measured. That is why
+  `npm run eval -- --gate glimmer|spark` prints **median gate latency** beside recall and
+  precision (`scoreGate` in `server/eval/score.ts`, off `FixtureRunRecord.gateCalls`, read
+  back out of `candidates.jsonl`'s new `kind: "gate"` lines): against a planted window of
+  11.8–20.6 s, 26 s of local judgment is the whole window, and only a live run or the report's
+  latency will say so. `--gate spark` makes no call at all and is the baseline the local gate
+  is compared to — the observer *is* Spark.
+- **An eval replay has no Glimmer unless the script hands it one.** `server/eval/runner.ts`
+  defaults `createGlimmer` to none, exactly as `SessionManager` does, so `npm test` never
+  dials the local server — which means `scripts/eval.ts` has to pass `glimmerFromEnv()` or
+  `--gate glimmer` quietly measures Muse Spark instead (the first V2-016 run did: "0 on
+  Glimmer, 1 on Spark"). The same was true of V2-012's research gate in every eval run before
+  this one.
