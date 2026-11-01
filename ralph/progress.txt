@@ -519,3 +519,36 @@
   clicks Stop must wait for Start to be enabled again, as the answer-queue note already says.
   NEXT: V2-014 (research-ready cards) — `ModelLoops.researchRunner.packets()` is the supply, and the
   card has to go out in a pause like an interjection but with its own budget. 8 stories left.
+
+[2026-11-01 01:15] V2-014 — completed — research packets reach the stage as compact "Research ready:" cards, shown only in a pause, on their own budget.
+  WHAT IS NEW:
+  - server/research/ResearchCards.ts: holds every ready packet until
+    `inPause(pauseState())` — the policy's rule, read off the policy's own getter, so
+    Sotto's own playback counts as somebody talking (V2-006) — and spends its own budget.
+    `cardForPacket` beside it is the pure layout, the way `delivery.ts` is for an interjection.
+  - shared/cards.ts: fifth CardVariant `research` + `StageCard.teaser`.
+  - shared/research.ts: RESEARCH_CARD_COOLDOWN_MS (60 s), MAX_RESEARCH_CARDS_PER_WINDOW (4),
+    RESEARCH_CARD_WINDOW_MS (15 min), researchCardId/researchCardHeadline, and a fifth
+    `ResearchLogLine` kind, `card`.
+  - web: the one Card component draws it — collapsible like a glow, key points inline rather
+    than behind a second toggle, sources as citations, the packet's visual as the same
+    sandboxed frame an answer's artifact uses. /dev/cards has closed and open samples, and
+    web/public/dev/sample-artifact.html is the stand-in document the open one frames.
+  - npm run verify:research (scripts/verify-research.mjs).
+  MEASURED (real 1x replay of research-business-idea, real Spark, local Glimmer gate):
+  packet-1's card went up at 67.3 s of the conversation having waited 50 ms for a pause,
+  90 px tall closed, headline "Research ready: AI meeting niche ~$3.5B in 2025; leaders raised
+  $600M+", 5 key points and 5 resolved sources when opened. ~4 minutes of wall clock to get
+  there; the script stops the session at the first card rather than paying for all three.
+  DESIGN CALLS WORTH KEEPING:
+  - A research card is NOT a policy delivery. Its id is `research-<packetId>`, deliberately
+    outside CARD_ID_PREFIX, so POST /api/feedback cannot file a verdict against it and the
+    eval runner's `deliveredLevel` and e2e's `interjections()` (both interject|glow) needed no
+    change. Keep it that way when adding a variant.
+  - Nothing is dropped. `flush()` in drainLoops shows whatever is still waiting, ignoring the
+    pause and the cooldown: a candidate is about a moment that has passed, a sourced packet is
+    about the world. It publishes against `this.last`, like an answer, because the stage is
+    read after Stop.
+  NEXT: V2-015 (spoken research briefings) — `ModelLoops.researchRunner.packets()` is the
+  supply, and `ResearchCards` is where a packet's card would be brought forward while Sotto
+  speaks. 7 stories left.

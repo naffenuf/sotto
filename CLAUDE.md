@@ -1072,3 +1072,34 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   running job, so a test that *holds* one must drain microtasks (`tick()`) instead of settling, and
   `drainLoops` awaiting `research.flush()` means **Stop waits for a search in flight** (up to ~20 s)
   — deliberate, because V2-018's digest lists the research produced.
+
+- **A research card is not a delivery, and that is what makes it cheap to add.** V2-014's fifth
+  `CardVariant` (`research`) reaches the stage through `server/research/ResearchCards.ts`, which
+  holds every ready packet until `inPause(pauseState())` — the policy's own rule, read off the
+  policy's own getter, so Sotto's playback counts as somebody talking (V2-006) — and spends a
+  budget of its own (`RESEARCH_CARD_COOLDOWN_MS` 60 s, `MAX_RESEARCH_CARDS_PER_WINDOW` 4 per 15
+  min) beside the interjection one. Its id is `research-<packetId>`, deliberately **outside**
+  `CARD_ID_PREFIX`, so `POST /api/feedback` can never find a candidate behind it and the two
+  delivery filters that already existed — `deliveredLevel` in `server/eval/runner.ts` and
+  `interjections()` in `server/e2e/checks.ts`, both `interject|glow` — needed no change at all.
+  Adding a variant is three edits when those filters are honoured and a day's work when they are
+  not. Unlike a held candidate, a packet is **never dropped**: `flush()` in `drainLoops` shows
+  whatever is still waiting, pause and cooldown ignored, because a candidate is about a moment
+  that has passed while a sourced packet is about the world — and it publishes against
+  `this.last`, like an answer, since the stage is read after Stop.
+- **One click has to be the whole interaction.** A research card is `card--collapsed` like a glow,
+  but opening it renders the key points *inline* (`Details` grew an `inline` prop) rather than
+  behind the "details ▾" toggle an answer uses: "clicking expands key points, sources and the
+  visual" is one click, not two. The teaser is a new `StageCard.teaser` because it is shown
+  **closed as well as open** — it is what somebody reads before deciding to open anything — which
+  is exactly what `detailMd` is not. Measured in the browser: 90 px closed at 1440 px wide.
+- **The replay that proves a research card costs four minutes and one search.** `npm run
+  verify:research` starts a real `research-business-idea` events replay through
+  `POST /api/session/start` (the header's Start button is the microphone), waits for the first
+  `[data-variant="research"]` card — 67.3 s into the conversation, having waited 50 ms for a pause
+  — and stops the session there rather than paying for all three packets. A 1x replay stalls on
+  every tracked model call, so its wall clock is the conversation plus every gate and search in
+  series. The one thing a replay will not reliably produce is a packet whose search drew a
+  **visual** (none of V2-013's three did, and none here), so the opened-card-with-a-frame case is
+  checked on `/dev/cards`, which now carries closed and open research samples and frames
+  `web/public/dev/sample-artifact.html`.
