@@ -7,9 +7,13 @@
  * call inside a 6 s wall-clock deadline, after which the verdict is `none` and
  * the line says `fallback: true`.
  *
+ * The same call answers V3-013's question too — whether a `decision` turn
+ * *settled* something — so a read-back arrives with the turn rather than with
+ * the board update a dozen seconds later, and costs nothing extra.
+ *
  * Three things never reach the model. A turn that is not
- * {@link isQuestionShaped} costs nothing, which is the only reason a call per
- * question is affordable (8% of `brainstorm`'s turns). A turn that addresses
+ * {@link worthClassifying} costs nothing, which is the only reason a call per
+ * question is affordable (13% of `brainstorm`'s turns). A turn that addresses
  * Sotto by name is the address path's — the room asked *Sotto*, so an answer
  * is owed whatever kind of question it is, and classifying it here would
  * duplicate the answer. And an echo of Sotto's own voice, a playback command
@@ -28,11 +32,12 @@ import { systemClock, type Clock } from "../clock.js";
 import { detectsAddress } from "../wake.js";
 import {
   QuestionSchema,
+  type DecisionClosing,
   type OpenQuestion,
   type QuestionClassifier,
   type QuestionResult,
 } from "./question.js";
-import { isQuestionShaped } from "./questionShape.js";
+import { worthClassifying } from "./questionShape.js";
 
 /** A slow classifier must not leave a question hanging; the verdict is then `none`. */
 export const QUESTION_TIMEOUT_MS = 6_000;
@@ -53,6 +58,11 @@ export interface QuestionWatcherOptions {
   inFollowUpWindow?: (turn: TurnUpdate) => boolean;
   /** Something the room wondered aloud that a lookup can answer (V3-003). */
   onOpenQuestion: (question: OpenQuestion) => void;
+  /**
+   * The group just settled something (V3-013), off the same call: a decision
+   * read back the instant it lands rather than a board update later.
+   */
+  onDecisionClosing?: (closing: DecisionClosing) => void;
   /** Every classification, including the ones that cost nothing. */
   onTiming: (record: Record<string, unknown>) => void;
 }
@@ -104,10 +114,10 @@ export class QuestionWatcher {
       });
       return;
     }
-    // Nothing is written down for a turn that is not a question: it is most of
-    // the conversation, `turn_final` already records it, and no classification
-    // happened to log.
-    if (!isQuestionShaped(turn.text)) return;
+    // Nothing is written down for a turn that is neither a question nor the
+    // group settling something (V3-013): it is most of the conversation,
+    // `turn_final` already records it, and no classification happened to log.
+    if (!worthClassifying(turn.text)) return;
     const work = this.decide(turn, previous, atMs);
     this.pending.add(work);
     void work.finally(() => this.pending.delete(work));
@@ -143,15 +153,29 @@ export class QuestionWatcher {
       turnId: turn.turnId,
       kind: result?.kind ?? "none",
       latencyMs,
+      ...(result?.closing === true ? { closing: true, decision: result.decision } : {}),
       ...(result === null ? { fallback: true } : {}),
     });
-    if (result === null || result.kind !== "open_question") return;
+    if (result === null) return;
     const speaker = turn.speaker;
+    const named = speaker === null ? null : this.options.speakers()[speaker] ?? speaker;
+    // V3-013: the group settled something. The read-back is the one thing
+    // this watcher produces that is not about a question at all.
+    if (result.closing) {
+      this.options.onDecisionClosing?.({
+        turnId: turn.turnId,
+        decision: result.decision,
+        decidedBy: named,
+        decidedAtMs: atMs,
+      });
+      return;
+    }
+    if (result.kind !== "open_question") return;
     this.options.onOpenQuestion({
       turnId: turn.turnId,
       question: result.question,
       topic: result.topic,
-      askedBy: speaker === null ? null : this.options.speakers()[speaker] ?? speaker,
+      askedBy: named,
       askedAtMs: atMs,
     });
   }

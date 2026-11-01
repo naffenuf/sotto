@@ -26,8 +26,14 @@ export const momentTypes = [
  * `research` is not a level the interjection policy can choose: it means a
  * research-ready card has to appear inside the window (v2 PRD V2-014), which
  * is the only thing a `research_hook` can be caught by.
+ *
+ * `speak` is the one above everything (V3-013, V3-010): the moment is only
+ * really caught if Sotto said something out loud inside the window — an
+ * answer to what the room wondered (V3-004), or a decision read back with the
+ * room's own unsettled question on it. A card for one of those is `caught_low`
+ * rather than a catch, which is exactly what the rank below says.
  */
-export const expectedLevels = ["glow", "interject", "research"] as const;
+export const expectedLevels = ["glow", "interject", "research", "speak"] as const;
 
 const lineIndex = z.number().int().min(0);
 

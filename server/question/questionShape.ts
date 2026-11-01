@@ -98,3 +98,53 @@ function sentences(text: string): string[] {
 function words(text: string): string[] {
   return text.match(/[\p{L}\p{N}']+/gu) ?? [];
 }
+
+/**
+ * Ways a group says a thing is settled (V3-013).
+ *
+ * A closing decision is not question-shaped at all — "OK, let's go with six
+ * gardens then" has no question word and no question mark — so it would never
+ * reach the classifier on {@link isQuestionShaped} alone, and the PRD's "it
+ * costs no extra call" would be an extra call by another name. These are the
+ * phrases a room uses to stop weighing something, matched wherever they
+ * appear: the turn that settles it usually starts with the agreement
+ * ("Right, let's lock that in") but just as often ends with it ("Fine, we kill
+ * the Monday meeting then").
+ *
+ * Generous on purpose, because the model decides: "we could lock it in now, or
+ * wait for Alex" matches here and comes back `closing: false`, which is one
+ * cheap call rather than a missed read-back. What is *not* here is the bare
+ * agreement — "works for me", "fine", "sounds good" — which is most of a
+ * conversation's short turns and carries no decision to read back.
+ */
+const CLOSINGS = [
+  /\blet'?s\s+(?:just\s+)?(?:go\s+with|do|lock|book|run\s+with|start\s+with|say|call\s+it|take)\b/,
+  /\blet'?s\s+(?:just\s+)?(?:go|do\s+it|do\s+that)\b/,
+  /\bwe'?re\s+(?:agreed|going\s+with|doing|booking|locking|settled)\b/,
+  /\b(?:that'?s|it'?s|we'?re)\s+(?:settled|decided|agreed|locked|a\s+plan)\b/,
+  /\b(?:we'?ll|i'?ll)\s+(?:go\s+with|lock|book|put\s+(?:it|that)\s+down)\b/,
+  /\block(?:ing)?\s+(?:it|that|this)\s+in\b/,
+  /\bgoing\s+with\b/,
+  /\b(?:decided|agreed|settled|sorted)\s+then\b/,
+  /\bbook(?:ing)?\s+(?:it|that)\b/,
+  /\bsign(?:ing)?\s+off\s+on\b/,
+  /\bput\s+(?:it|that)\s+down\s+as\b/,
+  /\bgo\s+with\s+(?:the|that|those|six|two|three|four|five|option)\b/,
+] as const;
+
+/** Whether this turn is shaped like the group settling something (V3-013). */
+export function isClosingShaped(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return CLOSINGS.some((pattern) => pattern.test(normalized));
+}
+
+/**
+ * Whether this final turn is worth one classification call at all.
+ *
+ * The union of the two shapes, because the classifier answers both questions
+ * in one call (V3-013): what the turn is doing, and — if that is a decision —
+ * whether it was just settled.
+ */
+export function worthClassifying(text: string): boolean {
+  return isQuestionShaped(text) || isClosingShaped(text);
+}

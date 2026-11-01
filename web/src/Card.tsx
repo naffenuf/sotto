@@ -414,12 +414,13 @@ function ArtifactFrame({ artifact }: { artifact: CardArtifact }) {
 }
 
 /**
- * The one line about a research card's own standing (V3-004).
+ * The one line about a card's own standing (V3-004, V3-013).
  *
  * Shown closed as well as open, above the teaser: when somebody in the room
  * answered the question first, whether the search agrees with them is the
  * thing worth reading, and it is the only thing said about it — nothing was
- * spoken.
+ * spoken. The same line says what decision a correction of Sotto's own is
+ * still open against, which is why that card has just come to the top.
  */
 function Note({ card }: { card: StageCard }) {
   const note = card.note ?? "";

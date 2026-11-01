@@ -42,3 +42,26 @@ For open_question: question is the thing to look up, cleaned into one plain sent
 on its own without the conversation (resolve "it", "that place", "they" from the previous turns),
 and topic is three to five words naming it, as it would be said out loud in "I'll check the drive
 time". For every other kind, question and topic are empty.
+
+Two more fields, for a decision only (V3-013). closing is true when the turn *settles* something
+rather than weighing it: "OK, let's go with six gardens", "so we're agreed on Saturday", "let's
+lock that in", "right, booking it then". It is false when the turn is still asking which way to go
+("do we go Thursday or Friday?", "should we do it at all?"), when somebody is only leaning one way
+("I'd probably say Saturday"), and for every kind that is not a decision. When closing is true,
+decision is what was settled in a few words, as a note-taker would write it down — "six gardens,
+Saturday", "May launch", "cancel the Monday meeting" — and nothing else: no lead-in, no "we
+decided", no full sentence. When closing is false, decision is empty.
+
+Examples of a closing decision:
+- "OK, let's go with six gardens then." — closing, decision "six gardens".
+- "So we're agreed, Saturday the fourteenth, and I'll send the invite." — closing, decision
+  "Saturday the fourteenth".
+- "Right, let's lock that in. Flash for the voice." — closing, decision "Flash for the voice".
+- "Fine, we kill the Monday meeting and try the Friday note instead." — closing, decision "kill
+  the Monday meeting, try a Friday note".
+
+Examples that are a decision but NOT closing:
+- "Do we go Thursday or Friday?" — the question is still open.
+- "Should we even do six gardens, or start with two?" — still weighing it.
+- "I think Saturday works better for me, personally." — one person leaning, nothing settled.
+- "We could lock it in now, or wait for Alex." — still weighing it.

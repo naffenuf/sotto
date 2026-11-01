@@ -72,17 +72,21 @@ function outcomeRank(outcome: MomentOutcome): number {
 }
 
 /**
- * `glow` < `interject` < `research`: "the expected level or higher" in one
- * number.
+ * `glow` < `interject` < `research` < `speak`: "the expected level or higher"
+ * in one number.
  *
  * `research` is a level a policy delivery can never have and a research-ready
  * card always has (V2-014). Since V2-019 the two halves of the stage are
  * judged against the two kinds of moment they can catch and no further, so in
  * practice a research moment's outcome is `caught`, `late` or `missed`: the
  * rank is still here because the comparison is what *says* so.
+ *
+ * `speak` is a level no *card* has (V3-013): a moment that expected Sotto to
+ * say something and got a card instead is `caught_low`, which is the truthful
+ * answer until V3-010 scores spoken contributions in their own right.
  */
 function levelRank(level: ScoredLevel | ExpectedLevel): number {
-  return level === "research" ? 2 : level === "interject" ? 1 : 0;
+  return level === "speak" ? 3 : level === "research" ? 2 : level === "interject" ? 1 : 0;
 }
 
 /** One planted moment, scored. */

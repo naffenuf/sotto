@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { SimulatedClock } from "../clock.js";
 import { QUESTION_TIMEOUT_MS, QuestionWatcher } from "./QuestionWatcher.js";
-import type { OpenQuestion, QuestionResult } from "./question.js";
+import type { DecisionClosing, OpenQuestion, QuestionResult } from "./question.js";
 
 function turn(text: string, id = "0:1", speaker: string | null = "A"): TurnUpdate {
   return {
@@ -15,12 +15,25 @@ const open: QuestionResult = {
   kind: "open_question",
   question: "How long is the drive to the farmhouse?",
   topic: "the drive time",
+  closing: false,
+  decision: "",
+};
+
+/** V3-013: the group settling something, off the same call. */
+const settled: QuestionResult = {
+  kind: "decision",
+  question: "",
+  topic: "",
+  closing: true,
+  decision: "six sheds, one per association",
 };
 
 interface Harness {
   watcher: QuestionWatcher;
   clock: SimulatedClock;
   questions: OpenQuestion[];
+  /** V3-013: the decisions the same call reported as settled. */
+  closings: DecisionClosing[];
   timing: Record<string, unknown>[];
   asked: string[];
 }
@@ -33,6 +46,7 @@ function watcherFor(
   const clock = new SimulatedClock(0);
   const wall = options.wall ?? clock;
   const questions: OpenQuestion[] = [];
+  const closings: DecisionClosing[] = [];
   const timing: Record<string, unknown>[] = [];
   const asked: string[] = [];
   let next = 0;
@@ -48,9 +62,10 @@ function watcherFor(
     },
     speakers: () => ({ A: "Craig", B: "EJ" }),
     onOpenQuestion: (question) => questions.push(question),
+    onDecisionClosing: (closing) => closings.push(closing),
     onTiming: (record) => timing.push(record),
   });
-  return { watcher, clock, questions, timing, asked };
+  return { watcher, clock, questions, closings, timing, asked };
 }
 
 describe("QuestionWatcher", () => {
@@ -112,12 +127,13 @@ describe("QuestionWatcher", () => {
   });
 
   it("reports nothing for the five kinds that are not an open question", async () => {
+    const nothing = { question: "", topic: "", closing: false, decision: "" } as const;
     const quiet: QuestionResult[] = [
-      { kind: "to_group", question: "", topic: "" },
-      { kind: "rhetorical", question: "", topic: "" },
-      { kind: "decision", question: "", topic: "" },
-      { kind: "answered", question: "", topic: "" },
-      { kind: "none", question: "", topic: "" },
+      { kind: "to_group", ...nothing },
+      { kind: "rhetorical", ...nothing },
+      { kind: "decision", ...nothing },
+      { kind: "answered", ...nothing },
+      { kind: "none", ...nothing },
     ];
     const { watcher, questions, timing } = watcherFor(quiet);
     quiet.forEach((_reply, index) => {
@@ -226,5 +242,48 @@ describe("QuestionWatcher", () => {
     watcher.stop();
     await watcher.flush();
     expect(questions).toEqual([]);
+  });
+});
+
+describe("QuestionWatcher: the group settling something (V3-013)", () => {
+  it("classifies a closing-shaped turn that is no question at all", async () => {
+    const { watcher, clock, closings, asked, timing } = watcherFor([settled]);
+    clock.advanceTo(100_000);
+    watcher.acceptTurn(
+      turn(" Fine. Right. Let's lock that in. Saturday the 14th. Mechanic and coffee cart. "),
+    );
+    await watcher.flush();
+    // It would never have reached the model on the question filter alone.
+    expect(asked).toHaveLength(1);
+    expect(closings).toEqual([
+      {
+        turnId: "0:1",
+        decision: "six sheds, one per association",
+        decidedBy: "Craig",
+        decidedAtMs: 100_000,
+      },
+    ]);
+    expect(timing[0]).toMatchObject({
+      stage: "question", kind: "decision", closing: true,
+      decision: "six sheds, one per association",
+    });
+  });
+
+  it("reports nothing for a decision the group is still weighing", async () => {
+    const { watcher, closings, timing } = watcherFor([
+      { kind: "decision", question: "", topic: "", closing: false, decision: "" },
+    ]);
+    watcher.acceptTurn(turn(" We could lock it in now, or wait for Alex. "));
+    await watcher.flush();
+    expect(closings).toEqual([]);
+    expect(timing[0]).not.toHaveProperty("closing");
+  });
+
+  it("is never both a closing and an open question", async () => {
+    const { watcher, questions, closings } = watcherFor([settled]);
+    watcher.acceptTurn(turn(" So we're agreed, six sheds. "));
+    await watcher.flush();
+    expect(questions).toEqual([]);
+    expect(closings).toHaveLength(1);
   });
 });

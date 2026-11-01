@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseAsrFrameRecords } from "../../shared/asr.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { TurnAssembler } from "../asr/turns.js";
-import { isQuestionShaped } from "./questionShape.js";
+import { isClosingShaped, isQuestionShaped, worthClassifying } from "./questionShape.js";
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
 
@@ -100,16 +100,57 @@ describe("isQuestionShaped", () => {
    * bound is per conversation because the conversations differ in kind:
    * `research-business-idea` is mostly questions, and
    * `rhetorical-questions` is nothing but, which is what it is for.
+   *
+   * Measured on the union with V3-013's closings, which is what really costs
+   * a call: three extra turns across all twelve conversations, every one of
+   * them a group settling something out loud.
    */
   it.each([
     ["brainstorm", 0.25], ["no-wake", 0.2], ["offsite-plan", 0.3],
     ["ask-search", 0.1], ["ask-diagram", 0.1],
-    ["moment-assumption", 0.3], ["moment-contradiction", 0.25], ["moment-dropped", 0.15],
+    ["moment-assumption", 0.35], ["moment-contradiction", 0.3], ["moment-dropped", 0.15],
     ["moment-fact", 0.1], ["moment-mixed", 0.25],
-    ["research-business-idea", 0.35], ["rhetorical-questions", 0.45],
+    ["research-business-idea", 0.35], ["rhetorical-questions", 0.5],
+    ["decision-closings", 0.25],
   ])("sends no more than its share of %s's turns to the model", (fixture, most) => {
     const turns = finals(fixture);
-    const share = turns.filter(isQuestionShaped).length / turns.length;
+    const share = turns.filter(worthClassifying).length / turns.length;
     expect(share, `${fixture}: ${Math.round(share * 100)}%`).toBeLessThanOrEqual(most);
+  });
+});
+
+/**
+ * V3-013's half of the pre-filter. A closing decision has no question word
+ * and no question mark, so without this it would never reach the classifier
+ * at all — and the three it finds in the existing captures are all real.
+ */
+describe("isClosingShaped", () => {
+  /** The three decisions `decision-closings` settles, verbatim. */
+  const closings: string[] = [
+    " Fine. Right. Let's lock that in. Saturday the 14th. Mechanic and coffee cart. ",
+    " So we're agreed, six sheds, one per association, and I will send the agreements out Friday. ",
+    " Let's go with paper sheets then and you type them up at the end of each month. ",
+    // And the shapes the older captures happen to contain.
+    " Decided then, photo to three suggestions and we cut everything else. ",
+    " Let's do pricing today. I want a number we can actually defend to somebody. ",
+  ];
+
+  it.each(closings)("passes %j", (text) => {
+    expect(isClosingShaped(text)).toBe(true);
+  });
+
+  /** Weighing it is not settling it; the model decides, but these cost nothing. */
+  it.each([
+    " Works for me. ",
+    " Fair enough. ",
+    " Paper. Half the people who use a tool library do not want another account. ",
+    " He wants 300 for the day. I have seen the quote. ",
+  ])("rejects %j", (text) => {
+    expect(isClosingShaped(text)).toBe(false);
+  });
+
+  it("finds all three of decision-closings' decisions and nothing else", () => {
+    const shaped = finals("decision-closings").filter(isClosingShaped);
+    expect(shaped).toHaveLength(3);
   });
 });

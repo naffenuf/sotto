@@ -143,13 +143,16 @@ export interface StageCard {
   /** `state: "error"`: the muted line shown in place of the content. */
   message?: string;
   /**
-   * `research`: one short line about the card's own standing (V3-004).
+   * One short line about the card's own standing (V3-004, V3-013).
    *
-   * Set when somebody in the room answered the question before Sotto could
-   * say what it found, so nothing was said out loud: `confirmed` when the
-   * search agrees with them, and the fact that it does not when it does not.
-   * Shown closed as well as open, like {@link teaser} — it is the reason the
-   * card is worth a glance at all.
+   * On a `research` card: somebody in the room answered the question before
+   * Sotto could say what it found, so nothing was said out loud — `confirmed`
+   * when the search agrees with them, and the fact that it does not when it
+   * does not. On an `interject` or a `glow`: the decision this correction of
+   * Sotto's own is still open against, which is why it has just come to the
+   * top of the stage ("Still open against \"six sheds\""). Shown closed as
+   * well as open, like {@link teaser} — it is the reason the card is worth a
+   * glance at all.
    */
   note?: string;
   /**
@@ -166,12 +169,14 @@ export interface StageCard {
    */
   raised?: boolean;
   /**
-   * `research`: bring this card back to the top of the stage, open (V2-015).
+   * Bring this card back to the top of the stage, open (V2-015, V3-013).
    *
    * Set on the one push that happens because somebody *asked* for the
    * research — Sotto is briefing the room on it as the card arrives, so it is
    * the thing being read, and the key points, the sources and the visual are
-   * what they asked to see. Everywhere else a card that arrives again keeps
+   * what they asked to see — and on a correction of Sotto's own pinned beside
+   * a decision the group has just settled, which is the one moment that card
+   * is worth looking at again. Everywhere else a card that arrives again keeps
    * its place and its collapsed state, so an answer landing in pieces does
    * not jump the stack.
    */

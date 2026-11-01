@@ -83,6 +83,8 @@ import { AddressWatcher } from "../answer/AddressWatcher.js";
 import { classifyQuestion, type OpenQuestion } from "../question/question.js";
 import { QuestionWatcher } from "../question/QuestionWatcher.js";
 import { Reservations } from "../question/Reservations.js";
+import { ReadBacks } from "../decision/ReadBacks.js";
+import { decisionNote } from "../decision/readback.js";
 import { StillCurrentWatcher } from "../question/StillCurrentWatcher.js";
 import { classifyStillCurrent } from "../question/stillCurrent.js";
 import { classifyAddress } from "../answer/address.js";
@@ -323,6 +325,15 @@ interface ModelLoops {
    */
   stillCurrent: StillCurrentWatcher | null;
   /**
+   * Read-backs at decision points (V3-013), or `null` with no model client.
+   *
+   * It makes no call of its own either: the closing decision rides V3-002's
+   * classifier and the attachment is matched on words, which is what lets a
+   * read-back arrive seconds after the decision rather than after the board
+   * update that records it.
+   */
+  readBacks: ReadBacks | null;
+  /**
    * The room turning Sotto down or up by talking to it (V3-006), or `null`
    * with no model client.
    *
@@ -388,6 +399,8 @@ interface RunningSession {
   reservations: Reservations | null;
   /** V3-004: the cached "is the room still on this?", retired with the session. */
   stillCurrent: StillCurrentWatcher | null;
+  /** V3-013: the read-backs, which stop matching decisions with the session. */
+  readBacks: ReadBacks | null;
   /** Where this session's judgment calls run: local Glimmer or Spark (V2-010). */
   judgment: JudgmentRouter;
   info: SessionInfo;
@@ -652,6 +665,7 @@ export class SessionManager {
     running.researchCards?.stop();
     running.reservations?.stop();
     running.stillCurrent?.stop();
+    running.readBacks?.stop();
     running.judgment.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
@@ -1151,6 +1165,7 @@ export class SessionManager {
         questions: null,
         reservations: null,
         stillCurrent: null,
+        readBacks: null,
         steering: null,
       };
     }
@@ -1158,6 +1173,30 @@ export class SessionManager {
       if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
     };
     const deliveries = new Map<string, Delivered>();
+    /**
+     * V3-013: corrections of Sotto's own that a read-back pinned beside a
+     * decision, by candidate id, with the decision they bear on.
+     *
+     * Remembered rather than applied once, because the policy may still be
+     * holding the candidate when the decision lands: the card then goes out
+     * pinned, rather than going out plain and never catching up.
+     */
+    const pinnedDecisions = new Map<string, string>();
+    const pinToDecision = (candidateId: string, decision: string): void => {
+      pinnedDecisions.set(candidateId, decision);
+      const cardId = deliveredCardId(candidateId);
+      const delivered = deliveries.get(cardId);
+      if (delivered === undefined) return;
+      const note = decisionNote(decision);
+      if (delivered.card.note === note && delivered.card.raised === true) return;
+      // Raised and brought forward, open: it is Sotto's question about the
+      // thing the room has just decided, which is as prominent as a card
+      // gets without anybody being spoken to (V3-008).
+      const card: StageCard = { ...delivered.card, raised: true, forward: true, note };
+      deliveries.set(cardId, { ...delivered, card });
+      this.logger.log(`[readback] ${info.id} pinned ${cardId} beside: ${decision}`);
+      if (this.current?.info.id === info.id) this.bus.publishCard(card);
+    };
     const onTiming = (event: Record<string, unknown>): void => store.writer?.appendTiming?.(event);
     // Every candidate line goes two places: `candidates.jsonl`, and the
     // digest the session ends with (V2-018), which is where "what Sotto
@@ -1208,6 +1247,10 @@ export class SessionManager {
       onDeliver: (interjection) => {
         this.deliver(info, deliveries, interjection);
         steering.noteContribution();
+        // V3-013: a read-back already pinned this one beside a decision while
+        // the policy was still holding it, so the card goes out pinned.
+        const pinned = pinnedDecisions.get(interjection.candidate.id);
+        if (pinned !== undefined) pinToDecision(interjection.candidate.id, pinned);
         onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id });
         const line = spokenCorrection(interjection);
         if (line === null) return;
@@ -1242,7 +1285,13 @@ export class SessionManager {
       wallClock: this.wallClock,
       logger: this.logger,
       onRecord: (record) => { recordCandidate(record); onTiming({ stage: "candidate_gate", ...record }); },
-      onScored: (candidate) => policy.accept(candidate),
+      // V3-013: and the read-backs, which attach the room's own unsettled
+      // question to a decision. The gate having passed it is the PRD's bar
+      // for an attachment — whether or not the policy ever delivers a card.
+      onScored: (candidate) => {
+        readBacks.accept(candidate);
+        policy.accept(candidate);
+      },
     });
     const verifier = new Verifier({
       clock,
@@ -1398,7 +1447,41 @@ export class SessionManager {
           stillCurrent.forget(record.ideaId);
           if (!record.spoken) this.raiseHand(info, deliveries, record.ideaId);
         }
+        // V3-013: the two limits count what the room really heard, so the
+        // read-backs are told what became of each line — and a decision
+        // nothing more will be said about needs no further verdicts.
+        if (record.kind === "readback") {
+          readBacks.observe(record);
+          if (record.retrying !== true) stillCurrent.forget(record.ideaId);
+        }
       },
+      logger: this.logger,
+    });
+    // V3-013: the scribe's move. A closing decision arrives off V3-002's
+    // classifier, the room's own unsettled question is matched to it on
+    // words, and the line is said at the next real pause under V3-004's
+    // rules. One of Sotto's own corrections is pinned to the stage instead,
+    // and only a `bold` session says that one out loud.
+    const readBacks = new ReadBacks({
+      clock,
+      speak: (request) => {
+        // Watched before it is queued, so the verdict the pause reads is
+        // already there: nothing has been said since the decision, which is
+        // `current` with no model call at all.
+        stillCurrent.watch(request.id, {
+          kind: "decision",
+          question: request.decision,
+          answer: request.text,
+          askedAtMs: clock.now(),
+        });
+        reservations.readBack(request);
+      },
+      pinCard: (candidateId, decision) => pinToDecision(candidateId, decision),
+      // Whether the room can already see this candidate as a card, which is
+      // what decides whether saying its question costs the frequency setting
+      // anything (V3-013, following V3-008's rule for a spoken correction).
+      delivered: (candidateId) => deliveries.has(deliveredCardId(candidateId)),
+      onTiming,
       logger: this.logger,
     });
     // The search (V2-013): one grounded call per approved idea, writing
@@ -1525,8 +1608,11 @@ export class SessionManager {
       onTiming,
       onOpenQuestion: (question) =>
         this.noticeQuestion(info, store, question, research, researchCards, reservations),
+      // V3-013: the same call tells us when the group settled something, so
+      // the read-back arrives with the turn rather than with the board.
+      onDecisionClosing: (closing) => readBacks.closing(closing),
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations, stillCurrent, steering };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations, stillCurrent, readBacks, steering };
   }
 
   /**
@@ -1853,6 +1939,7 @@ export class SessionManager {
     running.research?.stop();
     running.reservations?.stop();
     running.stillCurrent?.stop();
+    running.readBacks?.stop();
     running.wrapUp.stop();
     running.judgment.stop();
     // Not `running.answers`: a question typed after Stop is answered against

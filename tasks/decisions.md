@@ -284,3 +284,83 @@ would have failed in practice as well as on the rule.
 **Where it lives:** `server/interject/policy.ts` (`SPEAK_PAUSE_MS`, `inPause`),
 `server/eval/ceiling.ts` (`speakReach`, `speakThresholdMs`, `SPEAK_MARGIN_MS`,
 `SPEAK_MOMENT_TYPES`), `scripts/eval-ceiling.ts` (`--speak`), PRD V3-004.
+
+## 2026-11-01 — A read-back's attachment costs nothing when the room can already see it
+
+**What changed:** V3-013 reads a decision back at the next real pause and may
+carry the room's own unsettled question on it. The PRD says a read-back
+"counts against the frequency budget", and it does — with one exemption: when
+the question on it belongs to a candidate the policy has **already delivered as
+a card**, saying it beside the decision spends nothing. `ReadBackRequest
+.alreadyDelivered` carries that fact and `Reservations.charges()` reads it.
+
+**Why.** It is V3-008's rule, in the same words: the card spent the
+contribution when it went out, and this is that contribution reaching the
+room's ears rather than a second one. Without the exemption the feature is
+unreachable rather than rationed. Measured on `decision-closings` with the
+offline pipeline: the policy delivers the candidate as an `interject` the
+moment it has a pause, which is **forty to fifty seconds before** the decision
+it bears on, and an interject pushes `interjectedAtMs` — so at `normal`'s
+180-second cooldown every read-back that had anything to say was skipped as
+`cooldown`, and at `often`'s 90 seconds too. The thing being rationed would
+have been exactly the contribution the PRD asks for.
+
+What still pays: a **bare** read-back (nothing attached), and one whose
+candidate the policy is still holding. And the read-back's own two limits are
+untouched — one spoken read-back per five minutes, one attached question per
+ten — so the ceiling is one attached read-back per ten minutes whatever the
+budget says.
+
+## 2026-11-01 — Which candidate goes with which decision is matched on words
+
+**What changed:** `decisionRelevance` in `server/decision/readback.ts` scores
+coverage of the *decision's* own content words by the candidate's headline,
+detail, "why now" and cited quotes, against `DECISION_RELEVANCE` (0.4 — two of
+a five-word decision, one of a two-word one). No model call.
+
+**Why no call.** A read-back's whole value is arriving while the decision is
+still in the air: V3-013 rides V3-002's existing classifier for exactly that
+reason, and a second judgment call in front of it would cost the sentence the
+only thing it has. The bar works because V3-008 made every correction a
+question *tied to what was just said* — "Before the mechanic and the coffee
+cart: where does the 450 come from?" shares the decision's own nouns, and a
+candidate about something else shares none of them.
+
+**The failure it accepts** is a miss, not a false attachment. A read-back with
+nothing on it is a courtesy (and is only said at frequency `often`); a
+read-back with the *wrong* question on it is Sotto not listening. Recency was
+considered and rejected for this reason: "any open candidate from the last
+minute" would have attached `brainstorm`'s dropped grocery-partnership thread
+to its "decided then, photo to three suggestions" closing, which is the first
+false speech the V3-010 gate would catch.
+
+## 2026-11-01 — `decision-closings`, and `expectedLevel: "speak"`
+
+**What changed:** a new fixture, `fixtures/scripts/decision-closings.json`
+(27 lines, 133.8 s, rendered and captured), in the eval set. It settles three
+things out loud and is the only conversation that exercises all three of
+V3-013's cases: a decision only Sotto sees a problem with (the launch costs
+against a stated 1,400 ceiling), a decision the group itself raised a question
+against and dropped (six sheds, one per association), and a decision with
+nothing open against it (paper sign-up sheets). `expectedLevels` gained
+`"speak"` for the second, which V3-010 will score properly; until then
+`levelRank` puts it above everything, so a card for a moment that expected
+speech is `caught_low` rather than a catch.
+
+**Measured** (`npm run eval:ceiling -- --fixtures decision-closings`, free):
+`launch-costs-contradiction` has a 29.5 s window with 1,571 ms of real quiet
+left after the observer could first look, and `association-signup-unanswered`
+15.9 s with 743 ms — both reachable at `PAUSE_MS` 700, and the second with 293
+ms of margin at the read-back's `SPEAK_PAUSE_MS` of 450. Note the ceiling tool
+models an interjection: for a read-back the candidate already exists when the
+decision lands, and the pause it waits for is the decision turn's own (a
+scripted 2,400 ms).
+
+**The pre-filter had to grow a second half.** A closing decision is not
+question-shaped at all — no question word, no question mark — so
+`isClosingShaped` joins `isQuestionShaped` in `worthClassifying`, which is what
+the watcher now asks. Measured across all twelve older captures: **three** extra
+calls in total (`brainstorm`'s "decided then, photo to three suggestions",
+`moment-assumption`'s "let's do pricing today", `moment-contradiction`'s "let's
+just say that out loud"), every one of them a group really settling something.
+`brainstorm` goes from 2 of 24 turns to 3 — still well inside V3-002's quarter.

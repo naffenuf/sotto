@@ -21,6 +21,7 @@ import { Steering } from "../session/Steering.js";
 import { PAUSE_MS, SPEAK_PAUSE_MS, type SpendVerdict } from "../interject/policy.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
 import type { StillCurrentState } from "./StillCurrentWatcher.js";
+import { READBACK_EXPIRY_MS } from "../decision/readback.js";
 import {
   ANSWER_STALE_MS,
   ANSWER_STALE_TURNS,
@@ -1214,6 +1215,239 @@ describe("Reservations: Sotto's own correction (V3-008)", () => {
       headline: "  ",
       text: "  ",
     });
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(voice.opened).toBe(1);
+    expect(harness.records).toHaveLength(1);
+  });
+});
+
+describe("Reservations: reading a decision back (V3-013)", () => {
+  const BARE = "Got it: six sheds.";
+  const WITH_QUESTION =
+    "Got it: six sheds. EJ asked, what if only one of them signs. Did that get settled?";
+
+  /** The read-back, as `ReadBacks` hands it over. */
+  function readBack(
+    harness: Harness,
+    attached: "group" | "own" | null = "group",
+    text = WITH_QUESTION,
+    alreadyDelivered = false,
+  ): void {
+    harness.reservations.readBack({
+      id: "decision-0:9",
+      turnId: "0:9",
+      decision: "six sheds",
+      attached,
+      candidateId: attached === null ? null : "cand-4",
+      text,
+      bareText: BARE,
+      alreadyDelivered,
+    });
+  }
+
+  it("is said at the first real pause, with the group's question on it", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    harness.speak();
+    readBack(harness);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS - 1);
+    harness.reservations.acceptTurn(partial());
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+
+    harness.clock.advanceBy(1);
+    harness.reservations.acceptTurn(partial());
+    await harness.tick();
+    expect(voice.said).toEqual([WITH_QUESTION]);
+  });
+
+  it("records what was settled, what was attached and the candidate", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    harness.speak();
+    readBack(harness);
+    harness.clock.advanceBy(2_000);
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({
+      stage: "spoken_contribution",
+      kind: "readback",
+      ideaId: "decision-0:9",
+      turnId: "0:9",
+      decision: "six sheds",
+      attached: "group",
+      candidateId: "cand-4",
+      spoken: true,
+      text: WITH_QUESTION,
+      pauseWaitMs: 2_450,
+    });
+    expect(harness.spoken[0]?.text).toBe(WITH_QUESTION);
+  });
+
+  it("spends the frequency's allowance, like any unprompted line", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    readBack(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(harness.spend.spent).toBe(1);
+  });
+
+  /**
+   * V3-013, following V3-008's rule: the card the question is already on
+   * spent the contribution when the policy delivered it, so saying it beside
+   * the decision costs nothing more. Without this the cooldown that card
+   * spent would silence every read-back that had something to say.
+   */
+  it("spends nothing when the question is already on the stage", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { verdict: "cooldown" });
+    readBack(harness, "group", WITH_QUESTION, true);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(voice.said).toEqual([WITH_QUESTION]);
+    expect(harness.spend.spent).toBe(0);
+  });
+
+  it("says nothing when the budget says no", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { verdict: "budget" });
+    readBack(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({ kind: "readback", spoken: false, reason: "budget" });
+  });
+
+  it("says nothing at all at boldness cautious", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "cautious" } });
+    readBack(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({ kind: "readback", reason: "boldness" });
+  });
+
+  it("is card only when muted: nothing was heard", async () => {
+    const harness = setup(new FakeVoice("muted"));
+    readBack(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({ kind: "readback", spoken: false, reason: "unheard" });
+    expect(harness.spend.spent).toBe(0);
+  });
+
+  it("says a bare read-back only at frequency often", async () => {
+    const quietVoice = new FakeVoice();
+    const normal = setup(quietVoice);
+    readBack(normal, null, BARE);
+    normal.clock.advanceBy(SPEAK_PAUSE_MS);
+    await normal.tick();
+    expect(quietVoice.opened).toBe(0);
+    expect(normal.records[0]).toMatchObject({
+      kind: "readback", attached: null, spoken: false, reason: "frequency",
+    });
+
+    const loudVoice = new FakeVoice();
+    const often = setup(loudVoice, { settings: { frequency: "often" } });
+    readBack(often, null, BARE);
+    often.clock.advanceBy(SPEAK_PAUSE_MS);
+    await often.tick();
+    expect(loudVoice.said).toEqual([BARE]);
+  });
+
+  /**
+   * V3-008's rule, kept here: one of Sotto's own corrections is pinned to the
+   * stage and said out loud only at boldness `bold`. The boldness is read at
+   * the pause, so a header turned down mid-wait loses the attachment rather
+   * than the read-back.
+   */
+  it("drops Sotto's own question from the line unless the session is bold", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { frequency: "often" } });
+    readBack(harness, "own", "Got it: six sheds. What about the fourteen hundred ceiling?");
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.said).toEqual([BARE]);
+    voice.played();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({ kind: "readback", attached: null, spoken: true });
+  });
+
+  it("says Sotto's own question at boldness bold", async () => {
+    const voice = new FakeVoice();
+    const line = "Got it: six sheds. What about the fourteen hundred ceiling?";
+    const harness = setup(voice, { settings: { boldness: "bold" } });
+    readBack(harness, "own", line);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.said).toEqual([line]);
+    voice.played();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({ kind: "readback", attached: "own", spoken: true });
+  });
+
+  it("gives up after twenty seconds without a pause", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    harness.speak();
+    readBack(harness);
+    harness.clock.advanceBy(READBACK_EXPIRY_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({ kind: "readback", spoken: false, reason: "expired" });
+  });
+
+  it("yields to a voice in the room and tries once more", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    readBack(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    harness.reservations.yieldToHuman();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({
+      kind: "readback", spoken: true, yielded: true, yields: 1, retrying: true,
+    });
+    harness.speak();
+    harness.clock.advanceBy(1_000);
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(2);
+  });
+
+  it("is not said when the room has moved on (V3-004's verdict)", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { stillCurrent: () => movedOn });
+    readBack(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({ kind: "readback", reason: "moved_on" });
+  });
+
+  it("reads one decision back once, however often it arrives", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    readBack(harness);
+    readBack(harness);
     harness.clock.advanceBy(SPEAK_PAUSE_MS);
     await harness.tick();
     voice.played();

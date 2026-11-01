@@ -1,0 +1,52 @@
+{
+  "lines": [
+    { "speaker": "B", "text": "Right. The tool library pilot. Six sheds, one per neighbourhood association, opening in March.", "pauseAfterMs": 800 },
+    { "speaker": "A", "text": "And fourteen hundred in the pot, which is the whole grant. That is the hard number.", "pauseAfterMs": 900 },
+    { "speaker": "B", "text": "Twelve hundred of that is the starter kits. Two hundred a shed.", "pauseAfterMs": 800 },
+    { "speaker": "A", "text": "Plus insurance. Eighty a month, so call it another hundred for the first stretch.", "pauseAfterMs": 1200 },
+    { "speaker": "B", "text": "Tight, but it works. Nothing else can go on top of that.", "pauseAfterMs": 1000 },
+    { "speaker": "A", "text": "Now, the launch day. One Saturday, all six sheds open at once.", "pauseAfterMs": 800 },
+    { "speaker": "B", "text": "With a bike mechanic doing free repairs. That is the thing people will actually turn up for.", "pauseAfterMs": 900 },
+    { "speaker": "A", "text": "He wants three hundred for the day. I have seen the quote.", "pauseAfterMs": 800 },
+    { "speaker": "B", "text": "Three hundred is worth it for the photographs alone.", "pauseAfterMs": 900 },
+    { "speaker": "A", "text": "And a coffee cart is another hundred and fifty on top of that.", "pauseAfterMs": 1100 },
+    { "speaker": "B", "text": "Fine. Right, let's lock that in. Saturday the fourteenth, mechanic and coffee cart.", "pauseAfterMs": 2200 },
+    { "speaker": "A", "text": "I will book the mechanic tomorrow then.", "pauseAfterMs": 1400 },
+    { "speaker": "B", "text": "The associations. All six said yes on the phone, which is not the same as signing anything.", "pauseAfterMs": 900 },
+    { "speaker": "A", "text": "What if only one of them actually signs the agreement when it lands?", "pauseAfterMs": 1500 },
+    { "speaker": "B", "text": "The agreement is two pages. I had the template off the bike co-op.", "pauseAfterMs": 900 },
+    { "speaker": "A", "text": "That reminds me, the co-op want their logo on the shed doors.", "pauseAfterMs": 1000 },
+    { "speaker": "B", "text": "They can have it. They gave us the template and a van for a weekend.", "pauseAfterMs": 900 },
+    { "speaker": "A", "text": "Noted. So the doors get two logos, theirs and the council's.", "pauseAfterMs": 1000 },
+    { "speaker": "B", "text": "And the council will want theirs bigger, obviously.", "pauseAfterMs": 900 },
+    { "speaker": "A", "text": "Obviously. Right, and the sheds themselves, back to those.", "pauseAfterMs": 1000 },
+    { "speaker": "B", "text": "So we're agreed, six sheds, one per association, and I will send the agreements out Friday.", "pauseAfterMs": 2400 },
+    { "speaker": "A", "text": "Friday works for me.", "pauseAfterMs": 1400 },
+    { "speaker": "B", "text": "Last thing. The sign-up sheet. Paper in the shed, or a form online?", "pauseAfterMs": 1000 },
+    { "speaker": "A", "text": "Paper. Half the people who use a tool library do not want another account.", "pauseAfterMs": 900 },
+    { "speaker": "B", "text": "Fair enough.", "pauseAfterMs": 1000 },
+    { "speaker": "A", "text": "Let's go with paper sheets then, and you type them up at the end of each month.", "pauseAfterMs": 2200 },
+    { "speaker": "B", "text": "That is everything. I will write it up and send it round tonight.", "pauseAfterMs": 1200 }
+  ],
+  "wakeQuestions": [],
+  "moments": [
+    {
+      "id": "launch-costs-contradiction",
+      "type": "contradiction",
+      "setupLines": [1, 4, 7, 9],
+      "triggerLine": 10,
+      "deadlineLine": 15,
+      "expectedLevel": "interject",
+      "description": "A says the fourteen hundred grant is the hard number (line 1) and B agrees nothing else can go on top once the kits and the insurance are counted (line 4). Then the launch day adds three hundred for the mechanic (line 7) and a hundred and fifty for the coffee cart (line 9), and at line 10 B locks the pair in. Only Sotto is tracking the arithmetic: twelve hundred plus a hundred plus four hundred and fifty is sixteen hundred and fifty against a fourteen hundred ceiling. This is Sotto's own reading of the conversation, so it belongs on the screen (V3-008) and is pinned beside the read-back of line 10 rather than said out loud at the default settings."
+    },
+    {
+      "id": "association-signup-unanswered",
+      "type": "unanswered_question",
+      "setupLines": [12, 13, 14],
+      "triggerLine": 20,
+      "deadlineLine": 24,
+      "expectedLevel": "speak",
+      "description": "At line 13 A asks directly what happens if only one of the six associations signs the agreement. B answers a different question about the template (line 14) and the conversation goes to logos and the council; nobody comes back to it. At line 20 B settles the six sheds, one per association, and sends the agreements out on it. The group's own unsettled question belongs on the read-back, quoted back to them (V3-013), which is a spoken contribution at every frequency."
+    }
+  ]
+}

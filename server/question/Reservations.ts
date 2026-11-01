@@ -64,6 +64,11 @@ import type { Clock } from "../clock.js";
 import { PAUSE_MS, SPEAK_PAUSE_MS, inPause } from "../interject/policy.js";
 import type { SpendVerdict } from "../interject/policy.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
+import {
+  READBACK_EXPIRY_MS,
+  type ReadBackAttachment,
+  type ReadBackRequest,
+} from "../decision/readback.js";
 import type { StillCurrentState } from "./StillCurrentWatcher.js";
 
 type Logger = Pick<Console, "log" | "warn">;
@@ -113,9 +118,20 @@ export const MAX_ANSWER_YIELDS = 2;
  * answer is — a real pause, the cached still-current verdict, yielding to any
  * voice with one retry, ninety seconds or six turns of expiry — and differs
  * only in that it spends nothing, because the card it was delivered as
- * already spent one interject.
+ * already spent one interject. `readback` is V3-013's: the decision the group
+ * has just settled, said back in the scribe's voice, with the group's own
+ * unsettled question on it when one fits. It is the one kind with a shorter
+ * fuse — twenty seconds, because a read-back is about the instant a decision
+ * lands — and the one the frequency setting can silence outright when it
+ * carries nothing.
  */
-export const spokenContributionKinds = ["reserve", "no_answer", "answer", "correction"] as const;
+export const spokenContributionKinds = [
+  "reserve",
+  "no_answer",
+  "answer",
+  "correction",
+  "readback",
+] as const;
 export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
 
 /**
@@ -126,13 +142,17 @@ export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
  *   turning Sotto down mid-wait is the way it reads this.
  * - `cooldown` / `budget`: the frequency setting's, spent on something else.
  * - `no_gap`: nobody stopped talking inside {@link RESERVE_WINDOW_MS}.
+ * - `frequency`: a bare read-back (V3-013), which only a session set to
+ *   contribute `often` says out loud; the decision lands on the board either
+ *   way.
  * - `unheard`: muted, or no page attached to play it — the card is the sign.
  * - `moved_on`: the room is somewhere else now, so the card is the only sign.
  * - `answered`: somebody present answered the question and the search agrees,
  *   so the card says `confirmed` and nothing is said (V3-004).
  * - `disagrees`: somebody present answered it and the search does not agree.
  *   The correction belongs on the screen, where it can be read twice.
- * - `expired`: ninety seconds or six final turns went by without a pause.
+ * - `expired`: ninety seconds or six final turns went by without a pause —
+ *   or, for a read-back, twenty.
  * - `yielded`: cut off by a voice in the room twice (V3-004).
  * - `overtaken`: the search came back with nothing before the claim could be
  *   made, so there is nothing left to claim.
@@ -143,6 +163,7 @@ export const reserveSkipReasons = [
   "cooldown",
   "budget",
   "no_gap",
+  "frequency",
   "unheard",
   "moved_on",
   "answered",
@@ -166,8 +187,22 @@ export interface SpokenContributionRecord {
    * identifies it.
    */
   ideaId: string;
-  /** The same id again on a `correction`, under the name a reader expects. */
+  /**
+   * The same id again on a `correction`, under the name a reader expects —
+   * and, on a `readback`, the candidate whose question is attached to it
+   * (V3-013), or absent when nothing is.
+   */
   candidateId?: string;
+  /**
+   * What a `readback` carries (V3-013): the room's own unsettled question,
+   * one of Sotto's own corrections, or `null` for the bare decision.
+   *
+   * Read at the pause rather than when it was queued, so a session turned
+   * down from `bold` mid-wait records the line it really said.
+   */
+  attached?: ReadBackAttachment | null;
+  /** What was settled, on a `readback`: "six gardens, Saturday". */
+  decision?: string;
   /** The turn the question was heard in, or the one a correction rests on. */
   turnId: string;
   /** Three to five words naming it; a correction's is its headline. */
@@ -308,6 +343,16 @@ interface Pending {
   turnsWaited: number;
   /** How many times a voice in the room has cut this line off. */
   yields: number;
+  /** A `readback`'s attachment (V3-013), decided again at the pause. */
+  attached?: ReadBackAttachment | null;
+  /** The same read-back with nothing attached, for the degraded case. */
+  bareText?: string;
+  /** The candidate the attachment came from. */
+  candidateId?: string | null;
+  /** What was settled, for the log. */
+  decision?: string;
+  /** The attachment's card already spent a contribution (V3-013). */
+  alreadyPaid?: boolean;
 }
 
 export class Reservations {
@@ -332,6 +377,8 @@ export class Reservations {
   private readonly answered = new Set<string>();
   /** Corrections already queued, by candidate id (V3-008). */
   private readonly corrections = new Set<string>();
+  /** Read-backs already queued, by decision id (V3-013). */
+  private readonly readBacks = new Set<string>();
   /** The utterance a human voice would cancel, while there is one. */
   private utterance: VoiceUtterance | undefined;
   /**
@@ -476,6 +523,47 @@ export class Reservations {
     this.review();
   }
 
+  /**
+   * The group just settled something (PRD V3-013): say it back at the next
+   * real pause.
+   *
+   * The scribe's move, and the only line in here that is not about a question
+   * — so it is the only one whose words come from somewhere other than the
+   * classifier's topic: {@link ReadBacks} composed them, and both the
+   * attached version and the bare one arrive, because which of the two is
+   * said depends on the boldness at the moment of speaking.
+   *
+   * Rules, all of them V3-004's: {@link SPEAK_PAUSE_MS} of corrected
+   * silence, the cached still-current verdict, yielding to any voice with one
+   * retry — and a twenty-second fuse rather than ninety, because a read-back
+   * is about the instant a decision lands.
+   */
+  readBack(request: ReadBackRequest): void {
+    if (this.stopped || request.text.trim() === "") return;
+    if (this.readBacks.has(request.id)) return;
+    this.readBacks.add(request.id);
+    const nowMs = this.clock.now();
+    this.waiting.push({
+      kind: "readback",
+      ideaId: request.id,
+      turnId: request.turnId,
+      topic: request.decision,
+      text: request.text,
+      askedAtMs: nowMs,
+      sinceMs: nowMs,
+      pauseMs: SPEAK_PAUSE_MS,
+      expiry: { afterMs: READBACK_EXPIRY_MS, reason: "expired" },
+      turnsWaited: 0,
+      yields: 0,
+      attached: request.attached,
+      bareText: request.bareText,
+      candidateId: request.candidateId,
+      decision: request.decision,
+      alreadyPaid: request.alreadyDelivered,
+    });
+    this.review();
+  }
+
   /** One line about one question, waiting from now, with nothing yet decided. */
   private line(
     ideaId: string,
@@ -509,7 +597,17 @@ export class Reservations {
    * claim may have been said in between.
    */
   private charges(line: Pending): boolean {
+    // A claim asks for the floor, and so does a read-back nobody asked for
+    // (V3-013): both are Sotto choosing to speak.
     if (line.kind === "reserve") return true;
+    if (line.kind === "readback") {
+      // Unless the question on it is one the room can already see: the card
+      // spent the contribution when the policy delivered it, and this is that
+      // contribution reaching the room's ears. The same rule a spoken
+      // correction follows, for the same reason. A read-back that lost its
+      // attachment is a courtesy of Sotto's own and pays for itself.
+      return !(line.attached !== null && line.alreadyPaid === true);
+    }
     // A correction was already paid for by the interject card it was
     // delivered as (V3-008), and a closing line is the end of a claim.
     if (line.kind === "no_answer" || line.kind === "correction") return false;
@@ -673,6 +771,10 @@ export class Reservations {
         keep.push(line);
         continue;
       }
+      // V3-013: the boldness is read here rather than when the read-back was
+      // queued, so a session turned down mid-wait loses the attachment rather
+      // than the read-back.
+      if (line.kind === "readback") this.degrade(line);
       const reason = this.reasonNotToSpeak(line);
       if (reason !== null) {
         this.skip(line, reason);
@@ -696,6 +798,19 @@ export class Reservations {
     return null;
   }
 
+  /**
+   * One of Sotto's own questions may only be *said* at boldness `bold`
+   * (V3-013), so at anything else the read-back loses it and says the
+   * decision alone. The card beside it was pinned when the decision landed
+   * and stays either way, which is where V3-008 puts Sotto's corrections.
+   */
+  private degrade(line: Pending): void {
+    if (line.attached !== "own") return;
+    if (this.options.settings().boldness === "bold") return;
+    line.attached = null;
+    line.text = line.bareText ?? line.text;
+  }
+
   /** Everything but the gap that can stop a line being said. */
   private reasonNotToSpeak(line: Pending): ReserveSkipReason | null {
     // A cautious session contributes on screen only, which is the same
@@ -705,6 +820,16 @@ export class Reservations {
     const boldness = this.options.settings().boldness;
     if (boldness === "cautious") return "boldness";
     if (line.kind === "correction" && boldness !== "bold") return "boldness";
+    // A read-back with nothing on it is a courtesy rather than a
+    // contribution, so only a session asked to speak up `often` says one; the
+    // decision lands on the board at every setting (V3-013).
+    if (
+      line.kind === "readback" &&
+      (line.attached ?? null) === null &&
+      this.options.settings().frequency !== "often"
+    ) {
+      return "frequency";
+    }
     // Whether the room still wants this (V3-004). Read, never asked for: the
     // verdict is already cached, so nothing between here and the first audio
     // waits on a model. Not asked about a claim: that lives inside a
@@ -790,7 +915,8 @@ export class Reservations {
     // the answer, so it waits for another pause (V3-004). Twice is the room
     // saying it does not want to hear this, and the card is then the only
     // sign.
-    const retried = line.kind === "answer" || line.kind === "correction";
+    const retried =
+      line.kind === "answer" || line.kind === "correction" || line.kind === "readback";
     const retrying = yielded && retried && yields < MAX_ANSWER_YIELDS;
     this.options.onRecord({
       stage: "spoken_contribution",
@@ -802,13 +928,14 @@ export class Reservations {
       spoken: true,
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
+      ...(line.kind === "readback" ? readBackFields(line) : {}),
       ...(line.kind === "answer"
         ? {
             questionToSpeechMs: decidedAtMs - line.askedAtMs,
             pauseWaitMs: decidedAtMs - line.sinceMs,
             ...(current === undefined ? {} : { stillCurrent: current }),
           }
-        : line.kind === "correction"
+        : line.kind === "correction" || line.kind === "readback"
           ? {
               pauseWaitMs: decidedAtMs - line.sinceMs,
               ...(current === undefined ? {} : { stillCurrent: current }),
@@ -857,7 +984,8 @@ export class Reservations {
       spoken: false,
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
-      ...(line.kind === "answer" || line.kind === "correction"
+      ...(line.kind === "readback" ? readBackFields(line) : {}),
+      ...(line.kind === "answer" || line.kind === "correction" || line.kind === "readback"
         ? { pauseWaitMs: nowMs - line.sinceMs }
         : {}),
       ...(line.yields === 0 ? {} : { yields: line.yields }),
@@ -966,6 +1094,20 @@ function asObject(topic: string): string {
   // A capital where the sentence does not need one is a name.
   if (/^[A-Z]/.test(first)) return text;
   return `the ${text}`;
+}
+
+/**
+ * What a read-back's record says about itself (V3-013): what was settled,
+ * what was attached by the time it was said, and the candidate it came from.
+ */
+function readBackFields(line: Pending): Record<string, unknown> {
+  return {
+    attached: line.attached ?? null,
+    ...(line.decision === undefined ? {} : { decision: line.decision }),
+    ...(line.candidateId === undefined || line.candidateId === null
+      ? {}
+      : { candidateId: line.candidateId }),
+  };
 }
 
 function message(error: unknown): string {

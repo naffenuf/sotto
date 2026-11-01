@@ -34,3 +34,12 @@ said, so knowing it is wrong would change something. answered: somebody present 
 corrected it themselves — agrees is true when their correction and Sotto's say the same thing.
 moved_on: that part of the conversation is over and nothing now rests on the claim, so correcting
 it would only be scoring a point.
+
+<!-- V3-013: the same three verdicts, about a decision Sotto is about to read back. -->
+And sometimes what is waiting is a **read-back**: the group has just settled something and Sotto
+is about to say it back in the scribe's voice, with their own unsettled question on it when there
+is one. current: they are still on that decision, or on the next step of it, so hearing it said
+back lands. moved_on: they have gone somewhere else entirely and reading it back would reopen
+something closed. answered does not apply to a read-back — a decision is not a question anybody
+can answer — so use current or moved_on, and leave agrees false. Err towards current here more
+than anywhere: a read-back is four words, and it arrives seconds after the decision.

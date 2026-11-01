@@ -10,9 +10,10 @@
  *
  * The six kinds are the PRD's, and only one of them is work: an
  * `open_question` is something a lookup can answer, which becomes a research
- * idea at once (V3-003). The other five exist to say no — and `decision` is
- * also what V3-013 reads for a closing decision, which is why the pair share
- * this call rather than paying for two.
+ * idea at once (V3-003). The other five exist to say no — except `decision`,
+ * which V3-013 reads for a *closing*: `closing: true` plus the decision in a
+ * few words is what the read-back is said from, and it shares this call
+ * rather than paying for a second one.
  */
 import { z } from "zod";
 import type { SpeakerNames } from "../../shared/events.js";
@@ -39,12 +40,20 @@ export type QuestionKind = (typeof questionKinds)[number];
  * verdict that names something to look up while saying nobody can look it up
  * is not a usable answer, so the schema refuses it and the caller falls back
  * to `none`.
+ *
+ * `closing` and `decision` belong to a `decision` and nothing else, for the
+ * same reason (V3-013): a read-back of something nobody settled is Sotto
+ * putting words in the room's mouth.
  */
 export const QuestionSchema = z
   .object({
     kind: z.enum(questionKinds),
     question: z.string().trim(),
     topic: z.string().trim(),
+    /** V3-013: the group is settling this, not still weighing it. */
+    closing: z.boolean().default(false),
+    /** What was settled, in a few words, for the read-back to say. */
+    decision: z.string().trim().default(""),
   })
   .refine(
     (value) =>
@@ -52,7 +61,13 @@ export const QuestionSchema = z
         ? value.question !== "" && value.topic !== ""
         : value.question === "" && value.topic === "",
     { message: "question and topic belong to an open_question only" },
-  );
+  )
+  .refine((value) => (value.closing ? value.kind === "decision" : true), {
+    message: "only a decision can be closing",
+  })
+  .refine((value) => (value.decision !== "") === value.closing, {
+    message: "a decision in a few words belongs to a closing decision only",
+  });
 
 export type QuestionResult = z.infer<typeof QuestionSchema>;
 
@@ -83,6 +98,26 @@ export interface OpenQuestion {
   askedAtMs: number;
 }
 
+/**
+ * A decision the group just settled (V3-013), as the read-back sees it.
+ *
+ * It comes off the same call an `open_question` does — the classifier is
+ * already reading the latest turn with four turns of context, and "OK, let's
+ * go with six gardens" is a `decision` either way — so noticing a closing
+ * costs nothing beyond one more field, and arrives with the turn rather than
+ * with the board update a dozen seconds later.
+ */
+export interface DecisionClosing {
+  /** The turn it was settled in, which the read-back's log cites. */
+  turnId: string;
+  /** What was settled, in a few words: "six gardens, Saturday". */
+  decision: string;
+  /** The name the group gave the speaker, the bare label, or `null`. */
+  decidedBy: string | null;
+  /** Session clock when the turn went final. */
+  decidedAtMs: number;
+}
+
 /** Asks only what the turn is doing; looking the answer up is V3-003's. */
 export async function classifyQuestion(
   model: ModelClient,
@@ -102,7 +137,7 @@ export async function classifyQuestion(
     schema: {
       type: "object",
       additionalProperties: false,
-      required: ["kind", "question", "topic"],
+      required: ["kind", "question", "topic", "closing", "decision"],
       properties: {
         kind: { type: "string", enum: [...questionKinds] },
         question: {
@@ -116,6 +151,20 @@ export async function classifyQuestion(
           description:
             "For open_question: three to five words naming it, as in \"I'll check the drive " +
             "time\". Empty for every other kind.",
+        },
+        closing: {
+          type: "boolean",
+          description:
+            "For decision only: true when this turn settles it rather than weighs it — \"OK, " +
+            "let's go with six gardens\", \"so we're agreed on Saturday\", \"let's lock that " +
+            "in\". False for a turn that is still asking which way to go, and for every other " +
+            "kind.",
+        },
+        decision: {
+          type: "string",
+          description:
+            "For a closing decision: what was settled, in a few words, as a note-taker would " +
+            "write it down — \"six gardens, Saturday\". Empty otherwise.",
         },
       },
     },

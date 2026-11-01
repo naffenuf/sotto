@@ -1,0 +1,169 @@
+{
+  "name": "decision-closings",
+  "sampleRate": 24000,
+  "durationMs": 133816,
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "B",
+      "startMs": 0,
+      "endMs": 5603
+    },
+    {
+      "index": 1,
+      "speaker": "A",
+      "startMs": 6403,
+      "endMs": 12020
+    },
+    {
+      "index": 2,
+      "speaker": "B",
+      "startMs": 12920,
+      "endMs": 16130
+    },
+    {
+      "index": 3,
+      "speaker": "A",
+      "startMs": 16930,
+      "endMs": 22001
+    },
+    {
+      "index": 4,
+      "speaker": "B",
+      "startMs": 23201,
+      "endMs": 26094
+    },
+    {
+      "index": 5,
+      "speaker": "A",
+      "startMs": 27094,
+      "endMs": 31808
+    },
+    {
+      "index": 6,
+      "speaker": "B",
+      "startMs": 32608,
+      "endMs": 37428
+    },
+    {
+      "index": 7,
+      "speaker": "A",
+      "startMs": 38328,
+      "endMs": 41970
+    },
+    {
+      "index": 8,
+      "speaker": "B",
+      "startMs": 42770,
+      "endMs": 45170
+    },
+    {
+      "index": 9,
+      "speaker": "A",
+      "startMs": 46070,
+      "endMs": 49495
+    },
+    {
+      "index": 10,
+      "speaker": "B",
+      "startMs": 50595,
+      "endMs": 55135
+    },
+    {
+      "index": 11,
+      "speaker": "A",
+      "startMs": 57335,
+      "endMs": 59440
+    },
+    {
+      "index": 12,
+      "speaker": "B",
+      "startMs": 60840,
+      "endMs": 65961
+    },
+    {
+      "index": 13,
+      "speaker": "A",
+      "startMs": 66861,
+      "endMs": 70536
+    },
+    {
+      "index": 14,
+      "speaker": "B",
+      "startMs": 72036,
+      "endMs": 76076
+    },
+    {
+      "index": 15,
+      "speaker": "A",
+      "startMs": 76976,
+      "endMs": 80490
+    },
+    {
+      "index": 16,
+      "speaker": "B",
+      "startMs": 81490,
+      "endMs": 84794
+    },
+    {
+      "index": 17,
+      "speaker": "A",
+      "startMs": 85694,
+      "endMs": 90151
+    },
+    {
+      "index": 18,
+      "speaker": "B",
+      "startMs": 91151,
+      "endMs": 93593
+    },
+    {
+      "index": 19,
+      "speaker": "A",
+      "startMs": 94493,
+      "endMs": 99429
+    },
+    {
+      "index": 20,
+      "speaker": "B",
+      "startMs": 100429,
+      "endMs": 105258
+    },
+    {
+      "index": 21,
+      "speaker": "A",
+      "startMs": 107658,
+      "endMs": 108801
+    },
+    {
+      "index": 22,
+      "speaker": "B",
+      "startMs": 110201,
+      "endMs": 114841
+    },
+    {
+      "index": 23,
+      "speaker": "A",
+      "startMs": 115841,
+      "endMs": 120539
+    },
+    {
+      "index": 24,
+      "speaker": "B",
+      "startMs": 121439,
+      "endMs": 122050
+    },
+    {
+      "index": 25,
+      "speaker": "A",
+      "startMs": 123050,
+      "endMs": 127210
+    },
+    {
+      "index": 26,
+      "speaker": "B",
+      "startMs": 129410,
+      "endMs": 132616
+    }
+  ]
+}

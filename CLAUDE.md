@@ -1555,3 +1555,60 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   (US-013), so asking whether the room has moved on from *it* asks about the wrong sentence. Nothing
   said since the claim is `current` with no call, which is the usual case for a correction the
   policy has just delivered into a pause, so the exception normally costs no model call at all.
+
+- **A read-back is noticed by one call that already exists, and the cost was a second
+  pre-filter.** V3-013's `decision_closing` is `closing: true` plus the decision in a few words on
+  V3-002's own classification (`server/question/question.ts`, `prompts/question.md`), so a decision
+  is read back seconds after it lands rather than after the board update that records it. But a
+  closing has **no question word and no question mark** — "Fine. Right. Let's lock that in." — so it
+  would never have reached the classifier at all: `isClosingShaped` joins `isQuestionShaped` in
+  `worthClassifying`, which is what `QuestionWatcher` now asks. Measured across the twelve older
+  captures: **three** extra calls in total, every one a group really settling something
+  (`brainstorm` 2 of 24 turns → 3, still inside V3-002's quarter). The classifier's `decision` text
+  is the read-back's words, so `questionShape.test.ts` keeps both halves honest against the
+  captures.
+- **Which of the room's questions goes with which decision is matched on words, and the bar is
+  measured.** `server/decision/readback.ts` is pure: coverage of the *decision's* content words by
+  the candidate's headline, detail, "why now" and quotes, against `DECISION_RELEVANCE` (1/3), with
+  the dates and the counts dropped from the decision side — "Saturday the 14th, mechanic and coffee
+  cart" is a decision about the mechanic and the coffee cart, and every conversation is full of
+  Thursdays and sixes. The real observer's question on that decision was "The bike mechanic — where
+  does that fit with $1400 and nothing on top?": **one** shared word of the three that mean
+  anything, which is where 1/3 comes from and why 0.4 missed it on the first real run. A near miss
+  is logged (`bestRelevance` on the `decision_closing` line) because "the bar is wrong" and "the
+  observer noticed nothing" look identical otherwise. No model call, ever: a judgment call in front
+  of a read-back costs it the only thing it has. Recency was considered and rejected — "any open
+  candidate from the last minute" attaches `brainstorm`'s dropped grocery thread to its
+  "photo to three suggestions" closing, which is V3-010's first false speech.
+- **The attachment is free, and without that exemption the feature is unreachable.** A read-back
+  counts against V2-017's budget — except when the question on it belongs to a candidate the policy
+  has *already delivered as a card* (`ReadBackRequest.alreadyDelivered`, from
+  `deliveries.has(deliveredCardId(id))`). It is V3-008's rule in the same words: the card spent the
+  contribution, and this is that contribution reaching the room's ears. Measured: the policy
+  delivers the candidate the moment it has a pause, **forty to fifty seconds before** the decision
+  it bears on, and an `interject` pushes `interjectedAtMs` — so at `normal`'s 180 s cooldown (and
+  `often`'s 90 s) every read-back that had anything to say was skipped as `cooldown`. A **bare**
+  read-back still pays, and is only said at frequency `often`; the two limits
+  (`READBACK_COOLDOWN_MS` 5 min spoken, `ATTACHED_COOLDOWN_MS` 10 min attached) cap it either way,
+  and an attachment hit by the ten minutes degrades to the bare line rather than being dropped.
+- **Sotto's own question about a decision is a pinned card, not a sentence.** A `contradiction` or
+  an `untested_assumption` that relates to a closing is republished with `raised`, `forward` and a
+  `note` ("Still open against \"six sheds\"") — `pinToDecision` in `SessionManager`, remembered in
+  `pinnedDecisions` so a candidate the policy is still *holding* goes out pinned when it is
+  delivered. `Card.tsx` needed nothing: `Note` already renders in both the collapsed and the open
+  path for every variant, and `forward` already opens a card and re-stamps it to the top. The line
+  is composed for `bold` and `Reservations.degrade()` re-reads the boldness **at the pause**, so a
+  session turned down mid-wait loses the attachment rather than the read-back.
+- **`decision-closings` is the fixture for all three cases, and `expectedLevel` grew `"speak"`.**
+  27 lines, 133.8 s: a decision only Sotto sees a problem with (launch costs against a stated 1,400
+  ceiling), one the group itself asked a question about and dropped (six sheds, one per
+  association), and one with nothing open against it (paper sheets). Measured reachable
+  (`eval:ceiling`: 1,571 ms and 743 ms of real quiet inside the two windows) — but note the ceiling
+  tool models an *interjection*, where the candidate cannot exist until a board update after the
+  trigger; a read-back's candidate already exists when the decision lands, and the pause it waits
+  for is the decision turn's own. `"speak"` ranks above everything in `levelRank`, so until V3-010
+  scores spoken contributions a card for a speak moment is `caught_low` rather than a catch —
+  which also means **adding this fixture to the eval set lowers the measured recall** until V3-010
+  lands. Real run, `decision-closings` end to end: all three closings detected, and the read-back
+  said *"Got it: six sheds, one per association. B asked, What if only one of them actually signs
+  the agreement when it lands. Did that get settled?"*

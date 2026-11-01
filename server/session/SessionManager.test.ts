@@ -38,7 +38,7 @@ import type { SessionWriter } from "./SessionStore.js";
 import { emptyModel } from "../test/emptyModel.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
-import type { Boldness } from "../../shared/policy.js";
+import type { Boldness, Frequency } from "../../shared/policy.js";
 import type { VoiceOut, VoiceUtterance } from "../voice/voiceOut.js";
 import type { GlimmerClient } from "../model/GlimmerClient.js";
 import { DIGEST_SECTIONS } from "./digest.js";
@@ -2873,5 +2873,338 @@ describe("SessionManager, Sotto's own corrections (V3-008)", () => {
     expect(sotto.map((turn) => turn.text)).toContain(
       "Quick correction: Instagram launched in 2010, not 2014.",
     );
+  }, 60_000);
+});
+
+/**
+ * V3-013 through the whole pipeline: a decision the group settles out loud is
+ * read back at the next real pause, with the room's own unsettled question on
+ * it — and one of Sotto's own corrections is pinned to the stage beside the
+ * decision it bears on rather than said.
+ *
+ * `decision-closings` settles three things. The first (the launch costs) only
+ * Sotto sees a problem with, so at the default boldness that read-back loses
+ * its attachment and, being bare, is not said at `normal` frequency at all.
+ * The second (six sheds) is the one the group itself raised a question about
+ * and dropped. The third (paper sheets) has nothing hanging off it.
+ */
+describe("SessionManager: read-backs at decision points (V3-013)", () => {
+  /**
+   * A model that settles decisions and notices one thing, or both.
+   *
+   * One at a time by default, because a contradiction the policy delivers is
+   * an interject, and an interject spends the frequency's cooldown (V2-017) —
+   * so a session that has just put a card up cannot also read a decision back
+   * fifty seconds later. That interaction is real and has a test of its own
+   * below; it would otherwise hide every other assertion here.
+   */
+  class DecidingModel implements ModelClient {
+    readonly labels: string[] = [];
+    private sawCost = false;
+    private sawRisk = false;
+
+    constructor(private readonly notices: "cost" | "risk" | "both" = "both") {}
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "address") return { kind: "mention", question: "" };
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "research-planner") return { ideas: [] };
+      if (call.label === "still-current") {
+        return { verdict: "current", agrees: false, why: "still on the sheds" };
+      }
+      if (call.label === "question") return this.classify(call.user);
+      if (call.label === "observer") return this.look(call.user);
+      return { candidates: [] };
+    }
+
+    /** The three closings, read off the latest turn the way Spark would. */
+    private classify(user: string): unknown {
+      const latest = user.slice(user.lastIndexOf("LATEST turn:"));
+      const decision = latest.includes("lock that in")
+        ? "Saturday the 14th, mechanic and coffee cart"
+        : latest.includes("we're agreed")
+          ? "six sheds, one per association"
+          : latest.includes("go with paper sheets")
+            ? "paper sheets, typed up monthly"
+            : "";
+      return decision === ""
+        ? { kind: "none", question: "", topic: "", closing: false, decision: "" }
+        : { kind: "decision", question: "", topic: "", closing: true, decision };
+    }
+
+    /**
+     * Two candidates, each on the first look that can see what it rests on:
+     * the overspend is stated at line 7 and the risk at line 13, both a board
+     * update before the decision they bear on.
+     */
+    private look(user: string): unknown {
+      const cite = (fragment: string): string =>
+        user.match(new RegExp(`\\[([^\\]]+)\\][^\\n]*${fragment}`))?.[1] ?? "0:0";
+      const wants = this.notices;
+      if (wants !== "risk" && !this.sawCost && user.includes("wants 300 for the day")) {
+        this.sawCost = true;
+        return {
+          candidates: [
+            {
+              type: "contradiction",
+              // Phrased the way V3-008 asks for: a question tied to what was
+              // just said, which is also what makes it match the decision.
+              headline: "Before the mechanic and the coffee cart: where does the 450 come from?",
+              detail: "1200 of kits and 100 of insurance leaves 100 of the 1400, not 450.",
+              whyNow: "the launch costs are being agreed",
+              evidenceTurnIds: [cite("wants 300 for the day")],
+              relatedBoardItemIds: [],
+              scores: { relevance: 0.9, novelty: 0.9, importance: 0.9, confidence: 0.9 },
+            },
+          ],
+        };
+      }
+      if (wants !== "cost" && !this.sawRisk && user.includes("actually signs the agreement")) {
+        this.sawRisk = true;
+        return {
+          candidates: [
+            {
+              type: "unanswered_question",
+              headline: "Nobody answered what happens if one association signs",
+              detail: "The question was asked and the conversation moved to logos.",
+              whyNow: "the six sheds are about to be committed",
+              evidenceTurnIds: [cite("actually signs the agreement")],
+              relatedBoardItemIds: [],
+              scores: { relevance: 0.9, novelty: 0.9, importance: 0.9, confidence: 0.9 },
+            },
+          ],
+        };
+      }
+      return { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("a read-back needs no search");
+    }
+
+    async prose(): Promise<never> {
+      throw new Error("a read-back is written locally");
+    }
+  }
+
+  class SpeakingVoice implements VoiceOut {
+    private count = 0;
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const spoken = (): string => parts.join(" ");
+      return Promise.resolve({
+        id: `v${(this.count += 1)}`,
+        append: (text) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      });
+    }
+  }
+
+  function writer(timing: Record<string, unknown>[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: () => {},
+      appendTiming: (record: Record<string, unknown>) => timing.push(record),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  async function replay(
+    settings: { frequency?: Frequency; boldness?: Boldness } = {},
+    notices: "cost" | "risk" | "both" = "both",
+  ): Promise<{
+    cards: StageCard[];
+    timing: Record<string, unknown>[];
+    voice: SpeakingVoice;
+    turns: TurnUpdate[];
+  }> {
+    const bus = new EventBus(quiet);
+    const timing: Record<string, unknown>[] = [];
+    const cards: StageCard[] = [];
+    const turns: TurnUpdate[] = [];
+    const voice = new SpeakingVoice();
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+      if (event.type === "turn") turns.push(event.turn);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer(timing),
+      createModel: () => new DecidingModel(notices),
+      createVoice: () => voice,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    sessions.setPolicySettings(settings);
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "decision-closings" });
+    await ended;
+    return { cards, timing, voice, turns };
+  }
+
+  const closings = (timing: Record<string, unknown>[]): Record<string, unknown>[] =>
+    timing.filter((record) => record["stage"] === "decision_closing");
+
+  const readBacks = (timing: Record<string, unknown>[]): Record<string, unknown>[] =>
+    timing.filter(
+      (record) => record["stage"] === "spoken_contribution" && record["kind"] === "readback",
+    );
+
+  it("notices all three decisions off the question classifier's own call", async () => {
+    const run = await replay();
+    expect(closings(run.timing).map((record) => record["decision"])).toEqual([
+      "Saturday the 14th, mechanic and coffee cart",
+      "six sheds, one per association",
+      "paper sheets, typed up monthly",
+    ]);
+    // Five of the 27 turns are shaped like a question or a closing, so five
+    // calls — the whole detection, with nothing added to the bill.
+    expect(run.timing.filter((record) => record["stage"] === "question")).toHaveLength(5);
+  }, 60_000);
+
+  it("reads back the decision the group left a question against, quoted", async () => {
+    const run = await replay({}, "risk");
+    const sheds = closings(run.timing)[1];
+    expect(sheds).toMatchObject({ found: "group", attached: "group" });
+
+    const spoken = readBacks(run.timing).find(
+      (record) => record["decision"] === "six sheds, one per association",
+    );
+    expect(spoken).toMatchObject({ attached: "group", spoken: true });
+    expect(String(spoken?.["text"])).toContain("Got it: six sheds, one per association.");
+    expect(String(spoken?.["text"])).toContain("actually signs the agreement");
+    expect(String(spoken?.["text"])).toContain("Did that get settled?");
+    // Said out loud, and in the transcript as Sotto's line (V2-008a).
+    expect(run.voice.utterances.some((text) => text.startsWith("Got it: six sheds"))).toBe(true);
+    expect(run.turns.filter(isSottoTurn).map((turn) => turn.text)).toContainEqual(
+      expect.stringContaining("Got it: six sheds"),
+    );
+  }, 60_000);
+
+  it("pins Sotto's own question to the stage instead of saying it", async () => {
+    const run = await replay({}, "cost");
+    expect(closings(run.timing)[0]).toMatchObject({ found: "own", attached: "own" });
+
+    // The card is the contribution: raised, brought forward and saying what
+    // it is open against (V3-008).
+    const pinned = run.cards.filter((card) => card.note !== undefined && card.raised === true);
+    expect(pinned.length).toBeGreaterThan(0);
+    expect(pinned.at(-1)?.note).toBe(
+      'Still open against "Saturday the 14th, mechanic and coffee cart"',
+    );
+    expect(pinned.at(-1)?.forward).toBe(true);
+    expect(pinned.at(-1)?.headline).toContain("where does the 450 come from");
+
+    // And nothing of it was said: at the default boldness the line degraded
+    // to a bare read-back, which `normal` frequency does not say either.
+    const launch = readBacks(run.timing).find(
+      (record) => record["decision"] === "Saturday the 14th, mechanic and coffee cart",
+    );
+    expect(launch).toMatchObject({ attached: null, spoken: false });
+    expect(run.voice.utterances.some((text) => text.includes("450"))).toBe(false);
+  }, 60_000);
+
+  it("says nothing about a decision with nothing hanging off it", async () => {
+    const run = await replay({}, "risk");
+    expect(closings(run.timing)[2]).toMatchObject({ found: null, attached: null });
+    const paper = readBacks(run.timing).find(
+      (record) => record["decision"] === "paper sheets, typed up monthly",
+    );
+    // One spoken read-back per five minutes, and the sheds took it; a bare
+    // one would not have been said at `normal` anyway.
+    expect(paper === undefined || paper["spoken"] === false).toBe(true);
+    expect(run.voice.utterances.some((text) => text.includes("paper sheets"))).toBe(false);
+  }, 60_000);
+
+  it("says Sotto's own question when the room asked for bold", async () => {
+    const run = await replay({ boldness: "bold" }, "cost");
+    const launch = readBacks(run.timing).find(
+      (record) => record["decision"] === "Saturday the 14th, mechanic and coffee cart",
+    );
+    expect(launch).toMatchObject({ attached: "own", spoken: true });
+    expect(String(launch?.["text"])).toContain("where does the 450 come from");
+  }, 60_000);
+
+  /**
+   * The interaction worth knowing about, and the reason for V3-013's one
+   * exemption: both cards went up before their decisions, and each spent an
+   * interject on the frequency's cooldown (V2-017). The read-back that
+   * carries a question the room can already see therefore costs nothing — it
+   * is that contribution reaching their ears — so the sheds are still read
+   * back, while the bare one Sotto would be volunteering is not.
+   */
+  it("still says the question a card already paid for", async () => {
+    const run = await replay({}, "both");
+    const sheds = readBacks(run.timing).find(
+      (record) => record["decision"] === "six sheds, one per association",
+    );
+    expect(sheds).toMatchObject({ attached: "group", spoken: true });
+    expect(run.voice.utterances.some((text) => text.startsWith("Got it: six sheds"))).toBe(true);
+    // And both candidates reached the stage as cards in the first place.
+    expect(run.cards.filter((card) => card.variant === "interject").length).toBeGreaterThanOrEqual(
+      2,
+    );
+  }, 60_000);
+
+  it("reads nothing back on a conversation that settles nothing", async () => {
+    const bus = new EventBus(quiet);
+    const timing: Record<string, unknown>[] = [];
+    const voice = new SpeakingVoice();
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer(timing),
+      createModel: () => new DecidingModel(),
+      createVoice: () => voice,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "brainstorm" });
+    await ended;
+    expect(closings(timing)).toEqual([]);
+    expect(readBacks(timing)).toEqual([]);
+    expect(voice.utterances).toEqual([]);
   }, 60_000);
 });

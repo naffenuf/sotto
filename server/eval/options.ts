@@ -28,13 +28,16 @@ export const V2_EVAL_FIXTURES = ["research-business-idea", "offsite-plan"] as co
  *
  * `rhetorical-questions` (V3-002) is a quiet one in the same sense
  * `brainstorm` is: it plants no moment, and its job is to be a conversation
- * full of questions Sotto must say nothing about.
+ * full of questions Sotto must say nothing about. `decision-closings`
+ * (V3-013) is the opposite: three decisions settled out loud, two of them
+ * with something unsettled hanging off them.
  */
 export function isEvalFixture(name: string): boolean {
   return (
     name === "brainstorm" ||
     name === "no-wake" ||
     name === "rhetorical-questions" ||
+    name === "decision-closings" ||
     name.startsWith("moment-") ||
     (V2_EVAL_FIXTURES as readonly string[]).includes(name)
   );
