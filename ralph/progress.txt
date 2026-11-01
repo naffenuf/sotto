@@ -132,3 +132,45 @@ and closes the loop when nothing comes back.
   `spokenContributionKinds` is where `"answer"` joins `reserve`/`no_answer`. If V3-016 finds recall
   on reservations poor, the lever is the PRD's `RESERVE_WINDOW_MS` (a PRD change), never the gap
   threshold, which is the policy's.
+
+[2026-11-01 08:25] V3-004 — completed — Sotto says what it found, to the room, at a real pause.
+- **The threshold is measured.** `npm run eval:ceiling -- --speak` is a new mode (no API call,
+  `server/eval/ceiling.ts`'s `speakReach`/`speakThresholdMs`): it lays the three planted open
+  questions' windows over the real quiet inside them — 1,340 / 1,725 / 968 ms — and the PRD's rule
+  (largest threshold with ≥ 500 ms of margin) gives 468, so **`SPEAK_PAUSE_MS` is 450**, margins
+  890 / 1,275 / 518. The PRD expected ~1,000; that number came from the *interjection* windows and
+  would have left `competitor-gaps` nothing at all. `tasks/decisions.md` has the table.
+  **450 is below the 650 ms floor** `ENDPOINTER_HANGOVER_MS` puts on corrected silence, so it means
+  "the first moment the transcription says nobody is talking" — which is the intent: what keeps
+  Sotto off a sentence is `pause.speaking`, not the threshold.
+- **The still-current check** is `server/question/stillCurrent.ts` (the call) +
+  `StillCurrentWatcher.ts` (the cache), built like V3-002's pair. It runs at packet-ready and after
+  every later final turn, one call at a time per idea with the stale turns re-checked on return, and
+  `verdict(ideaId)` is read *synchronously* by the speaking path. No turn since the question → the
+  `current` default with **no call**. A failed check keeps the last verdict (losing the check costs
+  judgment, not speech). `SessionManager` calls `forget(ideaId)` on the answer's final record: a run
+  that left it watching made **fifty** checks about two questions it had already closed out.
+- **The answer is a third kind of `Reservations` line**, which is why it was cheap: the gap loop,
+  the arming, the yield, the budget spend, the transcript line and the record were all there.
+  New: a per-line pause threshold, expiry (90 s / 6 final turns), one retry after a yield (the
+  retry is its own transcript row via `reserveUtteranceId(kind, id, attempt)`), dynamic charging
+  (`charges()` reads `spent` at speak time, so a claim said late still pays for its own answer), and
+  an answer **waits behind the claim on its own question** — in a `max` replay the search *always*
+  beats the claim's pause timer, so without that the answer would speak first and the claim would
+  hit its own cooldown.
+- `moved_on` → card only. `answered` → `StageCard.note` on the research card
+  (`RESEARCH_CONFIRMED_NOTE` / `RESEARCH_DISAGREES_NOTE`, `ResearchCards.annotate`), nothing spoken.
+  Two samples on `/dev/cards` — the only place both halves exist.
+- **Live check**: `npm run verify:speak` (real `offsite-plan` events replay, real model, real
+  ElevenLabs muted in Chromium) PASSED on the second run — both of Sotto's lines in the transcript
+  in conversation order, card with a source. Note `questionToSpeechMs`/`pauseWaitMs` read ~100 ms
+  there: a replay's clock stands still inside `clock.track`, same artifact as V3-003's
+  `questionToPacketMs`. Only `npm run e2e` charges real seconds for the search.
+- **The finding the next iteration needs.** The *first* run of that check had an unprompted
+  interjection delivered at 32.2 s, which spent V2-017's cooldown (180 s at `normal`) — so the
+  claim at 57 s AND the answer at 62 s were both `reason: "cooldown"`, card only. That is the
+  specified behaviour (V3-004: "Counts against the frequency budget and cooldown"), but it means
+  the main form of V3 can be silenced by an opportunistic contradiction 25 s earlier, and no
+  frequency setting avoids it (`often` is still a 90 s cooldown). If V3-016's shadow run finds that
+  costly, the lever is a **separate cooldown for answers to the room's own questions** — the
+  precedent is V2-014's `researchCardCooldownMs` — and it is a PRD change, not a threshold tweak.

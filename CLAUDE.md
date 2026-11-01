@@ -1438,3 +1438,42 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   the room talking over Sotto — and a yield arriving while `voice.begin()` is still in flight
   (~300 ms) is *remembered*, cancelling the utterance the moment it exists. The same reason V2-007
   gave cancellation its own state instead of trusting the synthesis result.
+
+- **A threshold the PRD guesses at is a threshold the captures can settle.** V3-004's
+  `SPEAK_PAUSE_MS` is 450 ms, from `npm run eval:ceiling -- --speak` (`speakReach`,
+  `speakThresholdMs`, free, no API call): the three planted open questions offer 1,340 / 1,725 /
+  968 ms of real quiet inside their own windows, so the largest value leaving every one of them
+  500 ms of margin is 468. The PRD expected ~1,000 ms — that range was measured inside the
+  *interjection* windows (US-023) and would have left `competitor-gaps` zero margin. Two things
+  follow. A speak threshold **below 650 ms is no threshold at all**: `TurnAssembler.pauseState`
+  counts silence from `speechEnd − ENDPOINTER_HANGOVER_MS`, so `silentForMs` reads 650 the instant
+  a turn closes, and what keeps Sotto off somebody's sentence at 450 is `pause.speaking` rather
+  than the number. And the window is narrower than the table looks: the fast path takes 13–28 s,
+  and the quiet left *after* that is 697–968 ms, which `--speak` prints per readiness offset.
+  `inPause(pause, pauseMs = PAUSE_MS)` takes the threshold now, so a caller picks its own.
+- **A cached verdict is how a model judgment sits in a spoken path.** `StillCurrentWatcher`
+  (`server/question/`) asks Spark whether the room still wants an answer — at packet-ready and
+  after every later final turn — and `verdict(ideaId)` is read **synchronously** at the pause, so
+  between "a gap opened" and the first audio there is no call. Three rules make it affordable and
+  safe: nobody having spoken since the question is `current` with **no call at all**; one check in
+  flight per idea, with turns that arrive meanwhile marking it stale so the returning check starts
+  the next one; and a failed check **keeps the last verdict** (`current` if there is none), because
+  losing the check should cost judgment rather than speech. And it must be told when to stop —
+  `SessionManager` calls `forget(ideaId)` on the answer's final record, after a run that left it
+  watching made **fifty** checks about two questions already closed out on screen.
+- **Three things Sotto says about one question live in one module, and the order is load-bearing.**
+  `Reservations` now says the claim (V3-015), the closing line and the **answer** (V3-004) — one
+  utterance at a time, because opening a second stops the first. The answer waits for
+  `SPEAK_PAUSE_MS` rather than `PAUSE_MS`, expires at 90 s *or* 6 final turns, is retried once
+  after a human voice cuts it off (the retry is its own transcript row — `reserveUtteranceId` takes
+  an attempt), and **waits behind the claim on its own question**: in a `max` replay the search
+  always finishes before the claim's 700 ms pause timer can fire, so without that rule the answer
+  speaks first and the claim then hits its own cooldown. `charges()` is read at speak time, not at
+  queue time, so a claim said late still pays for its own answer.
+- **The frequency cooldown can silence the main form of V3, and that is the specification.** A
+  `verify:speak` run where the policy delivered an unprompted interjection at 32.2 s made *both*
+  the claim (57 s) and the answer (62 s) `reason: "cooldown"`, card only — V3-004 counts against
+  V2-017's budget and V2-017's cooldown is 180 s at `normal`, 90 s at `often`, so no setting avoids
+  it. Worth knowing before reading a quiet run as a bug, and before V3-016: the lever, if it proves
+  costly, is a cooldown of its own for answers to the room's own questions (V2-014's
+  `researchCardCooldownMs` is the precedent), which is a PRD change rather than a threshold tweak.
