@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_GATE_MODE } from "../../shared/candidates.js";
-import { DEFAULT_CHATTINESS, chattinessLevels } from "../../shared/policy.js";
+import { defaultPolicySettings } from "../../shared/policy.js";
 import { evalFixtures, isEvalFixture, parseEvalArgs, runTimestamp } from "./options.js";
 
 describe("evalFixtures", () => {
@@ -34,25 +34,44 @@ describe("evalFixtures", () => {
 });
 
 describe("parseEvalArgs", () => {
-  it("runs the whole eval set at the default chattiness with no arguments", () => {
+  it("runs the whole eval set at the default settings with no arguments", () => {
     expect(parseEvalArgs([])).toEqual({
-      chattiness: [DEFAULT_CHATTINESS],
+      settings: [defaultPolicySettings()],
       gate: DEFAULT_GATE_MODE,
       fixtures: null,
       skipJudge: false,
     });
   });
 
-  it("takes one chattiness, or all of them", () => {
-    expect(parseEvalArgs(["--chattiness", "quiet"])).toMatchObject({ chattiness: ["quiet"] });
-    expect(parseEvalArgs(["--chattiness", "all"])).toMatchObject({
-      chattiness: [...chattinessLevels],
+  it("takes one frequency and one boldness, or all of either (V2-017)", () => {
+    expect(parseEvalArgs(["--frequency", "rare"])).toMatchObject({
+      settings: [{ frequency: "rare", boldness: "normal" }],
     });
+    expect(parseEvalArgs(["--boldness", "bold"])).toMatchObject({
+      settings: [{ frequency: "normal", boldness: "bold" }],
+    });
+    expect(parseEvalArgs(["--boldness", "all"])).toMatchObject({
+      settings: [
+        { frequency: "normal", boldness: "cautious" },
+        { frequency: "normal", boldness: "normal" },
+        { frequency: "normal", boldness: "bold" },
+      ],
+    });
+  });
+
+  it("crosses the two, frequency first", () => {
+    const parsed = parseEvalArgs(["--frequency", "all", "--boldness", "all"]);
+    expect(parsed).toMatchObject({ settings: expect.any(Array) });
+    const settings = "settings" in parsed ? parsed.settings : [];
+    expect(settings).toHaveLength(9);
+    expect(settings[0]).toEqual({ frequency: "rare", boldness: "cautious" });
+    expect(settings[1]).toEqual({ frequency: "rare", boldness: "normal" });
+    expect(settings.at(-1)).toEqual({ frequency: "often", boldness: "bold" });
   });
 
   it("takes a comma-separated fixture list and the no-judge flag", () => {
     expect(parseEvalArgs(["--fixtures", "moment-fact, brainstorm", "--no-judge"])).toEqual({
-      chattiness: [DEFAULT_CHATTINESS],
+      settings: [defaultPolicySettings()],
       gate: DEFAULT_GATE_MODE,
       fixtures: ["moment-fact", "brainstorm"],
       skipJudge: true,
@@ -66,9 +85,17 @@ describe("parseEvalArgs", () => {
   });
 
   it("says what is wrong rather than guessing", () => {
-    expect(parseEvalArgs(["--chattiness"])).toEqual({ error: "--chattiness needs a value" });
-    expect(parseEvalArgs(["--chattiness", "loud"])).toMatchObject({
-      error: expect.stringContaining("unknown chattiness"),
+    expect(parseEvalArgs(["--frequency"])).toEqual({ error: "--frequency needs a value" });
+    expect(parseEvalArgs(["--frequency", "constant"])).toMatchObject({
+      error: expect.stringContaining("unknown frequency"),
+    });
+    expect(parseEvalArgs(["--boldness"])).toEqual({ error: "--boldness needs a value" });
+    expect(parseEvalArgs(["--boldness", "loud"])).toMatchObject({
+      error: expect.stringContaining("unknown boldness"),
+    });
+    // The setting V2-017 replaced is gone, not quietly accepted.
+    expect(parseEvalArgs(["--chattiness", "quiet"])).toMatchObject({
+      error: expect.stringContaining("unknown argument"),
     });
     expect(parseEvalArgs(["--fixtures", " , "])).toEqual({ error: "--fixtures was empty" });
     expect(parseEvalArgs(["--gate"])).toEqual({ error: "--gate needs a value" });

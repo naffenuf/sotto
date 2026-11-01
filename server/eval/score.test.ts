@@ -6,15 +6,17 @@ import type {
   JudgeMatchRecord,
   MomentRecord,
 } from "../../shared/eval.js";
-import type { Chattiness } from "../../shared/policy.js";
+import { policySettingsLabel, type PolicySettings } from "../../shared/policy.js";
 import {
   MIN_MOMENT_RECALL,
+  boldnessFromChattiness,
   isQuietFixture,
   median,
   outcomeFor,
-  scoreChattiness,
   scoreFixture,
   scoreRun,
+  scoreSettings,
+  settingsOf,
   windowFor,
 } from "./score.js";
 
@@ -73,7 +75,7 @@ function match(overrides: Partial<JudgeMatchRecord> = {}): JudgeMatchRecord {
 function run(overrides: Partial<FixtureRunRecord> = {}): FixtureRunRecord {
   return {
     fixture: "moment-contradiction",
-    chattiness: "normal",
+    settings: { frequency: "normal", boldness: "normal" },
     sessionDir: "/tmp/session",
     durationMs: 130_000,
     finalTurns: 26,
@@ -88,13 +90,14 @@ function run(overrides: Partial<FixtureRunRecord> = {}): FixtureRunRecord {
 }
 
 function record(runs: FixtureRunRecord[], overrides: Partial<EvalRunRecord> = {}): EvalRunRecord {
-  const chattiness = [...new Set(runs.map((one) => one.chattiness))] as Chattiness[];
+  const seen = new Map<string, PolicySettings>();
+  for (const one of runs) seen.set(policySettingsLabel(settingsOf(one)), settingsOf(one));
   return {
     id: "2026-10-28_120000",
     startedAt: "2026-10-28T12:00:00.000Z",
     finishedAt: "2026-10-28T12:10:00.000Z",
     gitCommit: "abc1234",
-    chattiness: chattiness.length === 0 ? ["normal"] : chattiness,
+    settings: [...seen.values()],
     fixtures: [...new Set(runs.map((one) => one.fixture))],
     judge: { model: "muse-spark-1.3", promptHash: "deadbeef1234", calls: 1, cacheHits: 0 },
     runs,
@@ -268,7 +271,7 @@ describe("median", () => {
   });
 });
 
-describe("scoreChattiness", () => {
+describe("scoreSettings", () => {
   const caught = run({
     fixture: "moment-contradiction",
     moments: [moment()],
@@ -284,7 +287,7 @@ describe("scoreChattiness", () => {
   const quiet = run({ fixture: "brainstorm" });
 
   it("computes the three headline metrics the PRD names", () => {
-    const group = scoreChattiness("normal", [caught, low, quiet], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [caught, low, quiet], true);
     expect(group.totals).toMatchObject({
       moments: 2,
       caught: 1,
@@ -310,7 +313,7 @@ describe("scoreChattiness", () => {
       deliveries: [delivery({ cardId: "card-c", deliveredAtMs: 130_000 })],
       matches: [match({ cardId: "card-c", momentId: "m3" })],
     });
-    const group = scoreChattiness("normal", [late], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [late], true);
     expect(group.totals.late).toBe(1);
     expect(group.recall).toBe(0);
     // It matched a moment, so it is not a false interject either.
@@ -322,15 +325,15 @@ describe("scoreChattiness", () => {
   it("fails the recall gate below the threshold and passes at it", () => {
     const moments = [moment({ id: "m1" }), moment({ id: "m2" }), moment({ id: "m3" })];
     const missing = run({ moments, deliveries: [delivery()], matches: [match()] });
-    expect(scoreChattiness("normal", [missing], true).recall).toBeCloseTo(1 / 3);
-    expect(gate(scoreChattiness("normal", [missing], true), "recall").status).toBe("fail");
+    expect(scoreSettings({ frequency: "normal", boldness: "normal" }, [missing], true).recall).toBeCloseTo(1 / 3);
+    expect(gate(scoreSettings({ frequency: "normal", boldness: "normal" }, [missing], true), "recall").status).toBe("fail");
 
     const two = run({
       moments: [moment({ id: "m1" }), moment({ id: "m2" })],
       deliveries: [delivery(), delivery({ cardId: "card-b" })],
       matches: [match(), match({ cardId: "card-b", momentId: "m2" })],
     });
-    const group = scoreChattiness("normal", [two], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [two], true);
     expect(group.recall).toBe(1);
     expect(group.recall).toBeGreaterThanOrEqual(MIN_MOMENT_RECALL);
     expect(gate(group, "recall").status).toBe("pass");
@@ -338,7 +341,7 @@ describe("scoreChattiness", () => {
 
   it("fails the quiet-fixture gate on one false interject in brainstorm", () => {
     const noisy = run({ fixture: "brainstorm", deliveries: [delivery()] });
-    const group = scoreChattiness("normal", [caught, noisy], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [caught, noisy], true);
     expect(group.totals.quietFalseInterjects).toBe(1);
     expect(group.interjectPrecision).toBe(0.5);
     expect(gate(group, "false interject").status).toBe("fail");
@@ -350,7 +353,7 @@ describe("scoreChattiness", () => {
       fixture: "no-wake",
       deliveries: [delivery({ cardId: "card-g", level: "glow" })],
     });
-    const group = scoreChattiness("normal", [caught, glowing], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [caught, glowing], true);
     expect(group.totals.falseGlows).toBe(1);
     expect(group.totals.quietFalseInterjects).toBe(0);
     expect(group.passed).toBe(true);
@@ -363,20 +366,20 @@ describe("scoreChattiness", () => {
       deliveries: [delivery({ inPause: false })],
       matches: [match()],
     });
-    const group = scoreChattiness("normal", [rude], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [rude], true);
     expect(group.pauseRate).toBe(0);
     expect(gate(group, "pause").status).toBe("fail");
     expect(group.passed).toBe(false);
   });
 
   it("fails on a replay that threw, whatever the rest of the run says", () => {
-    const group = scoreChattiness("normal", [caught, run({ error: "boom" })], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [caught, run({ error: "boom" })], true);
     expect(group.totals.replayErrors).toBe(1);
     expect(gate(group, "replay").status).toBe("fail");
   });
 
   it("skips the gates that need matches when judging was skipped", () => {
-    const group = scoreChattiness("normal", [run({ moments: [moment()] })], false);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [run({ moments: [moment()] })], false);
     expect(gate(group, "recall").status).toBe("skipped");
     expect(gate(group, "false interject").status).toBe("skipped");
     expect(gate(group, "pause").status).toBe("pass");
@@ -385,7 +388,7 @@ describe("scoreChattiness", () => {
   });
 
   it("treats a run with nothing to catch as neither recall nor precision failure", () => {
-    const group = scoreChattiness("normal", [quiet], true);
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [quiet], true);
     expect(group.recall).toBe(1);
     expect(group.interjectPrecision).toBe(1);
     expect(group.passed).toBe(true);
@@ -401,23 +404,24 @@ function gate(group: { gates: { name: string; status: string; detail: string }[]
 }
 
 describe("scoreRun", () => {
-  it("scores and gates each chattiness setting on its own", () => {
-    const quietRun = run({
-      chattiness: "quiet",
+  it("scores and gates each pair of settings on its own", () => {
+    const cautiousRun = run({
+      settings: { frequency: "normal", boldness: "cautious" },
       moments: [moment()],
       deliveries: [],
       matches: [],
     });
-    const activeRun = run({
-      chattiness: "active",
+    const boldRun = run({
+      settings: { frequency: "normal", boldness: "bold" },
       moments: [moment()],
       deliveries: [delivery()],
       matches: [match()],
     });
-    const score = scoreRun(
-      record([quietRun, activeRun], { chattiness: ["quiet", "active"] }),
-    );
-    expect(score.groups.map((group) => group.chattiness)).toEqual(["quiet", "active"]);
+    const score = scoreRun(record([cautiousRun, boldRun]));
+    expect(score.groups.map((group) => policySettingsLabel(group.settings))).toEqual([
+      "normal/cautious",
+      "normal/bold",
+    ]);
     expect(score.groups[0]?.recall).toBe(0);
     expect(score.groups[1]?.recall).toBe(1);
     // One failing setting fails the run.
@@ -435,8 +439,38 @@ describe("scoreRun", () => {
   });
 
   it("falls back to the settings its runs were recorded at", () => {
-    const score = scoreRun(record([run()], { chattiness: [] }));
-    expect(score.groups.map((group) => group.chattiness)).toEqual(["normal"]);
+    const score = scoreRun(record([run()], { settings: [] }));
+    expect(score.groups.map((group) => group.settings)).toEqual([
+      { frequency: "normal", boldness: "normal" },
+    ]);
+  });
+
+  it("still renders a run recorded before V2-017, under the new names", () => {
+    // `chattiness` decided exactly the thresholds boldness decides now, and
+    // the cooldown and budget were `normal` frequency's constants.
+    const { settings: _dropped, ...rest } = run({
+      moments: [moment()],
+      deliveries: [delivery()],
+      matches: [match()],
+    });
+    const old: FixtureRunRecord = { ...rest, chattiness: "active" };
+    const { settings: _alsoDropped, ...base } = record([old]);
+    const score = scoreRun({ ...base, chattiness: ["active"] });
+    expect(score.groups.map((group) => group.settings)).toEqual([
+      { frequency: "normal", boldness: "bold" },
+    ]);
+    expect(score.groups[0]?.recall).toBe(1);
+    expect(score.groups[0]?.fixtures[0]?.settings).toEqual({
+      frequency: "normal",
+      boldness: "bold",
+    });
+  });
+
+  it("maps quiet/normal/active onto the boldness that carries their thresholds", () => {
+    expect(boldnessFromChattiness("quiet")).toBe("cautious");
+    expect(boldnessFromChattiness("normal")).toBe("normal");
+    expect(boldnessFromChattiness("active")).toBe("bold");
+    expect(boldnessFromChattiness(undefined)).toBe("normal");
   });
 });
 

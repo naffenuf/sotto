@@ -10,7 +10,7 @@ import { scoreRun } from "./score.js";
 const runs: FixtureRunRecord[] = [
   {
     fixture: "brainstorm",
-    chattiness: "normal",
+    settings: { frequency: "normal", boldness: "normal" },
     sessionDir: "/tmp/brainstorm",
     durationMs: 180_000,
     finalTurns: 40,
@@ -48,7 +48,7 @@ const runs: FixtureRunRecord[] = [
   },
   {
     fixture: "moment-contradiction",
-    chattiness: "normal",
+    settings: { frequency: "normal", boldness: "normal" },
     sessionDir: "/tmp/contradiction",
     durationMs: 130_000,
     finalTurns: 26,
@@ -124,7 +124,7 @@ const runs: FixtureRunRecord[] = [
   },
   {
     fixture: "moment-fact",
-    chattiness: "normal",
+    settings: { frequency: "normal", boldness: "normal" },
     sessionDir: null,
     durationMs: 0,
     finalTurns: 0,
@@ -143,7 +143,7 @@ const record: EvalRunRecord = {
   startedAt: "2026-10-28T12:00:00.000Z",
   finishedAt: "2026-10-28T12:12:00.000Z",
   gitCommit: "abc1234+",
-  chattiness: ["normal"],
+  settings: [{ frequency: "normal", boldness: "normal" }],
   gate: "glimmer",
   fixtures: ["brainstorm", "moment-contradiction", "moment-fact"],
   judge: { model: "muse-spark-1.3", promptHash: "162841b6b7d8", calls: 1, cacheHits: 1 },
@@ -223,7 +223,7 @@ describe("renderTerminalReport", () => {
   const text = renderTerminalReport(record, scoreRun(record));
 
   it("shows a row per fixture with its replay counts", () => {
-    expect(text).toContain("=== chattiness: normal ===");
+    expect(text).toContain("=== frequency/boldness: normal/normal ===");
     expect(text).toMatch(/brainstorm\s+40\s+1\s+1/);
     expect(text).toContain("moment-fact (FAILED)");
   });
@@ -266,7 +266,7 @@ describe("renderReportMarkdown", () => {
 
   it("records the settings, the commit and the judge prompt", () => {
     expect(markdown).toContain("| git commit | abc1234+ |");
-    expect(markdown).toContain("| chattiness | normal |");
+    expect(markdown).toContain("| frequency/boldness | normal/normal |");
     expect(markdown).toContain("| gate | glimmer |");
     expect(markdown).toContain("| judge prompt | 162841b6b7d8 |");
     expect(markdown).toContain("| judge calls | 1 (1 cached) |");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Candidate } from "../../shared/candidates.js";
-import type { PolicyDecision } from "../../shared/policy.js";
+import { FREQUENCY_LIMITS, type PolicyDecision } from "../../shared/policy.js";
 import { cardForInterjection, deliveredCardId } from "./delivery.js";
 import type { Interjection } from "./InterjectionPolicy.js";
 
@@ -10,7 +10,8 @@ const decision: PolicyDecision = {
   score: 0.72,
   level: "interject",
   thresholds: { glow: 0.35, interject: 0.6 },
-  chattiness: "normal",
+  limits: FREQUENCY_LIMITS.normal,
+  settings: { frequency: "normal", boldness: "normal" },
 };
 
 function candidate(over: Partial<Candidate> = {}): Candidate {

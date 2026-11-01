@@ -13,7 +13,7 @@ import type { DecisionLogRecord } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { E2eFiles, E2eObserved, Stamped } from "../../shared/e2e.js";
 import type { MomentRecord } from "../../shared/eval.js";
-import { DEFAULT_CHATTINESS, thresholdsFor } from "../../shared/policy.js";
+import { DEFAULT_BOLDNESS, defaultPolicySettings, limitsFor, thresholdsFor } from "../../shared/policy.js";
 import type { SessionRecord } from "../../shared/session.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { defaultSettings } from "../../shared/session.js";
@@ -127,8 +127,9 @@ function decision(overrides: Partial<DecisionLogRecord> = {}): DecisionLogRecord
     reason: "delivered",
     score: 0.86,
     level: "interject",
-    thresholds: thresholdsFor(DEFAULT_CHATTINESS),
-    chattiness: DEFAULT_CHATTINESS,
+    thresholds: thresholdsFor(DEFAULT_BOLDNESS),
+    limits: limitsFor("normal"),
+    settings: defaultPolicySettings(),
     heldForMs: 8_000,
     turnsWaited: 2,
     ...overrides,

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DecisionLogRecord } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
+import { FREQUENCY_LIMITS } from "../../shared/policy.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { PAUSE_MS } from "../interject/policy.js";
@@ -36,7 +37,7 @@ describe("replayFixture", () => {
   it("replays a capture to the end and saves it like any other session", async () => {
     const result = await replayFixture({
       fixture: "brainstorm",
-      chattiness: "normal",
+      settings: { frequency: "normal", boldness: "normal" },
       sessionRoot: root,
       createModel: noModel,
       logger: quiet,
@@ -60,14 +61,14 @@ describe("runFixture", () => {
   it("places a fixture's planted moments against the turns the replay produced", async () => {
     const run = await runFixture({
       fixture: "moment-contradiction",
-      chattiness: "quiet",
+      settings: { frequency: "normal", boldness: "cautious" },
       sessionRoot: root,
       createModel: noModel,
       logger: quiet,
     });
 
     expect(run.error).toBeUndefined();
-    expect(run.chattiness).toBe("quiet");
+    expect(run.settings).toEqual({ frequency: "normal", boldness: "cautious" });
     expect(run.finalTurns).toBeGreaterThan(10);
     expect(run.moments).toHaveLength(1);
     const moment = run.moments[0];
@@ -86,7 +87,7 @@ describe("runFixture", () => {
   it("records a replay that could not start rather than throwing", async () => {
     const run = await runFixture({
       fixture: "no-such-fixture",
-      chattiness: "normal",
+      settings: { frequency: "normal", boldness: "normal" },
       sessionRoot: root,
       createModel: noModel,
       logger: quiet,
@@ -112,7 +113,8 @@ describe("readCandidateLog and deliveredDecisions", () => {
       score: 0.7,
       level: "interject",
       thresholds: { glow: 0.35, interject: 0.6 },
-      chattiness: "normal",
+      limits: FREQUENCY_LIMITS.normal,
+      settings: { frequency: "normal", boldness: "normal" },
       ...partial,
     };
   }
@@ -203,7 +205,8 @@ describe("deliveriesFrom", () => {
       score: 0.81,
       level: "interject",
       thresholds: { glow: 0.35, interject: 0.6 },
-      chattiness: "normal",
+      limits: FREQUENCY_LIMITS.normal,
+      settings: { frequency: "normal", boldness: "normal" },
     };
     const [delivery] = deliveriesFrom(
       result({ cards: [card({})], delivered: new Map([["cand-1", decided]]) }),

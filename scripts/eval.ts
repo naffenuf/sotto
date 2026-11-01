@@ -2,7 +2,8 @@
  * The interjection eval harness (PRD US-016).
  *
  *   npm run eval                                  # every eval fixture, normal
- *   npm run eval -- --chattiness all              # quiet, normal and active
+ *   npm run eval -- --boldness all                # cautious, normal and bold
+ *   npm run eval -- --frequency rare              # the sparing budget
  *   npm run eval -- --gate spark                  # the observer's own scores
  *                                                 # (default: the local gate)
  *   npm run eval -- --fixtures moment-fact        # one conversation
@@ -26,7 +27,7 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { EvalRunRecord, FixtureRunRecord } from "../shared/eval.js";
-import type { Chattiness } from "../shared/policy.js";
+import { policySettingsLabel } from "../shared/policy.js";
 import { loadConfig } from "../server/config.js";
 import { listFixtures } from "../server/fixtures.js";
 import { UsageMeter, estimateCostUsd, formatUsd } from "../server/eval/cost.js";
@@ -34,6 +35,7 @@ import { Judge, JudgeCache, JUDGE_CACHE_DIR } from "../server/eval/judge.js";
 import { evalFixtures, parseEvalArgs, runTimestamp, EVAL_USAGE } from "../server/eval/options.js";
 import { promptHashes } from "../server/eval/prompts.js";
 import { renderTerminalReport } from "../server/eval/report.js";
+import { settingsOf } from "../server/eval/score.js";
 import { writeReport } from "../server/eval/reportFile.js";
 import { runFixture } from "../server/eval/runner.js";
 import { MuseClient, SPARK_MODEL } from "../server/model/client.js";
@@ -60,17 +62,22 @@ function gitCommit(): string | null {
   }
 }
 
+/** `rare/bold` for a run's line, off whatever the record carries. */
+function label(run: FixtureRunRecord): string {
+  return policySettingsLabel(settingsOf(run));
+}
+
 /** One line per replay, so a long run says where it has got to. */
 function report(run: FixtureRunRecord): void {
   if (run.error !== undefined) {
-    console.error(`  ${run.fixture} [${run.chattiness}] FAILED: ${run.error}`);
+    console.error(`  ${run.fixture} [${label(run)}] FAILED: ${run.error}`);
     return;
   }
   const matched = new Set(run.matches.filter((match) => match.matches).map((m) => m.momentId));
   const outside = run.deliveries.filter((delivery) => !delivery.inPause).length;
   const levels = run.deliveries.map((delivery) => delivery.level[0]).join("") || "-";
   console.log(
-    `  ${run.fixture} [${run.chattiness}]: ${run.finalTurns} turns, ` +
+    `  ${run.fixture} [${label(run)}]: ${run.finalTurns} turns, ` +
       `${run.candidates} candidate(s), ${run.deliveries.length} delivered (${levels}), ` +
       `${matched.size}/${run.moments.length} moment(s) matched` +
       (outside > 0 ? `, ${outside} OUTSIDE A PAUSE` : "") +
@@ -127,20 +134,22 @@ async function main(): Promise<void> {
       });
 
   console.log(
-    `[eval] ${id}: ${fixtures.length} fixture(s) × ${parsed.chattiness.join(", ")}` +
+    `[eval] ${id}: ${fixtures.length} fixture(s) × ` +
+      `${parsed.settings.map(policySettingsLabel).join(", ")}` +
       `, gate ${parsed.gate}` +
       (judge === undefined ? " (judging skipped)" : ""),
   );
 
   const runs: FixtureRunRecord[] = [];
-  for (const chattiness of parsed.chattiness as Chattiness[]) {
-    console.log(`\n=== chattiness: ${chattiness} ===`);
+  for (const settings of parsed.settings) {
+    const label = policySettingsLabel(settings);
+    console.log(`\n=== frequency/boldness: ${label} ===`);
     for (const fixture of fixtures) {
       const run = await runFixture({
         fixture,
-        chattiness,
+        settings,
         gate: parsed.gate,
-        sessionRoot: join(SESSIONS_DIR, id, chattiness),
+        sessionRoot: join(SESSIONS_DIR, id, label.replace("/", "-")),
         apiKey,
         createModel: () => new MuseClient({ apiKey, onUsage: meter.record }),
         // Judgment runs where it would in a real session (V2-010): on Glimmer
@@ -160,7 +169,7 @@ async function main(): Promise<void> {
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
     gitCommit: gitCommit(),
-    chattiness: [...parsed.chattiness],
+    settings: [...parsed.settings],
     gate: parsed.gate,
     fixtures,
     judge: {

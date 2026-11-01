@@ -25,6 +25,7 @@ import { z } from "zod";
 import type { Artifact } from "./artifacts.js";
 import type { Citation } from "./cards.js";
 import { clipChars, clipWords } from "./candidates.js";
+import { DEFAULT_FREQUENCY, FREQUENCY_LIMITS } from "./policy.js";
 
 /** Where an idea came from. Recorded, because the two differ in quality. */
 export const researchOrigins = ["hook", "planner"] as const;
@@ -668,16 +669,22 @@ export function researchCardHeadline(title: string): string {
 }
 
 /**
- * How long after one research card the next one waits.
+ * How long after one research card the next one waits, at the default
+ * frequency.
  *
- * Its own budget, separate from the interjection one (US-014's
- * {@link COOLDOWN_MS} is three minutes) and deliberately shorter, because the
- * two cost the group different things: an interjection asks for the floor,
- * while a research card is a line that appears on a screen nobody has to look
- * at. A minute is long enough that two searches finishing together do not
- * land in the same pause, which is the only way a quiet card is loud.
+ * Its own budget, separate from the interjection one (whose cooldown at
+ * `normal` is three minutes) and deliberately shorter, because the two cost
+ * the group different things: an interjection asks for the floor, while a
+ * research card is a line that appears on a screen nobody has to look at. A
+ * minute is long enough that two searches finishing together do not land in
+ * the same pause, which is the only way a quiet card is loud.
+ *
+ * V2-017 made both numbers a frequency setting's: this is the `normal` row of
+ * {@link FREQUENCY_LIMITS}, which is what {@link ResearchCards} falls back to
+ * when nobody passes it limits.
  */
-export const RESEARCH_CARD_COOLDOWN_MS = 60_000;
+export const RESEARCH_CARD_COOLDOWN_MS =
+  FREQUENCY_LIMITS[DEFAULT_FREQUENCY].researchCardCooldownMs;
 
 /** The window the research card budget is counted over. */
 export const RESEARCH_CARD_WINDOW_MS = 15 * 60_000;
@@ -689,7 +696,8 @@ export const RESEARCH_CARD_WINDOW_MS = 15 * 60_000;
  * {@link RESEARCH_WINDOW_MS}, so this is the backstop rather than the brake:
  * it is what stops a long conversation turning into a feed.
  */
-export const MAX_RESEARCH_CARDS_PER_WINDOW = 4;
+export const MAX_RESEARCH_CARDS_PER_WINDOW =
+  FREQUENCY_LIMITS[DEFAULT_FREQUENCY].maxResearchCardsPerWindow;
 
 /* ------------------------------------------------------------------ *
  * The briefing (V2-015): what happens when somebody asks for it.

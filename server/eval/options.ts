@@ -5,7 +5,15 @@
  * around it does nothing but I/O.
  */
 import { DEFAULT_GATE_MODE, gateModes, type GateMode } from "../../shared/candidates.js";
-import { chattinessLevels, DEFAULT_CHATTINESS, type Chattiness } from "../../shared/policy.js";
+import {
+  boldnessLevels,
+  DEFAULT_BOLDNESS,
+  DEFAULT_FREQUENCY,
+  frequencyLevels,
+  type Boldness,
+  type Frequency,
+  type PolicySettings,
+} from "../../shared/policy.js";
 
 /** The conversations the harness measures: the two quiet ones, then the moments. */
 export function isEvalFixture(name: string): boolean {
@@ -24,8 +32,13 @@ export function evalFixtures(available: readonly string[]): string[] {
 }
 
 export interface EvalOptions {
-  /** The settings to run, in order. `--chattiness all` gives all three. */
-  chattiness: Chattiness[];
+  /**
+   * The settings to run, in order: every frequency asked for crossed with
+   * every boldness, frequency first. `all` is allowed for either, so
+   * `--boldness all` is three runs of each fixture and `--frequency all
+   * --boldness all` is nine.
+   */
+  settings: PolicySettings[];
   /**
    * Who scores the candidates (V2-016): `glimmer` for the local gate, `spark`
    * for the observer's own scores, which is the baseline it is measured
@@ -39,13 +52,16 @@ export interface EvalOptions {
 }
 
 export const EVAL_USAGE =
-  "usage: npm run eval -- [--chattiness quiet|normal|active|all] " +
+  "usage: npm run eval -- [--frequency rare|normal|often|all] " +
+  "[--boldness cautious|normal|bold|all] " +
   "[--gate glimmer|spark] [--fixtures <name,name>] [--no-judge]";
 
 /** What the arguments meant, or the first thing wrong with them. */
 export function parseEvalArgs(argv: readonly string[]): EvalOptions | { error: string } {
+  let frequencies: Frequency[] = [DEFAULT_FREQUENCY];
+  let boldnesses: Boldness[] = [DEFAULT_BOLDNESS];
   const options: EvalOptions = {
-    chattiness: [DEFAULT_CHATTINESS],
+    settings: [],
     gate: DEFAULT_GATE_MODE,
     fixtures: null,
     skipJudge: false,
@@ -53,17 +69,26 @@ export function parseEvalArgs(argv: readonly string[]): EvalOptions | { error: s
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] as string;
     const value = (): string | undefined => argv[++index];
-    if (arg === "--chattiness") {
+    if (arg === "--frequency") {
       const asked = value();
-      if (asked === undefined) return { error: "--chattiness needs a value" };
+      if (asked === undefined) return { error: "--frequency needs a value" };
       if (asked === "all") {
-        options.chattiness = [...chattinessLevels];
-        continue;
+        frequencies = [...frequencyLevels];
+      } else if (isFrequency(asked)) {
+        frequencies = [asked];
+      } else {
+        return { error: `unknown frequency ${JSON.stringify(asked)}; ${EVAL_USAGE}` };
       }
-      if (!isChattiness(asked)) {
-        return { error: `unknown chattiness ${JSON.stringify(asked)}; ${EVAL_USAGE}` };
+    } else if (arg === "--boldness") {
+      const asked = value();
+      if (asked === undefined) return { error: "--boldness needs a value" };
+      if (asked === "all") {
+        boldnesses = [...boldnessLevels];
+      } else if (isBoldness(asked)) {
+        boldnesses = [asked];
+      } else {
+        return { error: `unknown boldness ${JSON.stringify(asked)}; ${EVAL_USAGE}` };
       }
-      options.chattiness = [asked];
     } else if (arg === "--gate") {
       const asked = value();
       if (asked === undefined) return { error: "--gate needs a value" };
@@ -86,11 +111,18 @@ export function parseEvalArgs(argv: readonly string[]): EvalOptions | { error: s
       return { error: `unknown argument ${JSON.stringify(arg)}; ${EVAL_USAGE}` };
     }
   }
+  options.settings = frequencies.flatMap((frequency) =>
+    boldnesses.map((boldness) => ({ frequency, boldness })),
+  );
   return options;
 }
 
-function isChattiness(value: string): value is Chattiness {
-  return (chattinessLevels as readonly string[]).includes(value);
+function isFrequency(value: string): value is Frequency {
+  return (frequencyLevels as readonly string[]).includes(value);
+}
+
+function isBoldness(value: string): value is Boldness {
+  return (boldnessLevels as readonly string[]).includes(value);
 }
 
 function isGateMode(value: string): value is GateMode {

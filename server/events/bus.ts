@@ -133,7 +133,7 @@ export class EventBus {
   }
 
   /**
-   * Publishes the settings as they now stand (US-014's chattiness). They are
+   * Publishes the settings as they now stand (V2-017's two). They are
    * deliberately *not* reset by a session starting: a user who turned Sotto
    * down meant it for the next conversation too.
    */

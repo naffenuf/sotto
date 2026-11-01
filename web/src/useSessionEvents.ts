@@ -78,7 +78,7 @@ export interface SessionEventsState {
    */
   listening: boolean;
   /**
-   * The settings as the server holds them (US-014's chattiness). The header's
+   * The settings as the server holds them (V2-017's two). The header's
    * selector shows this rather than its own last click, so two tabs agree.
    */
   settings: SessionSettings;

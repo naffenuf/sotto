@@ -413,7 +413,7 @@ describe("SessionManager, board and observer", () => {
     for (const record of decisions) {
       expect(record.decision).toBe("silent");
       expect(record.reason).toBe("below_threshold");
-      expect(record.chattiness).toBe("normal");
+      expect(record.settings).toEqual({ frequency: "normal", boldness: "normal" });
       expect(record.score).toBeCloseTo(0.189, 3);
     }
   });
@@ -1373,7 +1373,7 @@ describe("SessionManager, typed questions", () => {
   });
 });
 
-describe("SessionManager, chattiness", () => {
+describe("SessionManager, frequency and boldness", () => {
   /** A model that is wired up but never actually asked anything here. */
   const idleModel: ModelClient = {
     async structured(): Promise<never> {
@@ -1399,12 +1399,33 @@ describe("SessionManager, chattiness", () => {
       createAsrClient: ({ onFrame }) => new FakeAsrClient(onFrame),
     });
 
-    expect(sessions.settings()).toEqual({ chattiness: "normal", voiceMuted: false });
-    expect(sessions.setChattiness("quiet")).toEqual({ chattiness: "quiet", voiceMuted: false });
-    expect(bus.settingsState()).toEqual({ chattiness: "quiet", voiceMuted: false });
+    expect(sessions.settings()).toEqual({
+      frequency: "normal",
+      boldness: "normal",
+      voiceMuted: false,
+    });
+    // One at a time: turning Sotto down does not also raise its bar.
+    expect(sessions.setPolicySettings({ frequency: "rare" })).toEqual({
+      frequency: "rare",
+      boldness: "normal",
+      voiceMuted: false,
+    });
+    expect(sessions.setPolicySettings({ boldness: "cautious" })).toEqual({
+      frequency: "rare",
+      boldness: "cautious",
+      voiceMuted: false,
+    });
+    expect(bus.settingsState()).toEqual({
+      frequency: "rare",
+      boldness: "cautious",
+      voiceMuted: false,
+    });
 
     sessions.start({ kind: "wav", fixture: "brainstorm" });
-    expect(sessions.interjectionPolicy()?.setting()).toBe("quiet");
+    expect(sessions.interjectionPolicy()?.settings()).toEqual({
+      frequency: "rare",
+      boldness: "cautious",
+    });
   });
 
   it("changes a running session's policy and its folder", async () => {
@@ -1437,19 +1458,29 @@ describe("SessionManager, chattiness", () => {
 
     sessions.start({ kind: "wav", fixture: "brainstorm" });
     // The folder records the level the session started at.
-    expect(settings).toEqual([{ chattiness: "normal", voiceMuted: false }]);
+    expect(settings).toEqual([{ frequency: "normal", boldness: "normal", voiceMuted: false }]);
 
-    sessions.setChattiness("active");
-    expect(sessions.interjectionPolicy()?.setting()).toBe("active");
-    expect(settings).toEqual([{ chattiness: "normal", voiceMuted: false }, { chattiness: "active", voiceMuted: false }]);
+    sessions.setPolicySettings({ boldness: "bold" });
+    expect(sessions.interjectionPolicy()?.settings()).toEqual({
+      frequency: "normal",
+      boldness: "bold",
+    });
+    expect(settings).toEqual([
+      { frequency: "normal", boldness: "normal", voiceMuted: false },
+      { frequency: "normal", boldness: "bold", voiceMuted: false },
+    ]);
     // Setting it to what it already is changes nothing and writes nothing.
-    sessions.setChattiness("active");
+    sessions.setPolicySettings({ boldness: "bold" });
     expect(settings).toHaveLength(2);
 
     await sessions.stop();
     expect(sessions.interjectionPolicy()).toBeNull();
     // And it outlives the session, for the next one to inherit.
-    expect(sessions.settings()).toEqual({ chattiness: "active", voiceMuted: false });
+    expect(sessions.settings()).toEqual({
+      frequency: "normal",
+      boldness: "bold",
+      voiceMuted: false,
+    });
   });
 });
 

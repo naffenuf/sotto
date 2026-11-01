@@ -127,7 +127,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         error: `not a settings change: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
       } satisfies ApiError);
     }
-    if (parsed.data.chattiness !== undefined) sessions.setChattiness(parsed.data.chattiness);
+    if (parsed.data.frequency !== undefined || parsed.data.boldness !== undefined) {
+      sessions.setPolicySettings(parsed.data);
+    }
     if (parsed.data.voiceMuted !== undefined) {
       sessions.setVoiceMuted(parsed.data.voiceMuted);
       if (parsed.data.voiceMuted) voice.stop();

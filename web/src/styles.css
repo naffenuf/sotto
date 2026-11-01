@@ -110,6 +110,17 @@ body {
   max-width: 18rem;
 }
 
+/* The two contribution settings (V2-017): compact, and the same width, so
+   "how often / how sure" reads as one control rather than two. */
+.controls__select--setting {
+  padding: 0.3rem 0.4rem;
+  min-width: 6rem;
+}
+
+.controls__label {
+  white-space: nowrap;
+}
+
 .controls__button {
   cursor: pointer;
 }

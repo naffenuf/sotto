@@ -34,7 +34,7 @@ import {
   type CandidateLogRecord,
   type DecisionLogRecord,
 } from "../../shared/candidates.js";
-import { CHATTINESS_THRESHOLDS, decisionReasons, decisions } from "../../shared/policy.js";
+import { BOLDNESS_THRESHOLDS, decisionReasons, decisions } from "../../shared/policy.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { EventBus } from "../events/bus.js";
 import { SessionManager } from "../session/SessionManager.js";
@@ -227,8 +227,8 @@ describe.skipIf(apiKey === "")(`the observer after replaying ${fixture}`, () => 
       expect(decisionReasons).toContain(decision.reason);
       expect(decision.score).toBeGreaterThanOrEqual(0);
       expect(decision.score).toBeLessThanOrEqual(1);
-      expect(decision.chattiness).toBe("normal");
-      expect(decision.thresholds).toEqual(CHATTINESS_THRESHOLDS.normal);
+      expect(decision.settings).toEqual({ frequency: "normal", boldness: "normal" });
+      expect(decision.thresholds).toEqual(BOLDNESS_THRESHOLDS.normal);
     }
   });
 

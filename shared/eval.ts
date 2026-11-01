@@ -15,7 +15,7 @@
 import { z } from "zod";
 import type { CandidateGateWhere, CandidateType, GateMode } from "./candidates.js";
 import type { ExpectedLevel, MomentType } from "./fixtures.js";
-import type { Chattiness, DecisionReason, DeliveredLevel } from "./policy.js";
+import type { DecisionReason, DeliveredLevel, PolicySettings } from "./policy.js";
 import type { PauseState } from "./turns.js";
 
 /** The `json_schema.name` a judge request sends. */
@@ -162,10 +162,25 @@ export interface GateCallRecord {
   error?: string;
 }
 
-/** One fixture replayed at one chattiness setting. */
+/**
+ * The one setting the harness had before V2-017 split it in two.
+ *
+ * Kept only so a run recorded then can still be read back and reported on
+ * (`npm run eval:report <old id>`); nothing writes it any more. `quiet`,
+ * `normal` and `active` carried exactly the three threshold pairs the three
+ * {@link Boldness} settings carry now, and the cooldown and budget were
+ * constants equal to `normal` frequency's — which is the mapping
+ * `server/eval/score.ts` reads them with.
+ */
+export type LegacyChattiness = "quiet" | "normal" | "active";
+
+/** One fixture replayed at one pair of settings. */
 export interface FixtureRunRecord {
   fixture: string;
-  chattiness: Chattiness;
+  /** How often and how boldly. Absent on runs recorded before V2-017. */
+  settings?: PolicySettings;
+  /** @deprecated What V2-017 replaced; present only on runs recorded before it. */
+  chattiness?: LegacyChattiness;
   /** Where the session folder for this replay went, for reading afterwards. */
   sessionDir: string | null;
   /** The conversation's length on the session clock. */
@@ -207,7 +222,7 @@ export interface RunTokenUsage {
   reasoningTokens: number;
 }
 
-/** One `npm run eval`: every fixture, at every chattiness asked for. */
+/** One `npm run eval`: every fixture, at every pair of settings asked for. */
 export interface EvalRunRecord {
   /** The run's id, which is also its file name: `YYYY-MM-DD_HHMMSS`. */
   id: string;
@@ -216,7 +231,9 @@ export interface EvalRunRecord {
   /** `git rev-parse --short HEAD`, or `null` outside a checkout. */
   gitCommit: string | null;
   /** The settings asked for, in the order they were run. */
-  chattiness: Chattiness[];
+  settings?: PolicySettings[];
+  /** @deprecated What V2-017 replaced; present only on runs recorded before it. */
+  chattiness?: LegacyChattiness[];
   /**
    * Who scored the candidates (V2-016). Absent on runs recorded before it,
    * which all used the observer's own scores — i.e. `spark`.

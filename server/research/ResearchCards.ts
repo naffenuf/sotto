@@ -18,7 +18,9 @@
  *     two searches finishing together do not land in the same pause, and a
  *     cap per quarter of an hour. The numbers are smaller than the policy's
  *     because the two cost the group different things — see
- *     {@link RESEARCH_CARD_COOLDOWN_MS}.
+ *     {@link RESEARCH_CARD_COOLDOWN_MS} — but they come off the same
+ *     frequency setting (V2-017), because a group that asked Sotto to
+ *     contribute rarely meant everything it does unasked.
  *
  * Nothing here is ever dropped. An interjection that waits too long is about
  * a moment that has passed, but a sourced packet is about the world and is
@@ -27,9 +29,8 @@
  * reads the stage after Stop, which is exactly when the last search finishes.
  */
 import type { StageCard } from "../../shared/cards.js";
+import { DEFAULT_FREQUENCY, limitsFor, type FrequencyLimits } from "../../shared/policy.js";
 import {
-  MAX_RESEARCH_CARDS_PER_WINDOW,
-  RESEARCH_CARD_COOLDOWN_MS,
   RESEARCH_CARD_WINDOW_MS,
   researchCardHeadline,
   researchCardId,
@@ -52,8 +53,11 @@ export interface ResearchCardsOptions {
   /** One `card` line in `research.jsonl`. */
   onRecord: (record: ResearchCardRecord) => void;
   logger?: Logger;
-  cooldownMs?: number;
-  maxPerWindow?: number;
+  /**
+   * What the session's frequency setting allows (V2-017). Defaults to the
+   * `normal` row, which is the pair V2-014 measured.
+   */
+  limits?: FrequencyLimits;
   windowMs?: number;
 }
 
@@ -70,8 +74,8 @@ export class ResearchCards {
   private readonly onDeliver: ResearchCardsOptions["onDeliver"];
   private readonly onRecord: ResearchCardsOptions["onRecord"];
   private readonly logger: Logger;
-  private readonly cooldownMs: number;
-  private readonly maxPerWindow: number;
+  private cooldownMs: number;
+  private maxPerWindow: number;
   private readonly windowMs: number;
 
   /** Packets waiting for a pause and a budget slot, oldest first. */
@@ -89,9 +93,27 @@ export class ResearchCards {
     this.onDeliver = options.onDeliver;
     this.onRecord = options.onRecord;
     this.logger = options.logger ?? console;
-    this.cooldownMs = options.cooldownMs ?? RESEARCH_CARD_COOLDOWN_MS;
-    this.maxPerWindow = options.maxPerWindow ?? MAX_RESEARCH_CARDS_PER_WINDOW;
+    const limits = options.limits ?? limitsFor(DEFAULT_FREQUENCY);
+    this.cooldownMs = limits.researchCardCooldownMs;
+    this.maxPerWindow = limits.maxResearchCardsPerWindow;
     this.windowMs = options.windowMs ?? RESEARCH_CARD_WINDOW_MS;
+  }
+
+  /**
+   * Takes a new frequency setting mid-conversation (V2-017), and looks again:
+   * turning Sotto up should let a packet that was waiting on the cooldown
+   * through now rather than at the next turn.
+   */
+  setLimits(limits: FrequencyLimits): void {
+    if (
+      limits.researchCardCooldownMs === this.cooldownMs &&
+      limits.maxResearchCardsPerWindow === this.maxPerWindow
+    ) {
+      return;
+    }
+    this.cooldownMs = limits.researchCardCooldownMs;
+    this.maxPerWindow = limits.maxResearchCardsPerWindow;
+    this.review();
   }
 
   /** How many packets are still waiting for a moment. */

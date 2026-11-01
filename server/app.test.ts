@@ -276,23 +276,44 @@ describe("POST /api/session/settings", () => {
     payload,
   });
 
-  it("sets the chattiness with nothing running and remembers it on the bus", async () => {
+  it("sets the two contribution settings and remembers them on the bus", async () => {
     const { app: server, bus } = await buildTestApp();
 
-    const response = await server.inject(change({ chattiness: "quiet", voiceMuted: false }));
+    const response = await server.inject(
+      change({ frequency: "rare", boldness: "cautious", voiceMuted: false }),
+    );
+    const settings = { frequency: "rare", boldness: "cautious", voiceMuted: false };
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ settings: { chattiness: "quiet", voiceMuted: false } });
-    expect(bus.settingsState()).toEqual({ chattiness: "quiet", voiceMuted: false });
+    expect(response.json()).toEqual({ settings });
+    expect(bus.settingsState()).toEqual(settings);
     // So a browser that attaches afterwards is caught up with it.
-    expect(bus.snapshot()).toContainEqual({
-      type: "settings",
-      settings: { chattiness: "quiet", voiceMuted: false },
+    expect(bus.snapshot()).toContainEqual({ type: "settings", settings });
+  });
+
+  it("takes one of the two on its own, which is what each selector sends", async () => {
+    const { app: server } = await buildTestApp();
+    const first = await server.inject(change({ boldness: "bold" }));
+    expect(first.json()).toEqual({
+      settings: { frequency: "normal", boldness: "bold", voiceMuted: false },
+    });
+    const second = await server.inject(change({ frequency: "often" }));
+    expect(second.json()).toEqual({
+      settings: { frequency: "often", boldness: "bold", voiceMuted: false },
     });
   });
 
-  it("rejects anything that is not one of the three levels", async () => {
+  it("rejects anything that is not one of the levels, chattiness included", async () => {
     const { app: server } = await buildTestApp();
-    for (const payload of [{}, { chattiness: "" }, { chattiness: "loud" }, { chattiness: 2 }]) {
+    const bad = [
+      {},
+      { frequency: "" },
+      { frequency: "constant" },
+      { boldness: "loud" },
+      { boldness: 2 },
+      // The setting V2-017 replaced is not a settings change any more.
+      { chattiness: "quiet" },
+    ];
+    for (const payload of bad) {
       const response = await server.inject(change(payload));
       expect(response.statusCode, JSON.stringify(payload)).toBe(400);
     }
@@ -664,7 +685,10 @@ describe("/ws/events", () => {
       // Nothing has been said, so the board is empty rather than absent.
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
       // And Sotto is as talkative as it comes (US-014).
-      { type: "settings", settings: { chattiness: "normal", voiceMuted: false } },
+      {
+        type: "settings",
+        settings: { frequency: "normal", boldness: "normal", voiceMuted: false },
+      },
       // Nobody has said its name (US-017).
       { type: "wake", listening: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },

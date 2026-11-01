@@ -30,7 +30,13 @@ import type {
 } from "../../shared/eval.js";
 import type { ExpectedLevel } from "../../shared/fixtures.js";
 import { DEFAULT_GATE_MODE, type GateMode } from "../../shared/candidates.js";
-import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
+import {
+  DEFAULT_FREQUENCY,
+  policySettingsLabel,
+  type Boldness,
+  type DeliveredLevel,
+  type PolicySettings,
+} from "../../shared/policy.js";
 
 /** The gate: below this, `npm run eval` exits non-zero. */
 export const MIN_MOMENT_RECALL = 0.7;
@@ -104,7 +110,7 @@ export interface DeliveryScore {
 /** One fixture at one setting, scored. */
 export interface FixtureScore {
   fixture: string;
-  chattiness: Chattiness;
+  settings: PolicySettings;
   moments: MomentScore[];
   deliveries: DeliveryScore[];
   caught: number;
@@ -165,9 +171,9 @@ export interface GateScore {
   maxLatencyMs: number | null;
 }
 
-/** Everything one chattiness setting scored. */
-export interface ChattinessScore {
-  chattiness: Chattiness;
+/** Everything one pair of settings scored. */
+export interface SettingsScore {
+  settings: PolicySettings;
   fixtures: FixtureScore[];
   totals: ScoreTotals;
   /** (caught + caught_low) / moments. A `late` catch does not count. */
@@ -184,12 +190,33 @@ export interface ChattinessScore {
   passed: boolean;
 }
 
-/** A whole run, scored: one group per chattiness setting it was run at. */
+/** A whole run, scored: one group per pair of settings it was run at. */
 export interface RunScore {
   /** False when `--no-judge` ran: nothing was matched, so nothing is gated. */
   judged: boolean;
-  groups: ChattinessScore[];
+  groups: SettingsScore[];
   passed: boolean;
+}
+
+/**
+ * What one fixture run was run at.
+ *
+ * A record written before V2-017 carries the one `chattiness` setting
+ * instead, which mapped to exactly these thresholds — `quiet` to `cautious`,
+ * `normal` to `normal`, `active` to `bold` — while the cooldown and the
+ * budget were constants equal to `normal` frequency's. So an old report still
+ * renders, under the names the numbers it was measured with have now.
+ */
+export function settingsOf(run: Pick<FixtureRunRecord, "settings" | "chattiness">): PolicySettings {
+  if (run.settings !== undefined) return run.settings;
+  return { frequency: DEFAULT_FREQUENCY, boldness: boldnessFromChattiness(run.chattiness) };
+}
+
+/** The boldness one pre-V2-017 chattiness setting is the same thresholds as. */
+export function boldnessFromChattiness(chattiness: string | undefined): Boldness {
+  if (chattiness === "quiet") return "cautious";
+  if (chattiness === "active") return "bold";
+  return "normal";
 }
 
 /** The moments a card was matched to, by card id. Only `matches: true` counts. */
@@ -300,7 +327,7 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
 
   return {
     fixture: run.fixture,
-    chattiness: run.chattiness,
+    settings: settingsOf(run),
     moments,
     deliveries,
     caught: count("caught"),
@@ -415,13 +442,13 @@ function formatRatio(value: number): string {
   return value.toFixed(2);
 }
 
-/** One chattiness setting's fixtures, scored and gated together. */
-export function scoreChattiness(
-  chattiness: Chattiness,
+/** One pair of settings' fixtures, scored and gated together. */
+export function scoreSettings(
+  settings: PolicySettings,
   runs: readonly FixtureRunRecord[],
   judged: boolean,
   gateMode: GateMode = DEFAULT_GATE_MODE,
-): ChattinessScore {
+): SettingsScore {
   const fixtures = runs.map(scoreFixture);
   const totals = totalsOf(fixtures);
   const recall = totals.moments === 0 ? 1 : (totals.caught + totals.caughtLow) / totals.moments;
@@ -435,7 +462,7 @@ export function scoreChattiness(
     .filter((delay): delay is number => delay !== null);
   const gates = gatesFor(totals, recall, pauseRate, judged);
   return {
-    chattiness,
+    settings,
     fixtures,
     totals,
     recall,
@@ -472,27 +499,42 @@ export function scoreGate(mode: GateMode, runs: readonly FixtureRunRecord[]): Ga
 /**
  * A whole run record, scored.
  *
- * Each chattiness setting is scored and gated on its own: running three of
- * them is three experiments, and a `quiet` run that interjects nothing should
- * not lend its precision to an `active` one that interjects everywhere.
+ * Each pair of settings is scored and gated on its own: running three
+ * boldnesses is three experiments, and a `cautious` run that interjects
+ * nothing should not lend its precision to a `bold` one that interjects
+ * everywhere.
  */
 export function scoreRun(record: EvalRunRecord): RunScore {
   // `--no-judge` leaves no prompt hash, because no judge was built.
   const judged = record.judge.promptHash !== "";
-  const settings =
-    record.chattiness.length > 0
-      ? record.chattiness
-      : [...new Set(record.runs.map((run) => run.chattiness))];
   // A run recorded before V2-016 has no gate: the observer's own scores were
   // all there was, which is what `spark` means.
   const gateMode = record.gate ?? "spark";
-  const groups = settings.map((chattiness) =>
-    scoreChattiness(
-      chattiness,
-      record.runs.filter((run) => run.chattiness === chattiness),
+  const groups = settingsAsked(record).map((settings) =>
+    scoreSettings(
+      settings,
+      record.runs.filter((run) => policySettingsLabel(settingsOf(run)) === policySettingsLabel(settings)),
       judged,
       gateMode,
     ),
   );
   return { judged, groups, passed: groups.every((group) => group.passed) };
+}
+
+/**
+ * The settings a run was asked for, in order — off the record's own list when
+ * it has one (a pre-V2-017 record's `chattiness` list counts, mapped), and
+ * otherwise off the runs themselves.
+ */
+export function settingsAsked(record: EvalRunRecord): PolicySettings[] {
+  const asked =
+    record.settings ??
+    record.chattiness?.map((chattiness) => ({
+      frequency: DEFAULT_FREQUENCY,
+      boldness: boldnessFromChattiness(chattiness),
+    }));
+  const list = asked !== undefined && asked.length > 0 ? asked : record.runs.map(settingsOf);
+  const seen = new Map<string, PolicySettings>();
+  for (const one of list) seen.set(policySettingsLabel(one), one);
+  return [...seen.values()];
 }

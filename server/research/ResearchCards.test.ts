@@ -7,6 +7,7 @@ import {
   type ResearchCardRecord,
   type ResearchPacket,
 } from "../../shared/research.js";
+import { FREQUENCY_LIMITS } from "../../shared/policy.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import { SimulatedClock } from "../clock.js";
 import { PAUSE_MS } from "../interject/policy.js";
@@ -191,8 +192,34 @@ describe("ResearchCards", () => {
     });
   });
 
+  it("takes its cooldown and cap from the frequency setting (V2-017)", () => {
+    const h = harness({ limits: FREQUENCY_LIMITS.rare });
+    h.hush();
+    h.clock.advanceBy(PAUSE_MS);
+    h.cards.accept(packet({ id: "packet-1" }));
+    h.cards.accept(packet({ id: "packet-2" }));
+    // `rare`'s two-minute cooldown holds the second one back where `normal`'s
+    // minute would have let it through by now.
+    h.clock.advanceBy(FREQUENCY_LIMITS.normal.researchCardCooldownMs);
+    expect(h.delivered.map((card) => card.id)).toEqual(["research-packet-1"]);
+
+    // Turning the frequency up releases it on the spot, as the policy does.
+    h.cards.setLimits(FREQUENCY_LIMITS.often);
+    expect(h.delivered.map((card) => card.id)).toEqual([
+      "research-packet-1",
+      "research-packet-2",
+    ]);
+  });
+
   it("is a budget of its own: the cap per window holds the next card back", () => {
-    const h = harness({ cooldownMs: 0, maxPerWindow: 2, windowMs: 10_000 });
+    const h = harness({
+      limits: {
+        ...FREQUENCY_LIMITS.normal,
+        researchCardCooldownMs: 0,
+        maxResearchCardsPerWindow: 2,
+      },
+      windowMs: 10_000,
+    });
     h.hush();
     h.clock.advanceBy(5_000);
     h.cards.accept(packet({ id: "packet-1" }));

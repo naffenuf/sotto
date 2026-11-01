@@ -4,13 +4,13 @@
  *
  * `policy.ts` next door holds the rules and is pure. This is the part with a
  * memory — the candidates holding out for a pause, the interjects already
- * spent, the chattiness the header last set — and the part with a clock,
- * because two of the rules change their mind with nothing arriving to say so:
- * silence crosses {@link PAUSE_MS} while nobody is talking, and the courtesy
- * window after a wake phrase runs out. Both are timers, so a held candidate is
- * re-checked at the moment it becomes deliverable rather than at the next
- * frame, which would be the next person starting to speak — exactly the wrong
- * moment.
+ * spent, the frequency and boldness the header last set (V2-017) — and the
+ * part with a clock, because two of the rules change their mind with nothing
+ * arriving to say so: silence crosses {@link PAUSE_MS} while nobody is
+ * talking, and the courtesy window after a wake phrase runs out. Both are
+ * timers, so a held candidate is re-checked at the moment it becomes
+ * deliverable rather than at the next frame, which would be the next person
+ * starting to speak — exactly the wrong moment.
  *
  * Every decision goes to `candidates.jsonl`, but only when it *changes*: a
  * candidate waiting through four turns of conversation is one `hold` line and
@@ -18,12 +18,12 @@
  */
 import type { Candidate, DecisionLogRecord } from "../../shared/candidates.js";
 import {
-  DEFAULT_CHATTINESS,
-  type Chattiness,
+  defaultPolicySettings,
   type Decision,
   type DecisionReason,
   type DeliveredLevel,
   type PolicyDecision,
+  type PolicySettings,
 } from "../../shared/policy.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import type { Clock } from "../clock.js";
@@ -47,8 +47,8 @@ export interface InterjectionPolicyOptions {
   clock: Clock;
   /** Whether anybody is talking, read straight off the turn assembler. */
   pauseState: () => PauseState;
-  /** Where the session starts; the header can change it live. */
-  chattiness?: Chattiness;
+  /** Where the session starts; the header can change both live (V2-017). */
+  settings?: PolicySettings;
   /** Records every decision in `candidates.jsonl`. */
   onRecord: (record: DecisionLogRecord) => void;
   /** Hands a delivered candidate to the stage (US-015). */
@@ -74,7 +74,7 @@ export class InterjectionPolicy {
   private readonly onDeliver: (interjection: Interjection) => void;
   private readonly logger: Logger;
 
-  private chattiness: Chattiness;
+  private policySettings: PolicySettings;
   /** Candidates waiting for a better moment, oldest first. */
   private holding: Held[] = [];
   /** Final turns in the whole session: the other half of the expiry rule. */
@@ -95,24 +95,29 @@ export class InterjectionPolicy {
     this.pauseState = options.pauseState;
     this.onRecord = options.onRecord;
     this.onDeliver = options.onDeliver;
-    this.chattiness = options.chattiness ?? DEFAULT_CHATTINESS;
+    this.policySettings = options.settings ?? defaultPolicySettings();
     this.logger = options.logger ?? console;
   }
 
-  /** How talkative the session is set to be. */
-  setting(): Chattiness {
-    return this.chattiness;
+  /** How often and how boldly the session is set to contribute. */
+  settings(): PolicySettings {
+    return this.policySettings;
   }
 
   /**
-   * Changes the thresholds mid-conversation, and re-decides whatever is
-   * waiting: turning Sotto up should let a held thought through now, not at
-   * the next turn.
+   * Changes the frequency or the boldness mid-conversation, and re-decides
+   * whatever is waiting: turning Sotto up should let a held thought through
+   * now, not at the next turn.
    */
-  setChattiness(chattiness: Chattiness): void {
-    if (chattiness === this.chattiness) return;
-    this.chattiness = chattiness;
-    this.logger.log(`[policy] chattiness is now ${chattiness}`);
+  setSettings(settings: PolicySettings): void {
+    if (
+      settings.frequency === this.policySettings.frequency &&
+      settings.boldness === this.policySettings.boldness
+    ) {
+      return;
+    }
+    this.policySettings = settings;
+    this.logger.log(`[policy] now ${settings.frequency}/${settings.boldness}`);
     this.review();
   }
 
@@ -236,7 +241,15 @@ export class InterjectionPolicy {
       answerThinking: this.answerThinking,
       wakeAtMs: this.wakeAtMs,
     };
-    return { scores: held.candidate.scores, nowMs, pause, chattiness: this.chattiness, history };
+    return {
+      scores: held.candidate.scores,
+      type: held.candidate.type,
+      verified: held.candidate.verification !== undefined,
+      nowMs,
+      pause,
+      settings: this.policySettings,
+      history,
+    };
   }
 
   private deliver(

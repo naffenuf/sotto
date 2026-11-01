@@ -418,13 +418,13 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   waiting as `silent`/`session_ended`, so no candidate is unaccounted for. A downgrade is a
   reason, not a loss: `cooldown` and `budget` both deliver a `glow` whose `level` is still
   `interject`.
-- **Chattiness is the server's setting, not the tab's.** It lives on the `EventBus` (which now
-  snapshots **seven** events), is published as a `settings` event, and is deliberately *not*
-  cleared by a session starting — turning Sotto down is meant for the next conversation too.
+- **How talkative Sotto is, is the server's setting, not the tab's.** It lives on the `EventBus`
+  (which snapshots it as a `settings` event) and is deliberately *not* cleared by a session
+  starting — turning Sotto down is meant for the next conversation too.
   `POST /api/session/settings` works with nothing running (the next session inherits it) and
-  answers with the settings as they stand; the header's `<select>` shows what came back rather
-  than what it clicked, so two tabs agree. `SessionSettings` is a typed `{ chattiness }` now, and
-  `SessionManager.setChattiness` pushes it to the running policy *and* to `session.json`.
+  answers with the settings as they stand; the header's `<select>`s show what came back rather
+  than what they clicked, so two tabs agree. Since V2-017 that is **two** settings
+  (`SessionManager.setPolicySettings` takes either on its own) — see the V2-017 entry below.
 - **`SessionManager.interjectionPolicy()` is where the courtesy hooks attach.** Wake-phrase
   detection (US-017) calls `wakePhraseDetected()` and the answer agent (US-018) brackets its work
   with `setAnswerThinking(true/false)`; both make held candidates wait rather than dropping them,
@@ -1167,3 +1167,32 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `--gate glimmer` quietly measures Muse Spark instead (the first V2-016 run did: "0 on
   Glimmer, 1 on Spark"). The same was true of V2-012's research gate in every eval run before
   this one.
+
+- **One control became two, and only one of them is about *what* Sotto would say.** V2-017's
+  `frequency` (`rare|normal|often`) owns the rationing — `FREQUENCY_LIMITS` in `shared/policy.ts`
+  carries the cooldown and the budget for interjections *and* for research cards, because a group
+  that asked for rare contributions meant everything Sotto does unasked — while `boldness`
+  (`cautious|normal|bold`) owns the two thresholds, which are the three pairs the old
+  `quiet`/`normal`/`active` chattiness carried, in that order. `normal/normal` is therefore the
+  old `normal` exactly, and `server/interject/policy.test.ts` has a describe block that says so
+  in four assertions. Boldness is also the first thing in the policy that reads a candidate's
+  **type**: `cautious` raises a contradiction or a *verified* `factual_error` and nothing else
+  (`CAUTIOUS_TYPES`, applied by `boldnessAllows`), with `boldness` as a new `DecisionReason`
+  — checked *after* the score, so the log still says `below_threshold` for something that was
+  never worth saying anyway. `ResearchCards` took the pair as `limits` and grew `setLimits`, the
+  same shape `InterjectionPolicy.setSettings` has: changing a setting re-decides what is waiting
+  rather than waiting for the next turn.
+- **A record outlives the names of the things it recorded.** `eval/runs/<id>.json` from before
+  V2-017 carries `chattiness`, so `FixtureRunRecord.settings` and `EvalRunRecord.settings` are
+  **optional** beside a deprecated `chattiness`, and `settingsOf`/`settingsAsked` in
+  `server/eval/score.ts` map the old name onto the new (`quiet`→`cautious`, `active`→`bold`,
+  frequency `normal`, since the cooldown and budget were constants then). That is what keeps
+  `npm run eval:report <old id>` working, and it is the same move `promptHashes`, `usage` and
+  `gate` already made. Group by `policySettingsLabel(settings)` (`rare/bold`), never by object
+  identity. The eval's flags are `--frequency` and `--boldness`, each taking `all`, and the
+  settings run are their **cross product** — `--frequency all --boldness all` is nine groups.
+- **`npm run verify:controls` replaced `verify:chattiness`**, which had been dead since V2-009
+  took the source `<select>` out of the header: it starts its session with
+  `fetch("/api/session/start")` like `verify-hello.mjs` does. What it proves beyond the obvious
+  is that the two settings are *separate* — changing the frequency and reloading leaves the
+  boldness where it was — and that both reach `session.json`.

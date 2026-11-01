@@ -84,7 +84,7 @@ export interface SessionWriter {
   appendTurn(turn: TurnUpdate): void;
   /** Gives a diarization label a display name, or clears it with `null`. */
   renameSpeaker(label: string, name: string | null): void;
-  /** Replaces the saved settings: the chattiness the policy is using (US-014). */
+  /** Replaces the saved settings: what the policy is set to (V2-017). */
   setSettings(settings: SessionSettings): void;
   /** Writes the board as JSON and as markdown (US-009). */
   writeBoard(board: unknown, markdown: string): void;

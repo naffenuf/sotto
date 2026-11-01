@@ -22,13 +22,13 @@ const record: EvalRunRecord = {
   startedAt: "2026-10-28T12:00:00.000Z",
   finishedAt: "2026-10-28T12:01:00.000Z",
   gitCommit: "abc1234",
-  chattiness: ["normal"],
+  settings: [{ frequency: "normal", boldness: "normal" }],
   fixtures: ["brainstorm"],
   judge: { model: "muse-spark-1.3", promptHash: "162841b6b7d8", calls: 0, cacheHits: 0 },
   runs: [
     {
       fixture: "brainstorm",
-      chattiness: "normal",
+      settings: { frequency: "normal", boldness: "normal" },
       sessionDir: null,
       durationMs: 1_000,
       finalTurns: 4,

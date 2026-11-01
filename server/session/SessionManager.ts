@@ -37,7 +37,13 @@ import type { StageCard } from "../../shared/cards.js";
 import type { CandidateType } from "../../shared/candidates.js";
 import type { StatusState } from "../../shared/events.js";
 import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
-import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
+import {
+  limitsFor,
+  type Boldness,
+  type DeliveredLevel,
+  type Frequency,
+  type PolicySettings,
+} from "../../shared/policy.js";
 import type { ResearchLogLine } from "../../shared/research.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { defaultSettings, describeSource, sourceSlug } from "../../shared/session.js";
@@ -185,8 +191,11 @@ export interface SessionManagerOptions {
   wallClock?: Clock;
   /** Replay speed for `events` sources. `1x` for the UI, `max` for tests. */
   replaySpeed?: ReplaySpeed;
-  /** How talkative the policy starts out (US-014). The header changes it live. */
-  chattiness?: Chattiness;
+  /**
+   * How often and how boldly the policy starts out (US-014, split in two by
+   * V2-017). The header changes both live.
+   */
+  settings?: PolicySettings;
   /**
    * Who scores a candidate before the policy sees it (V2-016). Defaults to
    * {@link DEFAULT_GATE_MODE}; `spark` leaves the observer's own scores
@@ -423,10 +432,14 @@ export class SessionManager {
     // The bus is where the settings a browser is caught up with are
     // remembered, so they start from there and are only published when this
     // manager was built with something else in mind.
-    this.currentSettings = options.chattiness === undefined
-      ? this.bus.settingsState()
-      : { ...defaultSettings(), chattiness: options.chattiness };
-    if (this.currentSettings.chattiness !== this.bus.settingsState().chattiness) {
+    const remembered = this.bus.settingsState();
+    this.currentSettings = options.settings === undefined
+      ? remembered
+      : { ...defaultSettings(), ...options.settings };
+    if (
+      this.currentSettings.frequency !== remembered.frequency ||
+      this.currentSettings.boldness !== remembered.boldness
+    ) {
       this.bus.setSettings(this.currentSettings);
     }
   }
@@ -436,23 +449,34 @@ export class SessionManager {
     return this.current?.info ?? null;
   }
 
-  /** The settings as they now stand (US-014's chattiness). */
+  /** The settings as they now stand (V2-017's frequency and boldness). */
   settings(): SessionSettings {
     return this.currentSettings;
   }
 
   /**
-   * Changes how talkative Sotto is, live. A running session's policy picks it
-   * up at once and `session.json` records it; with nothing running it is the
-   * setting the next session will start with.
+   * Changes how often or how boldly Sotto contributes, live (V2-017). A
+   * running session's policy picks it up at once — and so do its research
+   * cards, which are rationed by the same frequency — and `session.json`
+   * records it; with nothing running it is what the next session starts with.
    */
-  setChattiness(chattiness: Chattiness): SessionSettings {
-    if (chattiness !== this.currentSettings.chattiness) {
-      this.currentSettings = { ...this.currentSettings, chattiness };
-      this.bus.setSettings(this.currentSettings);
-      this.current?.policy?.setChattiness(chattiness);
-      this.current?.store.writer?.setSettings(this.currentSettings);
+  setPolicySettings(patch: {
+    frequency?: Frequency | undefined;
+    boldness?: Boldness | undefined;
+  }): SessionSettings {
+    const frequency = patch.frequency ?? this.currentSettings.frequency;
+    const boldness = patch.boldness ?? this.currentSettings.boldness;
+    if (
+      frequency === this.currentSettings.frequency &&
+      boldness === this.currentSettings.boldness
+    ) {
+      return this.currentSettings;
     }
+    this.currentSettings = { ...this.currentSettings, frequency, boldness };
+    this.bus.setSettings(this.currentSettings);
+    this.current?.policy?.setSettings({ frequency, boldness });
+    this.current?.researchCards?.setLimits(limitsFor(frequency));
+    this.current?.store.writer?.setSettings(this.currentSettings);
     return this.currentSettings;
   }
 
@@ -510,7 +534,7 @@ export class SessionManager {
         : this.startLive(info, source, store);
     store.writer = this.openStore(info);
     // The folder records the context the session ran in, so the eval harness
-    // (US-016) can read a report's chattiness off the disk.
+    // (US-016) can read a report's frequency and boldness off the disk.
     store.writer?.setSettings(this.currentSettings);
 
     this.current = running;
@@ -973,7 +997,11 @@ export class SessionManager {
     const policy = new InterjectionPolicy({
       clock,
       pauseState,
-      chattiness: this.currentSettings.chattiness,
+      // The policy's two settings only: `voiceMuted` is nothing to do with it.
+      settings: {
+        frequency: this.currentSettings.frequency,
+        boldness: this.currentSettings.boldness,
+      },
       logger: this.logger,
       onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "policy_decision", ...record }); },
       // The stage (US-015). The level the policy chose becomes the card's
@@ -1060,6 +1088,9 @@ export class SessionManager {
     const researchCards = new ResearchCards({
       clock,
       pauseState,
+      // Rationed by the same frequency setting the policy is (V2-017): a
+      // group that asked for rare contributions meant all of them.
+      limits: limitsFor(this.currentSettings.frequency),
       logger: this.logger,
       onRecord: (record) => onResearch(record),
       onDeliver: (card, packet) => {

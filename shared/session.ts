@@ -9,7 +9,15 @@
  */
 import { z } from "zod";
 import type { SpeakerNames } from "./events.js";
-import { ChattinessSchema, DEFAULT_CHATTINESS, type Chattiness } from "./policy.js";
+import {
+  BoldnessSchema,
+  DEFAULT_BOLDNESS,
+  DEFAULT_FREQUENCY,
+  FrequencySchema,
+  type Boldness,
+  type Frequency,
+  type PolicySettings,
+} from "./policy.js";
 
 /** Fixture names are file stems under `fixtures/`, never paths. */
 const FixtureNameSchema = z
@@ -101,25 +109,30 @@ export interface FixtureListResponse {
  * recorded in — which is what the eval harness (US-016) reports alongside its
  * numbers.
  */
-export interface SessionSettings {
-  /** How talkative Sotto is being (US-014), set from the header. */
-  readonly chattiness: Chattiness;
+export interface SessionSettings extends PolicySettings {
+  /** How often Sotto contributes unasked (V2-017), set from the header. */
+  readonly frequency: Frequency;
+  /** How sure it has to be before it does (V2-017), likewise. */
+  readonly boldness: Boldness;
   readonly voiceMuted: boolean;
 }
 
 /** Where a server starts, before the header has said anything. */
 export function defaultSettings(): SessionSettings {
-  return { chattiness: DEFAULT_CHATTINESS, voiceMuted: false };
+  return { frequency: DEFAULT_FREQUENCY, boldness: DEFAULT_BOLDNESS, voiceMuted: false };
 }
 
 /**
  * Body of `POST /api/session/settings`. It works with no session running
  * too — the setting is the server's, and the next session inherits it.
  */
-export const SessionSettingsRequestSchema = z.object({
-  chattiness: ChattinessSchema.optional(),
-  voiceMuted: z.boolean().optional(),
-}).refine((value) => value.chattiness !== undefined || value.voiceMuted !== undefined);
+export const SessionSettingsRequestSchema = z
+  .object({
+    frequency: FrequencySchema.optional(),
+    boldness: BoldnessSchema.optional(),
+    voiceMuted: z.boolean().optional(),
+  })
+  .refine((value) => Object.values(value).some((one) => one !== undefined));
 export type SessionSettingsRequest = z.infer<typeof SessionSettingsRequestSchema>;
 
 /** Response to it: the settings as they now stand. */

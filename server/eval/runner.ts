@@ -28,7 +28,7 @@ import type {
   GateCallRecord,
   JudgeMatchRecord,
 } from "../../shared/eval.js";
-import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
+import type { DeliveredLevel, PolicySettings } from "../../shared/policy.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { EventBus } from "../events/bus.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
@@ -44,7 +44,8 @@ type Logger = Pick<Console, "log" | "warn" | "error">;
 
 export interface ReplayOptions {
   fixture: string;
-  chattiness: Chattiness;
+  /** How often and how boldly to run it (V2-017). */
+  settings: PolicySettings;
   /** Who scores the candidates (V2-016). Defaults to the shipped gate. */
   gate?: GateMode;
   /** Where the session folders go. One per replay, as any session has. */
@@ -96,7 +97,7 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     ...(options.createGlimmer === undefined ? {} : { createGlimmer: options.createGlimmer }),
     logger,
     replaySpeed: "max",
-    chattiness: options.chattiness,
+    settings: options.settings,
     ...(options.gate === undefined ? {} : { gate: options.gate }),
     createStore: (info) => {
       const store = SessionStore.create(info, { root: options.sessionRoot, logger });
@@ -153,7 +154,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
   const startedAt = Date.now();
   const base = {
     fixture: options.fixture,
-    chattiness: options.chattiness,
+    settings: options.settings,
     sessionDir: null,
     durationMs: 0,
     finalTurns: 0,
@@ -181,7 +182,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
 
   return {
     fixture: options.fixture,
-    chattiness: options.chattiness,
+    settings: options.settings,
     sessionDir: replay.sessionDir,
     durationMs: replay.durationMs,
     finalTurns: finals.length,

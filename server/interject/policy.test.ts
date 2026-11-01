@@ -1,19 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { CandidateScores } from "../../shared/candidates.js";
+import { candidateTypes } from "../../shared/candidates.js";
 import {
-  CHATTINESS_THRESHOLDS,
-  chattinessLevels,
-  type Chattiness,
+  BOLDNESS_THRESHOLDS,
+  FREQUENCY_LIMITS,
+  boldnessLevels,
+  frequencyLevels,
+  limitsFor,
+  thresholdsFor,
+  type Boldness,
+  type Frequency,
+  type PolicySettings,
 } from "../../shared/policy.js";
 import type { PauseState } from "../../shared/turns.js";
 import {
   BUDGET_WINDOW_MS,
-  COOLDOWN_MS,
   COURTESY_MS,
-  MAX_INTERJECTS_PER_WINDOW,
   PAUSE_MS,
   STALE_MS,
   STALE_TURNS,
+  boldnessAllows,
   candidateScore,
   decide,
   scoresFromGate,
@@ -29,6 +35,15 @@ function scoring(score: number): CandidateScores {
 }
 
 const pause: PauseState = { speaking: false, silentForMs: PAUSE_MS };
+
+/** The `normal` frequency's cooldown and budget, which the old code hard-coded. */
+const COOLDOWN_MS = FREQUENCY_LIMITS.normal.cooldownMs;
+const MAX_INTERJECTS_PER_WINDOW = FREQUENCY_LIMITS.normal.maxInterjectsPerWindow;
+
+/** A setting pair, defaulting to the one the old `normal` chattiness was. */
+function settings(overrides: Partial<PolicySettings> = {}): PolicySettings {
+  return { frequency: "normal", boldness: "normal", ...overrides };
+}
 const speaking: PauseState = { speaking: true, silentForMs: 0 };
 
 function history(overrides: Partial<PolicyHistory> = {}): PolicyHistory {
@@ -45,9 +60,11 @@ function history(overrides: Partial<PolicyHistory> = {}): PolicyHistory {
 function input(overrides: Partial<PolicyInput> = {}): PolicyInput {
   return {
     scores: scoring(0.9),
+    type: "contradiction",
+    verified: false,
     nowMs: 10_000,
     pause,
-    chattiness: "normal",
+    settings: settings(),
     history: history(),
     ...overrides,
   };
@@ -71,12 +88,12 @@ describe("candidateScore", () => {
 });
 
 describe("decide: thresholds", () => {
-  for (const chattiness of chattinessLevels) {
-    const { glow, interject } = CHATTINESS_THRESHOLDS[chattiness];
+  for (const boldness of boldnessLevels) {
+    const { glow, interject } = BOLDNESS_THRESHOLDS[boldness];
 
-    it(`${chattiness}: glow at ${glow} and interject at ${interject}, inclusive`, () => {
+    it(`${boldness}: glow at ${glow} and interject at ${interject}, inclusive`, () => {
       const at = (score: number): string =>
-        decide(input({ chattiness, scores: scoring(score) })).decision;
+        decide(input({ settings: settings({ boldness }), scores: scoring(score) })).decision;
 
       expect(at(glow - 0.001)).toBe("silent");
       expect(at(glow)).toBe("glow");
@@ -85,15 +102,18 @@ describe("decide: thresholds", () => {
     });
   }
 
-  it("reports the score, the level and the thresholds it used", () => {
-    const decision = decide(input({ chattiness: "quiet", scores: scoring(0.5) }));
+  it("reports the score, the level, the thresholds and the limits it used", () => {
+    const decision = decide(
+      input({ settings: settings({ boldness: "cautious" }), scores: scoring(0.5) }),
+    );
     expect(decision).toEqual({
       decision: "glow",
       reason: "delivered",
       score: 0.5,
       level: "glow",
       thresholds: { glow: 0.45, interject: 0.75 },
-      chattiness: "quiet",
+      limits: FREQUENCY_LIMITS.normal,
+      settings: { frequency: "normal", boldness: "cautious" },
     });
   });
 
@@ -108,12 +128,13 @@ describe("decide: thresholds", () => {
     expect(decision).toMatchObject({ decision: "silent", reason: "below_threshold" });
   });
 
-  it("raises the same candidate further at a looser setting", () => {
+  it("raises the same candidate further at a bolder setting", () => {
     const scores = scoring(0.5);
-    const level = (chattiness: Chattiness): string => decide(input({ chattiness, scores })).decision;
-    expect(level("quiet")).toBe("glow");
+    const level = (boldness: Boldness): string =>
+      decide(input({ settings: settings({ boldness }), scores })).decision;
+    expect(level("cautious")).toBe("glow");
     expect(level("normal")).toBe("glow");
-    expect(level("active")).toBe("interject");
+    expect(level("bold")).toBe("interject");
   });
 });
 
@@ -186,7 +207,7 @@ describe("decide: courtesy", () => {
 });
 
 describe("decide: budget", () => {
-  it("downgrades an interject to a glow for three minutes after one", () => {
+  it("downgrades an interject to a glow for the frequency's cooldown after one", () => {
     const interjectedAtMs = [10_000];
     // `seenAtMs` moves with the clock, so the cooldown is the only rule in play.
     const at = (nowMs: number) =>
@@ -208,7 +229,7 @@ describe("decide: budget", () => {
     ).toMatchObject({ decision: "glow", reason: "delivered", level: "glow" });
   });
 
-  it("allows three interjects in a quarter of an hour and no more", () => {
+  it("allows the frequency's interjects in a quarter of an hour and no more", () => {
     // Spaced past the cooldown, so only the budget can turn the fourth down.
     const spent = [0, COOLDOWN_MS, COOLDOWN_MS * 2];
     expect(spent).toHaveLength(MAX_INTERJECTS_PER_WINDOW);
@@ -279,7 +300,7 @@ describe("scoresFromGate (V2-016)", () => {
       importance: 0.9,
       confidence: 0.9,
     };
-    expect(candidateScore(observer)).toBeGreaterThan(CHATTINESS_THRESHOLDS.normal.interject);
+    expect(candidateScore(observer)).toBeGreaterThan(BOLDNESS_THRESHOLDS.normal.interject);
     // The group said it themselves five minutes ago.
     const gated = scoresFromGate({
       true: 0.9,
@@ -287,6 +308,143 @@ describe("scoresFromGate (V2-016)", () => {
       worthSaying: 0.8,
       stillRelevant: 0.3,
     });
-    expect(candidateScore(gated)).toBeLessThan(CHATTINESS_THRESHOLDS.normal.glow);
+    expect(candidateScore(gated)).toBeLessThan(BOLDNESS_THRESHOLDS.normal.glow);
+  });
+});
+
+describe("frequency (V2-017)", () => {
+  const spentAt = (times: readonly number[], nowMs: number, frequency: Frequency) =>
+    decide(
+      input({
+        nowMs,
+        settings: settings({ frequency }),
+        history: history({ seenAtMs: nowMs, interjectedAtMs: times }),
+      }),
+    );
+
+  it("is the PRD's table: cooldown 5 / 3 / 1.5 min, budget 2 / 3 / 5", () => {
+    expect(FREQUENCY_LIMITS.rare).toMatchObject({
+      cooldownMs: 5 * 60_000,
+      maxInterjectsPerWindow: 2,
+    });
+    expect(FREQUENCY_LIMITS.normal).toMatchObject({
+      cooldownMs: 3 * 60_000,
+      maxInterjectsPerWindow: 3,
+    });
+    expect(FREQUENCY_LIMITS.often).toMatchObject({
+      cooldownMs: 1.5 * 60_000,
+      maxInterjectsPerWindow: 5,
+    });
+  });
+
+  it("rations research cards from the same setting, normal being V2-014's pair", () => {
+    expect(FREQUENCY_LIMITS.normal.researchCardCooldownMs).toBe(60_000);
+    expect(FREQUENCY_LIMITS.normal.maxResearchCardsPerWindow).toBe(4);
+    // Rarer is slower and fewer at every step; more often is faster and more.
+    const cooldowns = frequencyLevels.map((one) => FREQUENCY_LIMITS[one].researchCardCooldownMs);
+    const caps = frequencyLevels.map((one) => FREQUENCY_LIMITS[one].maxResearchCardsPerWindow);
+    expect(cooldowns).toEqual([...cooldowns].sort((a, b) => b - a));
+    expect(caps).toEqual([...caps].sort((a, b) => a - b));
+  });
+
+  it("holds each frequency to its own cooldown", () => {
+    for (const frequency of frequencyLevels) {
+      const cooldownMs = FREQUENCY_LIMITS[frequency].cooldownMs;
+      expect(spentAt([0], cooldownMs - 1, frequency).reason).toBe("cooldown");
+      expect(spentAt([0], cooldownMs, frequency).decision).toBe("interject");
+    }
+  });
+
+  it("holds each frequency to its own budget", () => {
+    for (const frequency of frequencyLevels) {
+      const { cooldownMs, maxInterjectsPerWindow } = FREQUENCY_LIMITS[frequency];
+      // Spaced past the cooldown, so only the budget can turn the next down.
+      const spent = Array.from({ length: maxInterjectsPerWindow }, (_, i) => i * cooldownMs);
+      const nowMs = maxInterjectsPerWindow * cooldownMs;
+      expect(spentAt(spent, nowMs, frequency)).toMatchObject({
+        decision: "glow",
+        reason: "budget",
+      });
+      expect(spentAt(spent.slice(1), nowMs, frequency).decision).toBe("interject");
+    }
+  });
+});
+
+describe("boldness (V2-017)", () => {
+  it("carries today's quiet / normal / active thresholds, in that order", () => {
+    expect(boldnessLevels.map((one) => BOLDNESS_THRESHOLDS[one])).toEqual([
+      { glow: 0.45, interject: 0.75 },
+      { glow: 0.35, interject: 0.6 },
+      { glow: 0.25, interject: 0.45 },
+    ]);
+  });
+
+  it("lets cautious raise a contradiction and a verified factual error only", () => {
+    expect(boldnessAllows("cautious", "contradiction", false)).toBe(true);
+    expect(boldnessAllows("cautious", "factual_error", true)).toBe(true);
+    expect(boldnessAllows("cautious", "factual_error", false)).toBe(false);
+    for (const type of ["untested_assumption", "dropped_thread", "unanswered_question"] as const) {
+      expect(boldnessAllows("cautious", type, true)).toBe(false);
+    }
+  });
+
+  it("lets normal and bold raise everything", () => {
+    for (const boldness of ["normal", "bold"] as const) {
+      for (const type of candidateTypes) {
+        expect(boldnessAllows(boldness, type, false)).toBe(true);
+      }
+    }
+  });
+
+  it("says boldness, not below_threshold, for a type a cautious session won't raise", () => {
+    expect(
+      decide(
+        input({ settings: settings({ boldness: "cautious" }), type: "dropped_thread" }),
+      ),
+    ).toMatchObject({ decision: "silent", reason: "boldness" });
+    // The same candidate at normal boldness is heard.
+    expect(decide(input({ type: "dropped_thread" })).decision).toBe("interject");
+  });
+
+  it("scores a type it won't raise first, so the log says it was below the bar", () => {
+    expect(
+      decide(
+        input({
+          settings: settings({ boldness: "cautious" }),
+          type: "dropped_thread",
+          scores: scoring(0.1),
+        }),
+      ).reason,
+    ).toBe("below_threshold");
+  });
+});
+
+describe("normal/normal is today's normal chattiness, exactly (V2-017)", () => {
+  // The three numbers the one old setting decided: the two thresholds, which
+  // were `CHATTINESS_THRESHOLDS.normal`, and the cooldown and budget, which
+  // were constants in this file.
+  it("keeps the thresholds at 0.35 and 0.6", () => {
+    expect(thresholdsFor("normal")).toEqual({ glow: 0.35, interject: 0.6 });
+  });
+
+  it("keeps the cooldown at three minutes and the budget at three", () => {
+    expect(limitsFor("normal")).toMatchObject({
+      cooldownMs: 180_000,
+      maxInterjectsPerWindow: 3,
+    });
+  });
+
+  it("raises every type, as the old policy did: nothing was type-aware", () => {
+    for (const type of candidateTypes) {
+      expect(boldnessAllows("normal", type, false)).toBe(true);
+    }
+  });
+
+  it("decides the old normal's borderline cases the same way", () => {
+    const at = (score: number): string => decide(input({ scores: scoring(score) })).decision;
+    expect(at(0.349)).toBe("silent");
+    expect(at(0.35)).toBe("glow");
+    expect(at(0.599)).toBe("glow");
+    expect(at(0.6)).toBe("interject");
   });
 });

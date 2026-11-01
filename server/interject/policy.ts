@@ -12,7 +12,7 @@
  * The order of the rules is the policy:
  *
  *   1. **Score.** `importance × confidence × (0.5 + 0.5 × relevance) ×
- *      novelty`, against the chattiness thresholds. Below the glow threshold
+ *      novelty`, against the boldness thresholds. Below the glow threshold
  *      is `silent`, and nothing later can bring it back. Since V2-016 those
  *      four numbers are usually the *gate's* rather than the observer's own:
  *      see {@link scoresFromGate} for the mapping.
@@ -22,16 +22,24 @@
  *      addressed, it says nothing else: `hold`.
  *   4. **Timing.** Only in a pause. Otherwise `hold`, and ask again when the
  *      pause state changes.
- *   5. **Budget.** An interject soon after another one, or the fourth in a
- *      quarter of an hour, is downgraded to a glow rather than dropped.
+ *   5. **Budget.** An interject inside the frequency's cooldown, or one past
+ *      its allowance for the quarter of an hour, is downgraded to a glow
+ *      rather than dropped.
+ *
+ * Between 1 and 2 since V2-017 there is one more: a `cautious` session says
+ * nothing at all about the kinds of thing it cannot point at evidence for
+ * ({@link boldnessAllows}).
  */
-import type { CandidateScores, GateScores } from "../../shared/candidates.js";
+import type { CandidateScores, CandidateType, GateScores } from "../../shared/candidates.js";
 import {
+  CAUTIOUS_TYPES,
+  limitsFor,
   thresholdsFor,
+  type BoldnessThresholds,
+  type Boldness,
   type CandidateLevel,
-  type Chattiness,
-  type ChattinessThresholds,
   type PolicyDecision,
+  type PolicySettings,
 } from "../../shared/policy.js";
 import type { PauseState } from "../../shared/turns.js";
 
@@ -66,14 +74,8 @@ export const STALE_MS = 90_000;
 /** How many final turns may go by in that wait, which is the faster of the two. */
 export const STALE_TURNS = 6;
 
-/** After an interject, how long the next one is a glow instead. */
-export const COOLDOWN_MS = 180_000;
-
 /** The window the interject budget is counted over. */
 export const BUDGET_WINDOW_MS = 900_000;
-
-/** How many interjects that window allows. */
-export const MAX_INTERJECTS_PER_WINDOW = 3;
 
 /** How long after a wake phrase Sotto leaves the floor to the asker. */
 export const COURTESY_MS = 5_000;
@@ -103,10 +105,24 @@ export interface PolicyHistory {
 /** Everything one decision is made from. */
 export interface PolicyInput {
   scores: CandidateScores;
+  /**
+   * What kind of thing it is, which only {@link Boldness} reads: a `cautious`
+   * session raises contradictions and verified factual errors and nothing
+   * else. Everything before V2-017 was type-agnostic from here on down.
+   */
+  type: CandidateType;
+  /**
+   * Whether the web check came back `wrong` on it (US-013). Only a
+   * `factual_error` ever has one, and the verifier only passes a `wrong` one
+   * on — so this is true for every `factual_error` that reaches the policy —
+   * but `cautious` is the setting that promises evidence, so it checks rather
+   * than assuming.
+   */
+  verified: boolean;
   /** The session clock's reading, taken by the caller. */
   nowMs: number;
   pause: PauseState;
-  chattiness: Chattiness;
+  settings: PolicySettings;
   history: PolicyHistory;
 }
 
@@ -131,7 +147,7 @@ export function candidateScore(scores: CandidateScores): number {
  *
  * The questions line up one for one, which is why the gate asks these four
  * and not some other four — the formula above is unchanged, and so are the
- * chattiness thresholds it is measured against, so turning the gate on
+ * boldness thresholds it is measured against, so turning the gate on
  * changes *who answers* rather than what the answer means:
  *
  * | gate            | policy       | the question                               |
@@ -157,8 +173,26 @@ export function scoresFromGate(gate: GateScores): CandidateScores {
   };
 }
 
+/**
+ * Whether this boldness setting will raise this kind of thing at all.
+ *
+ * `cautious` is the only one that says no, and it says no to the three types
+ * that rest on the model's judgment rather than on something it can point at:
+ * see {@link CAUTIOUS_TYPES}. A `research_hook` never reaches the policy
+ * (V2-011), so it does not come into it.
+ */
+export function boldnessAllows(
+  boldness: Boldness,
+  type: CandidateType,
+  verified: boolean,
+): boolean {
+  if (boldness !== "cautious") return true;
+  if (!CAUTIOUS_TYPES.includes(type)) return false;
+  return type !== "factual_error" || verified;
+}
+
 /** The level a score earns on its own, before anything about the moment. */
-export function levelFor(score: number, thresholds: ChattinessThresholds): CandidateLevel {
+export function levelFor(score: number, thresholds: BoldnessThresholds): CandidateLevel {
   if (score >= thresholds.interject) return "interject";
   if (score >= thresholds.glow) return "glow";
   return "silent";
@@ -182,13 +216,17 @@ export function inCourtesyWindow(nowMs: number, history: PolicyHistory): boolean
 
 /** One decision about one candidate. */
 export function decide(input: PolicyInput): PolicyDecision {
-  const thresholds = thresholdsFor(input.chattiness);
+  const thresholds = thresholdsFor(input.settings.boldness);
+  const limits = limitsFor(input.settings.frequency);
   const score = candidateScore(input.scores);
   const level = levelFor(score, thresholds);
-  const base = { score, level, thresholds, chattiness: input.chattiness };
+  const base = { score, level, thresholds, limits, settings: input.settings };
 
   // Not worth saying at any moment, so the moment never comes into it.
   if (level === "silent") return { ...base, decision: "silent", reason: "below_threshold" };
+  if (!boldnessAllows(input.settings.boldness, input.type, input.verified)) {
+    return { ...base, decision: "silent", reason: "boldness" };
+  }
   if (isStale(input.nowMs, input.history)) {
     return { ...base, decision: "silent", reason: "stale" };
   }
@@ -207,11 +245,11 @@ export function decide(input: PolicyInput): PolicyDecision {
   const recent = input.history.interjectedAtMs.filter(
     (atMs) => input.nowMs - atMs < BUDGET_WINDOW_MS,
   );
-  if (recent.length >= MAX_INTERJECTS_PER_WINDOW) {
+  if (recent.length >= limits.maxInterjectsPerWindow) {
     return { ...base, decision: "glow", reason: "budget" };
   }
   const last = input.history.interjectedAtMs.at(-1);
-  if (last !== undefined && input.nowMs - last < COOLDOWN_MS) {
+  if (last !== undefined && input.nowMs - last < limits.cooldownMs) {
     return { ...base, decision: "glow", reason: "cooldown" };
   }
   return { ...base, decision: "interject", reason: "delivered" };

@@ -12,16 +12,17 @@
  * for any run can be rebuilt from `eval/runs/` at any time.
  */
 import type { EvalRunRecord } from "../../shared/eval.js";
+import { policySettingsLabel } from "../../shared/policy.js";
 import { estimateCostUsd, formatUsd, type TokenUsage } from "./cost.js";
 import type {
-  ChattinessScore,
   FixtureScore,
   GateResult,
   GateScore,
   MomentScore,
   RunScore,
+  SettingsScore,
 } from "./score.js";
-import { MIN_MOMENT_RECALL } from "./score.js";
+import { MIN_MOMENT_RECALL, settingsAsked, settingsOf } from "./score.js";
 
 /** A moment's outcome as a reader sees it. */
 const OUTCOME_LABEL = {
@@ -67,7 +68,7 @@ export function renderTable(rows: readonly string[][]): string {
 }
 
 /** One row per planted moment, in the order the fixtures ran. */
-function momentRows(group: ChattinessScore): string[][] {
+function momentRows(group: SettingsScore): string[][] {
   const rows: string[][] = [["fixture", "moment", "type", "want", "got", "outcome", "delay"]];
   for (const fixture of group.fixtures) {
     for (const moment of fixture.moments) {
@@ -93,7 +94,7 @@ function momentRow(fixture: FixtureScore, moment: MomentScore): string[] {
  * One row per fixture and a totals row, which is the line a tuning run reads
  * first: what it delivered and what that did for the score.
  */
-function fixtureRows(group: ChattinessScore): string[][] {
+function fixtureRows(group: SettingsScore): string[][] {
   const rows: string[][] = [
     ["fixture", "turns", "cand", "deliv", "in pause", "caught", "low", "late", "missed", "false i/g"],
   ];
@@ -131,11 +132,12 @@ function fixtureRows(group: ChattinessScore): string[][] {
  * The run record's own counts, which the score does not carry: turns and
  * candidates are about the replay, not about the choosing.
  */
-function withReplayCounts(rows: string[][], record: EvalRunRecord, group: ChattinessScore): string[][] {
+function withReplayCounts(rows: string[][], record: EvalRunRecord, group: SettingsScore): string[][] {
   return rows.map((row, index) => {
     if (index === 0) return row;
     const fixture = group.fixtures[index - 1];
-    const runsHere = record.runs.filter((one) => one.chattiness === group.chattiness);
+    const label = policySettingsLabel(group.settings);
+    const runsHere = record.runs.filter((one) => policySettingsLabel(settingsOf(one)) === label);
     // The last row is the totals row, which has no fixture of its own.
     const mine =
       fixture === undefined ? runsHere : runsHere.filter((one) => one.fixture === fixture.fixture);
@@ -153,7 +155,7 @@ export interface Headline {
 }
 
 /** The headline metrics, in the order the PRD names them. */
-export function headlines(group: ChattinessScore): Headline[] {
+export function headlines(group: SettingsScore): Headline[] {
   const { totals } = group;
   return [
     {
@@ -209,7 +211,7 @@ function gateLines(gates: readonly GateResult[]): string[] {
 export function renderTerminalReport(record: EvalRunRecord, score: RunScore): string {
   const parts: string[] = [];
   for (const group of score.groups) {
-    parts.push(`\n=== chattiness: ${group.chattiness} ===`);
+    parts.push(`\n=== frequency/boldness: ${policySettingsLabel(group.settings)} ===`);
     parts.push(renderTable(withReplayCounts(fixtureRows(group), record, group)));
     if (group.totals.moments > 0) {
       parts.push("");
@@ -276,7 +278,7 @@ export function renderReportMarkdown(context: ReportContext): string {
     ["started", record.startedAt],
     ["finished", record.finishedAt],
     ["git commit", record.gitCommit ?? "(not a checkout)"],
-    ["chattiness", record.chattiness.join(", ")],
+    ["frequency/boldness", settingsAsked(record).map(policySettingsLabel).join(", ")],
     ["gate", record.gate ?? "spark (recorded before V2-016)"],
     ["fixtures", record.fixtures.join(", ")],
     ["judge model", record.judge.model],
@@ -317,7 +319,7 @@ export function renderReportMarkdown(context: ReportContext): string {
 
   for (const group of score.groups) {
     out.push("");
-    out.push(`## Chattiness: ${group.chattiness}`);
+    out.push(`## Frequency/boldness: ${policySettingsLabel(group.settings)}`);
     out.push("");
     out.push(...headlines(group).map((one) => `- **${one.label}**: ${one.value}`));
     out.push("");

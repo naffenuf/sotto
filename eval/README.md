@@ -7,7 +7,7 @@ except this file and `reports/`, which is the part worth keeping.
 eval/
   runs/<timestamp>.json          one run: every delivery, moment and judge verdict
   reports/<timestamp>.md         that run, scored: per-moment table, totals, gates
-  sessions/<timestamp>/<chattiness>/<session folder>/
+  sessions/<timestamp>/<frequency>-<boldness>/<session folder>/
                                  the ordinary session folder each replay wrote
   cache/<hash>.json              one cached judge verdict
 ```
@@ -30,8 +30,9 @@ eval/
 Usage:
 
 ```sh
-npm run eval                             # the eval set at chattiness normal
-npm run eval -- --chattiness all         # quiet, normal and active
+npm run eval                             # the eval set at normal/normal
+npm run eval -- --boldness all           # cautious, normal and bold
+npm run eval -- --frequency rare         # the sparing cooldown and budget
 npm run eval -- --fixtures moment-fact   # one conversation
 npm run eval -- --no-judge               # replay and record, match nothing
 

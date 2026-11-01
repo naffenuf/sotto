@@ -92,7 +92,8 @@ export interface BoardEvent {
 }
 
 /**
- * The settings as the server now holds them (US-014's chattiness).
+ * The settings as the server now holds them (V2-017's frequency and
+ * boldness, and the voice mute).
  *
  * The setting belongs to the server rather than to one browser tab — the
  * policy reads it, and `session.json` records it — so the header shows what

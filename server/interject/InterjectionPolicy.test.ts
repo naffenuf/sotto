@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Candidate, CandidateScores, DecisionLogRecord } from "../../shared/candidates.js";
-import type { Chattiness } from "../../shared/policy.js";
+import {
+  FREQUENCY_LIMITS,
+  type Boldness,
+  type Frequency,
+  type PolicySettings,
+} from "../../shared/policy.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import { SimulatedClock } from "../clock.js";
 import { InterjectionPolicy, type Interjection } from "./InterjectionPolicy.js";
-import {
-  COOLDOWN_MS,
-  COURTESY_MS,
-  MAX_INTERJECTS_PER_WINDOW,
-  PAUSE_MS,
-  STALE_MS,
-  STALE_TURNS,
-} from "./policy.js";
+import { COURTESY_MS, PAUSE_MS, STALE_MS, STALE_TURNS } from "./policy.js";
+
+/** The `normal` frequency's rationing, which is what these tests run at. */
+const COOLDOWN_MS = FREQUENCY_LIMITS.normal.cooldownMs;
+const MAX_INTERJECTS_PER_WINDOW = FREQUENCY_LIMITS.normal.maxInterjectsPerWindow;
 
 /** Scores that multiply out to `score` exactly, through confidence alone. */
 function scoring(score: number): CandidateScores {
@@ -57,7 +59,8 @@ interface Harness {
  * turn assembler's: `silentForMs` counts from the last `speechEnd`, and the
  * policy hears about every snapshot.
  */
-function harness(chattiness: Chattiness = "normal"): Harness {
+function harness(boldness: Boldness = "normal", frequency: Frequency = "normal"): Harness {
+  const settings: PolicySettings = { frequency, boldness };
   const clock = new SimulatedClock(0);
   const records: DecisionLogRecord[] = [];
   const delivered: Interjection[] = [];
@@ -70,7 +73,7 @@ function harness(chattiness: Chattiness = "normal"): Harness {
   const policy = new InterjectionPolicy({
     clock,
     pauseState: pause,
-    chattiness,
+    settings,
     onRecord: (record) => records.push(record),
     onDeliver: (interjection) => delivered.push(interjection),
     logger: { log: () => {}, warn: () => {} },
@@ -137,7 +140,7 @@ describe("InterjectionPolicy", () => {
       heldForMs: PAUSE_MS,
       score: 0.9,
       thresholds: { glow: 0.35, interject: 0.6 },
-      chattiness: "normal",
+      settings: { frequency: "normal", boldness: "normal" },
     });
   });
 
@@ -276,36 +279,62 @@ describe("InterjectionPolicy", () => {
     expect(records.at(-1)).toMatchObject({ decision: "interject", reason: "delivered" });
   });
 
-  it("applies a chattiness change to what is already waiting", () => {
-    const { clock, policy, delivered, startSpeaking, stopSpeaking } = harness("quiet");
+  it("applies a boldness change to what is already waiting", () => {
+    const { clock, policy, delivered, startSpeaking, stopSpeaking } = harness("cautious");
     startSpeaking();
     policy.accept(candidate(0.5));
     expect(policy.heldCount()).toBe(1);
 
-    policy.setChattiness("active");
-    expect(policy.setting()).toBe("active");
+    policy.setSettings({ frequency: "normal", boldness: "bold" });
+    expect(policy.settings()).toEqual({ frequency: "normal", boldness: "bold" });
     expect(delivered).toEqual([]);
 
     stopSpeaking();
     clock.advanceBy(PAUSE_MS);
-    // 0.5 is a glow under `quiet` and an interject under `active`.
+    // 0.5 is a glow under `cautious` and an interject under `bold`.
     expect(delivered.at(-1)?.level).toBe("interject");
   });
 
-  it("drops a held candidate that a quieter setting no longer wants", () => {
+  it("drops a held candidate that a more cautious setting no longer wants", () => {
     const { policy, records, delivered, startSpeaking } = harness("normal");
     startSpeaking();
     policy.accept(candidate(0.4));
     expect(policy.heldCount()).toBe(1);
 
-    policy.setChattiness("quiet");
+    policy.setSettings({ frequency: "normal", boldness: "cautious" });
     expect(delivered).toEqual([]);
     expect(policy.heldCount()).toBe(0);
     expect(records.at(-1)).toMatchObject({
       decision: "silent",
       reason: "below_threshold",
-      chattiness: "quiet",
+      settings: { frequency: "normal", boldness: "cautious" },
     });
+  });
+
+  it("drops a held candidate of a type cautious will not raise (V2-017)", () => {
+    const { policy, records, delivered, startSpeaking } = harness("normal");
+    startSpeaking();
+    policy.accept(candidate(0.9, { type: "dropped_thread" }));
+    expect(policy.heldCount()).toBe(1);
+
+    policy.setSettings({ frequency: "normal", boldness: "cautious" });
+    expect(delivered).toEqual([]);
+    expect(records.at(-1)).toMatchObject({ decision: "silent", reason: "boldness" });
+  });
+
+  it("lets a rarer frequency turn a held interject into a glow (V2-017)", () => {
+    const { clock, policy, delivered, stopSpeaking } = harness("normal", "often");
+    stopSpeaking();
+    clock.advanceBy(PAUSE_MS);
+    policy.accept(candidate(0.9));
+    expect(delivered.at(-1)?.level).toBe("interject");
+
+    // Past `often`'s cooldown but well inside `rare`'s, so the setting alone
+    // decides what the next one is.
+    clock.advanceBy(FREQUENCY_LIMITS.often.cooldownMs);
+    policy.setSettings({ frequency: "rare", boldness: "normal" });
+    policy.accept(candidate(0.9));
+    expect(delivered.at(-1)).toMatchObject({ level: "glow", decision: { reason: "cooldown" } });
   });
 
   it("delivers the second candidate of one pause as a glow", () => {

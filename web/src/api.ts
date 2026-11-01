@@ -1,10 +1,11 @@
 import type {
   ApiError,
   AskResponse,
-  Chattiness,
+  Boldness,
   FeedbackResponse,
   FeedbackVerdict,
   FixtureListResponse,
+  Frequency,
   SessionSettingsResponse,
   SessionSource,
   SessionStartResponse,
@@ -58,12 +59,14 @@ export function stopSession(): Promise<SessionStopResponse> {
 }
 
 /**
- * Sets how talkative Sotto is (US-014). The server answers with the settings
- * as they now stand and pushes them to every tab, so the header follows the
- * reply rather than its own click.
+ * Sets how often Sotto contributes, or how sure it has to be (V2-017). The
+ * server answers with the settings as they now stand and pushes them to every
+ * tab, so the header follows the reply rather than its own click.
  */
-export function setChattiness(chattiness: Chattiness): Promise<SessionSettingsResponse> {
-  return call<SessionSettingsResponse>("/api/session/settings", { chattiness });
+export function setPolicySettings(
+  patch: { frequency: Frequency } | { boldness: Boldness },
+): Promise<SessionSettingsResponse> {
+  return call<SessionSettingsResponse>("/api/session/settings", patch);
 }
 
 export function setVoiceMuted(voiceMuted: boolean): Promise<SessionSettingsResponse> {
