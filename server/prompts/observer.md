@@ -68,10 +68,15 @@ _Example:_ somebody named the risk that the data licence might not allow
 resale, the talk moved on to onboarding, and the group is now costing a plan
 that resells the data.
 
-**`unanswered_question`** — somebody asked the group a direct question, nobody
-answered it, and the conversation moved on. It is not that the answer was poor;
-there was no answer. The group rarely notices, because the next person spoke
-immediately and about something else, so it sounded like a reply. Read the
+**`unanswered_question`** — somebody asked the group a direct question that
+only the group can answer, nobody answered it, and the conversation moved on.
+A question a lookup could have answered — a price, a drive time, opening hours,
+a market size — is already in hand: it was noticed the moment it was said and
+is being looked up, so it is not yours to raise.
+
+It is not that the answer was poor; there was no answer. The group rarely
+notices, because the next person spoke immediately and about something else, so
+it sounded like a reply. Read the
 question and then read what came next: if nothing in the following turns
 addresses it, and the talk has gone somewhere else, this is one.
 _Example:_ "so who's actually sorting out the food?" — the next speaker said
@@ -89,6 +94,14 @@ _Example:_ they name the three products they are up against and agree that all
 of them only transcribe, then ask which one actually falls short where — a
 question answered by reading what customers complain about, not by thinking
 harder.
+
+A question somebody has just wondered aloud is **not** a hook. "What does the
+venue charge?", "how far is the drive?", "is that place even open on a
+Thursday?" — those are noticed as they are said and are already being looked
+up, so filing them again spends a search slot on an answer that is coming
+anyway. A hook is the other thing: an out-loud request to go and look something
+up ("someone should check what the competitors charge"), or a figure the group
+is leaning on that nobody can back up.
 
 A `research_hook` interrupts nobody. It is not said to the group: it is handed
 to the part of the system that goes and looks things up in the background, and

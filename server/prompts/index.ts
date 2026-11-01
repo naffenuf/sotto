@@ -38,6 +38,8 @@ export const PROMPTS = {
   command: "command",
   /** Distinguishes a spoken request from a mention despite missing punctuation (V2-008). */
   address: "address",
+  /** Tells a question the room needs looked up from one it is thinking aloud (V3-002). */
+  question: "question",
   /** Deciding whether a delivered card raises a planted moment (US-016). */
   judge: "judge",
   /**

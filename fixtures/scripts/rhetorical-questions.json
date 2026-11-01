@@ -1,0 +1,151 @@
+{
+  "lines": [
+    {
+      "speaker": "B",
+      "text": "Right. The Monday status meeting. I want to talk about killing it.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Finally. Who even reads the weekly status email anymore?",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Nobody. It goes out at eight and by nine it's three screens down.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "So do we cancel it outright, or replace it with something?",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "If we cancel it outright, what's the worst that happens?",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Somebody misses a launch date and we spend a week finding out why.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "Which is the thing the meeting was meant to prevent, and doesn't.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "Forty-one people are on that distribution list, by the way. I counted on Monday.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "How many are on the list again?",
+      "pauseAfterMs": 600
+    },
+    {
+      "speaker": "A",
+      "text": "Forty-one. Most of them were added once and never asked to be.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "B",
+      "text": "That's the part that annoys me. Why do we keep adding people to things?",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Because taking someone off a list feels like a demotion.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "B",
+      "text": "Alright. If we replace it, replace it with what?",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "A written update, Monday morning, three bullets, and nobody reads it out loud.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "And where would it live? Not another document nobody can find.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "In the channel. One post, replies in the thread, done.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "B",
+      "text": "I could live with that.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "Hang on. What does Loom actually charge per seat these days?",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "B",
+      "text": "No idea at all. I haven't looked at their pricing since last year.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "A",
+      "text": "Then video is a maybe, not a plan.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Agreed. Written first, and we see whether anyone misses the meeting.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Should we tell people, or just stop sending the invite?",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "B",
+      "text": "We tell people. Quietly cancelling things is how you lose trust.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "Fair. And who's writing the first one?",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "B",
+      "text": "I will, this week, and you can tell me it's too long.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "I absolutely will. Is anyone going to defend the meeting?",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "B",
+      "text": "Priya might. She likes the five minutes at the end where people complain.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "That part we keep. The complaining was the only useful bit.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Decided then. Written update on Monday, meeting gone, complaints survive.",
+      "pauseAfterMs": 1000
+    }
+  ],
+  "wakeQuestions": [],
+  "moments": []
+}

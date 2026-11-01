@@ -75,6 +75,8 @@ import { ResearchRunner } from "../research/ResearchRunner.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
+import { classifyQuestion, type OpenQuestion } from "../question/question.js";
+import { QuestionWatcher } from "../question/QuestionWatcher.js";
 import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { Greeting } from "./Greeting.js";
@@ -248,6 +250,14 @@ interface ModelLoops {
   judgment: JudgmentRouter;
   /** Retired with the session so late classifications cannot restart speech. */
   address?: AddressWatcher;
+  /**
+   * What the room wondered aloud (V3-002), or `null` with no model client.
+   *
+   * It is deliberately beside the observer rather than inside it: an open
+   * question is noticed per final turn, in about two seconds, where the
+   * observer looks once per board update.
+   */
+  questions: QuestionWatcher | null;
   board: BoardUpdater | null;
   observer: Observer | null;
   verifier: Verifier | null;
@@ -336,6 +346,8 @@ export type AskOutcome = "asked" | "no-session" | "no-model";
 interface RunningSession {
   /** V2-008: final-turn addressing has its own bounded asynchronous work. */
   address?: AddressWatcher;
+  /** V3-002: the per-turn question classifier, retired with the session. */
+  questions: QuestionWatcher | null;
   /** Where this session's judgment calls run: local Glimmer or Spark (V2-010). */
   judgment: JudgmentRouter;
   info: SessionInfo;
@@ -593,6 +605,7 @@ export class SessionManager {
     if (running === undefined) return false;
     running.stopRequested = true;
     running.address?.stop();
+    running.questions?.stop();
     running.greeting?.stop();
     running.wrapUp.stop();
     running.research?.stop();
@@ -856,8 +869,16 @@ export class SessionManager {
         if (suppressTriggers || barge.owns(turn.turnId)) {
           wake.ignoreTurn(turn.turnId);
           loops.address?.remember(turn);
+          // Side talk and anything the barge-in owns are context for the next
+          // question (V3-002) without being a question themselves.
+          loops.questions?.ignoreTurn(turn.turnId);
+          loops.questions?.remember(turn);
         } else {
           wake.acceptTurn(turn);
+          // V3-002: and whether the room just wondered something aloud. A
+          // turn that says Sotto's name is skipped in there, because the
+          // address path above already owes it an answer.
+          loops.questions?.acceptTurn(turn);
         }
       },
     });
@@ -1065,6 +1086,7 @@ export class SessionManager {
         research: null,
         researchRunner: null,
         researchCards: null,
+        questions: null,
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
@@ -1264,7 +1286,46 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards };
+    // V3-002: what the room wonders aloud, noticed per final turn rather than
+    // through the observer. Nothing acts on a verdict yet — V3-003 turns an
+    // open question into a search, V3-015 claims it out loud and V3-004
+    // answers it — so for now it is written down and logged.
+    const questions = new QuestionWatcher({
+      clock,
+      // Real time: the four seconds this story is measured against are
+      // seconds the room waited, and a `max` replay's clock stands still
+      // inside a model call.
+      wallClock: this.wallClock,
+      classify: (input, signal) => classifyQuestion(model, input, signal),
+      speakers: () => this.bus.speakerNames(),
+      onTiming,
+      onOpenQuestion: (question) => this.noticeQuestion(info, store, question),
+    });
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions };
+  }
+
+  /**
+   * What happens when the room wonders something aloud (V3-002).
+   *
+   * For now: a line in the log and a line in `timing.jsonl`, which is what
+   * the integration test and the eval read. The question is a record of its
+   * own rather than a candidate — it never reaches the observer, the
+   * candidate gate or the policy — because it is not something to say, it is
+   * something to look up, and V3-003 is what looks it up.
+   */
+  private noticeQuestion(info: SessionInfo, store: StoreSlot, question: OpenQuestion): void {
+    this.logger.log(
+      `[question] ${info.id} ${question.turnId} wondered: ${question.question}` +
+        ` (${question.topic})`,
+    );
+    store.writer?.appendTiming?.({
+      stage: "open_question",
+      atMs: question.askedAtMs,
+      turnId: question.turnId,
+      topic: question.topic,
+      question: question.question,
+      askedBy: question.askedBy,
+    });
   }
 
   /**
@@ -1504,6 +1565,7 @@ export class SessionManager {
     running.gate?.stop();
     running.policy?.stop();
     running.address?.stop();
+    running.questions?.stop();
     running.greeting?.stop();
     running.research?.stop();
     running.wrapUp.stop();
@@ -1579,6 +1641,9 @@ async function drainLoops(
   // line belongs in the transcript it is about.
   await wrapUp?.flush();
   await loops.address?.flush();
+  // Before the research manager: a question wondered aloud in the last
+  // seconds is still a question, and V3-003 turns the verdict into a search.
+  await loops.questions?.flush();
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();

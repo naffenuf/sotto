@@ -22,6 +22,17 @@ describe("evalFixtures", () => {
     ]);
   });
 
+  it("takes rhetorical-questions with the quiet ones (V3-002)", () => {
+    expect(isEvalFixture("rhetorical-questions")).toBe(true);
+    expect(evalFixtures([...captured, "rhetorical-questions"])).toEqual([
+      "brainstorm",
+      "no-wake",
+      "rhetorical-questions",
+      "moment-contradiction",
+      "moment-mixed",
+    ]);
+  });
+
   it("takes the two v2 conversations too, last and in the PRD's order (V2-019)", () => {
     expect(isEvalFixture("research-business-idea")).toBe(true);
     expect(isEvalFixture("offsite-plan")).toBe(true);

@@ -23,34 +23,39 @@ import {
 export const V2_EVAL_FIXTURES = ["research-business-idea", "offsite-plan"] as const;
 
 /**
- * The conversations the harness measures: the two quiet ones, the moments,
- * and the two v2 conversations.
+ * The conversations the harness measures: the quiet ones, the moments, and the
+ * two v2 conversations.
+ *
+ * `rhetorical-questions` (V3-002) is a quiet one in the same sense
+ * `brainstorm` is: it plants no moment, and its job is to be a conversation
+ * full of questions Sotto must say nothing about.
  */
 export function isEvalFixture(name: string): boolean {
   return (
     name === "brainstorm" ||
     name === "no-wake" ||
+    name === "rhetorical-questions" ||
     name.startsWith("moment-") ||
     (V2_EVAL_FIXTURES as readonly string[]).includes(name)
   );
 }
 
 /**
- * The eval set, in the order it is run: `brainstorm` and `no-wake` first —
- * they are the ones a false interjection is a gate failure on — then every
- * `moment-*` fixture alphabetically, then the two v2 conversations, which are
- * the longest and the most expensive.
+ * The eval set, in the order it is run: the quiet conversations first —
+ * `brainstorm`, `no-wake` and `rhetorical-questions`, the ones a false
+ * interjection is a gate failure on — then every `moment-*` fixture
+ * alphabetically, then the two v2 conversations, which are the longest and
+ * the most expensive.
  */
 export function evalFixtures(available: readonly string[]): string[] {
   const chosen = available.filter(isEvalFixture);
+  const quiet = ["brainstorm", "no-wake", "rhetorical-questions"];
   const rank = (name: string): number =>
-    name === "brainstorm"
-      ? 0
-      : name === "no-wake"
-        ? 1
-        : (V2_EVAL_FIXTURES as readonly string[]).includes(name)
-          ? 3
-          : 2;
+    quiet.includes(name)
+      ? quiet.indexOf(name)
+      : (V2_EVAL_FIXTURES as readonly string[]).includes(name)
+        ? 4
+        : 3;
   return [...chosen].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 

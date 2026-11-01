@@ -2334,3 +2334,141 @@ describe("SessionManager, the digest (V2-018)", () => {
     expect(voice.utterances.join("\n")).toContain("wrap up yet");
   });
 });
+
+describe("SessionManager, what the room wonders aloud (V3-002)", () => {
+  /**
+   * A model that answers the question classifier and nothing else, so the
+   * replay exercises the wiring rather than a judgment: every
+   * question-shaped turn of `offsite-plan` comes back `open_question`.
+   */
+  class WonderingModel implements ModelClient {
+    readonly labels: string[] = [];
+    /** Every turn the classifier was asked about, newest last. */
+    readonly asked: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "question") {
+        this.asked.push(call.user);
+        return {
+          kind: "open_question",
+          question: "How long is the drive to the farmhouse?",
+          topic: "the drive time",
+        };
+      }
+      if (call.label === "address") return { kind: "mention", question: "" };
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "research-planner") return { ideas: [] };
+      return { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("a question classification is not grounded");
+    }
+
+    async prose(): Promise<never> {
+      throw new Error("V3-002 classifies a question; it does not answer one");
+    }
+  }
+
+  function timingWriter(timing: Record<string, unknown>[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: () => {},
+      appendTiming: (record: Record<string, unknown>) => timing.push(record),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  it("classifies the question-shaped turns of a replay and writes them down", async () => {
+    const bus = new EventBus(quiet);
+    const model = new WonderingModel();
+    const timing: Record<string, unknown>[] = [];
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => timingWriter(timing),
+      createModel: () => model,
+      replaySpeed: "max",
+      // The six-second deadline is on the wall clock; a `max` replay spends
+      // no wall time pacing, so the real one still finishes in a moment.
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "offsite-plan" });
+    await ended;
+
+    // Ten of the conversation's 37 turns are question-shaped, and the one
+    // that says Sotto's name is the address path's, so nine reach the model.
+    const classified = timing.filter((record) => record["stage"] === "question");
+    expect(classified).toHaveLength(9);
+    expect(model.labels.filter((label) => label === "question")).toHaveLength(9);
+    expect(timing).toContainEqual(expect.objectContaining({
+      stage: "question_skipped", reason: "addressed",
+    }));
+    // The classifier is given the previous turns by name, not just the latest.
+    expect(model.asked.at(-1)).toContain("Previous turns:");
+    expect(classified[0]).toMatchObject({ kind: "open_question" });
+    expect(classified[0]?.["latencyMs"]).toBeGreaterThanOrEqual(0);
+
+    // Every verdict is a record of its own, and nothing else: an open
+    // question is not a candidate, so it reaches no card and no policy.
+    const wondered = timing.filter((record) => record["stage"] === "open_question");
+    expect(wondered).toHaveLength(9);
+    expect(wondered[0]).toMatchObject({ topic: "the drive time" });
+    expect(cards.filter((card) => card.variant === "interject")).toEqual([]);
+    expect(cards.filter((card) => card.variant === "glow")).toEqual([]);
+  }, 60_000);
+
+  it("spends no call at all on a conversation with no questions in it", async () => {
+    const bus = new EventBus(quiet);
+    const model = new WonderingModel();
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => null,
+      createModel: () => model,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-fact" });
+    await ended;
+
+    // `moment-fact` is a conversation about a date somebody got wrong; two of
+    // its 24 turns are shaped like a question (8%), which is the whole point
+    // of the pre-filter.
+    expect(model.labels.filter((label) => label === "question")).toHaveLength(2);
+  }, 60_000);
+});
