@@ -77,6 +77,7 @@ import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
 import { classifyQuestion, type OpenQuestion } from "../question/question.js";
 import { QuestionWatcher } from "../question/QuestionWatcher.js";
+import { Reservations } from "../question/Reservations.js";
 import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { Greeting } from "./Greeting.js";
@@ -296,6 +297,14 @@ interface ModelLoops {
    * the last stage of the research pipeline and the only one the room sees.
    */
   researchCards: ResearchCards | null;
+  /**
+   * Claiming a question out loud (V3-015), or `null` with no model client.
+   *
+   * It needs no model of its own — the words are written from the
+   * classifier's topic — but a session with no model notices no questions, so
+   * there would be nothing for it to claim.
+   */
+  reservations: Reservations | null;
 }
 
 /** One card that reached the stage, kept so feedback can be filed on it. */
@@ -348,6 +357,8 @@ interface RunningSession {
   address?: AddressWatcher;
   /** V3-002: the per-turn question classifier, retired with the session. */
   questions: QuestionWatcher | null;
+  /** V3-015: the claims waiting for a gap, silenced with the session. */
+  reservations: Reservations | null;
   /** Where this session's judgment calls run: local Glimmer or Spark (V2-010). */
   judgment: JudgmentRouter;
   info: SessionInfo;
@@ -610,6 +621,7 @@ export class SessionManager {
     running.wrapUp.stop();
     running.research?.stop();
     running.researchCards?.stop();
+    running.reservations?.stop();
     running.judgment.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
@@ -821,7 +833,12 @@ export class SessionManager {
       playback: () => voice?.playback?.() ?? { playing: false, recent: [] },
       logger: this.logger,
       onHuman: (turn, record, duringPlayback) => {
-        if (this.current?.info.id === info.id) barge.accept(turn, record, duringPlayback);
+        if (this.current?.info.id !== info.id) return;
+        // V3-015: a voice in the room stops anything Sotto is saying unasked,
+        // at any point in the utterance — no wake word and no classification.
+        // This is the echo-filtered side, so Sotto never yields to itself.
+        loops.reservations?.yieldToHuman();
+        barge.accept(turn, record, duringPlayback);
       },
       onEvent: (record) => store.writer?.appendEvent(record),
       onEcho: (turn) => {
@@ -832,6 +849,7 @@ export class SessionManager {
         // without counting Sotto as another human turn toward expiry.
         loops.policy?.playbackChanged();
         loops.researchCards?.playbackChanged();
+        loops.reservations?.playbackChanged();
       },
       onUpdate: (turn, suppressTriggers) => {
         if (turn.final) store.writer?.appendTiming?.({ stage: "turn_final", atMs: clock.now(), turnId: turn.turnId, turnStartMs: turn.startMs, turnEndMs: turn.endMs });
@@ -863,6 +881,8 @@ export class SessionManager {
         // research card waits for the same pause (V2-014).
         loops.policy?.acceptTurn(turn);
         loops.researchCards?.acceptTurn(turn);
+        // And so does a claim waiting for its gap (V3-015).
+        loops.reservations?.acceptTurn(turn);
         // And so does the wake phrase: the indicator is the point of reading
         // a partial at all (US-017).
         // V2-007 privately owns interrupted commands; ordinary side talk stays suppressed.
@@ -1087,6 +1107,7 @@ export class SessionManager {
         researchRunner: null,
         researchCards: null,
         questions: null,
+        reservations: null,
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
@@ -1207,6 +1228,29 @@ export class SessionManager {
         onTiming({ stage: "research_publish", atMs: clock.now(), packetId: packet?.id ?? null, cardId: card.id, state: card.state, published: this.last?.sessionId === info.id });
       },
     });
+    // V3-015: "I'll check the drive time", said at the first gap after the
+    // room wonders something aloud. No model call — the words come off the
+    // classifier's topic — and one spend against the frequency's cooldown and
+    // allowance, because a claim asks for the floor exactly as an
+    // interjection does. The answer that follows it (V3-004) is its
+    // completion rather than a second contribution.
+    const reservations = new Reservations({
+      clock,
+      voice,
+      pauseState,
+      streamNow,
+      settings: () => policy.settings(),
+      allowed: () => policy.unpromptedAllowed(),
+      noteContribution: () => policy.noteSpokenContribution(),
+      // Opening an utterance stops whatever was being said, so a claim waits
+      // while Sotto is still writing somebody's answer. The getter closes
+      // over the `const` below and is only ever called once a question has
+      // been noticed, which is long after this returns.
+      answering: () => (answers.pending() ?? 0) > 0,
+      onSpoken: (turn) => this.recordSottoSpeech(info, store, null, turn),
+      onRecord: (record) => onTiming({ ...record }),
+      logger: this.logger,
+    });
     // The search (V2-013): one grounded call per approved idea, writing
     // `research/<id>.json`, `research/<id>.md` and any visual into this
     // session's folder. It is handed to the manager as its `run`, so the
@@ -1220,9 +1264,13 @@ export class SessionManager {
       onRecord: (record) => {
         onResearch(record);
         // V3-003: a question's thinking card has to stop spinning. A search
-        // that failed or came back unsourced says so on the card; V3-015 is
-        // what says it out loud, and only to a room that heard Sotto claim it.
-        if (record.outcome !== "ready") researchCards.failed(record.ideaId);
+        // that failed or came back unsourced says so on the card, and V3-015
+        // closes the loop out loud — but only to a room that heard Sotto
+        // claim the question in the first place.
+        if (record.outcome !== "ready") {
+          researchCards.failed(record.ideaId);
+          reservations.noAnswer(record.ideaId);
+        }
       },
       onPacket: (packet, markdown) => {
         store.writer?.writePacket(packet.id, packet, markdown);
@@ -1309,9 +1357,9 @@ export class SessionManager {
       speakers: () => this.bus.speakerNames(),
       onTiming,
       onOpenQuestion: (question) =>
-        this.noticeQuestion(info, store, question, research, researchCards),
+        this.noticeQuestion(info, store, question, research, researchCards, reservations),
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations };
   }
 
   /**
@@ -1337,6 +1385,7 @@ export class SessionManager {
     question: OpenQuestion,
     research: ResearchManager,
     researchCards: ResearchCards,
+    reservations: Reservations | null,
   ): void {
     const started = research.acceptQuestion(question);
     this.logger.log(
@@ -1355,7 +1404,14 @@ export class SessionManager {
       ideaId: started?.idea.id ?? null,
     });
     if (started === null) return;
-    if (started.outcome === "accepted") researchCards.pending(started.idea);
+    if (started.outcome === "accepted") {
+      researchCards.pending(started.idea);
+      // V3-015: and said out loud at the first gap in the next five seconds,
+      // so the room knows not to reach for a phone. Only an accepted
+      // question: a `reused` one is answered from a packet that already
+      // exists, so there is nothing to claim.
+      reservations?.claim(started.idea, question);
+    }
     // The answer exists already: show it as though they had asked for it,
     // which is what they did (V2-015's own rule, and no second search).
     else if (started.outcome === "reused") researchCards.reuse(started.idea, started.packet);
@@ -1601,6 +1657,7 @@ export class SessionManager {
     running.questions?.stop();
     running.greeting?.stop();
     running.research?.stop();
+    running.reservations?.stop();
     running.wrapUp.stop();
     running.judgment.stop();
     // Not `running.answers`: a question typed after Stop is answered against
@@ -1677,6 +1734,9 @@ async function drainLoops(
   // Before the research manager: a question wondered aloud in the last
   // seconds is still a question, and V3-003 turns the verdict into a search.
   await loops.questions?.flush();
+  // A claim being said as the conversation stops still belongs in the
+  // transcript it was said into (V3-015).
+  await loops.reservations?.flush();
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();

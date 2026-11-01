@@ -19,6 +19,7 @@
 import type { Candidate, DecisionLogRecord } from "../../shared/candidates.js";
 import {
   defaultPolicySettings,
+  limitsFor,
   type Decision,
   type DecisionReason,
   type DeliveredLevel,
@@ -27,7 +28,14 @@ import {
 } from "../../shared/policy.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import type { Clock } from "../clock.js";
-import { decide, nextCheckDelay, type PolicyHistory, type PolicyInput } from "./policy.js";
+import {
+  decide,
+  nextCheckDelay,
+  spendAllowed,
+  type PolicyHistory,
+  type PolicyInput,
+  type SpendVerdict,
+} from "./policy.js";
 
 type Logger = Pick<Console, "log" | "warn">;
 
@@ -134,6 +142,39 @@ export class InterjectionPolicy {
   /** When each visible interject went out, oldest first. */
   interjects(): readonly number[] {
     return this.interjectedAtMs;
+  }
+
+  /**
+   * Whether the frequency setting leaves room for Sotto to say something
+   * unasked right now (V3-015).
+   *
+   * The same cooldown and the same allowance an interjection is rationed by,
+   * read through the same pure function — because a reservation and an
+   * interjection cost the group the same thing, which is the floor. Unlike an
+   * interjection there is no quieter level to fall back to, so the caller's
+   * answer to anything but `ok` is to stay quiet; the card is already up.
+   */
+  unpromptedAllowed(): SpendVerdict {
+    return spendAllowed(
+      this.clock.now(),
+      this.interjectedAtMs,
+      limitsFor(this.policySettings.frequency),
+    );
+  }
+
+  /**
+   * Spends one contribution on something Sotto said unasked (V3-015).
+   *
+   * A reservation ("I'll check the drive time") is *the* contribution for
+   * budget purposes, and the answer that follows it is its completion rather
+   * than a second one — so this is called once, where the claim is made. The
+   * held candidates are re-decided straight away, because Sotto having just
+   * spoken is exactly the kind of thing the policy's cooldown is about.
+   */
+  noteSpokenContribution(): void {
+    if (this.stopped) return;
+    this.interjectedAtMs.push(this.clock.now());
+    this.review();
   }
 
   /**

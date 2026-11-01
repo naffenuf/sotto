@@ -2391,6 +2391,33 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     } satisfies SessionWriter;
   }
 
+  /** A voice that keeps every utterance, so a replay can be read back. */
+  class ClaimingVoice implements VoiceOut {
+    private count = 0;
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const id = `v${(this.count += 1)}`;
+      const spoken = (): string => parts.join(" ");
+      return Promise.resolve({
+        id,
+        append: (text) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      });
+    }
+  }
+
   it("classifies the question-shaped turns of a replay and writes them down", async () => {
     const bus = new EventBus(quiet);
     const model = new WonderingModel();
@@ -2470,5 +2497,113 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     // its 24 turns are shaped like a question (8%), which is the whole point
     // of the pre-filter.
     expect(model.labels.filter((label) => label === "question")).toHaveLength(2);
+  }, 60_000);
+
+  /**
+   * The same model, with a search that comes back — which is what a claim
+   * needs. In a `max` replay simulated time does not move inside
+   * `clock.track`, so the search *always* finishes before the claim's pause
+   * timer can fire; a model whose `grounded` throws therefore tests the
+   * overtaken rule rather than the claim (`Reservations.test.ts` has both).
+   */
+  class SearchingModel implements ModelClient {
+    readonly labels: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "question") {
+        return {
+          kind: "open_question",
+          question: "How long is the drive to the farmhouse?",
+          topic: "the drive time",
+        };
+      }
+      if (call.label === "address") return { kind: "mention", question: "" };
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "research-planner") return { ideas: [] };
+      return { candidates: [] };
+    }
+
+    async grounded(call: GroundedCall): Promise<GroundedReply> {
+      this.labels.push(call.label);
+      return {
+        value: {
+          title: "About two hours fifteen",
+          teaser: "The quickest route is two hours ten without traffic.",
+          keyPoints: ["Two hours ten via the motorway"],
+          spokenAnswer: "It's about two and a quarter hours.",
+          sources: [{ url: "https://maps.example.com/route", title: "Route" }],
+        },
+        citations: [],
+        searchedUrls: ["https://maps.example.com/route"],
+        searched: true,
+        functionCalls: 0,
+      };
+    }
+
+    async prose(): Promise<never> {
+      throw new Error("a reservation is written locally, never asked for");
+    }
+  }
+
+  /**
+   * V3-015, through the whole pipeline: the question the classifier noticed
+   * is claimed out loud at the next gap, and the line goes into the
+   * transcript as Sotto's.
+   *
+   * One claim, not nine: the eight repeats of the same question are
+   * duplicates of an idea already running (V3-003), and a duplicate starts no
+   * search and claims nothing.
+   */
+  it("claims the question out loud and writes the line into the transcript", async () => {
+    const bus = new EventBus(quiet);
+    const model = new SearchingModel();
+    const timing: Record<string, unknown>[] = [];
+    const voice = new ClaimingVoice();
+    const published: TurnUpdate[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "turn") published.push(event.turn);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => timingWriter(timing),
+      createModel: () => model,
+      createVoice: () => voice,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "offsite-plan" });
+    await ended;
+
+    const contributions = timing.filter(
+      (record) => record["stage"] === "spoken_contribution",
+    );
+    const claims = contributions.filter((record) => record["kind"] === "reserve");
+    expect(claims).toHaveLength(1);
+    expect(claims[0]).toMatchObject({
+      kind: "reserve",
+      spoken: true,
+      text: "I'll check the drive time.",
+      yielded: false,
+    });
+    expect(claims[0]?.["questionToReserveMs"]).toBeGreaterThanOrEqual(0);
+
+    // The search came back, so there is nothing to apologise for.
+    expect(contributions.filter((record) => record["kind"] === "no_answer")).toEqual([]);
+
+    // It was really said, and it is in the transcript as Sotto's (V2-008a).
+    expect(voice.utterances).toContain("I'll check the drive time.");
+    const mine = published.filter(isSottoTurn).map((turn) => turn.text);
+    expect(mine).toContain("I'll check the drive time.");
   }, 60_000);
 });

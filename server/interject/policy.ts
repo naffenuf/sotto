@@ -38,6 +38,7 @@ import {
   type BoldnessThresholds,
   type Boldness,
   type CandidateLevel,
+  type FrequencyLimits,
   type PolicyDecision,
   type PolicySettings,
 } from "../../shared/policy.js";
@@ -203,6 +204,31 @@ export function inPause(pause: PauseState): boolean {
   return !pause.speaking && pause.silentForMs >= PAUSE_MS;
 }
 
+/**
+ * What the frequency setting has left: whether one more thing Sotto says
+ * unasked fits inside the cooldown and the allowance.
+ *
+ * `budget` before `cooldown`, because the whole allowance being spent is the
+ * stronger statement about the last quarter of an hour. Both of them
+ * *downgrade* an interjection rather than dropping it ({@link decide}); V3-015
+ * reads the same verdict about a spoken contribution, which has no quieter
+ * level to fall back to and so is simply not said.
+ */
+export type SpendVerdict = "ok" | "cooldown" | "budget";
+
+/** Whether the frequency's cooldown and allowance leave room for one more. */
+export function spendAllowed(
+  nowMs: number,
+  interjectedAtMs: readonly number[],
+  limits: FrequencyLimits,
+): SpendVerdict {
+  const recent = interjectedAtMs.filter((atMs) => nowMs - atMs < BUDGET_WINDOW_MS);
+  if (recent.length >= limits.maxInterjectsPerWindow) return "budget";
+  const last = interjectedAtMs.at(-1);
+  if (last !== undefined && nowMs - last < limits.cooldownMs) return "cooldown";
+  return "ok";
+}
+
 /** Whether the candidate has waited past either expiry limit. */
 export function isStale(nowMs: number, history: PolicyHistory): boolean {
   return nowMs - history.seenAtMs >= STALE_MS || history.turnsWaited >= STALE_TURNS;
@@ -242,16 +268,8 @@ export function decide(input: PolicyInput): PolicyDecision {
 
   // An interject in a good moment, which the budget may still turn down a
   // notch. Downgraded, never dropped: the thought was worth having.
-  const recent = input.history.interjectedAtMs.filter(
-    (atMs) => input.nowMs - atMs < BUDGET_WINDOW_MS,
-  );
-  if (recent.length >= limits.maxInterjectsPerWindow) {
-    return { ...base, decision: "glow", reason: "budget" };
-  }
-  const last = input.history.interjectedAtMs.at(-1);
-  if (last !== undefined && input.nowMs - last < limits.cooldownMs) {
-    return { ...base, decision: "glow", reason: "cooldown" };
-  }
+  const spend = spendAllowed(input.nowMs, input.history.interjectedAtMs, limits);
+  if (spend !== "ok") return { ...base, decision: "glow", reason: spend };
   return { ...base, decision: "interject", reason: "delivered" };
 }
 
