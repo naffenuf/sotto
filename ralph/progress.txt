@@ -630,3 +630,43 @@
   NEXT: V2-017 (frequency and boldness controls) — chattiness becomes two settings;
   the eval's --chattiness goes with it and old reports must still render, which
   score.ts already does for a missing `gate`. 5 stories left.
+
+[2026-11-01 02:05] V2-017 — completed — one control became two: frequency rations what Sotto says unasked, boldness sets the bar and, at cautious, what it will raise at all.
+  WHAT IS NEW:
+  - shared/policy.ts: frequencyLevels/boldnessLevels, PolicySettings,
+    FREQUENCY_LIMITS (cooldown 300/180/90 s, budget 2/3/5 per 15 min, plus the
+    research-card pair 120/60/30 s and 2/4/6), BOLDNESS_THRESHOLDS (the old
+    quiet/normal/active pairs, renamed), CAUTIOUS_TYPES, policySettingsLabel.
+    `Chattiness` is gone from the live code.
+  - decide() takes the candidate's `type` and `verified` and reports `limits`
+    beside `thresholds`; boldnessAllows is the rule and `boldness` is a new
+    DecisionReason, checked AFTER the score so a worthless candidate still
+    logs below_threshold.
+  - InterjectionPolicy.setSettings and ResearchCards.setLimits (new) both
+    re-decide what is waiting; SessionManager.setPolicySettings takes either
+    setting on its own and pushes both.
+  - Header: frequency-select + boldness-select ("How often" / "How sure"),
+    each its own POST /api/session/settings. The route rejects `chattiness`.
+  - Eval: --frequency / --boldness, each taking `all`, run as a cross product.
+    SettingsScore replaces ChattinessScore; settingsOf/settingsAsked read a
+    pre-V2-017 record's `chattiness` (quiet->cautious, active->bold, frequency
+    normal), which is how old reports still render.
+  - npm run verify:controls replaces verify:chattiness (dead since V2-009 took
+    the source <select> out of the header).
+  MEASURED / VERIFIED:
+  - typecheck, npm test (1104), npm run build all green.
+  - Browser: both selectors at 1440px, defaults normal/normal, frequency
+    changed and survived a reload while boldness did not move, boldness
+    changed mid-replay, session.json recorded {rare, bold}. Screenshot looked
+    at: /tmp/sotto-shots/controls.png (+ -header.png).
+  - npm run eval:report -- 2026-10-29_053832 (a pre-V2-017 record) exits 0 and
+    renders "normal/normal"; the committed report was then restored so the
+    historical artifact stands as recorded.
+  WATCH OUT:
+  - normal/normal has to STAY the old normal exactly — there is a describe
+    block in server/interject/policy.test.ts asserting the four numbers, and
+    V2-019/V2-020 compare against runs recorded before the split.
+  - A `cautious` eval run will now miss untested_assumption, dropped_thread
+    and unanswered_question moments BY DESIGN. Don't read that as recall loss.
+  - Not re-run this iteration: test:integration, npm run eval, npm run e2e.
+  NEXT: V2-018 (end-of-session digest). 4 stories left.
