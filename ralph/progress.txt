@@ -313,3 +313,42 @@
   V2-008c should reuse the same promise chain SpokenAnswer already runs on, and note that
   AnswerAgent.ask() now carries heardAtMs, so its "acknowledgment to first real sentence" target can
   be logged off the same answer_voice record.
+
+[2026-11-01 00:05] V2-008c — completed — Sotto says an orienting line while it searches.
+  A second Spark call (server/answer/firstLine.ts + prompts/firstline.md: no tools, reasoning_effort
+  low, 2k tokens) writes one sentence from the conversation alone and says it after the
+  acknowledgment, while the searched answer is still being written. Measured on ask-search through
+  the real model and real ElevenLabs, four runs: ackMs 257-275, ack -> first REAL sentence 1,979 /
+  2,366 / 2,481 / 2,741 ms against the PRD's 4,000 ms target, continuation at 15.7-31.5 s. Real
+  output: "You're asking about those meal planning and fridge scanner apps and monthly versus
+  one-time unlock — let me get the numbers." then straight into "Mealime Pro is about two dollars
+  ninety nine cents a month..." — no repetition.
+  THE DESIGN DECISION: the criteria want the two calls in parallel AND the searched answer to get the
+  first line as context. The Responses API cannot be told something mid-flight — the prose request is
+  built once — so the searched call waits up to FIRST_LINE_CONTEXT_WAIT_MS for the line. 4 s, on the
+  WALL clock, from measurement: the line reaches the voice 1.9-3.3 s after the question and is itself
+  ~5 s of speech, so the head start is hidden behind speech the room is already hearing. 1.5 s and
+  3 s were both tried and both expired just short of some runs, throwing the context away for
+  nothing. A line that misses the cap is still spoken, just without the answer knowing;
+  timing.jsonl's answer_voice carries firstLineInContext so a run can be checked.
+  ONE UTTERANCE, not three: sayFirstLine feeds the ANSWER's utterance, so a barge-in is one cancel
+  and spokenSoFar reads across both halves, and opening it is still what cuts the acknowledgment off.
+  The skip ("the answer got there first") is a synchronous `answering` flag set inside say(), because
+  `opened` only becomes true once the promise chain runs a step — two calls in one tick would
+  otherwise both win.
+  New on Answer: firstLineMs and continuationMs (required). firstAudioMs keeps its old meaning — the
+  answer utterance's first audio, which IS the first line's, since the line opens it — so nothing
+  downstream changed. continuationMs needed one optional seam, VoiceUtterance.audioMs(), because
+  inside one utterance the continuation is heard where the line's audio ends.
+  Checked: npm run typecheck, npm test (64 files, 874 tests), npm run build, and
+  npx vitest run --config vitest.integration.config.ts server/answer/answer.integration.test.ts
+  (7/7, real Spark + real ElevenLabs). No microphone, no speakers, no browser check (no UI criterion).
+  WATCH OUT: FakeModel in AnswerAgent.test.ts now routes first_line calls into firstLineCalls, kept
+  apart from classifications, and heldFirstLine() holds one. A test that drives a search-likely
+  question with a voice has an extra async hop before the prose call is in flight, so held.call()
+  needs an await microtasks() first.
+  NEXT: V2-009 (opening hello and introductions) is the lowest unfinished priority. 13 stories left.
+  FOR V2-021: this adds one cheap structured call per spoken searched answer, so the e2e cost budget
+  ($0.50, last measured $0.4826) has to be re-measured. FOR A LATER STORY: the first line covers the
+  first ~5 s of the wait, not all of it — on a hard search there is still ~10 s of quiet between the
+  end of the line and the continuation. The PRD does not ask for more.

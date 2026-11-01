@@ -901,3 +901,22 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   (`latencyMs: 6000, fallback: true`) rather than the classifier. A `max` replay spends no wall time
   pacing, so such a test can simply take `systemClock` and still run in 400 ms; only a `1x` replay
   needs the instant one.
+
+- **Sotto says something before it knows anything, and that is three facts about the API.** V2-008c's
+  holding line — one orienting sentence said while a searched answer is still being written — is a
+  second Spark call (`server/answer/firstLine.ts`, `prompts/firstline.md`: no tools,
+  `reasoning_effort: "low"`, 2k tokens) and it lands in the **answer's** utterance, not a third one,
+  so a barge-in is one cancellation and `spokenSoFar` reads across both halves. Measured on
+  `ask-search` through real Spark and real ElevenLabs, four runs: the acknowledgment at 257–275 ms,
+  the first *real* sentence 1,979–2,741 ms after it (target 4,000), the searched half following at
+  15.7–31.5 s. Three things the design turns on. **The prose request is built once**, so a call
+  already in flight can never be told what the room has since heard — hence
+  `FIRST_LINE_CONTEXT_WAIT_MS` (4,000 ms, on the **wall** clock): the searched call waits for the
+  line and is given it, and the wait is hidden behind the ~5 s of speech the line itself is. 1.5 s
+  and 3 s both expired just short of real runs and threw the context away for nothing. **`opened` is
+  not synchronous** — it is set inside the promise chain — so "the answer got there first" is a
+  separate flag set inside `say()` itself; two calls in one tick would otherwise both win. And
+  **`firstAudioMs` keeps its meaning** (the answer utterance's first audio, which *is* the line's,
+  since the line opens it), so nothing downstream changed; the continuation needed one optional seam,
+  `VoiceUtterance.audioMs()`, because inside one utterance the second half is heard where the first
+  half's audio ends. The line covers the first ~5 s of the wait, not all of it.
