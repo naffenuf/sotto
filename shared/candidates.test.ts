@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  CANDIDATE_GATE_SCHEMA_NAME,
+  CandidateGateReplySchema,
   CORRECTION_LABEL,
   CORRECTION_MAX_WORDS,
   DETAIL_MAX_WORDS,
@@ -11,6 +13,7 @@ import {
   VERIFIED_DETAIL_MAX_WORDS,
   VerificationReplySchema,
   WHY_NOW_MAX_WORDS,
+  candidateGateJsonSchema,
   candidateTypes,
   clipChars,
   clipWords,
@@ -285,5 +288,56 @@ describe("verificationJsonSchema", () => {
   it("states the limit it cannot express as a keyword", () => {
     const properties = verificationJsonSchema.properties as Record<string, JsonSchemaNode>;
     expect(properties.correction?.description).toContain(String(CORRECTION_MAX_WORDS));
+  });
+});
+
+describe("candidateGateJsonSchema", () => {
+  it("is named, closed and fully required all the way down", () => {
+    expect(CANDIDATE_GATE_SCHEMA_NAME).toBe("candidate_gate");
+    for (const { path, node } of walk(candidateGateJsonSchema)) {
+      for (const keyword of unsupportedKeywords) {
+        expect(node[keyword], `${path} uses ${keyword}`).toBeUndefined();
+      }
+      if (node.type !== "object") continue;
+      expect(node.additionalProperties, `${path} is open`).toBe(false);
+      const properties = Object.keys(node.properties as JsonSchemaNode);
+      expect(node.required, `${path} does not require every property`).toEqual(properties);
+    }
+  });
+
+  it("asks the four questions the PRD names, and only those", () => {
+    expect(Object.keys(candidateGateJsonSchema.properties)).toEqual([
+      "true",
+      "new",
+      "worthSaying",
+      "stillRelevant",
+    ]);
+  });
+
+  it("describes a reply zod then accepts, with every field required", () => {
+    const full = sample(candidateGateJsonSchema as unknown as JsonSchemaNode);
+    expect(CandidateGateReplySchema.safeParse(full).success).toBe(true);
+    for (const key of Object.keys(full)) {
+      const { [key]: _dropped, ...without } = full;
+      expect(CandidateGateReplySchema.safeParse(without).success, `${key} is optional`).toBe(
+        false,
+      );
+    }
+  });
+
+  it("states the range in every description, since Glimmer reads none of them", () => {
+    for (const property of Object.values(candidateGateJsonSchema.properties)) {
+      expect(property.description).toContain("0 to 1");
+    }
+  });
+
+  it("clamps a score the model put outside 0-1", () => {
+    const parsed = CandidateGateReplySchema.parse({
+      true: 1.4,
+      new: -0.2,
+      worthSaying: 8,
+      stillRelevant: 0.5,
+    });
+    expect(parsed).toEqual({ true: 1, new: 0, worthSaying: 1, stillRelevant: 0.5 });
   });
 });

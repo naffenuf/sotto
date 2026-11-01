@@ -55,6 +55,7 @@ import { AnswerAgent } from "../answer/AnswerAgent.js";
 import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
+import { CandidateGate, DEFAULT_GATE_MODE, type GateMode } from "../interject/CandidateGate.js";
 import { cardForInterjection } from "../interject/delivery.js";
 import { InterjectionPolicy, type Interjection } from "../interject/InterjectionPolicy.js";
 import { Observer } from "../interject/Observer.js";
@@ -186,6 +187,12 @@ export interface SessionManagerOptions {
   replaySpeed?: ReplaySpeed;
   /** How talkative the policy starts out (US-014). The header changes it live. */
   chattiness?: Chattiness;
+  /**
+   * Who scores a candidate before the policy sees it (V2-016). Defaults to
+   * {@link DEFAULT_GATE_MODE}; `spark` leaves the observer's own scores
+   * alone, which is what `npm run eval -- --gate spark` measures.
+   */
+  gate?: GateMode;
 }
 
 /**
@@ -221,6 +228,12 @@ interface ModelLoops {
   board: BoardUpdater | null;
   observer: Observer | null;
   verifier: Verifier | null;
+  /**
+   * The judgment gate in front of the policy (V2-016), or `null` when there
+   * is no model client. Every candidate but a `research_hook` comes through
+   * it, including one the verifier has just checked.
+   */
+  gate: CandidateGate | null;
   policy: InterjectionPolicy | null;
   /** The answer agent (US-018), or `null` when there is no model client. */
   answers: AnswerAgent | null;
@@ -313,6 +326,8 @@ interface RunningSession {
   observer: Observer | null;
   /** The fact check (US-013), or `null` when there is no model client. */
   verifier: Verifier | null;
+  /** The judgment gate the candidates come through (V2-016). */
+  gate: CandidateGate | null;
   /** The interjection policy (US-014), or `null` when there is no model client. */
   policy: InterjectionPolicy | null;
   /** The answer agent (US-018), or `null` when there is no model client. */
@@ -356,6 +371,7 @@ export class SessionManager {
   private readonly liveClock: Clock;
   private readonly wallClock: Clock;
   private readonly replaySpeed: ReplaySpeed;
+  private readonly gateMode: GateMode;
 
   private current: RunningSession | undefined;
   /**
@@ -403,6 +419,7 @@ export class SessionManager {
     this.liveClock = options.liveClock ?? systemClock;
     this.wallClock = options.wallClock ?? systemClock;
     this.replaySpeed = options.replaySpeed ?? "1x";
+    this.gateMode = options.gate ?? DEFAULT_GATE_MODE;
     // The bus is where the settings a browser is caught up with are
     // remembered, so they start from there and are only published when this
     // manager was built with something else in mind.
@@ -939,6 +956,7 @@ export class SessionManager {
         board: null,
         observer: null,
         verifier: null,
+        gate: null,
         policy: null,
         answers: null,
         deliveries: new Map(),
@@ -962,14 +980,30 @@ export class SessionManager {
       // variant, and the card is kept so a 👍 can find its way back to it.
       onDeliver: (interjection) => { this.deliver(info, deliveries, interjection); onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id }); },
     });
+    // The second opinion (V2-016). Every candidate the policy ever sees comes
+    // through here, including one the verifier has just checked, so the four
+    // numbers the thresholds are applied to are a judge's rather than the
+    // proposer's own. `spark` mode hands them straight through.
+    const gate = new CandidateGate({
+      clock,
+      mode: this.gateMode,
+      client: () => judgment.client(),
+      board: () => board.board(),
+      turns: transcript,
+      wallClock: this.wallClock,
+      logger: this.logger,
+      onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "candidate_gate", ...record }); },
+      onScored: (candidate) => policy.accept(candidate),
+    });
     const verifier = new Verifier({
       clock,
       model,
       logger: this.logger,
       onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "verification_complete", ...record }); },
       // A claim that really is wrong has the correction in its detail by now,
-      // and goes to the policy like any other candidate.
-      onVerified: (candidate) => policy.accept(candidate),
+      // and goes to the policy like any other candidate — through the gate,
+      // which is where "any other candidate" is now defined (V2-016).
+      onVerified: (candidate) => gate.accept(candidate),
       onModelState,
     });
     const observer = new Observer({
@@ -985,7 +1019,7 @@ export class SessionManager {
       onCandidate: (candidate) => {
         if (candidate.type === "research_hook") { research.acceptHook(candidate); onTiming({ stage: "research_hook", atMs: clock.now(), candidateId: candidate.id, headline: candidate.headline }); }
         else if (candidate.type === "factual_error") { onTiming({ stage: "verification_start", atMs: clock.now(), candidateId: candidate.id }); verifier.verify(candidate); }
-        else policy.accept(candidate);
+        else gate.accept(candidate);
       },
       onModelState,
       onTiming,
@@ -1109,7 +1143,7 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, research, researchRunner, researchCards };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards };
   }
 
   /**
@@ -1336,6 +1370,7 @@ export class SessionManager {
     running.board?.stop();
     running.observer?.stop();
     running.verifier?.stop();
+    running.gate?.stop();
     running.policy?.stop();
     running.address?.stop();
     running.greeting?.stop();
@@ -1408,6 +1443,10 @@ async function drainLoops(
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();
+  // After the verifier, because a checked claim reaches the gate rather than
+  // the policy (V2-016), and the gate is the last thing between a candidate
+  // and the policy's final look.
+  await loops.gate?.flush();
   // After the observer, because its last look is where the last hooks come
   // from: every idea gets its gate verdict written down even though nothing
   // will be searched now. The planner does not take a final look (V2-012).

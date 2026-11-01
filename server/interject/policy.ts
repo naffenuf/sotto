@@ -13,7 +13,9 @@
  *
  *   1. **Score.** `importance × confidence × (0.5 + 0.5 × relevance) ×
  *      novelty`, against the chattiness thresholds. Below the glow threshold
- *      is `silent`, and nothing later can bring it back.
+ *      is `silent`, and nothing later can bring it back. Since V2-016 those
+ *      four numbers are usually the *gate's* rather than the observer's own:
+ *      see {@link scoresFromGate} for the mapping.
  *   2. **Expiry.** A candidate that has been waiting too long is about a
  *      moment that has passed: `silent`, reason `stale`.
  *   3. **Courtesy.** While Sotto is already answering, or has just been
@@ -23,7 +25,7 @@
  *   5. **Budget.** An interject soon after another one, or the fourth in a
  *      quarter of an hour, is downgraded to a glow rather than dropped.
  */
-import type { CandidateScores } from "../../shared/candidates.js";
+import type { CandidateScores, GateScores } from "../../shared/candidates.js";
 import {
   thresholdsFor,
   type CandidateLevel,
@@ -121,6 +123,38 @@ export function candidateScore(scores: CandidateScores): number {
   return (
     scores.importance * scores.confidence * (0.5 + 0.5 * scores.relevance) * scores.novelty
   );
+}
+
+/**
+ * The gate's four probabilities (V2-016) as the four scores this policy
+ * multiplies.
+ *
+ * The questions line up one for one, which is why the gate asks these four
+ * and not some other four — the formula above is unchanged, and so are the
+ * chattiness thresholds it is measured against, so turning the gate on
+ * changes *who answers* rather than what the answer means:
+ *
+ * | gate            | policy       | the question                               |
+ * | --------------- | ------------ | ------------------------------------------ |
+ * | `true`          | `confidence` | is the point really supported?             |
+ * | `new`           | `novelty`    | has it been said, or is it on the board?   |
+ * | `worthSaying`   | `importance` | would a thoughtful participant raise it?   |
+ * | `stillRelevant` | `relevance`  | has the conversation moved on?             |
+ *
+ * These *replace* the observer's own four rather than being averaged with
+ * them. A model that has just decided something is worth raising is the worst
+ * available judge of whether it is, and two opinions averaged would still
+ * carry half of that; the observer's scores stay on the candidate
+ * (`observerScores`) and in `candidates.jsonl` so a report can say what the
+ * second opinion changed.
+ */
+export function scoresFromGate(gate: GateScores): CandidateScores {
+  return {
+    confidence: gate.true,
+    novelty: gate.new,
+    importance: gate.worthSaying,
+    relevance: gate.stillRelevant,
+  };
 }
 
 /** The level a score earns on its own, before anything about the moment. */

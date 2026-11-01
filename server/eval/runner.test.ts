@@ -183,6 +183,7 @@ describe("deliveriesFrom", () => {
       durationMs: 9_000,
       candidates: 0,
       decisions: 0,
+      gateCalls: [],
       delivered: new Map(),
       ...partial,
     };

@@ -17,6 +17,7 @@ import type {
   ChattinessScore,
   FixtureScore,
   GateResult,
+  GateScore,
   MomentScore,
   RunScore,
 } from "./score.js";
@@ -170,12 +171,34 @@ export function headlines(group: ChattinessScore): Headline[] {
       value: String(totals.quietFalseInterjects),
     },
     {
+      label: `judgment gate (${group.gate.mode})`,
+      value: describeGate(group.gate),
+    },
+    {
       label: "deliveries in a pause",
       value:
         `${fraction(totals.deliveriesInPause, totals.deliveries)}` +
         `, median delay from the trigger line ${seconds(group.medianDelayMs)}`,
     },
   ];
+}
+
+/**
+ * `12 call(s), 12 on Glimmer, median 17.0s (max 21.4s)`, or what `--gate
+ * spark` has instead: no calls at all, which is the baseline.
+ */
+function describeGate(gate: GateScore): string {
+  if (gate.mode === "spark") return "not used — the observer's own scores stand";
+  if (gate.calls === 0) return "no candidates reached it";
+  const where =
+    gate.local === gate.calls
+      ? "all on Glimmer"
+      : `${gate.local} on Glimmer, ${gate.calls - gate.local} on Spark`;
+  return (
+    `${gate.calls} call(s), ${where}` +
+    (gate.failed > 0 ? `, ${gate.failed} with no verdict` : "") +
+    `, median latency ${seconds(gate.medianLatencyMs)} (max ${seconds(gate.maxLatencyMs)})`
+  );
 }
 
 function gateLines(gates: readonly GateResult[]): string[] {
@@ -254,6 +277,7 @@ export function renderReportMarkdown(context: ReportContext): string {
     ["finished", record.finishedAt],
     ["git commit", record.gitCommit ?? "(not a checkout)"],
     ["chattiness", record.chattiness.join(", ")],
+    ["gate", record.gate ?? "spark (recorded before V2-016)"],
     ["fixtures", record.fixtures.join(", ")],
     ["judge model", record.judge.model],
     ["judge prompt", record.judge.promptHash === "" ? "(judging skipped)" : record.judge.promptHash],

@@ -13,7 +13,7 @@
  * it gates on changed, without replaying a single conversation again.
  */
 import { z } from "zod";
-import type { CandidateType } from "./candidates.js";
+import type { CandidateGateWhere, CandidateType, GateMode } from "./candidates.js";
 import type { ExpectedLevel, MomentType } from "./fixtures.js";
 import type { Chattiness, DecisionReason, DeliveredLevel } from "./policy.js";
 import type { PauseState } from "./turns.js";
@@ -140,6 +140,28 @@ export interface JudgeMatchRecord {
   error?: string;
 }
 
+/**
+ * One gate call during a replay (V2-016), read back off `candidates.jsonl`.
+ *
+ * The latency is the reason this is in the run record at all: a gate call
+ * happens while the moment it is about is passing, so how long the local
+ * model takes is part of what the eval measures, beside what its judgment
+ * did to recall and precision.
+ */
+export interface GateCallRecord {
+  candidateId: string;
+  /** Which model answered, or `null` when there was none to ask. */
+  gate: CandidateGateWhere | null;
+  /** The score the policy then used: the gate's, mapped. */
+  score: number;
+  /** What the observer had proposed, so the difference is readable. */
+  observerScore: number;
+  /** Real milliseconds the call took. */
+  latencyMs: number;
+  /** Set when no verdict came back and the observer's scores stood. */
+  error?: string;
+}
+
 /** One fixture replayed at one chattiness setting. */
 export interface FixtureRunRecord {
   fixture: string;
@@ -154,6 +176,11 @@ export interface FixtureRunRecord {
   candidates: number;
   /** How many decisions the policy recorded. */
   decisions: number;
+  /**
+   * Every gate call the replay made (V2-016). Empty under `--gate spark`,
+   * which makes none, and absent on runs recorded before V2-016.
+   */
+  gateCalls?: GateCallRecord[];
   deliveries: DeliveryRecord[];
   moments: MomentRecord[];
   /** Every (delivery, moment) pair the judge looked at. */
@@ -190,6 +217,11 @@ export interface EvalRunRecord {
   gitCommit: string | null;
   /** The settings asked for, in the order they were run. */
   chattiness: Chattiness[];
+  /**
+   * Who scored the candidates (V2-016). Absent on runs recorded before it,
+   * which all used the observer's own scores — i.e. `spark`.
+   */
+  gate?: GateMode;
   fixtures: string[];
   judge: {
     model: string;

@@ -174,6 +174,116 @@ export interface Candidate extends ObserverCandidate {
   verification?: CandidateVerification;
   /** The pages the check rested on, in the order they were cited. */
   citations?: Citation[];
+  /**
+   * The observer's own four scores, kept when the gate (V2-016) replaced
+   * {@link ObserverCandidate.scores} with its own. Absent when nothing did.
+   */
+  observerScores?: CandidateScores;
+  /**
+   * What the local gate made of it (V2-016), when one ran. `scores` are
+   * already the mapping of this (`scoresFromGate` in
+   * `server/interject/policy.ts`), so the policy never reads this — it is
+   * here for the log and for anything that wants to know *why* the score
+   * changed.
+   */
+  gate?: CandidateGateVerdict;
+}
+
+/**
+ * The four questions the gate asks about one candidate (V2-016), each a
+ * probability between 0 and 1.
+ *
+ * The observer proposes and scores its own candidates, which is the model
+ * marking its own homework: a model that has just decided something is worth
+ * raising is the worst judge of whether it is. So a second, local model is
+ * asked the four questions that actually decide it, and its answers replace
+ * the observer's {@link CandidateScores} on the way to the policy.
+ *
+ * The names are the questions as the PRD puts them, which is also how they
+ * are asked in `server/prompts/gate.md`.
+ */
+export interface GateScores {
+  /** That the point is really supported by the transcript. */
+  true: number;
+  /** That it has not been said already and is not on the board. */
+  new: number;
+  /** That a thoughtful participant in the room would raise it. */
+  worthSaying: number;
+  /** That the conversation has not moved on from it. */
+  stillRelevant: number;
+}
+
+/**
+ * Which model answered the gate.
+ *
+ * `glimmer` is Muse Glimmer on this Mac — the point of the exercise, since
+ * judgment then costs nothing and leaves the room. `spark-fallback` is Muse
+ * Spark answering because there is no local model to ask (V2-010): the
+ * judgment still happens, it just happens in the cloud and by a different
+ * model than the one being judged's own scoring pass.
+ */
+export const candidateGates = ["glimmer", "spark-fallback"] as const;
+export type CandidateGateWhere = (typeof candidateGates)[number];
+
+/**
+ * Who scores a candidate: the gate, or the observer that proposed it.
+ *
+ * - `glimmer`: the gate runs — locally when there is a local model, and on
+ *   Muse Spark when there is not (V2-010), which is the difference between
+ *   {@link candidateGates}' two values.
+ * - `spark`: no gate call at all. The observer is Muse Spark and its own four
+ *   scores stand, which is what the core build shipped and what
+ *   `npm run eval -- --gate spark` measures the local gate against.
+ */
+export const gateModes = ["glimmer", "spark"] as const;
+export type GateMode = (typeof gateModes)[number];
+
+/** Judgment is local by default; V2-016 is the story that made it so. */
+export const DEFAULT_GATE_MODE: GateMode = "glimmer";
+
+/** What one gate call decided about one candidate. */
+export interface CandidateGateVerdict {
+  gate: CandidateGateWhere;
+  scores: GateScores;
+  /**
+   * Real milliseconds the call took. Wall clock, not the session clock: a
+   * `max`-speed replay's clock stands still while a call is in flight, and
+   * how long a local model takes to answer is the thing worth knowing.
+   */
+  latencyMs: number;
+}
+
+/**
+ * One line of `candidates.jsonl` recording a gate call (V2-016).
+ *
+ * It carries both sets of scores on purpose: the observer's, as proposed, and
+ * the gate's, so a report can say what the second opinion changed. A call
+ * that did not come back is written down too, with `gateScores` absent and
+ * `error` set — the candidate then goes on with the observer's own scores,
+ * which is the behaviour the gate replaced, rather than being dropped.
+ */
+export interface CandidateGateLogRecord {
+  kind: "gate";
+  /** When the verdict came back, on the session clock. */
+  atMs: number;
+  /** The {@link Candidate.id} that was scored. */
+  candidateId: string;
+  /** The claim, so the file reads without cross-referencing. */
+  headline: string;
+  type: CandidateType;
+  /** The scores the observer proposed. */
+  observerScores: CandidateScores;
+  /** The gate's four probabilities. Absent when no verdict came back. */
+  gateScores?: GateScores;
+  /** Which model answered, or `null` when there was none to ask. */
+  gate: CandidateGateWhere | null;
+  /** The scores the policy will actually use. */
+  scores: CandidateScores;
+  /** What those score together, which is what the thresholds see. */
+  score: number;
+  latencyMs: number;
+  /** Why no verdict came back, when none did. */
+  error?: string;
 }
 
 /**
@@ -296,13 +406,20 @@ export interface DecisionLogRecord extends PolicyDecision {
 }
 
 /** Every kind of line `candidates.jsonl` holds. */
-export type CandidateLogLine = CandidateLogRecord | VerificationLogRecord | DecisionLogRecord;
+export type CandidateLogLine =
+  | CandidateLogRecord
+  | CandidateGateLogRecord
+  | VerificationLogRecord
+  | DecisionLogRecord;
 
 /** Re-exported so a reader of a log line has the vocabulary to hand. */
 export type { Decision, DecisionReason };
 
 /** The `json_schema.name` an observer request sends. */
 export const OBSERVER_SCHEMA_NAME = "observer_candidates";
+
+const gateScore = (what: string) =>
+  ({ type: "number", description: `0 to 1. ${what}` }) as const;
 
 const scoreProperty = (what: string) =>
   ({ type: "number", description: `0 to 1. ${what}` }) as const;
@@ -466,5 +583,36 @@ export const verificationJsonSchema = {
     },
   },
   required: ["verdict", "correction", "citations"],
+  additionalProperties: false,
+} as const;
+
+/** The `json_schema.name` a gate request sends (V2-016). */
+export const CANDIDATE_GATE_SCHEMA_NAME = "candidate_gate";
+
+/** The gate's reply: one probability per question, nothing else. */
+export const CandidateGateReplySchema = z.strictObject({
+  true: ScoreSchema,
+  new: ScoreSchema,
+  worthSaying: ScoreSchema,
+  stillRelevant: ScoreSchema,
+});
+
+/**
+ * {@link CandidateGateReplySchema} as a JSON Schema.
+ *
+ * Glimmer never reads these descriptions — Ollama compiles the schema into a
+ * grammar and the model is told nothing by it — so they are for Muse Spark,
+ * which does read them, and the whole brief is in `server/prompts/gate.md`
+ * for both.
+ */
+export const candidateGateJsonSchema = {
+  type: "object",
+  properties: {
+    true: gateScore("That the point is really supported by the transcript."),
+    new: gateScore("That nobody has said it and it is not already on the board."),
+    worthSaying: gateScore("That a thoughtful participant would raise it now."),
+    stillRelevant: gateScore("That the conversation has not moved on from it."),
+  },
+  required: ["true", "new", "worthSaying", "stillRelevant"],
   additionalProperties: false,
 } as const;

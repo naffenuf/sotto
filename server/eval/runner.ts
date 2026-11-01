@@ -20,14 +20,20 @@ import type { StageCard } from "../../shared/cards.js";
 import type {
   CandidateLogLine,
   DecisionLogRecord,
+  GateMode,
 } from "../../shared/candidates.js";
-import type { DeliveryRecord, FixtureRunRecord, JudgeMatchRecord } from "../../shared/eval.js";
+import type {
+  DeliveryRecord,
+  FixtureRunRecord,
+  GateCallRecord,
+  JudgeMatchRecord,
+} from "../../shared/eval.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { EventBus } from "../events/bus.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
-import { inPause } from "../interject/policy.js";
-import type { ModelClientFactory } from "../session/SessionManager.js";
+import { candidateScore, inPause } from "../interject/policy.js";
+import type { GlimmerClientFactory, ModelClientFactory } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { SESSION_FILES, SessionStore } from "../session/SessionStore.js";
 import { loadScript, resolveMoments } from "./moments.js";
@@ -39,12 +45,21 @@ type Logger = Pick<Console, "log" | "warn" | "error">;
 export interface ReplayOptions {
   fixture: string;
   chattiness: Chattiness;
+  /** Who scores the candidates (V2-016). Defaults to the shipped gate. */
+  gate?: GateMode;
   /** Where the session folders go. One per replay, as any session has. */
   sessionRoot: string;
   /** Meta Model API key. Without one the session transcribes and notices nothing. */
   apiKey?: string | undefined;
   /** Seam for tests: `() => null` replays with no model and makes no calls. */
   createModel?: ModelClientFactory;
+  /**
+   * The local judgment model (V2-016). Defaults to none — so `npm test` never
+   * dials the local server, exactly as a `SessionManager` built without one
+   * does — which means `--gate glimmer` only really runs on Glimmer when
+   * `scripts/eval.ts` passes {@link glimmerFromEnv} in.
+   */
+  createGlimmer?: GlimmerClientFactory;
   logger?: Logger;
 }
 
@@ -57,6 +72,8 @@ export interface ReplayResult {
   durationMs: number;
   candidates: number;
   decisions: number;
+  /** Every gate call the replay made, in the order they came back (V2-016). */
+  gateCalls: GateCallRecord[];
   /** The policy's own decision, by candidate id, for the ones it delivered. */
   delivered: Map<string, DecisionLogRecord>;
 }
@@ -76,9 +93,11 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     bus,
     ...(options.apiKey === undefined ? {} : { apiKey: options.apiKey }),
     ...(options.createModel === undefined ? {} : { createModel: options.createModel }),
+    ...(options.createGlimmer === undefined ? {} : { createGlimmer: options.createGlimmer }),
     logger,
     replaySpeed: "max",
     chattiness: options.chattiness,
+    ...(options.gate === undefined ? {} : { gate: options.gate }),
     createStore: (info) => {
       const store = SessionStore.create(info, { root: options.sessionRoot, logger });
       sessionDir = store.dir;
@@ -118,6 +137,7 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     durationMs: Math.max(0, ...turns.map((turn) => turn.endMs ?? turn.startMs)),
     candidates: log.filter((line) => line.kind === "candidate").length,
     decisions: log.filter((line) => line.kind === "decision").length,
+    gateCalls: gateCallsFrom(log),
     delivered: deliveredDecisions(log),
   };
 }
@@ -139,6 +159,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
     finalTurns: 0,
     candidates: 0,
     decisions: 0,
+    gateCalls: [],
     deliveries: [],
     moments: [],
     matches: [],
@@ -166,6 +187,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
     finalTurns: finals.length,
     candidates: replay.candidates,
     decisions: replay.decisions,
+    gateCalls: replay.gateCalls,
     deliveries,
     moments,
     matches,
@@ -253,6 +275,29 @@ export function readCandidateLog(sessionDir: string | null): CandidateLogLine[] 
     }
   }
   return lines;
+}
+
+/**
+ * Every gate call in the log (V2-016), oldest first.
+ *
+ * The run record keeps these rather than the raw lines because a report only
+ * ever asks three things of them: how long they took, which model answered,
+ * and what the second opinion did to the score.
+ */
+export function gateCallsFrom(log: readonly CandidateLogLine[]): GateCallRecord[] {
+  const calls: GateCallRecord[] = [];
+  for (const line of log) {
+    if (line.kind !== "gate") continue;
+    calls.push({
+      candidateId: line.candidateId,
+      gate: line.gate,
+      score: line.score,
+      observerScore: candidateScore(line.observerScores),
+      latencyMs: line.latencyMs,
+      ...(line.error === undefined ? {} : { error: line.error }),
+    });
+  }
+  return calls;
 }
 
 /**

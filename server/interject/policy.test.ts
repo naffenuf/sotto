@@ -16,6 +16,7 @@ import {
   STALE_TURNS,
   candidateScore,
   decide,
+  scoresFromGate,
   nextCheckDelay,
   type PolicyHistory,
   type PolicyInput,
@@ -248,5 +249,44 @@ describe("nextCheckDelay", () => {
     expect(
       nextCheckDelay(input({ nowMs: STALE_MS * 3, pause: speaking, history: history() })),
     ).toBe(0);
+  });
+});
+
+describe("scoresFromGate (V2-016)", () => {
+  it("maps each of the gate's four questions onto the score it replaces", () => {
+    expect(
+      scoresFromGate({ true: 0.1, new: 0.2, worthSaying: 0.3, stillRelevant: 0.4 }),
+    ).toEqual({ confidence: 0.1, novelty: 0.2, importance: 0.3, relevance: 0.4 });
+  });
+
+  it("leaves the formula and the thresholds doing exactly what they did", () => {
+    // The same four numbers, whoever produced them, score the same.
+    const gated = scoresFromGate({
+      true: 0.9,
+      new: 0.8,
+      worthSaying: 0.7,
+      stillRelevant: 0.6,
+    });
+    expect(candidateScore(gated)).toBeCloseTo(
+      candidateScore({ confidence: 0.9, novelty: 0.8, importance: 0.7, relevance: 0.6 }),
+    );
+  });
+
+  it("can sink a candidate the observer was sure of, which is the point", () => {
+    const observer: CandidateScores = {
+      relevance: 1,
+      novelty: 1,
+      importance: 0.9,
+      confidence: 0.9,
+    };
+    expect(candidateScore(observer)).toBeGreaterThan(CHATTINESS_THRESHOLDS.normal.interject);
+    // The group said it themselves five minutes ago.
+    const gated = scoresFromGate({
+      true: 0.9,
+      new: 0.1,
+      worthSaying: 0.8,
+      stillRelevant: 0.3,
+    });
+    expect(candidateScore(gated)).toBeLessThan(CHATTINESS_THRESHOLDS.normal.glow);
   });
 });

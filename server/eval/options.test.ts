@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_GATE_MODE } from "../../shared/candidates.js";
 import { DEFAULT_CHATTINESS, chattinessLevels } from "../../shared/policy.js";
 import { evalFixtures, isEvalFixture, parseEvalArgs, runTimestamp } from "./options.js";
 
@@ -36,6 +37,7 @@ describe("parseEvalArgs", () => {
   it("runs the whole eval set at the default chattiness with no arguments", () => {
     expect(parseEvalArgs([])).toEqual({
       chattiness: [DEFAULT_CHATTINESS],
+      gate: DEFAULT_GATE_MODE,
       fixtures: null,
       skipJudge: false,
     });
@@ -51,9 +53,16 @@ describe("parseEvalArgs", () => {
   it("takes a comma-separated fixture list and the no-judge flag", () => {
     expect(parseEvalArgs(["--fixtures", "moment-fact, brainstorm", "--no-judge"])).toEqual({
       chattiness: [DEFAULT_CHATTINESS],
+      gate: DEFAULT_GATE_MODE,
       fixtures: ["moment-fact", "brainstorm"],
       skipJudge: true,
     });
+  });
+
+  it("takes either gate, and defaults to the local one (V2-016)", () => {
+    expect(parseEvalArgs([])).toMatchObject({ gate: "glimmer" });
+    expect(parseEvalArgs(["--gate", "spark"])).toMatchObject({ gate: "spark" });
+    expect(parseEvalArgs(["--gate", "glimmer"])).toMatchObject({ gate: "glimmer" });
   });
 
   it("says what is wrong rather than guessing", () => {
@@ -62,6 +71,10 @@ describe("parseEvalArgs", () => {
       error: expect.stringContaining("unknown chattiness"),
     });
     expect(parseEvalArgs(["--fixtures", " , "])).toEqual({ error: "--fixtures was empty" });
+    expect(parseEvalArgs(["--gate"])).toEqual({ error: "--gate needs a value" });
+    expect(parseEvalArgs(["--gate", "llama"])).toMatchObject({
+      error: expect.stringContaining("unknown gate"),
+    });
     expect(parseEvalArgs(["--quick"])).toMatchObject({
       error: expect.stringContaining("unknown argument"),
     });

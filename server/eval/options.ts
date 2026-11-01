@@ -4,6 +4,7 @@
  * Pure: it turns argv into a plan and says why when it cannot, so the script
  * around it does nothing but I/O.
  */
+import { DEFAULT_GATE_MODE, gateModes, type GateMode } from "../../shared/candidates.js";
 import { chattinessLevels, DEFAULT_CHATTINESS, type Chattiness } from "../../shared/policy.js";
 
 /** The conversations the harness measures: the two quiet ones, then the moments. */
@@ -25,6 +26,12 @@ export function evalFixtures(available: readonly string[]): string[] {
 export interface EvalOptions {
   /** The settings to run, in order. `--chattiness all` gives all three. */
   chattiness: Chattiness[];
+  /**
+   * Who scores the candidates (V2-016): `glimmer` for the local gate, `spark`
+   * for the observer's own scores, which is the baseline it is measured
+   * against. One per run — two gates are two experiments.
+   */
+  gate: GateMode;
   /** Fixture names, or `null` for "the whole eval set that is captured". */
   fixtures: string[] | null;
   /** Skip the judge: replay and record, matching nothing. For a quick look. */
@@ -33,12 +40,13 @@ export interface EvalOptions {
 
 export const EVAL_USAGE =
   "usage: npm run eval -- [--chattiness quiet|normal|active|all] " +
-  "[--fixtures <name,name>] [--no-judge]";
+  "[--gate glimmer|spark] [--fixtures <name,name>] [--no-judge]";
 
 /** What the arguments meant, or the first thing wrong with them. */
 export function parseEvalArgs(argv: readonly string[]): EvalOptions | { error: string } {
   const options: EvalOptions = {
     chattiness: [DEFAULT_CHATTINESS],
+    gate: DEFAULT_GATE_MODE,
     fixtures: null,
     skipJudge: false,
   };
@@ -56,6 +64,13 @@ export function parseEvalArgs(argv: readonly string[]): EvalOptions | { error: s
         return { error: `unknown chattiness ${JSON.stringify(asked)}; ${EVAL_USAGE}` };
       }
       options.chattiness = [asked];
+    } else if (arg === "--gate") {
+      const asked = value();
+      if (asked === undefined) return { error: "--gate needs a value" };
+      if (!isGateMode(asked)) {
+        return { error: `unknown gate ${JSON.stringify(asked)}; ${EVAL_USAGE}` };
+      }
+      options.gate = asked;
     } else if (arg === "--fixtures") {
       const asked = value();
       if (asked === undefined) return { error: "--fixtures needs a value" };
@@ -76,6 +91,10 @@ export function parseEvalArgs(argv: readonly string[]): EvalOptions | { error: s
 
 function isChattiness(value: string): value is Chattiness {
   return (chattinessLevels as readonly string[]).includes(value);
+}
+
+function isGateMode(value: string): value is GateMode {
+  return (gateModes as readonly string[]).includes(value);
 }
 
 /**

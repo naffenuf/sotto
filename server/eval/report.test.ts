@@ -16,6 +16,16 @@ const runs: FixtureRunRecord[] = [
     finalTurns: 40,
     candidates: 1,
     decisions: 2,
+    gateCalls: [
+      {
+        candidateId: "cand-9",
+        gate: "spark-fallback",
+        score: 0.72,
+        observerScore: 0.72,
+        latencyMs: 3_000,
+        error: "Glimmer is unavailable",
+      },
+    ],
     deliveries: [
       {
         cardId: "card-cand-9",
@@ -44,6 +54,10 @@ const runs: FixtureRunRecord[] = [
     finalTurns: 26,
     candidates: 1,
     decisions: 2,
+    gateCalls: [
+      { candidateId: "cand-1", gate: "glimmer", score: 0.81, observerScore: 0.9, latencyMs: 17_000 },
+      { candidateId: "cand-2", gate: "glimmer", score: 0.2, observerScore: 0.7, latencyMs: 21_000 },
+    ],
     deliveries: [
       {
         cardId: "card-cand-1",
@@ -130,6 +144,7 @@ const record: EvalRunRecord = {
   finishedAt: "2026-10-28T12:12:00.000Z",
   gitCommit: "abc1234+",
   chattiness: ["normal"],
+  gate: "glimmer",
   fixtures: ["brainstorm", "moment-contradiction", "moment-fact"],
   judge: { model: "muse-spark-1.3", promptHash: "162841b6b7d8", calls: 1, cacheHits: 1 },
   promptHashes: [
@@ -172,6 +187,35 @@ describe("headlines", () => {
     expect(metrics.get("false interjects on brainstorm + no-wake")).toBe("1");
     expect(metrics.get("deliveries in a pause")).toContain("2/2 (100%)");
     expect(metrics.get("deliveries in a pause")).toContain("8.0s");
+  });
+
+  it("states the gate's own numbers, latency first (V2-016)", () => {
+    const score = scoreRun(record);
+    const group = score.groups[0];
+    if (group === undefined) throw new Error("no group");
+    const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
+    const gate = metrics.get("judgment gate (glimmer)");
+    expect(gate).toContain("3 call(s)");
+    expect(gate).toContain("2 on Glimmer, 1 on Spark");
+    expect(gate).toContain("1 with no verdict");
+    // Median of 3s, 17s and 21s.
+    expect(gate).toContain("median latency 17.0s");
+    expect(gate).toContain("max 21.0s");
+  });
+
+  it("says the observer scored its own candidates when the gate was spark", () => {
+    const score = scoreRun({ ...record, gate: "spark" });
+    const group = score.groups[0];
+    if (group === undefined) throw new Error("no group");
+    const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
+    expect(metrics.get("judgment gate (spark)")).toContain("the observer's own scores");
+  });
+
+  it("reads a run recorded before V2-016 as the spark baseline", () => {
+    const { gate: _dropped, ...before } = record;
+    const group = scoreRun(before).groups[0];
+    if (group === undefined) throw new Error("no group");
+    expect(group.gate.mode).toBe("spark");
   });
 });
 
@@ -223,6 +267,7 @@ describe("renderReportMarkdown", () => {
   it("records the settings, the commit and the judge prompt", () => {
     expect(markdown).toContain("| git commit | abc1234+ |");
     expect(markdown).toContain("| chattiness | normal |");
+    expect(markdown).toContain("| gate | glimmer |");
     expect(markdown).toContain("| judge prompt | 162841b6b7d8 |");
     expect(markdown).toContain("| judge calls | 1 (1 cached) |");
     expect(markdown).toContain("- **interject precision**: 1/2 (50%)");

@@ -29,6 +29,7 @@ import type {
   MomentRecord,
 } from "../../shared/eval.js";
 import type { ExpectedLevel } from "../../shared/fixtures.js";
+import { DEFAULT_GATE_MODE, type GateMode } from "../../shared/candidates.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
 
 /** The gate: below this, `npm run eval` exits non-zero. */
@@ -148,6 +149,22 @@ export interface GateResult {
   detail: string;
 }
 
+/** What the judgment gate did and cost, over one group of fixtures (V2-016). */
+export interface GateScore {
+  /** Who scored the candidates: the local gate, or the observer itself. */
+  mode: GateMode;
+  /** How many gate calls came back. Zero under `--gate spark`, which makes none. */
+  calls: number;
+  /** Of those, how many ran on Muse Glimmer rather than falling back to Spark. */
+  local: number;
+  /** Calls that came back with no verdict; the observer's scores then stood. */
+  failed: number;
+  /** Median real milliseconds a call took, or `null` when none were made. */
+  medianLatencyMs: number | null;
+  /** The slowest call: what the worst-case moment paid. */
+  maxLatencyMs: number | null;
+}
+
 /** Everything one chattiness setting scored. */
 export interface ChattinessScore {
   chattiness: Chattiness;
@@ -161,6 +178,8 @@ export interface ChattinessScore {
   pauseRate: number;
   /** Median delay from the trigger line's end to delivery, over matched moments. */
   medianDelayMs: number | null;
+  /** What the judgment gate did and cost in this group (V2-016). */
+  gate: GateScore;
   gates: GateResult[];
   passed: boolean;
 }
@@ -401,6 +420,7 @@ export function scoreChattiness(
   chattiness: Chattiness,
   runs: readonly FixtureRunRecord[],
   judged: boolean,
+  gateMode: GateMode = DEFAULT_GATE_MODE,
 ): ChattinessScore {
   const fixtures = runs.map(scoreFixture);
   const totals = totalsOf(fixtures);
@@ -422,8 +442,30 @@ export function scoreChattiness(
     interjectPrecision,
     pauseRate,
     medianDelayMs: median(delays),
+    gate: scoreGate(gateMode, runs),
     gates,
     passed: gates.every((one) => one.status !== "fail"),
+  };
+}
+
+/**
+ * The gate's own numbers (V2-016): who answered, and how long they took.
+ *
+ * Latency is a wall-clock measurement a replay can still make honestly — the
+ * session clock stands still during a call, but a local model takes the time
+ * it takes — and it is the number that decides whether the gate can live
+ * inside a planted moment's window at all.
+ */
+export function scoreGate(mode: GateMode, runs: readonly FixtureRunRecord[]): GateScore {
+  const calls = runs.flatMap((run) => run.gateCalls ?? []);
+  const latencies = calls.map((call) => call.latencyMs);
+  return {
+    mode,
+    calls: calls.length,
+    local: calls.filter((call) => call.gate === "glimmer").length,
+    failed: calls.filter((call) => call.error !== undefined).length,
+    medianLatencyMs: median(latencies),
+    maxLatencyMs: latencies.length === 0 ? null : Math.max(...latencies),
   };
 }
 
@@ -441,11 +483,15 @@ export function scoreRun(record: EvalRunRecord): RunScore {
     record.chattiness.length > 0
       ? record.chattiness
       : [...new Set(record.runs.map((run) => run.chattiness))];
+  // A run recorded before V2-016 has no gate: the observer's own scores were
+  // all there was, which is what `spark` means.
+  const gateMode = record.gate ?? "spark";
   const groups = settings.map((chattiness) =>
     scoreChattiness(
       chattiness,
       record.runs.filter((run) => run.chattiness === chattiness),
       judged,
+      gateMode,
     ),
   );
   return { judged, groups, passed: groups.every((group) => group.passed) };

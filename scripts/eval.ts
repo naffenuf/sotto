@@ -3,6 +3,8 @@
  *
  *   npm run eval                                  # every eval fixture, normal
  *   npm run eval -- --chattiness all              # quiet, normal and active
+ *   npm run eval -- --gate spark                  # the observer's own scores
+ *                                                 # (default: the local gate)
  *   npm run eval -- --fixtures moment-fact        # one conversation
  *   npm run eval -- --no-judge                    # replay only, match nothing
  *
@@ -35,6 +37,7 @@ import { renderTerminalReport } from "../server/eval/report.js";
 import { writeReport } from "../server/eval/reportFile.js";
 import { runFixture } from "../server/eval/runner.js";
 import { MuseClient, SPARK_MODEL } from "../server/model/client.js";
+import { glimmerFromEnv } from "../server/model/GlimmerClient.js";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const RUNS_DIR = join(repoRoot, "eval/runs");
@@ -125,6 +128,7 @@ async function main(): Promise<void> {
 
   console.log(
     `[eval] ${id}: ${fixtures.length} fixture(s) × ${parsed.chattiness.join(", ")}` +
+      `, gate ${parsed.gate}` +
       (judge === undefined ? " (judging skipped)" : ""),
   );
 
@@ -135,9 +139,15 @@ async function main(): Promise<void> {
       const run = await runFixture({
         fixture,
         chattiness,
+        gate: parsed.gate,
         sessionRoot: join(SESSIONS_DIR, id, chattiness),
         apiKey,
         createModel: () => new MuseClient({ apiKey, onUsage: meter.record }),
+        // Judgment runs where it would in a real session (V2-010): on Glimmer
+        // when `GLIMMER_BASE_URL` points at a live one, and on Muse Spark
+        // when it does not. Without this the `glimmer` gate would quietly
+        // measure Spark, which is the thing it is meant to be compared to.
+        createGlimmer: () => glimmerFromEnv(),
         judge,
       });
       runs.push(run);
@@ -151,6 +161,7 @@ async function main(): Promise<void> {
     finishedAt: new Date().toISOString(),
     gitCommit: gitCommit(),
     chattiness: [...parsed.chattiness],
+    gate: parsed.gate,
     fixtures,
     judge: {
       model: SPARK_MODEL,
