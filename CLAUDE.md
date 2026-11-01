@@ -1316,3 +1316,28 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   line and goes straight to speech (V2-015), so the report prints `ack —, first audio 0.3s`
   and anything asking "did Sotto answer out loud" has to read `firstAudioMs`. The two
   fixtures that really search show `ack 0.2s` and first audio at 2.0–3.2 s.
+
+- **The gate splits by who is waiting, and the two paths are reported apart.** V3-001 makes
+  `DEFAULT_GATE_MODE` `"spark"` — which means the interjection gate makes **no call at all** and
+  the observer's own four scores stand (`--gate spark` has always meant that; the observer *is*
+  Spark) — while `ResearchGate` is untouched on Glimmer with the Spark fallback, because it
+  already resolved through `JudgmentRouter.client()`. The whole case is latency against the
+  window the judgment sits inside: a local verdict is 24–34 s (re-measured 24.7 s median) and a
+  planted interjection window is 12–29 s, while 27.8 s in front of a 16–21 s search whose answer
+  is for the rest of the conversation costs nobody anything. So the report's one "judgment gate"
+  row became two, "interjection gate" and "research gate", off `scoreGate` and the new
+  `scoreResearchGate` (`ResearchRunRecord.gateLatencyMs`, optional, read off `research.jsonl`) —
+  never compare the two paths on one number again. `--gate` is on `npm run e2e` now as well, and
+  that is the only clock that charges a gate for its seconds.
+- **Flipping `DEFAULT_GATE_MODE` breaks the tests that assume the gate runs, not the gate.**
+  `CandidateGate.test.ts`'s `gateFor` harness took the default, so eight tests about a gate call
+  silently became tests about no call. The harness now asks for `"glimmer"` explicitly and the
+  one test about not calling says `DEFAULT_GATE_MODE` out loud. Same shape in `options.test.ts`
+  and `report.test.ts`: a default is a contract two files away from where it lives.
+- **The real-time e2e was right and the replay was wrong, which is the reason it exists.** V2-020
+  passed all five eval gates with a gate that put both planted moments 31.9 s and 50.1 s *past*
+  their deadline in V2-021's live run, because simulated time does not move inside `clock.track`.
+  After the split the same two fixtures deliver **4.6 s and 8.4 s** after their trigger turns, in
+  windows of 18.2 s and 23.2 s, 22/22 checks and $1.31 of a $2.30 allowance. When a timing
+  decision is on the table, `npm run e2e -- --fixtures <the two>` is ~$1.3 and eight minutes;
+  a replay's report cannot answer it at any price.
