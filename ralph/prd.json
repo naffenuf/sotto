@@ -358,8 +358,8 @@
         "Verify in browser using webapp-testing skill (Playwright: Backstage shows the digest for a replayed session)"
       ],
       "priority": 18,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (1127), npm run build, the real-API integration test (server/session/digest.integration.test.ts, an offsite-plan replay: 311 s, seven sections, five held-back candidates each with a reason) and npm run verify:digest in a real browser all pass. digest.md is written by SessionManager.finish() just before store.writer.end(), from server/session/digest.ts's SessionDigest - a COLLECTOR fed at the same call sites the session folder's logs are written from (StoreSlot.digest), never a reader of the folder, so the digest exists for a session whose folder could not be opened. Suppressed candidates take their score and reason from the policy's own last decision, else the gate's verdict, else candidateScore() of the observer's four; a research_hook is never 'almost said' (it left the interjection path in V2-011). 'Sotto, wrap us up' is matched lexically (asksForWrapUp, the same shape as V2-015's asksForResearch), answered by server/session/WrapUp.ts from spokenSummary() with NO model call, spoken through an ordinary VoiceOut utterance (so a barge-in cancels it like any other) or shown as a notice card when muted, and written to the transcript as a Sotto turn. Typed into the Ask box it takes the same path while a session is running. Backstage shows digest.md as text (the card markdown renderer has no headings). ONE thing beyond the stated criteria was needed: listHistory/readHistory take { replays: true }, which server/app.ts passes when SOTTO_DEV=1, because the criterion asks for Backstage to show a REPLAYED session's digest and the list was microphone-only. A production build still lists mic sessions only. Not re-run this iteration: the rest of test:integration, npm run eval, npm run e2e."
     },
     {
       "id": "V2-019",

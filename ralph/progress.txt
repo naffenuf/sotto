@@ -670,3 +670,42 @@
     and unanswered_question moments BY DESIGN. Don't read that as recall loss.
   - Not re-run this iteration: test:integration, npm run eval, npm run e2e.
   NEXT: V2-018 (end-of-session digest). 4 stories left.
+
+[2026-11-01 02:45] V2-018 — completed — the digest: seven sections written on Stop, shown in Backstage, and spoken when somebody asks Sotto to wrap up.
+  WHAT IS NEW:
+  - server/session/digest.ts: DIGEST_SECTIONS (the seven headings, spelled
+    once), SessionDigest (the collector), renderDigest, spokenSummary and
+    asksForWrapUp. Pure over what it was handed; no file is ever read back.
+  - server/session/WrapUp.ts: one utterance per request, Greeting's two rules
+    (spoken or shown, never both; write down only what was heard). Cancelled
+    by an ordinary barge-in because it is an ordinary utterance on the hub.
+  - SessionWriter.writeDigest + SESSION_FILES.digest; StoreSlot.digest is fed
+    at the four appendCandidate sites, writeBoard, appendResearch and
+    appendAnswer. finish() writes it just before end().
+  - listHistory/readHistory take { replays: true }; server/app.ts passes it
+    when SOTTO_DEV=1. HistoryDetail.digest, shown in Backstage as <pre>.
+  - A notice card whose id starts NOTICE_CARD_IDS.wrapUp renders its detail
+    inline (detailIsTheCard in Card.tsx): "Where we got to" with the summary
+    behind "details ▾" is a card that says nothing.
+  - npm run verify:digest (scripts/verify-digest.mjs).
+  MEASURED / VERIFIED:
+  - typecheck, npm test (1127), npm run build green.
+  - digest.integration.test.ts: a real offsite-plan replay, 311 s, seven
+    sections, five held-back candidates each matching
+    `- **headline** — reason _(type, score 0.42)_`.
+  - Browser: moment-fact replay stopped after the first board update, typed
+    "Sotto, wrap us up" (muted, so no ElevenLabs call) -> notice card with
+    the summary inline, then Backstage showed the digest, 633px tall.
+    Screenshots looked at: /tmp/sotto-shots/digest.png, -wrapup.png.
+  - verify-history-ui.mjs still passes.
+  WATCH OUT:
+  - A SPOKEN wrap-up's wording comes from the classifier only when the final
+    turn is re-classified; a reused early verdict re-derives the question
+    from the final text (V2-008b), so no existing fixture can carry one. The
+    SessionManager test forces the recheck by answering `name_only` first.
+  - A board op literal in a test needs `sourceTurnIds` or the WHOLE update is
+    discarded (BoardUpdateSchema is a strict array) — that cost an hour.
+  - The page refreshes its history on the `session: null` event, which goes
+    out BEFORE the drain writes `endedAt`; a check that stops a session with
+    fetch() has to reload before reading the list.
+  NEXT: V2-019 (eval update). 3 stories left.

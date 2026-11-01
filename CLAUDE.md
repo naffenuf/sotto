@@ -1196,3 +1196,34 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `fetch("/api/session/start")` like `verify-hello.mjs` does. What it proves beyond the obvious
   is that the two settings are *separate* — changing the frequency and reloading leaves the
   boldness where it was — and that both reach `session.json`.
+
+- **The digest is collected, not read back, and that is what makes the wrap-up free.**
+  V2-018's `SessionDigest` (`server/session/digest.ts`) is handed each record at the same call
+  sites the session folder's logs are written from — `StoreSlot.digest` beside `StoreSlot.writer`
+  — so `digest.md` exists for a session whose folder could never be opened, and "Sotto, wrap us
+  up" is answered from memory with **no model call and no file read**. The seven headings are
+  `DIGEST_SECTIONS`, spelled once; every section is always written, with `_None recorded._` where
+  there is nothing. "What Sotto almost said" takes each candidate's score and reason from the
+  policy's own **last** decision, else the gate's verdict, else `candidateScore()` of the
+  observer's four — and a `research_hook` is never in it, because it left the interjection path
+  by design (V2-011). `SessionManager.finish()` writes it just before `store.writer.end()`, by
+  which point `drainLoops` has run.
+- **A wrap-up is an ordinary utterance, which is the whole of "interruptible as usual".**
+  `server/session/WrapUp.ts` follows `Greeting`'s two rules — spoken or shown, never both; write
+  down only what the room heard — and because it opens its utterance on the same `VoiceOut` the
+  answers use, `BargeIn` → `AnswerAgent.interrupt()` → `voice.interrupt()` cancels it with no new
+  code. It is matched lexically (`asksForWrapUp`, the shape of V2-015's `asksForResearch`), from
+  **two** front doors: the wake watcher's `onQuestion`, before the answer agent sees it, and
+  `askQuestion` while a session is running (after Stop a typed wrap-up falls through to the
+  answer agent, which reads the board anyway).
+- **Backstage lists replays only in a dev build.** `listHistory`/`readHistory` take
+  `{ replays: true }` and `server/app.ts` passes it when `SOTTO_DEV=1`, because a `wav` or
+  `events` folder is a recording being played back rather than a conversation a group had — and
+  there are eighty of them in a checkout. Two things bite a Playwright check here: the page
+  refreshes its history on the `session: null` event, which goes out **before** the drain writes
+  `endedAt`, and a folder with no `endedAt` is not a past discussion — so a check that stops a
+  session with `fetch()` has to reload before reading the list.
+- **A board op literal in a test needs its `sourceTurnIds`.** `BoardUpdateSchema` is
+  `z.array(BoardOpSchema)` over strict objects, so one `add_decision` missing that field throws
+  away the **whole** update, `set_summary` included — a board that silently stays empty while
+  every loop downstream still runs.
