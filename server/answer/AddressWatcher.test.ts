@@ -20,11 +20,16 @@ function turn(text: string, id = "0:1", speaker: string | null = "A", final = tr
     speakerMappingUncertain: false };
 }
 
-function setup(classify: AddressClassifier = async () => ({ kind: "mention", question: "" })) {
+function setup(
+  classify: AddressClassifier = async () => ({ kind: "mention", question: "" }),
+  /** How many cards Sotto is holding, which V3-017's `call_on` turns on. */
+  raised = 0,
+) {
   const clock = new SimulatedClock();
   const wall = new SimulatedClock();
   const calls: AddressInput[] = [];
   const questions: WakeTrigger[] = [];
+  const calledOn: WakeTrigger[] = [];
   const listening: boolean[] = [];
   const timing: Record<string, unknown>[] = [];
   const signals: AbortSignal[] = [];
@@ -37,10 +42,12 @@ function setup(classify: AddressClassifier = async () => ({ kind: "mention", que
     },
     speakers: () => ({ A: "Craig", B: "EJ" }),
     onQuestion: (question) => questions.push(question),
+    onCallOn: (trigger) => calledOn.push(trigger),
+    raised: () => raised,
     onListening: (value) => listening.push(value),
     onTiming: (event) => timing.push(event),
   });
-  return { clock, wall, calls, questions, listening, timing, signals, watcher };
+  return { clock, wall, calls, questions, calledOn, listening, timing, signals, watcher };
 }
 
 describe("model-assisted addressing", () => {
@@ -377,5 +384,92 @@ describe("checking a settled partial early", () => {
 
   it("goes early on four words, which is what the captures reach in time", () => {
     expect(ADDRESS_EARLY_WORDS).toBe(4);
+  });
+});
+
+/**
+ * V3-017: "Sotto, go ahead" is not a question about the world, so it goes to
+ * the hand rather than to the answer agent — and the count of what Sotto is
+ * holding goes to the classifier, because that is the only thing that can
+ * read a bare name as an invitation.
+ */
+describe("being called on (V3-017)", () => {
+  it("routes a call_on to the hand and not to the answer agent", async () => {
+    const t = setup(async () => ({ kind: "call_on", question: "" }), 2);
+    t.watcher.acceptTurn(turn("Sotto go ahead", "0:1", "A", false));
+    t.watcher.acceptTurn(turn("Sotto go ahead"));
+    await t.watcher.flush();
+    await t.clock.settle();
+
+    expect(t.questions).toEqual([]);
+    expect(t.calledOn).toEqual([{ turnId: "0:1", speaker: "A", question: "" }]);
+    expect(t.timing).toContainEqual(expect.objectContaining({
+      stage: "address", kind: "call_on", fallback: false,
+    }));
+  });
+
+  it("tells the classifier how many things Sotto is holding", async () => {
+    const t = setup(async () => ({ kind: "call_on", question: "" }), 3);
+    t.watcher.acceptTurn(turn("Soto anything"));
+    await t.watcher.flush();
+
+    expect(t.calls.map((input) => input.raised)).toEqual([3]);
+  });
+
+  it("still arms the speaker when the call was only the name", async () => {
+    const t = setup(async (input) => (
+      input.turn.text.trim() === "Soto"
+        ? { kind: "call_on", question: "" }
+        : { kind: "request", question: "what does a marquee cost" }
+    ), 1);
+    t.watcher.acceptTurn(turn("Soto", "0:1"));
+    await t.watcher.flush();
+    expect(t.calledOn).toHaveLength(1);
+
+    // The transcription cannot tell "Soto?" from "Soto", so the request this
+    // may have been the opening of still reaches the answer agent.
+    t.watcher.acceptTurn(turn("what does a marquee cost", "0:2"));
+    await t.watcher.flush();
+    expect(t.questions.map((question) => question.question)).toEqual([
+      "what does a marquee cost",
+    ]);
+  });
+
+  it("reads an extended call again rather than trusting the fragment", async () => {
+    const t = setup(async (input) => (
+      input.turn.text.includes("marquee")
+        ? { kind: "request", question: "what does a marquee cost" }
+        : { kind: "call_on", question: "" }
+    ), 1);
+    // Four words after the name, so V2-008b checks the partial there.
+    t.watcher.acceptTurn(turn("Soto what have you got", "0:1", "A", false));
+    expect(t.calls).toHaveLength(1);
+    // And then the speaker keeps going, which changes what the turn is.
+    t.watcher.acceptTurn(turn("Soto what have you got for what does a marquee cost", "0:1"));
+    await t.watcher.flush();
+    await t.clock.settle();
+
+    expect(t.calls).toHaveLength(2);
+    expect(t.calledOn).toEqual([]);
+    expect(t.questions).toHaveLength(1);
+    expect(t.timing).toContainEqual(expect.objectContaining({
+      stage: "address_early", event: "rechecked", reason: "extended",
+    }));
+  });
+
+  it("does nothing at all for a session with nowhere to put it", async () => {
+    const clock = new SimulatedClock();
+    const watcher = new AddressWatcher({
+      clock,
+      wallClock: new SimulatedClock(),
+      classify: async () => ({ kind: "call_on", question: "" }),
+      speakers: () => ({}),
+      onQuestion: () => { throw new Error("a call_on is not a question"); },
+      onListening: () => {},
+      onTiming: () => {},
+    });
+    watcher.acceptTurn(turn("Sotto go ahead"));
+    await watcher.flush();
+    await clock.settle();
   });
 });

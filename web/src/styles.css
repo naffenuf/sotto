@@ -80,6 +80,36 @@ body {
   flex-wrap: wrap;
 }
 
+/* V3-017: Sotto has something it has not said. Quiet, and the only thing in
+   the header that is accented — a hand up at the back of the room. */
+.raised-hand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: #fdf3e3;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.raised-hand:hover {
+  border-color: var(--ink);
+}
+
+.raised-hand__mark {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.raised-hand__count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 .controls {
   display: flex;
   align-items: center;

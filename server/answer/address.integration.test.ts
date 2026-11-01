@@ -21,8 +21,13 @@ const apiKey = (process.env.MODEL_API_KEY ?? "").trim();
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
 const model = new MuseClient({ apiKey, logger: quiet });
 
-/** The checkpoint's exact cases, not model-generated variants. */
-const cases = [
+/**
+ * The checkpoint's exact cases, not model-generated variants, plus V3-017's
+ * four ways of calling on Sotto. `raised` is how many cards Sotto is holding
+ * at the time, which is the only thing that separates a bare name said as an
+ * invitation from one said on the way to a question.
+ */
+const cases: { before: string; text: string; want: string; raised?: number }[] = [
   {
     "before": "",
     "text": "Hi, I'm Craig… it's a Saturday so the stock market is closed but I was wondering " +
@@ -98,6 +103,39 @@ const cases = [
     "before": "",
     "text": "thanks Soto that was helpful can you also check the weather for Saturday",
     "want": "request"
+  },
+  // V3-017: the room calling on Sotto to say what it is holding back.
+  {
+    "before": "",
+    "text": "Sotto go ahead",
+    "want": "call_on",
+    "raised": 1
+  },
+  {
+    "before": "",
+    "text": "Soto what have you got",
+    "want": "call_on",
+    "raised": 2
+  },
+  {
+    "before": "",
+    "text": "ok Soto anything",
+    "want": "call_on",
+    "raised": 1
+  },
+  // The same bare name, read two ways by what Sotto is holding.
+  {
+    "before": "",
+    "text": "Soto",
+    "want": "call_on",
+    "raised": 3
+  },
+  // Still a request when it names a subject, however much is raised.
+  {
+    "before": "",
+    "text": "Soto what does a marquee cost to hire for a weekend",
+    "want": "request",
+    "raised": 2
   }
 ];
 
@@ -107,11 +145,12 @@ function turn(text: string, id = "0:1", speaker = "A"): TurnUpdate {
 }
 
 describe.skipIf(apiKey === "")("V2-008 real address classification", () => {
-  it.each(cases)("$want: $text", async ({ before, text, want }) => {
+  it.each(cases)("$want: $text", async ({ before, text, want, raised }) => {
     const started = systemClock.now();
     const previous = before === "" ? [] : [turn(before.replace(/^[^:]+: /, ""), "0:0")];
     const result = await classifyAddress(model, {
       turn: turn(text), previous, speakers: { A: before.startsWith("EJ:") ? "EJ" : "Craig" },
+      raised: raised ?? 0,
     });
     console.log(`[address] ${want} ${Math.round(systemClock.now() - started)} ms: ${result.kind}`);
     expect(result.kind).toBe(want);

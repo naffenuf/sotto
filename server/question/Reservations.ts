@@ -101,6 +101,17 @@ export const ANSWER_STALE_MS = 90_000;
 export const ANSWER_STALE_TURNS = 6;
 
 /**
+ * How often a card the room called for looks again while something else is
+ * being said (V3-017).
+ *
+ * The only thing in its way is an utterance already open, and an utterance
+ * ending is not an event anything here hears about — the answer agent's own
+ * voice finishes without an ASR frame arriving to say so, exactly as playback
+ * does (V2-006). Half a second, because the room is waiting.
+ */
+export const CALLED_ON_RECHECK_MS = 500;
+
+/**
  * How many times a human voice may cut an answer off before it gives up.
  *
  * Twice. The first is somebody who happened to start talking at the same
@@ -124,6 +135,12 @@ export const MAX_ANSWER_YIELDS = 2;
  * fuse — twenty seconds, because a read-back is about the instant a decision
  * lands — and the one the frequency setting can silence outright when it
  * carries nothing.
+ *
+ * `called_on` is V3-017's and it is the odd one out: the room *asked*. So it
+ * is the only kind that waits for no gap, is not held back by the boldness or
+ * the frequency, charges nothing, and is not cancelled by a voice in the room
+ * — a question Sotto has been asked is answered under the wake-word rules,
+ * where only the barge-in (V2-007) stops it.
  */
 export const spokenContributionKinds = [
   "reserve",
@@ -131,6 +148,7 @@ export const spokenContributionKinds = [
   "answer",
   "correction",
   "readback",
+  "called_on",
 ] as const;
 export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
 
@@ -203,6 +221,11 @@ export interface SpokenContributionRecord {
   attached?: ReadBackAttachment | null;
   /** What was settled, on a `readback`: "six gardens, Saturday". */
   decision?: string;
+  /**
+   * The card being read out, on a `called_on` (V3-017), or absent when there
+   * was nothing raised to read.
+   */
+  cardId?: string;
   /** The turn the question was heard in, or the one a correction rests on. */
   turnId: string;
   /** Three to five words naming it; a correction's is its headline. */
@@ -353,6 +376,15 @@ interface Pending {
   decision?: string;
   /** The attachment's card already spent a contribution (V3-013). */
   alreadyPaid?: boolean;
+  /**
+   * The room asked for this line (V3-017), so none of the rules about
+   * speaking unasked apply to it: no gap to wait for, no setting that can
+   * silence it, no budget to spend, and no yielding to the voice that just
+   * asked.
+   */
+  asked?: boolean;
+  /** The card a `called_on` is reading out. */
+  cardId?: string;
 }
 
 export class Reservations {
@@ -381,6 +413,8 @@ export class Reservations {
   private readonly readBacks = new Set<string>();
   /** The utterance a human voice would cancel, while there is one. */
   private utterance: VoiceUtterance | undefined;
+  /** The line being said, while one is: whether a voice may take it away. */
+  private saying: Pending | undefined;
   /**
    * True from the moment a line is handed to the voice until its record is
    * written. The utterance itself only exists a few hundred milliseconds
@@ -564,6 +598,49 @@ export class Reservations {
     this.review();
   }
 
+  /**
+   * The room called on Sotto to say what it is holding (PRD V3-017).
+   *
+   * `line` is already written — {@link calledOnCardLine} read it off the card
+   * — so this says it at the first opportunity and nothing in between costs a
+   * model call. It is said under the rules for a question somebody asked out
+   * loud rather than the ones for speaking unasked: no gap to wait for
+   * (they stopped talking to ask), no still-current check (they just asked),
+   * nothing charged to the frequency's allowance, and no yielding — only the
+   * barge-in (V2-007) stops it, exactly as it stops an answer.
+   *
+   * It goes to the *front* of the queue: everything else waiting is waiting
+   * for a gap that nobody has asked about.
+   */
+  calledOn(input: {
+    /** The card being read out, or absent for "Nothing right now." */
+    cardId?: string;
+    /** The turn they asked in. */
+    turnId: string;
+    /** What the log calls it: the card's id, or the line itself. */
+    topic: string;
+    text: string;
+  }): void {
+    if (this.stopped || input.text.trim() === "") return;
+    const nowMs = this.clock.now();
+    this.waiting.unshift({
+      kind: "called_on",
+      ideaId: input.cardId ?? "",
+      turnId: input.turnId,
+      topic: input.topic,
+      text: input.text,
+      askedAtMs: nowMs,
+      sinceMs: nowMs,
+      pauseMs: 0,
+      expiry: null,
+      turnsWaited: 0,
+      yields: 0,
+      asked: true,
+      ...(input.cardId === undefined ? {} : { cardId: input.cardId }),
+    });
+    this.review();
+  }
+
   /** One line about one question, waiting from now, with nothing yet decided. */
   private line(
     ideaId: string,
@@ -609,8 +686,10 @@ export class Reservations {
       return !(line.attached !== null && line.alreadyPaid === true);
     }
     // A correction was already paid for by the interject card it was
-    // delivered as (V3-008), and a closing line is the end of a claim.
+    // delivered as (V3-008), and a closing line is the end of a claim. A card
+    // the room called for (V3-017) is not Sotto choosing to speak at all.
     if (line.kind === "no_answer" || line.kind === "correction") return false;
+    if (line.kind === "called_on") return false;
     return !this.spent.has(line.ideaId);
   }
 
@@ -694,7 +773,10 @@ export class Reservations {
    * is not retried.
    */
   yieldToHuman(): void {
-    if (!this.opening) return;
+    // V3-017: a card the room called for is answered under the wake-word
+    // rules, so the voice that asked for it does not take it away again.
+    // Only {@link Reservations.interrupt} stops one.
+    if (!this.opening || this.saying?.asked === true) return;
     this.yielded = true;
     this.logger.log(`[reserve] yielding to a voice in the room`);
     // A yield that arrives while the voice is still opening is remembered
@@ -713,7 +795,12 @@ export class Reservations {
   interrupt(): void {
     if (!this.opening) return;
     this.bargedIn = true;
-    this.yieldToHuman();
+    this.yielded = true;
+    this.logger.log(`[reserve] the barge-in took the floor back`);
+    // Not through {@link yieldToHuman}: a card the room called for is deaf to
+    // an ordinary voice (V3-017) and the barge-in is the one thing that still
+    // stops it, exactly as it stops an answer.
+    this.utterance?.cancel();
   }
 
   /** Resolves once everything being said has been said and written down. */
@@ -763,7 +850,11 @@ export class Reservations {
         this.skip(line, expired);
         continue;
       }
-      if (said || this.opening || !free || !inPause(pause, line.pauseMs)) {
+      // V3-017: a card the room called for waits for no gap — the person
+      // asking has just stopped talking — but still waits its turn behind
+      // whatever is already being said.
+      const gap = line.asked === true || inPause(pause, line.pauseMs);
+      if (said || this.opening || !free || !gap) {
         keep.push(line);
         continue;
       }
@@ -813,6 +904,10 @@ export class Reservations {
 
   /** Everything but the gap that can stop a line being said. */
   private reasonNotToSpeak(line: Pending): ReserveSkipReason | null {
+    // V3-017: the room asked for this one, so none of what follows applies.
+    // A `cautious` session is asking not to be interrupted, not to be
+    // refused an answer, and a budget is about what Sotto does unasked.
+    if (line.asked === true) return null;
     // A cautious session contributes on screen only, which is the same
     // promise {@link boldnessAllows} keeps for a candidate. A correction is
     // the boldest thing Sotto says, so it needs the setting it was queued
@@ -851,6 +946,7 @@ export class Reservations {
   /** Says one line, and records what the room got of it. */
   private say(line: Pending, nowMs: number): void {
     this.opening = true;
+    this.saying = line;
     this.yielded = false;
     this.bargedIn = false;
     this.speaking = this.clock.track(
@@ -870,12 +966,14 @@ export class Reservations {
     }
     if (utterance === null) {
       this.opening = false;
+      this.saying = undefined;
       this.skip(line, "unheard");
       return;
     }
     if (this.stopped) {
       utterance.cancel();
       this.opening = false;
+      this.saying = undefined;
       this.skip(line, "session_ended");
       return;
     }
@@ -884,7 +982,9 @@ export class Reservations {
     if (this.yielded) utterance.cancel();
     // V3-006: the room is about to hear something nobody asked for, which is
     // what makes an addressed "stop" in the next few seconds about *that*.
-    this.options.onSaying?.();
+    // Not a card the room called for (V3-017): "stop" after that is about the
+    // card, and being talked over while answering is not a hint to say less.
+    if (line.asked !== true) this.options.onSaying?.();
     // Playback starts inside ElevenLabs' first chunk (measured at 299 ms), so
     // this is where the line belongs on the conversation's timeline.
     const startMs = this.options.streamNow();
@@ -906,6 +1006,7 @@ export class Reservations {
     }
     this.utterance = undefined;
     this.opening = false;
+    this.saying = undefined;
     const yielded = this.yielded;
     const bargedIn = this.bargedIn;
     const heard = spoken === undefined ? "" : yielded ? spoken.spokenSoFar : spoken.text;
@@ -928,6 +1029,7 @@ export class Reservations {
       spoken: true,
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
+      ...(line.cardId === undefined ? {} : { cardId: line.cardId }),
       ...(line.kind === "readback" ? readBackFields(line) : {}),
       ...(line.kind === "answer"
         ? {
@@ -984,6 +1086,7 @@ export class Reservations {
       spoken: false,
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
+      ...(line.cardId === undefined ? {} : { cardId: line.cardId }),
       ...(line.kind === "readback" ? readBackFields(line) : {}),
       ...(line.kind === "answer" || line.kind === "correction" || line.kind === "readback"
         ? { pauseWaitMs: nowMs - line.sinceMs }
@@ -1004,6 +1107,12 @@ export class Reservations {
     if (this.waiting.length === 0) return;
     const due: number[] = [];
     for (const line of this.waiting) {
+      // V3-017: nothing about the conversation is holding this one up, so
+      // there is nothing to wait for but whatever is being said now.
+      if (line.asked === true) {
+        due.push(CALLED_ON_RECHECK_MS);
+        continue;
+      }
       if (!pause.speaking && pause.silentForMs < line.pauseMs) {
         due.push(line.pauseMs - pause.silentForMs);
       }

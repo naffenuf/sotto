@@ -491,6 +491,11 @@ export class ResearchCards {
  * `state` is always `ready`: a packet exists only once its search has come
  * back and its sources have been resolved, so nothing about it is still
  * arriving.
+ *
+ * `raised` is always set, which is V3-017's hand: a finding Sotto has looked
+ * up and not said is exactly the kind of thing the room should be able to
+ * call on it for. The one that *was* said out loud (V3-004) has the flag
+ * taken off it again when the sentence lands.
  */
 export function cardForPacket(packet: ResearchPacket, atMs: number): StageCard {
   return {
@@ -500,6 +505,7 @@ export function cardForPacket(packet: ResearchPacket, atMs: number): StageCard {
     createdAtMs: atMs,
     headline: researchCardHeadline(packet.title),
     teaser: packet.teaser,
+    raised: true,
     ...(packet.keyPoints.length === 0
       ? {}
       : { detailMd: packet.keyPoints.map((point) => `- ${point}`).join("\n") }),

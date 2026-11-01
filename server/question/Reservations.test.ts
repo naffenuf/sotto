@@ -1456,3 +1456,135 @@ describe("Reservations: reading a decision back (V3-013)", () => {
     expect(harness.records).toHaveLength(1);
   });
 });
+
+/**
+ * V3-017: a card the room called for. The whole of it is what does *not*
+ * apply — no gap, no setting, no budget, no yielding — because the room
+ * asked, and a question asked out loud is answered under the wake-word rules.
+ */
+describe("Reservations: called on (V3-017)", () => {
+  const held = {
+    cardId: "card-cand-1",
+    turnId: "0:9",
+    topic: "card-cand-1",
+    text: "Before six gardens: what if only one signs up?",
+  };
+
+  it("says it with nobody having stopped talking", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    // Mid-sentence: no gap at all, which would hold any other line back.
+    run.speak();
+    run.reservations.calledOn(held);
+    await run.tick();
+
+    expect(voice.said).toEqual([held.text]);
+    expect(run.reservations.waitingCount()).toBe(0);
+  });
+
+  it("records the card it read out and charges the frequency nothing", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice, { verdict: "cooldown" });
+    run.speak();
+    run.reservations.calledOn(held);
+    await run.tick();
+    voice.played();
+    await run.tick();
+
+    expect(voice.said).toEqual([held.text]);
+    expect(run.records).toHaveLength(1);
+    expect(run.records[0]).toMatchObject({
+      kind: "called_on",
+      cardId: "card-cand-1",
+      spoken: true,
+      yielded: false,
+      text: held.text,
+    });
+    // The budget said no, and it was said anyway: the room asked for it.
+    expect(run.spend.spent).toBe(0);
+    // And it is in the transcript as Sotto's line (V2-008a).
+    expect(run.spoken.map((turn) => turn.text)).toEqual([held.text]);
+  });
+
+  it("is not taken away by a voice in the room", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.calledOn(held);
+    await run.tick();
+    // The yield rule (V3-004) would cancel any other line here.
+    run.reservations.yieldToHuman();
+    await run.tick();
+    voice.played();
+    await run.tick();
+
+    expect(voice.cancelled).toBe(0);
+    expect(run.records[0]).toMatchObject({ spoken: true, yielded: false });
+  });
+
+  it("is still stopped by the barge-in (V2-007)", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.calledOn(held);
+    await run.tick();
+    run.reservations.interrupt();
+    await run.tick();
+
+    expect(voice.cancelled).toBe(1);
+    expect(run.records[0]).toMatchObject({ kind: "called_on", bargedIn: true });
+  });
+
+  it("says it at boldness cautious, where nothing unasked is said", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice, { settings: { boldness: "cautious" } });
+    run.reservations.calledOn(held);
+    await run.tick();
+    voice.played();
+    await run.tick();
+
+    expect(voice.said).toEqual([held.text]);
+  });
+
+  it("goes ahead of everything already waiting for a gap", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    // A claim waiting for a pause that has not come.
+    run.speak();
+    run.reservations.claim(idea, asked());
+    run.reservations.calledOn(held);
+    await run.tick();
+    voice.played();
+    await run.tick();
+
+    expect(voice.said).toEqual([held.text]);
+  });
+
+  it("does not open V3-006's window: the room asked for it", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.calledOn(held);
+    await run.tick();
+    voice.played();
+    await run.tick();
+
+    // `onSaying` is "the room is hearing something nobody asked for", which
+    // is what an addressed "stop" in the next fifteen seconds is about.
+    expect(run.sayings()).toBe(0);
+  });
+
+  it("says the short no when nothing is raised", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.calledOn({
+      turnId: "0:9",
+      topic: "nothing",
+      text: "Nothing right now.",
+    });
+    await run.tick();
+    voice.played();
+    await run.tick();
+
+    expect(voice.said).toEqual(["Nothing right now."]);
+    expect(run.records[0]).toMatchObject({ kind: "called_on", spoken: true });
+    expect(run.records[0]?.cardId).toBeUndefined();
+  });
+});

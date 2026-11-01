@@ -40,6 +40,13 @@
  * Nothing about *when* Sotto speaks changes: the acknowledgment still waits
  * for the final turn, because answering while somebody is still talking is
  * the one thing worse than answering slowly.
+ *
+ * V3-017's `call_on` joins those three. It is routed to {@link
+ * AddressWatcherOptions.onCallOn} rather than to the answer agent — there is
+ * no question to answer, only a card to read out — and a bare name read as
+ * one still arms the speaker, because the transcription cannot tell "Sotto?"
+ * from "Sotto" and the request this was the opening of may be two seconds
+ * away.
  */
 import type { SpeakerNames } from "../../shared/events.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
@@ -75,7 +82,10 @@ export const ADDRESS_SETTLE_MS = 600;
 export const ADDRESS_EXTENSION_WORDS = 3;
 
 /** What one classification came to, once it has been through the schema. */
-type AddressResult = { kind: "request" | "name_only" | "mention"; question: string };
+type AddressResult = {
+  kind: "request" | "name_only" | "mention" | "call_on";
+  question: string;
+};
 
 /** Effects are shared with the old wake watcher; only the intent decision changes. */
 export interface AddressWatcherOptions {
@@ -86,6 +96,18 @@ export interface AddressWatcherOptions {
   onListening: (listening: boolean) => void;
   onQuestion: (trigger: WakeTrigger) => void;
   onTiming: (record: Record<string, unknown>) => void;
+  /**
+   * How many cards Sotto is holding and has not said (V3-017). The
+   * classifier is told, because it is what separates a bare name said as an
+   * invitation to speak from one said on the way to a question.
+   */
+  raised?: () => number;
+  /**
+   * The room called on Sotto to say what it is holding (V3-017). Absent on a
+   * session that has nothing to say it with, in which case the verdict is
+   * simply logged.
+   */
+  onCallOn?: (trigger: WakeTrigger) => void;
 }
 
 interface ArmedSpeaker {
@@ -299,10 +321,26 @@ export class AddressWatcher {
       stage: "address", atMs: this.options.clock.now(), turnId: turn.turnId,
       kind: result.kind, latencyMs: this.wall.now() - started, fallback,
     });
-    if (result.kind === "name_only" && turn.speaker !== null) {
+    // A bare name read as a call on Sotto (V3-017) arms the speaker too: the
+    // transcription cannot tell "Sotto?" from "Sotto" and the next few
+    // seconds may still carry the request this was the start of.
+    if (
+      turn.speaker !== null &&
+      (result.kind === "name_only" ||
+        (result.kind === "call_on" && questionAfterName(turn.text) === ""))
+    ) {
       this.arm(turn, turn.speaker, arrivedAt);
     }
     this.publishListening();
+    if (result.kind === "call_on") {
+      const heardAtMs = this.heard.get(turn.turnId);
+      this.heard.delete(turn.turnId);
+      this.options.onCallOn?.({
+        turnId: turn.turnId, speaker: turn.speaker, question: "",
+        ...(heardAtMs === undefined ? {} : { heardAtMs }),
+      });
+      return;
+    }
     if (result.kind === "request") {
       const heardAtMs = this.heard.get(turn.turnId);
       this.heard.delete(turn.turnId);
@@ -379,7 +417,15 @@ export class AddressWatcher {
     const cancelTimeout = this.wall.setTimeout(() => controller.abort(), ADDRESS_TIMEOUT_MS);
     try {
       return AddressSchema.parse(await Promise.race([
-        this.options.classify({ turn, previous, speakers: this.options.speakers() }, controller.signal),
+        this.options.classify(
+          {
+            turn,
+            previous,
+            speakers: this.options.speakers(),
+            raised: this.options.raised?.() ?? 0,
+          },
+          controller.signal,
+        ),
         cancelled,
       ]));
     } catch {
@@ -442,7 +488,14 @@ function stale(result: AddressResult | null, extra: number): string | null {
   if (extra === 0) return null;
   // The request is in the words the early check never read.
   if (result.kind === "name_only") return "name_only";
-  if (result.kind === "mention" && extra > ADDRESS_EXTENSION_WORDS) return "extended";
+  // V3-017: a `call_on` is an invitation with no subject, so words the early
+  // check never read may well have turned it into a request.
+  if (
+    (result.kind === "mention" || result.kind === "call_on") &&
+    extra > ADDRESS_EXTENSION_WORDS
+  ) {
+    return "extended";
+  }
   return null;
 }
 

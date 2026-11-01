@@ -28,6 +28,7 @@ import { BoardPanel } from "./BoardPanel.js";
 import { Backstage } from "./Backstage.js";
 import { SessionControls } from "./SessionControls.js";
 import type { HistoryDetail, HistoryEntry } from "../../shared/history.js";
+import { RaisedHand, useRaisedHand } from "./RaisedHand.js";
 import { Stage } from "./Stage.js";
 import { StatusDots } from "./StatusDots.js";
 import { TranscriptPanel, type TurnHighlight } from "./TranscriptPanel.js";
@@ -48,6 +49,8 @@ export function App() {
   const mic = useRef<MicCapture | null>(null);
   /** The turn an evidence quote last asked the transcript to show (US-015). */
   const [cited, setCited] = useState<TurnHighlight | null>(null);
+  /** What Sotto is holding and has not said (V3-017). */
+  const hand = useRaisedHand(events.cards);
 
   const stopMic = useCallback(() => {
     mic.current?.stop();
@@ -200,6 +203,9 @@ export function App() {
           voiceMuted={events.settings.voiceMuted}
           onVoiceMutedChange={onVoiceMutedChange}
         />
+        {/* Beside the dots, as the PRD puts it: the one place that says
+            Sotto has something it has not said (V3-017). */}
+        <RaisedHand cards={hand.cards} onOpenAll={hand.openAll} />
         <StatusDots statuses={statuses} />
       </header>
       <div className="layout">
@@ -237,6 +243,7 @@ export function App() {
           cards={events.cards}
           onQuoteClick={onQuoteClick}
           onFeedback={onFeedback}
+          onOpen={(card) => hand.open(card.id)}
           footer={<AskBox onAsk={onAsk} />}
           banner={
             <>

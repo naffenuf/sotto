@@ -67,6 +67,12 @@ import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
 import { CandidateGate, DEFAULT_GATE_MODE, type GateMode } from "../interject/CandidateGate.js";
 import { correctedClaim, spokenCorrection } from "../interject/corrections.js";
+import {
+  NOTHING_RAISED_LINE,
+  RaisedHand,
+  calledOnCardLine,
+  calledOnPacketLine,
+} from "./raisedHand.js";
 import { cardForInterjection, deliveredCardId } from "../interject/delivery.js";
 import { InterjectionPolicy, type Interjection } from "../interject/InterjectionPolicy.js";
 import { Observer } from "../interject/Observer.js";
@@ -283,6 +289,12 @@ interface ModelLoops {
   answers: AnswerAgent | null;
   /** Every card the policy delivered, by card id (US-015). */
   deliveries: Map<string, Delivered>;
+  /**
+   * What Sotto is holding and has not said (V3-017), with the sentence each
+   * one would be read out in. Built even without a model client, so that
+   * "Sotto, go ahead" always has somewhere to land.
+   */
+  hand: RaisedHand;
   /**
    * What Sotto decides to look up, and how much of it (V2-012).
    *
@@ -1103,6 +1115,34 @@ export class SessionManager {
       classify: (input, signal) => classifyAddress(model, input, signal),
       speakers: () => this.bus.speakerNames(),
       onTiming: (record) => store.writer?.appendTiming?.(record),
+      // V3-017: how many things Sotto is holding, which is what lets a turn
+      // that is only the name be read as "go on, then".
+      raised: () => loops.hand.count(),
+      // And the call itself: the newest raised card, read out as it reads.
+      // Said under the rules for a question somebody asked out loud, because
+      // that is what this is.
+      onCallOn: (trigger) => {
+        if (!current()) return;
+        loops.policy?.wakePhraseDetected();
+        const held = loops.hand.latest();
+        store.writer?.appendTiming?.({
+          stage: "wake_call_on",
+          atMs: clock.now(),
+          turnId: trigger.turnId,
+          raised: loops.hand.count(),
+          cardId: held?.cardId ?? null,
+        });
+        this.logger.log(
+          `[wake] ${info.id} ${trigger.turnId} called on Sotto` +
+            (held === null ? " with nothing raised" : `: ${held.cardId}`),
+        );
+        loops.reservations?.calledOn({
+          ...(held === null ? {} : { cardId: held.cardId }),
+          turnId: trigger.turnId,
+          topic: held?.cardId ?? "nothing",
+          text: held?.line ?? NOTHING_RAISED_LINE,
+        });
+      },
     });
     loops.address = address;
     return address;
@@ -1145,6 +1185,10 @@ export class SessionManager {
     // Built either way: judgment is its own model (V2-010), and a session
     // with no Muse Spark key can still have Glimmer on this Mac.
     const judgment = this.judgmentRouter(info, model);
+    // V3-017: the queue of things Sotto is holding, kept whether or not there
+    // is a model — a session with no key notices nothing, so the hand simply
+    // stays down.
+    const hand = new RaisedHand();
     if (model === null) {
       this.logger.warn(
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
@@ -1159,6 +1203,7 @@ export class SessionManager {
         policy: null,
         answers: null,
         deliveries: new Map(),
+        hand,
         research: null,
         researchRunner: null,
         researchCards: null,
@@ -1194,6 +1239,7 @@ export class SessionManager {
       // gets without anybody being spoken to (V3-008).
       const card: StageCard = { ...delivered.card, raised: true, forward: true, note };
       deliveries.set(cardId, { ...delivered, card });
+      hand.observe(card, calledOnCardLine(card), clock.now());
       this.logger.log(`[readback] ${info.id} pinned ${cardId} beside: ${decision}`);
       if (this.current?.info.id === info.id) this.bus.publishCard(card);
     };
@@ -1245,7 +1291,7 @@ export class SessionManager {
       // still shown either way, and `raised` on it (set in
       // `cardForInterjection`) is what V3-017's hand counts.
       onDeliver: (interjection) => {
-        this.deliver(info, deliveries, interjection);
+        this.deliver(info, deliveries, hand, interjection);
         steering.noteContribution();
         // V3-013: a read-back already pinned this one beside a decision while
         // the policy was still holding it, so the card goes out pinned.
@@ -1364,6 +1410,15 @@ export class SessionManager {
     // on a budget of its own. The card is published while this session still
     // owns the stage, which an answer's is too: a search that finishes in the
     // last seconds of a conversation is read after Stop, not before it.
+    /**
+     * Which card each idea's packet landed on (V3-017), so the hand can come
+     * down when the answer to that question is said out loud (V3-004).
+     *
+     * The card id is not derivable: a question the room wondered aloud fills
+     * in the *question's* thinking card rather than taking one of its own
+     * (V3-003).
+     */
+    const researchCardByIdea = new Map<string, string>();
     const researchCards = new ResearchCards({
       clock,
       pauseState,
@@ -1373,6 +1428,13 @@ export class SessionManager {
       logger: this.logger,
       onRecord: (record) => onResearch(record),
       onDeliver: (card, packet) => {
+        // V3-017: a finished search Sotto has not said out loud is the other
+        // half of what the room can call on, read out as the packet's own
+        // spoken line. A thinking card and a search that came back with
+        // nothing carry no `raised`, so they leave the queue rather than
+        // joining it.
+        hand.observe(card, packet === null ? "" : calledOnPacketLine(packet), clock.now());
+        if (packet !== null) researchCardByIdea.set(packet.ideaId, card.id);
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
         onTiming({ stage: "research_publish", atMs: clock.now(), packetId: packet?.id ?? null, cardId: card.id, state: card.state, published: this.last?.sessionId === info.id });
       },
@@ -1430,8 +1492,11 @@ export class SessionManager {
         // V3-006: everything said here is unprompted, so a line the room
         // actually heard opens the fifteen-second window an addressed "stop"
         // is read inside, and a line a voice in the room cut off is the hint
-        // that two of, inside ten minutes, turn Sotto down.
-        steering.observe(record);
+        // that two of, inside ten minutes, turn Sotto down. Everything but a
+        // card the room called for (V3-017), which is an answer to a direct
+        // question: neither its "stop" nor its yields are about how much
+        // Sotto says unasked.
+        if (record.kind !== "called_on") steering.observe(record);
         // V3-004: once the answer has been said, shown or written off, nothing
         // more will be said about this question — so stop paying for a verdict
         // on every remaining final turn. A measured run that left the watcher
@@ -1440,12 +1505,25 @@ export class SessionManager {
         if (record.kind === "answer" && record.retrying !== true) {
           stillCurrent.forget(record.ideaId);
         }
+        // V3-017: an answer the room heard is no longer something Sotto is
+        // holding, so its research card lowers its hand.
+        if (record.kind === "answer" && record.spoken) {
+          const cardId = researchCardByIdea.get(record.ideaId);
+          if (cardId !== undefined) this.lowerHand(info, deliveries, hand, cardId);
+        }
+        // V3-017: and a card that has just been read out because the room
+        // called for it.
+        if (record.kind === "called_on" && record.spoken && record.cardId !== undefined) {
+          this.lowerHand(info, deliveries, hand, record.cardId);
+        }
         // V3-008: a correction Sotto queued and then never said — no pause,
         // cut off twice, the room moved on — is back to being something it is
         // holding, so the hand goes up for it after all.
         if (record.kind === "correction" && record.retrying !== true) {
           stillCurrent.forget(record.ideaId);
-          if (!record.spoken) this.raiseHand(info, deliveries, record.ideaId);
+          if (!record.spoken) {
+            this.raiseHand(info, deliveries, hand, clock.now(), record.ideaId);
+          }
         }
         // V3-013: the two limits count what the room really heard, so the
         // read-backs are told what became of each line — and a decision
@@ -1612,7 +1690,7 @@ export class SessionManager {
       // the read-back arrives with the turn rather than with the board.
       onDecisionClosing: (closing) => readBacks.closing(closing),
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations, stillCurrent, readBacks, steering };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, reservations, stillCurrent, readBacks, steering };
   }
 
   /**
@@ -1742,6 +1820,7 @@ export class SessionManager {
   private deliver(
     info: SessionInfo,
     deliveries: Map<string, Delivered>,
+    hand: RaisedHand,
     interjection: Interjection,
   ): void {
     const candidate = interjection.candidate;
@@ -1755,6 +1834,9 @@ export class SessionManager {
     this.logger.log(
       `[stage] ${info.id} ${interjection.level} ${card.id}: ${card.headline}`,
     );
+    // V3-017: a correction shown and not said is something the room can call
+    // on, read out as the card reads.
+    hand.observe(card, calledOnCardLine(card), interjection.atMs);
     if (this.current?.info.id === info.id) this.bus.publishCard(card);
   }
 
@@ -1770,6 +1852,8 @@ export class SessionManager {
   private raiseHand(
     info: SessionInfo,
     deliveries: Map<string, Delivered>,
+    hand: RaisedHand,
+    atMs: number,
     candidateId: string,
   ): void {
     const cardId = deliveredCardId(candidateId);
@@ -1777,7 +1861,31 @@ export class SessionManager {
     if (delivered === undefined || delivered.card.raised === true) return;
     const card: StageCard = { ...delivered.card, raised: true };
     deliveries.set(cardId, { ...delivered, card });
+    hand.observe(card, calledOnCardLine(card), atMs);
     if (this.current?.info.id === info.id) this.bus.publishCard(card);
+  }
+
+  /**
+   * The hand comes down for one card (V3-017): it has just been said, so the
+   * stage is told and the queue forgets it.
+   *
+   * Republished rather than quietly dropped, because the browser derives the
+   * count from the cards it has — and the card itself stays on the stage,
+   * which is the whole promise of V3-008.
+   */
+  private lowerHand(
+    info: SessionInfo,
+    deliveries: Map<string, Delivered>,
+    hand: RaisedHand,
+    cardId: string,
+  ): void {
+    hand.lower(cardId);
+    const shown = this.bus.cardState().find((one) => one.id === cardId);
+    if (shown === undefined || shown.raised !== true) return;
+    const card: StageCard = { ...shown, raised: false };
+    const delivered = deliveries.get(cardId);
+    if (delivered !== undefined) deliveries.set(cardId, { ...delivered, card });
+    if (this.last?.sessionId === info.id) this.bus.publishCard(card);
   }
 
   /**

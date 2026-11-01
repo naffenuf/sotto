@@ -3208,3 +3208,188 @@ describe("SessionManager: read-backs at decision points (V3-013)", () => {
     expect(voice.utterances).toEqual([]);
   }, 60_000);
 });
+
+/**
+ * V3-017 through the whole pipeline: a correction Sotto is holding raises its
+ * hand, and "Sotto, go ahead" has it read out loud.
+ *
+ * `ask-search` is the capture where somebody says Sotto's name six lines in,
+ * so the observer has looked twice by then and the policy has put cards up.
+ * The address classifier is told to read that line as a `call_on`, which is
+ * what the real one does for "Sotto, go ahead" (its integration test checks
+ * the wording; this checks the wiring).
+ */
+describe("SessionManager: raising a hand and being called on (V3-017)", () => {
+  /** Offers `candidates` on its first observer look, then nothing. */
+  class HoldingModel implements ModelClient {
+    private looked = false;
+
+    constructor(private readonly candidates: unknown[]) {}
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      if (call.label === "address") return { kind: "call_on", question: "" };
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "research-planner") return { ideas: [] };
+      if (call.label === "question") return { kind: "none", question: "", topic: "" };
+      if (call.label === "still-current") {
+        return { verdict: "current", agrees: false, why: "nobody has moved on" };
+      }
+      if (call.label === "observer" && !this.looked) {
+        this.looked = true;
+        return { candidates: this.candidates };
+      }
+      return { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("nothing here is verified");
+    }
+
+    async prose(): Promise<never> {
+      throw new Error("a called-on card is read off the card, not written");
+    }
+  }
+
+  function writer(timing: Record<string, unknown>[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: () => {},
+      appendTiming: (record: Record<string, unknown>) => timing.push(record),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  function noticed(headline: string, detail: string): unknown {
+    return {
+      type: "contradiction",
+      headline,
+      detail,
+      whyNow: "the price is being written down",
+      evidenceTurnIds: ["0:3"],
+      relatedBoardItemIds: [],
+      scores: { relevance: 0.95, novelty: 0.9, importance: 0.9, confidence: 0.9 },
+    };
+  }
+
+  async function replay(candidates: unknown[]): Promise<{
+    cards: StageCard[];
+    timing: Record<string, unknown>[];
+    utterances: string[];
+    turns: TurnUpdate[];
+  }> {
+    const bus = new EventBus(quiet);
+    const timing: Record<string, unknown>[] = [];
+    const cards: StageCard[] = [];
+    const turns: TurnUpdate[] = [];
+    const utterances: string[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+      if (event.type === "turn") turns.push(event.turn);
+    });
+    const voice: VoiceOut = {
+      begin: () => {
+        let said = "";
+        return Promise.resolve<VoiceUtterance>({
+          id: `v${utterances.length + 1}`,
+          append: (text) => { said += text; },
+          firstAudioMs: () => (said === "" ? null : 10),
+          cancel: () => {},
+          finish: () => {
+            utterances.push(said);
+            return Promise.resolve({
+              reason: "complete" as const,
+              text: said,
+              spokenSoFar: said,
+              firstAudioMs: said === "" ? null : 10,
+            });
+          },
+        });
+      },
+    };
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer(timing),
+      createModel: () => new HoldingModel(candidates),
+      createVoice: () => voice,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) { off(); resolve(); }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    await ended;
+    return { cards, timing, utterances, turns };
+  }
+
+  it("reads out the one thing it is holding", async () => {
+    const run = await replay([
+      noticed("A $12 solo tier does not fit the $4,000 floor", "You would need 333 solos."),
+    ]);
+
+    // The card went up with its hand raised: shown, not said (V3-008).
+    const held = run.cards.filter((card) => card.raised === true);
+    expect(held).toHaveLength(1);
+    const call = run.timing.filter((record) => record["stage"] === "wake_call_on");
+    expect(call).toHaveLength(1);
+    expect(call[0]).toMatchObject({ raised: 1, cardId: held[0]?.id });
+    // And it was read out, headline then detail, under the card's own id.
+    const spoken = run.timing.filter(
+      (record) => record["stage"] === "spoken_contribution" && record["kind"] === "called_on",
+    );
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0]).toMatchObject({ cardId: held[0]?.id, spoken: true, yielded: false });
+    expect(run.utterances).toEqual([
+      "A $12 solo tier does not fit the $4,000 floor. You would need 333 solos.",
+    ]);
+    // Said, so the hand comes down: the card is republished without the flag.
+    const last = run.cards.filter((card) => card.id === held[0]?.id).at(-1);
+    expect(last?.raised).toBe(false);
+    // And the line is in the transcript as Sotto's (V2-008a).
+    expect(run.turns.filter((turn) => isSottoTurn(turn)).map((turn) => turn.text)).toContain(
+      "A $12 solo tier does not fit the $4,000 floor. You would need 333 solos.",
+    );
+  }, 60_000);
+
+  it("reads out the most recent of several", async () => {
+    const run = await replay([
+      noticed("The $12 solo tier does not fit the floor", "You would need 333 solos."),
+      noticed("Nobody has said who writes the copy", "It has been dropped twice."),
+    ]);
+
+    const held = run.cards.filter((card) => card.raised === true);
+    expect(held.length).toBeGreaterThanOrEqual(2);
+    const call = run.timing.find((record) => record["stage"] === "wake_call_on");
+    expect(call?.["raised"]).toBeGreaterThanOrEqual(2);
+    // The newest one Sotto was holding when the room asked, which is the last
+    // card to have gone up before the call.
+    expect(run.utterances).toEqual([
+      "Nobody has said who writes the copy. It has been dropped twice.",
+    ]);
+  }, 60_000);
+
+  it("says so when it is holding nothing", async () => {
+    const run = await replay([]);
+
+    expect(run.cards.filter((card) => card.raised === true)).toEqual([]);
+    expect(run.timing).toContainEqual(
+      expect.objectContaining({ stage: "wake_call_on", raised: 0, cardId: null }),
+    );
+    expect(run.utterances).toEqual(["Nothing right now."]);
+  }, 60_000);
+});

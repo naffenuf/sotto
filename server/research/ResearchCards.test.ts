@@ -110,6 +110,9 @@ describe("cardForPacket", () => {
       createdAtMs: 12_345,
       headline: "Research ready: Otter and Fireflies charge $8–19 a seat",
       teaser: "All three publish per-seat pricing, and two charge extra for analytics.",
+      // V3-017: a finding Sotto has not said out loud is one of the things
+      // the room can call on it for.
+      raised: true,
       detailMd: "- Otter Business is $20 a seat, $16 annually\n- Granola is $10 a seat",
       citations: [{ url: "https://otter.ai/pricing", title: "Otter.ai — Pricing" }],
     });

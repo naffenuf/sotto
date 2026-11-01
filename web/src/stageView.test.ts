@@ -5,6 +5,7 @@ import {
   arrangeCards,
   foldCard,
   nextTrayDueAt,
+  raisedCards,
   trayLabel,
   type StageCardView,
 } from "./stageView.js";
@@ -131,5 +132,51 @@ describe("foldCard", () => {
   it("drops the oldest card once the cap is reached", () => {
     const folded = foldCard(stage, card("card-ans-2", "answer", 0), NOW, 2);
     expect(folded.map((one) => one.id)).toEqual(["card-ans-1", "card-ans-2"]);
+  });
+});
+
+/**
+ * V3-017's count. The PRD's three ways of taking a hand down, one per test:
+ * the reader opened it, the server said it, and it aged off the stage.
+ */
+describe("raisedCards", () => {
+  const held = (id: string, variant: StageCard["variant"], receivedAtMs: number) => ({
+    ...card(id, variant, receivedAtMs),
+    raised: true,
+  });
+  const none = new Set<string>();
+
+  it("counts only what Sotto is holding, newest first", () => {
+    const cards = [
+      held("card-1", "glow", NOW - 20_000),
+      card("card-ans-1", "answer", NOW - 10_000),
+      held("card-2", "interject", NOW - 5_000),
+    ];
+    expect(raisedCards(cards, none, NOW).map((one) => one.id)).toEqual(["card-2", "card-1"]);
+  });
+
+  it("stops counting a card the reader opened", () => {
+    const cards = [held("card-1", "glow", NOW - 1_000), held("card-2", "interject", NOW)];
+    expect(raisedCards(cards, new Set(["card-1"]), NOW).map((one) => one.id)).toEqual([
+      "card-2",
+    ]);
+  });
+
+  it("stops counting a card the server has said and republished", () => {
+    const spoken = { ...card("card-1", "interject", NOW), raised: false };
+    expect(raisedCards([spoken], none, NOW)).toEqual([]);
+  });
+
+  it("stops counting a glow that has aged into the tray", () => {
+    const stale = held("card-1", "glow", NOW - QUIET_TRAY_MS - 1_000);
+    expect(raisedCards([stale], none, NOW)).toEqual([]);
+    // An interjection does not age off the stage, so its hand stays up.
+    const kept = held("card-2", "interject", NOW - QUIET_TRAY_MS - 1_000);
+    expect(raisedCards([kept], none, NOW).map((one) => one.id)).toEqual(["card-2"]);
+  });
+
+  it("is empty when Sotto is holding nothing", () => {
+    expect(raisedCards([card("card-ans-1", "answer", NOW)], none, NOW)).toEqual([]);
+    expect(raisedCards([], none, NOW)).toEqual([]);
   });
 });

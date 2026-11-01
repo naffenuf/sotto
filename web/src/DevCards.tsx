@@ -7,7 +7,9 @@
  * Playwright check (`npm run verify:cards`) drives, so the layout is checked
  * against the real component rather than a mock of it.
  */
+import { useRef } from "react";
 import { Card } from "./Card.js";
+import { RaisedHand, useRaisedHand } from "./RaisedHand.js";
 import { Stage } from "./Stage.js";
 import { QUIET_TRAY_MS, type StageCardView } from "./stageView.js";
 import type { StageCard } from "../../shared/index.js";
@@ -102,12 +104,16 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
     },
     {
       title: "interject — ready",
-      note: "Accent border, “Sotto noticed…”, a why-now line and the evidence it rests on.",
+      note:
+        "Accent border, “Sotto noticed…”, a why-now line and the evidence it" +
+        " rests on. Held rather than said (V3-008), so it is one of the things" +
+        " the header's raised hand counts (V3-017).",
       card: {
         id: "i-ready",
         variant: "interject",
         state: "ready",
         createdAtMs: now,
+        raised: true,
         headline: "A $12 solo tier does not fit the $4,000 a month floor you set",
         whyNow: "the price is about to be written down",
         detailMd:
@@ -157,6 +163,7 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
         variant: "glow",
         state: "ready",
         createdAtMs: now,
+        raised: true,
         headline: "Nobody has said who writes the digest copy",
         whyNow: "the digest was just decided",
         detailMd: "It has come up twice and been dropped twice, both times near a decision.",
@@ -227,6 +234,7 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
         variant: "research",
         state: "ready",
         createdAtMs: now,
+        raised: true,
         headline: "Research ready: Otter, Fireflies and Granola charge $8\u201319 a seat",
         teaser:
           "All three publish per-seat pricing with a free tier, and two of them" +
@@ -373,7 +381,7 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
 }
 
 export function DevCards() {
-  const now = Date.now();
+  const now = useRef(Date.now()).current;
   const cases = samples(now);
 
   /**
@@ -400,11 +408,16 @@ export function DevCards() {
     },
   ];
 
+  const hand = useRaisedHand(stageCards);
+
   return (
     <div className="dev">
       <header className="header">
         <h1 className="brand">Sotto</h1>
         <p className="dev__title">/dev/cards — every variant and state</p>
+        {/* V3-017: three of the stage's cards are held and not said, and two
+            more have aged into the tray and so no longer count. */}
+        <RaisedHand cards={hand.cards} onOpenAll={hand.openAll} />
         <a className="dev__back" href="/">
           back to the app
         </a>
@@ -415,7 +428,7 @@ export function DevCards() {
           Newest on top. Glows older than two minutes have collapsed into the tray.
         </p>
         <div className="dev__stage" data-testid="dev-stage">
-          <Stage cards={stageCards} />
+          <Stage cards={stageCards} onOpen={(card) => hand.open(card.id)} />
         </div>
       </section>
       <section className="dev__section">

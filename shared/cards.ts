@@ -19,8 +19,10 @@
  * - `glow`: a quiet thought, one muted line until somebody opens it.
  * - `research`: background research that is ready to read (V2-014). Compact
  *   and closed like a glow — "Research ready: …" plus the teaser — and it
- *   opens into the key points, the sources and any visual. Never spoken, and
- *   never a decision the policy took, so it carries no feedback buttons.
+ *   opens into the key points, the sources and any visual. Never *unasked*
+ *   spoken — V3-004 says one the room wondered aloud, and V3-017 reads one
+ *   out when the room calls on it — and never a decision the policy took, so
+ *   it carries no feedback buttons.
  * - `notice`: Sotto talking about itself rather than about the conversation —
  *   the opening hello when the voice is muted, the one nudge for names
  *   (V2-009), a wrap-up nothing could say out loud (V2-018) and the note
@@ -156,16 +158,21 @@ export interface StageCard {
    */
   note?: string;
   /**
-   * Sotto has this and has not said it out loud (V3-008).
+   * Sotto has this and has not said it out loud (V3-008, V3-017).
    *
    * Set on every card the interjection policy delivers — a contradiction, a
    * wrong number, an assumption nobody checked, a thread they dropped, a
    * question nobody answered — except the one a `bold` session says in a
-   * sentence. It is what V3-017's raised hand counts: the stage shows that
-   * Sotto is holding something, and anybody can call on it, which is how a
-   * correction reaches the room's ears at the default settings. A card that
-   * was queued to be spoken and then never was — no pause, cut off twice, the
-   * room moved on — is published again with this set.
+   * sentence, and on every `research` card, which is a finding Sotto looked
+   * up and did not say. It is what V3-017's raised hand counts: the header
+   * shows that Sotto is holding something, and anybody can call on it, which
+   * is how a correction reaches the room's ears at the default settings.
+   *
+   * It goes both ways. A card that was queued to be spoken and then never was
+   * — no pause, cut off twice, the room moved on — is published again with
+   * this set; and a card that *was* said, because the room called on it or
+   * because a `bold` session spoke it, is published again with it `false`.
+   * The card itself stays on the stage either way.
    */
   raised?: boolean;
   /**

@@ -28,6 +28,8 @@ export interface StageProps {
   onQuoteClick?: ((turnId: string) => void) | undefined;
   /** Files the group's verdict on a card (US-015). */
   onFeedback?: ((card: StageCard, verdict: FeedbackVerdict) => void) | undefined;
+  /** The reader opened a card, so the raised hand stops counting it (V3-017). */
+  onOpen?: ((card: StageCard) => void) | undefined;
 }
 
 export function Stage({
@@ -37,6 +39,7 @@ export function Stage({
   footer,
   onQuoteClick,
   onFeedback,
+  onOpen,
 }: StageProps) {
   const now = useTrayClock(cards);
   const { stack, tray } = useMemo(() => arrangeCards(cards, now), [cards, now]);
@@ -56,6 +59,7 @@ export function Stage({
                 card={card}
                 onQuoteClick={onQuoteClick}
                 onFeedback={onFeedback}
+                onOpen={onOpen}
               />
             ))}
           </div>
@@ -79,6 +83,7 @@ export function Stage({
                     card={card}
                     onQuoteClick={onQuoteClick}
                     onFeedback={onFeedback}
+                    onOpen={onOpen}
                   />
                 ))}
               </div>

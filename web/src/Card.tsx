@@ -99,6 +99,14 @@ export interface CardProps {
    * nobody can give an opinion on is better than one whose buttons do nothing.
    */
   onFeedback?: ((card: StageCard, verdict: FeedbackVerdict) => void) | undefined;
+  /**
+   * The reader has opened this card (V3-017), so whatever Sotto was holding
+   * in it has been heard from and the raised hand stops counting it.
+   *
+   * Only ever called for a card the reader actually expanded: a card that
+   * arrives already open was not opened by anybody.
+   */
+  onOpen?: ((card: StageCard) => void) | undefined;
 }
 
 export function Card({
@@ -106,6 +114,7 @@ export function Card({
   defaultExpanded = false,
   onQuoteClick,
   onFeedback,
+  onOpen,
 }: CardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded || card.forward === true);
   // V2-015: somebody asked for this research, so it opens where it stands —
@@ -127,7 +136,10 @@ export function Card({
         data-state={card.state}
         data-expanded="false"
         aria-expanded={false}
-        onClick={() => setExpanded(true)}
+        onClick={() => {
+          setExpanded(true);
+          onOpen?.(card);
+        }}
         title={research ? "Open what Sotto found" : "Open this quiet thought"}
       >
         <span className={research ? "card__research-mark" : "card__glow-dot"} aria-hidden="true">

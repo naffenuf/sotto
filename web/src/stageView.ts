@@ -70,6 +70,34 @@ export function arrangeCards(cards: readonly StageCardView[], now: number): Stag
   return { stack, tray };
 }
 
+/**
+ * What Sotto is holding and has not said (PRD V3-017), newest first — the
+ * stage's own order, so the first of them is the one a `call_on` would be
+ * answered with.
+ *
+ * Three things take a card off this list, which is the whole of the PRD's
+ * "opened, spoken or expired":
+ *
+ *   - **Opened**: the reader expanded it, so they have heard what Sotto had.
+ *     That is the one of the three only the browser can know, which is why
+ *     the count lives here rather than on the server.
+ *   - **Spoken**: the server republishes the card without
+ *     {@link StageCard.raised} the moment the sentence lands — because it was
+ *     said in a `bold` session (V3-008), or because the room called on it.
+ *   - **Expired**: a glow that has aged into the tray is no longer on the
+ *     stage, and a hand still up for it would be asking about a thought the
+ *     conversation left behind two minutes ago.
+ */
+export function raisedCards(
+  cards: readonly StageCardView[],
+  opened: ReadonlySet<string>,
+  now: number,
+): StageCardView[] {
+  return arrangeCards(cards, now).stack.filter(
+    (card) => card.raised === true && !opened.has(card.id),
+  );
+}
+
 /** The tray's label. One thought is not "1 quiet thoughts". */
 export function trayLabel(count: number): string {
   return `${count} quiet thought${count === 1 ? "" : "s"}`;
