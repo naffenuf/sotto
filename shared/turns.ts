@@ -40,6 +40,68 @@ export interface TurnUpdate {
    * merging two people.
    */
   speakerMappingUncertain: boolean;
+  /**
+   * True when this is **Sotto's own speech** rather than something the
+   * microphone heard (V2-008a): its text is what Sotto was given to say, and
+   * its `startMs` is where playback started on this same stream timeline.
+   *
+   * Everything that listens to the room has to skip these — the wake and
+   * address classifiers, barge-in, the self-echo matcher's human side,
+   * speaker introductions and the eval's turn matching — because Sotto
+   * answering its own name would be a loop. The board does read them, labeled
+   * {@link SOTTO_SPEAKER}, so a fact Sotto established can reach the notes.
+   */
+  sotto?: true;
+  /**
+   * True when a {@link sotto} entry was cut off mid-sentence, so its `text` is
+   * only what the room actually heard (`spokenSoFar`) and not everything Sotto
+   * was writing.
+   */
+  interrupted?: true;
+}
+
+/** The speaker label Sotto's own lines carry, in every view of a transcript. */
+export const SOTTO_SPEAKER = "Sotto";
+
+/** Whether this turn is Sotto talking rather than a person. */
+export function isSottoTurn(turn: TurnUpdate): boolean {
+  return turn.sotto === true;
+}
+
+/** The turn id one of Sotto's utterances takes; derived, never counted. */
+export function sottoTurnId(utteranceId: string): string {
+  return `sotto:${utteranceId}`;
+}
+
+/**
+ * One line of Sotto's own speech, as a final turn on the conversation's
+ * timeline (V2-008a).
+ *
+ * `startMs` is the stream clock — the one `TurnUpdate.startMs` always means —
+ * read at the moment playback started, never the server's uptime; `endMs` is
+ * the same instant, because the entry is written when the utterance opened
+ * and nothing later moves it.
+ */
+export function sottoTurn(options: {
+  /** The utterance this was, e.g. an answer id. */
+  utteranceId: string;
+  /** What Sotto said: its own source text, or `spokenSoFar` if cut off. */
+  text: string;
+  /** Stream time when playback started. */
+  startMs: number;
+  interrupted: boolean;
+}): TurnUpdate {
+  return {
+    turnId: sottoTurnId(options.utteranceId),
+    speaker: SOTTO_SPEAKER,
+    text: options.text.replace(/\s+/g, " ").trim(),
+    final: true,
+    startMs: options.startMs,
+    endMs: options.startMs,
+    speakerMappingUncertain: false,
+    sotto: true,
+    ...(options.interrupted ? { interrupted: true as const } : {}),
+  };
 }
 
 /** Whether anybody is talking, and for how long nobody has been. */

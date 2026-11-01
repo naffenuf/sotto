@@ -39,6 +39,7 @@ export type {
   PlantedMoment,
   WakeQuestion,
 } from "./fixtures.js";
+export { SOTTO_SPEAKER, isSottoTurn, sottoTurn, sottoTurnId } from "./turns.js";
 export type { PauseState, TurnUpdate } from "./turns.js";
 export {
   BOARD_OPS_SCHEMA_NAME,

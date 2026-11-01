@@ -4,8 +4,14 @@ import { join, resolve, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { SessionInfo, SessionRecord } from "../../shared/session.js";
-import type { TurnUpdate } from "../../shared/turns.js";
-import { SESSION_FILES, SessionStore, clockStamp, folderTimestamp } from "./SessionStore.js";
+import { SOTTO_SPEAKER, sottoTurn, type TurnUpdate } from "../../shared/turns.js";
+import {
+  INTERRUPTED_MARKER,
+  SESSION_FILES,
+  SessionStore,
+  clockStamp,
+  folderTimestamp,
+} from "./SessionStore.js";
 
 const quiet = { log: () => {}, warn: () => {} };
 
@@ -217,6 +223,69 @@ describe("SessionStore transcript.md", () => {
     saved.renameSpeaker("A", "   ");
     expect(read(saved.dir, SESSION_FILES.transcript)).toBe("**[00:00] A:** First.\n");
     expect(session(saved.dir).speakers["A"]).toEqual({ name: null });
+  });
+});
+
+describe("SessionStore transcript.md and Sotto's own speech (V2-008a)", () => {
+  it("labels it Sotto without making Sotto a speaker anybody can rename", () => {
+    const saved = store();
+    saved.appendTurn(turn({ turnId: "0:0", speaker: "A", text: "What do rivals charge?" }));
+    saved.appendTurn(
+      sottoTurn({
+        utteranceId: "ans-1",
+        text: "They charge five to twenty-five dollars a seat.",
+        startMs: 4_000,
+        interrupted: false,
+      }),
+    );
+
+    expect(lines(read(saved.dir, SESSION_FILES.transcript))).toEqual([
+      "**[00:00] A:** What do rivals charge?",
+      "**[00:04] Sotto:** They charge five to twenty-five dollars a seat.",
+    ]);
+    // Only the room's labels are speakers; Sotto is not one of them.
+    expect(Object.keys(session(saved.dir).speakers)).toEqual(["A"]);
+  });
+
+  it("marks a line the room only heard part of", () => {
+    const saved = store();
+    saved.appendTurn(
+      sottoTurn({ utteranceId: "ans-1", text: "They charge five to", startMs: 0, interrupted: true }),
+    );
+    expect(read(saved.dir, SESSION_FILES.transcript)).toBe(
+      `**[00:00] ${SOTTO_SPEAKER}:** They charge five to ${INTERRUPTED_MARKER}\n`,
+    );
+  });
+
+  it("keeps the file in conversation order when its line lands late", () => {
+    const saved = store();
+    saved.appendTurn(turn({ turnId: "0:0", speaker: "A", startMs: 1_000, text: "What do rivals charge?" }));
+    // The barge-in that cut Sotto off is transcribed before the utterance it
+    // interrupted is over, so Sotto's line arrives last and belongs second.
+    saved.appendTurn(turn({ turnId: "0:1", speaker: "A", startMs: 9_000, text: "Sotto, stop." }));
+    saved.appendTurn(
+      sottoTurn({ utteranceId: "ans-1", text: "They charge five to", startMs: 4_000, interrupted: true }),
+    );
+
+    expect(lines(read(saved.dir, SESSION_FILES.transcript))).toEqual([
+      "**[00:01] A:** What do rivals charge?",
+      `**[00:04] ${SOTTO_SPEAKER}:** They charge five to ${INTERRUPTED_MARKER}`,
+      "**[00:09] A:** Sotto, stop.",
+    ]);
+  });
+
+  it("leaves its line alone when a speaker is renamed", () => {
+    const saved = store();
+    saved.appendTurn(turn({ turnId: "0:0", speaker: "A", text: "First." }));
+    saved.appendTurn(
+      sottoTurn({ utteranceId: "ans-1", text: "Second.", startMs: 2_000, interrupted: false }),
+    );
+    saved.renameSpeaker("A", "Craig");
+
+    expect(lines(read(saved.dir, SESSION_FILES.transcript))).toEqual([
+      "**[00:00] Craig:** First.",
+      `**[00:02] ${SOTTO_SPEAKER}:** Second.`,
+    ]);
   });
 });
 

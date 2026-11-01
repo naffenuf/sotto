@@ -3,7 +3,7 @@ import type { Answer, AnswerLogRecord } from "../../shared/answers.js";
 import { emptyBoard, type Board } from "../../shared/board.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import { SOTTO_SPEAKER, type TurnUpdate } from "../../shared/turns.js";
 import type { Artifact, ShowHtmlArgs } from "../../shared/artifacts.js";
 import { SimulatedClock } from "../clock.js";
 import type { SpeechEndReason } from "../voice/Speaker.js";
@@ -157,6 +157,8 @@ interface Harness {
   wall: SimulatedClock;
   /** Present only when the harness was given one. */
   voice: FakeVoice | undefined;
+  /** Sotto's own transcript lines, in order (V2-008a). */
+  spokenTurns: TurnUpdate[];
 }
 
 function harness(
@@ -171,6 +173,8 @@ function harness(
     voice?: FakeVoice;
     /** The real-time clock the voice latencies are read off. */
     wall?: SimulatedClock;
+    /** Where "now" is on the transcription stream's timeline (V2-008a). */
+    streamNow?: () => number;
   } = {},
 ): Harness {
   const clock = new SimulatedClock(0);
@@ -182,6 +186,7 @@ function harness(
   const thinking: boolean[] = [];
   const states: [string, string][] = [];
   const warnings: string[] = [];
+  const spokenTurns: TurnUpdate[] = [];
   const agent = new AnswerAgent({
     clock,
     model,
@@ -195,6 +200,8 @@ function harness(
     onRecord: (record) => records.push(record),
     ...(options.onArtifact === undefined ? {} : { onArtifact: options.onArtifact }),
     wallClock: wall,
+    ...(options.streamNow === undefined ? {} : { streamNow: options.streamNow }),
+    onSpoken: (turn) => spokenTurns.push(turn),
     ...(options.voice === undefined ? {} : { voice: options.voice }),
     onThinking: (value) => thinking.push(value),
     onModelState: (state, detail) => states.push([state, detail]),
@@ -215,6 +222,7 @@ function harness(
     warnings,
     wall,
     voice: options.voice,
+    spokenTurns,
   };
 }
 
@@ -472,10 +480,17 @@ describe("AnswerAgent", () => {
 
 describe("AnswerAgent out loud (V2-005)", () => {
   /** A harness with a voice, and the fake voice beside it. */
-  function spoken(replies: ((call: ProseCall) => Promise<ProseReply>)[]) {
+  function spoken(
+    replies: ((call: ProseCall) => Promise<ProseReply>)[],
+    streamNow?: () => number,
+  ) {
     const wall = new SimulatedClock(0);
     const voice = new FakeVoice(wall);
-    const h = harness(replies, { voice, wall });
+    const h = harness(replies, {
+      voice,
+      wall,
+      ...(streamNow === undefined ? {} : { streamNow }),
+    });
     return { h, voice };
   }
 
@@ -713,6 +728,148 @@ describe("AnswerAgent out loud (V2-005)", () => {
     expect(h.records[0]?.headline).toBe("They charge $12 a seat.");
     expect(h.records[0]?.detailMd).toBe("Evernote is $25.");
     expect(voice.utterances[1]?.text()).toBe("They charge $12 a seat. Evernote is $25.");
+  });
+});
+
+describe("Sotto's speech in the transcript (V2-008a)", () => {
+  /** A harness with a voice, and a stream clock the test can move. */
+  function spoken(
+    replies: ((call: ProseCall) => Promise<ProseReply>)[],
+    streamNow: () => number = () => 0,
+  ) {
+    const wall = new SimulatedClock(0);
+    const voice = new FakeVoice(wall);
+    const h = harness(replies, { voice, wall, streamNow });
+    return { h, voice };
+  }
+
+  it("writes down what it said, labeled Sotto and placed where playback started", async () => {
+    // The stream is 42 s in when the first sentence is spoken; the session
+    // clock is nearly an hour of server uptime ahead of it, which is the
+    // V2-008 bug this must not repeat.
+    const { h } = spoken(
+      [
+        async (call) => {
+          for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+          return reply({ text: STREAM.at(-1) as string });
+        },
+      ],
+      () => 42_000,
+    );
+    h.clock.advanceTo(3_210_000);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.spokenTurns).toHaveLength(1);
+    expect(h.spokenTurns[0]).toEqual({
+      turnId: "sotto:ans-1",
+      speaker: SOTTO_SPEAKER,
+      // Sotto's own words, not the microphone's version of them.
+      text: SAID,
+      final: true,
+      startMs: 42_000,
+      endMs: 42_000,
+      speakerMappingUncertain: false,
+      sotto: true,
+    });
+  });
+
+  it("holds only what the room heard when speech was cut off, and says so", async () => {
+    const { h, voice } = spoken([
+      async (call) => {
+        call.onText?.({ itemId: ANSWER_ITEM, text: STREAM[3] as string });
+        await microtasks();
+        const spoke = voice.utterances[1];
+        if (spoke === undefined) throw new Error("the answer was never spoken");
+        spoke.heard = "They charge five to twenty";
+        spoke.cancel();
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.spokenTurns).toHaveLength(1);
+    expect(h.spokenTurns[0]?.text).toBe("They charge five to twenty");
+    expect(h.spokenTurns[0]?.interrupted).toBe(true);
+  });
+
+  it("adds nothing when a cut-off utterance never reported being heard", async () => {
+    const { h, voice } = spoken([
+      async (call) => {
+        call.onText?.({ itemId: ANSWER_ITEM, text: STREAM[3] as string });
+        await microtasks();
+        voice.utterances[1]?.cancel();
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.spokenTurns).toEqual([]);
+  });
+
+  it("adds nothing for a muted answer, which nobody heard", async () => {
+    const { h, voice } = spoken([async () => reply({ text: STREAM.at(-1) as string })]);
+    voice.available = false;
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.records[0]?.status).toBe("done");
+    expect(h.spokenTurns).toEqual([]);
+  });
+
+  it("adds nothing for an acknowledgment, which is not a contribution", async () => {
+    const { h, voice } = spoken([
+      async () => {
+        await microtasks();
+        // The acknowledgment is the only utterance there has been.
+        expect(voice.utterances).toHaveLength(1);
+        throw new Error("the model gave up");
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.records[0]?.status).toBe("error");
+    expect(h.spokenTurns).toEqual([]);
+  });
+
+  it("writes down the sentences a failed answer had already said", async () => {
+    const { h } = spoken(
+      [
+        async (call) => {
+          // Far enough for the spoken half to be whole, which is what it said.
+          call.onText?.({ itemId: ANSWER_ITEM, text: STREAM[3] as string });
+          throw new Error("the stream broke");
+        },
+      ],
+      () => 7_500,
+    );
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.records[0]?.status).toBe("error");
+    expect(h.spokenTurns[0]).toMatchObject({ text: SAID, startMs: 7_500, sotto: true });
+  });
+
+  it("gives each answer its own line", async () => {
+    const whole = STREAM.at(-1) as string;
+    const { h } = spoken([
+      async (call) => {
+        call.onText?.({ itemId: ANSWER_ITEM, text: whole });
+        return reply({ text: whole });
+      },
+      async (call) => {
+        call.onText?.({ itemId: ANSWER_ITEM, text: whole });
+        return reply({ text: whole });
+      },
+    ]);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+    h.agent.ask({ question: "and what about us?", askedBy: "B", turnId: "0:3" });
+    await h.clock.settle();
+
+    expect(h.spokenTurns.map((one) => one.turnId)).toEqual(["sotto:ans-1", "sotto:ans-2"]);
   });
 });
 

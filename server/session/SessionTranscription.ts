@@ -110,8 +110,22 @@ export class SessionTranscription {
   /** Playback holds deliveries even when the model has finished generating. */
   pauseState(): PauseState {
     if (this.options.playback().playing) return { speaking: true, silentForMs: 0 };
-    const streamNow = this.streamAtMs + this.options.clock.now() - this.sampledAtMs;
-    return this.assembler.pauseState(streamNow);
+    return this.assembler.pauseState(this.streamNow());
+  }
+
+  /**
+   * Where "now" falls on the transcription stream's own timeline, which is the
+   * one every `TurnUpdate.startMs` is measured against.
+   *
+   * The injected clock counts from the start of the *process* in a live
+   * session and from the start of the *capture* in a replay, so the two
+   * timelines are offset by however long the server had been up (V2-008).
+   * Projecting elapsed clock time from the last frame's `atMs` is the only
+   * answer available between frames — and it is what lets Sotto's own speech
+   * be placed beside the turns it is answering (V2-008a).
+   */
+  streamNow(): number {
+    return this.streamAtMs + this.options.clock.now() - this.sampledAtMs;
   }
 
   /** A truncated stream must not strand raw human frames behind an open turn. */

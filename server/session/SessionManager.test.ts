@@ -28,6 +28,8 @@ import type {
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
 import { emptyModel } from "../test/emptyModel.js";
+import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
+import type { VoiceOut, VoiceUtterance } from "../voice/voiceOut.js";
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
 
@@ -824,6 +826,135 @@ describe("SessionManager, answers", () => {
     });
     expect(answers[0]?.turnId).not.toBeNull();
     expect(answers[0]?.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("SessionManager, Sotto's speech in the transcript (V2-008a)", () => {
+  /**
+   * A voice that remembers rather than speaks. Enough of {@link VoiceOut} for
+   * the answer to count as heard: `npm test` never synthesizes.
+   */
+  class RecordingVoice implements VoiceOut {
+    private count = 0;
+    /** Everything each utterance was handed, oldest first. */
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const id = `v${(this.count += 1)}`;
+      const spoken = (): string => parts.join(" ");
+      const utterance: VoiceUtterance = {
+        id,
+        append: (text) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      };
+      return Promise.resolve(utterance);
+    }
+  }
+
+  /** The board and observer calls, so a test can see what each was told. */
+  class AnsweringModel implements ModelClient {
+    readonly boardCalls: string[] = [];
+    readonly observerCalls: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      if (call.label === "address") {
+        return { kind: "request", question: "what do the main competitors charge per month?" };
+      }
+      if (call.label === "board") {
+        this.boardCalls.push(call.user);
+        return { operations: [{ op: "set_summary", text: "Pricing a note app." }] };
+      }
+      this.observerCalls.push(call.user);
+      return { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("an answer is prose, not JSON");
+    }
+
+    async prose(call: ProseCall): Promise<ProseReply> {
+      const text =
+        "Say this:\nThey charge five to twenty-five dollars a seat.\n\n" +
+        "Show this:\nRivals charge $5-$25 a seat\n\n- Notion $12 a seat";
+      call.onText?.({ itemId: "msg_1", text });
+      return { text, citations: [], searchedUrls: [], searched: true, functionCalls: 0 };
+    }
+  }
+
+  it("writes its own answer into the transcript, where the board sees it and the observer does not", async () => {
+    const bus = new EventBus(quiet);
+    const model = new AnsweringModel();
+    const saved: TurnUpdate[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: (turn: TurnUpdate) => saved.push(turn),
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+    const published: TurnUpdate[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "turn") published.push(event.turn);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => model,
+      createVoice: () => new RecordingVoice(),
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    await ended;
+
+    const said = "They charge five to twenty-five dollars a seat.";
+    const mine = published.filter(isSottoTurn);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({
+      turnId: "sotto:ans-1",
+      speaker: SOTTO_SPEAKER,
+      text: said,
+      final: true,
+    });
+    // On the capture's own timeline, somewhere inside the conversation, not
+    // at the server's uptime and not at zero.
+    const last = published.filter((turn) => turn.final && !isSottoTurn(turn)).at(-1);
+    expect(mine[0]?.startMs).toBeGreaterThan(0);
+    expect(mine[0]?.startMs).toBeLessThanOrEqual((last?.endMs ?? 0) + 5_000);
+    // And in the session folder's transcript, exactly once.
+    expect(saved.filter(isSottoTurn)).toHaveLength(1);
+
+    // The board is told about it, labeled Sotto; the observer never is.
+    expect(model.boardCalls.join("\n")).toContain(`${SOTTO_SPEAKER} (`);
+    expect(model.boardCalls.join("\n")).toContain(said);
+    expect(model.observerCalls.join("\n")).not.toContain(said);
   });
 });
 

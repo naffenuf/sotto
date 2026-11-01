@@ -4,7 +4,7 @@
  * sees that speaker's arm; deadlines use real time even in max-speed replay.
  */
 import type { SpeakerNames } from "../../shared/events.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { systemClock, type Clock } from "../clock.js";
 import { detect, detectsAddress } from "../wake.js";
 import type { WakeTrigger } from "../wakeWatcher.js";
@@ -66,6 +66,8 @@ export class AddressWatcher {
 
   /** Listens on partials; classifies eligible final turns exactly once and in arrival order. */
   acceptTurn(turn: TurnUpdate): void {
+    // Sotto's own line is in the transcript (V2-008a), never in its ears.
+    if (isSottoTurn(turn)) return;
     if (this.stopped || this.seen.has(turn.turnId) || this.ignored.has(turn.turnId)) return;
     const named = detectsAddress(turn.text);
     if (named) this.listeningTurns.add(turn.turnId);

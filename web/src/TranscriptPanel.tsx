@@ -13,6 +13,7 @@
  * back to check something and should not be yanked forward again.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { SOTTO_SPEAKER, isSottoTurn } from "../../shared/index.js";
 import type { SpeakerNames, TurnUpdate } from "../../shared/index.js";
 
 /** How close to the bottom still counts as following the conversation. */
@@ -33,9 +34,13 @@ const SPEAKER_COLORS = [
   "#c38080",
 ] as const;
 
+/** Sotto's own chip colour (V2-008a): the accent, never one of the room's. */
+const SOTTO_COLOR = "#86551b";
+
 /** The colour of a diarization label, or a muted grey while there is none. */
 export function speakerColor(label: string | null): string {
   if (label === null) return "#6f6a60";
+  if (label === SOTTO_SPEAKER) return SOTTO_COLOR;
   let hash = 0;
   for (const character of label) hash = (hash * 31 + character.charCodeAt(0)) % 4096;
   return SPEAKER_COLORS[hash % SPEAKER_COLORS.length] ?? SPEAKER_COLORS[0];
@@ -44,6 +49,9 @@ export function speakerColor(label: string | null): string {
 /** What the chip says: the name the user gave, or the bare label. */
 function speakerText(label: string | null, speakers: SpeakerNames): string {
   if (label === null) return "…";
+  // Sotto's label is not a diarization label and is never renamed, so a
+  // speaker who happened to be named "Sotto" cannot take it over.
+  if (label === SOTTO_SPEAKER) return SOTTO_SPEAKER;
   return speakers[label] ?? label;
 }
 
@@ -147,24 +155,35 @@ export function TranscriptPanel({
             <p
               key={turn.turnId}
               className={`turn ${turn.final ? "turn--final" : "turn--partial"}${
-                turn.turnId === highlight?.turnId ? " turn--cited" : ""
-              }`}
+                isSottoTurn(turn) ? " turn--sotto" : ""
+              }${turn.turnId === highlight?.turnId ? " turn--cited" : ""}`}
               data-testid="turn"
               data-turn-id={turn.turnId}
               data-cited={turn.turnId === highlight?.turnId ? true : undefined}
               data-final={turn.final}
               data-speaker={turn.speaker ?? ""}
+              data-sotto={isSottoTurn(turn) ? true : undefined}
+              data-interrupted={turn.interrupted === true ? true : undefined}
             >
               <button
                 type="button"
                 className="turn__chip"
                 data-testid="speaker-chip"
-                style={{ background: speakerColor(turn.speaker), color: "#11100e" }}
-                disabled={turn.speaker === null}
+                // Sotto's chip is the accent, which needs light ink on it; the
+                // room's colours are all pale.
+                style={{
+                  background: speakerColor(turn.speaker),
+                  color: isSottoTurn(turn) ? "#fdfbf7" : "#11100e",
+                }}
+                // Sotto is not one of the room's labels, so there is no name
+                // to give it (V2-008a).
+                disabled={turn.speaker === null || isSottoTurn(turn)}
                 title={
-                  turn.speaker === null
-                    ? "waiting for the speaker label"
-                    : `Name speaker ${turn.speaker}${turn.speakerMappingUncertain ? " (this label is a guess after a reconnect)" : ""}`
+                  isSottoTurn(turn)
+                    ? "Sotto said this out loud"
+                    : turn.speaker === null
+                      ? "waiting for the speaker label"
+                      : `Name speaker ${turn.speaker}${turn.speakerMappingUncertain ? " (this label is a guess after a reconnect)" : ""}`
                 }
                 onClick={() => setEditing(turn.speaker)}
               >
@@ -174,6 +193,13 @@ export function TranscriptPanel({
                 {turn.speakerMappingUncertain && <span className="turn__guess">?</span>}
               </button>{" "}
               <span className="turn__text">{turn.text.trim()}</span>
+              {/* The room heard this much and no more: the rest was cut off. */}
+              {turn.interrupted === true && (
+                <span className="turn__interrupted" data-testid="turn-interrupted">
+                  {" "}
+                  (interrupted)
+                </span>
+              )}
             </p>
           ))
         )}

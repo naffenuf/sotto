@@ -22,6 +22,7 @@ import type { Board } from "../../shared/board.js";
 import type { DecisionLogRecord } from "../../shared/candidates.js";
 import type { E2eFiles, E2eObserved } from "../../shared/e2e.js";
 import type { SessionRecord } from "../../shared/session.js";
+import { isSottoTurn } from "../../shared/turns.js";
 import { fixtureAudioPath } from "../audio/WavReplaySource.js";
 import { readWavFile } from "../audio/wav.js";
 import { AUDIO_SAMPLE_RATE } from "../../shared/audio.js";
@@ -96,7 +97,9 @@ export async function runLive(options: LiveRunOptions): Promise<E2eObserved> {
   const at = (): number => Date.now() - startedAt;
   const ended = new Promise<void>((resolve) => {
     const off = bus.subscribe((event) => {
-      if (event.type === "turn" && event.turn.final) {
+      // V2-008a: the latency map and the moment checks read the room's turns;
+      // Sotto's own lines carry no `endMs` the API reported.
+      if (event.type === "turn" && event.turn.final && !isSottoTurn(event.turn)) {
         observed.turns.push({ value: event.turn, atMs: at() });
       }
       if (event.type === "card") observed.cards.push({ value: event.card, atMs: at() });

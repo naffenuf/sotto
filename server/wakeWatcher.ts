@@ -17,7 +17,7 @@
  * matching — the speaker said "Sotto vo…" and went on to "voce" — takes the
  * indicator back down.
  */
-import type { TurnUpdate } from "../shared/turns.js";
+import { isSottoTurn, type TurnUpdate } from "../shared/turns.js";
 import { detect, type WakeOptions } from "./wake.js";
 
 /** A question somebody asked Sotto out loud. */
@@ -69,7 +69,8 @@ export class WakeWatcher {
    * implies. Safe to call with every update the assembler produces.
    */
   acceptTurn(turn: TurnUpdate): void {
-    if (this.answered.has(turn.turnId)) return;
+    // Sotto's own line is in the transcript (V2-008a), never in its ears.
+    if (isSottoTurn(turn) || this.answered.has(turn.turnId)) return;
     const match = detect(turn.text, this.wake);
 
     if (!turn.final) {

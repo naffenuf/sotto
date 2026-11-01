@@ -231,6 +231,12 @@ function withCard(cards: StageCardView[], card: StageCard): StageCardView[] {
 /**
  * Folds one snapshot into the list: a turn already there is replaced in place,
  * so a partial turning into its final text never doubles the row.
+ *
+ * A new turn is inserted by `startMs` rather than appended, which is a no-op
+ * for the room's turns — they arrive in the order they were spoken — and is
+ * the whole point for Sotto's own lines (V2-008a): one is written down when
+ * its utterance is over but belongs where playback started, which can be
+ * before a turn already on screen.
  */
 function withTurn(turns: TurnUpdate[], turn: TurnUpdate): TurnUpdate[] {
   const index = turns.findIndex((existing) => existing.turnId === turn.turnId);
@@ -239,6 +245,7 @@ function withTurn(turns: TurnUpdate[], turn: TurnUpdate): TurnUpdate[] {
     next[index] = turn;
     return next;
   }
-  const next = [...turns, turn];
+  const at = turns.findIndex((existing) => existing.startMs > turn.startMs);
+  const next = at === -1 ? [...turns, turn] : [...turns.slice(0, at), turn, ...turns.slice(at)];
   return next.length > MAX_TURNS ? next.slice(next.length - MAX_TURNS) : next;
 }

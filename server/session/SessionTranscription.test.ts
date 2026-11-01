@@ -75,6 +75,25 @@ describe("the session's echo boundary", () => {
     expect(transcription.pauseState()).toEqual({ speaking: false, silentForMs: 700 });
   });
 
+  it("puts now on the stream timeline, not on server uptime (V2-008a)", () => {
+    const clock = new SimulatedClock(1_914_000);
+    const transcription = new SessionTranscription({
+      clock,
+      playback: () => ({ playing: false, recent: [] }),
+      logger: { warn: () => {} },
+      onUpdate: () => {},
+      onEvent: () => {},
+      onEcho: () => {},
+    });
+    // Before any frame there is nothing to project from, so the stream is at 0.
+    expect(transcription.streamNow()).toBe(0);
+    transcription.accept({ session: 0, atMs: 42_000,
+      frame: { type: "speechStart", turnId: 0, audioProcessedMs: 41_300 } });
+    expect(transcription.streamNow()).toBe(42_000);
+    clock.advanceBy(1_500);
+    expect(transcription.streamNow()).toBe(43_500);
+  });
+
   it("keeps every echo partial and raw frame out, and marks only timing", () => {
     const t = setup();
     t.playback(speech);

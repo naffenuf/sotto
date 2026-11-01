@@ -23,7 +23,7 @@ import type {
 } from "../../shared/candidates.js";
 import type { DeliveryRecord, FixtureRunRecord, JudgeMatchRecord } from "../../shared/eval.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { EventBus } from "../events/bus.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
 import { inPause } from "../interject/policy.js";
@@ -90,7 +90,10 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
   const cards: StageCard[] = [];
   const ended = new Promise<void>((resolve) => {
     const off = bus.subscribe((event) => {
-      if (event.type === "turn") turns.push(event.turn);
+      // V2-008a: Sotto's own lines are in the transcript, not the conversation
+      // a moment was planted in; scoring and the pause reconstruction read
+      // only what the room said.
+      if (event.type === "turn" && !isSottoTurn(event.turn)) turns.push(event.turn);
       // A card with an id already on the stage replaces it: an interjection
       // is delivered once, but the rule is the stage's, so follow it here too.
       if (event.type === "card") {

@@ -52,7 +52,7 @@ import {
 import type { Board } from "../../shared/board.js";
 import type { Citation, StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { renderBoardMarkdown } from "../board/markdown.js";
 import { systemClock, type Clock } from "../clock.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
@@ -178,6 +178,23 @@ export interface AnswerAgentOptions {
    * speech that really did take a second.
    */
   wallClock?: Clock;
+  /**
+   * Where "now" is on the transcription stream's timeline (V2-008a), which is
+   * what {@link TurnUpdate.startMs} always means. Read when playback of the
+   * answer starts, so Sotto's own line lands beside the turns it answers
+   * rather than at the server's uptime. Defaults to the session clock, which
+   * is the same timeline in a replay and offset from it in a live session.
+   */
+  streamNow?: () => number;
+  /**
+   * One line of Sotto's own speech, for the transcript (V2-008a).
+   *
+   * Called once per answer that was really heard, with Sotto's **own** text —
+   * never the microphone's version of it — and only after the utterance is
+   * over, because whether it was cut off decides what the entry holds. A
+   * muted answer, and an acknowledgment, produce nothing here.
+   */
+  onSpoken?: (turn: TurnUpdate) => void;
   onTiming?: (event: Record<string, unknown>) => void;
   logger?: Logger;
 }
@@ -361,6 +378,12 @@ export class AnswerAgent {
     let pushedHeadline = "";
     /** The spoken half as far as it has been handed to the voice. */
     let spokenText = "";
+    /**
+     * Stream time when the answer's first sentence went to the voice, which is
+     * playback start to within ElevenLabs' first chunk (measured at 299 ms).
+     * Null while nothing has been said, which is also the muted case.
+     */
+    let spokeAtStreamMs: number | null = null;
     // Filled in as the model draws (US-020), so a diagram can be on the stage
     // while the sentence under it is still being written.
     const artifacts: Artifact[] = [];
@@ -392,11 +415,15 @@ export class AnswerAgent {
         said = true;
         spokenText = halves.spoken;
         const tail = rest.trim();
-        if (tail !== "") speech?.say(tail);
+        if (tail !== "") {
+          spokeAtStreamMs ??= this.streamNow();
+          speech?.say(tail);
+        }
         return tail !== "";
       }
       const { sentences, tail } = splitSentences(rest);
       if (sentences.length === 0) return false;
+      spokeAtStreamMs ??= this.streamNow();
       for (const sentence of sentences) speech?.say(sentence);
       spokenText = halves.spoken.slice(0, halves.spoken.length - tail.length);
       return true;
@@ -447,6 +474,7 @@ export class AnswerAgent {
         spokenText,
         ...voiceTimings(spoken),
       };
+      this.recordSpeech(answer, spoken, spokenText, spokeAtStreamMs);
       this.finish(done, asked);
       this.logger.log(
         `[answer] ${done.id} answered in ${done.latencyMs} ms` +
@@ -476,6 +504,7 @@ export class AnswerAgent {
         ...voiceTimings(spoken),
         error: detail,
       };
+      this.recordSpeech(answer, spoken, spokenText, spokeAtStreamMs);
       this.logger.warn(`[answer] ${answer.id} failed: ${detail}`);
       this.failedSinceIdle = true;
       this.options.onModelState?.("error", detail);
@@ -568,6 +597,45 @@ export class AnswerAgent {
 
   private elapsed(answer: Answer): number {
     return Math.max(0, this.clock.now() - answer.createdAtMs);
+  }
+
+  /** Stream time now; the session clock is the same timeline in a replay. */
+  private streamNow(): number {
+    return this.options.streamNow?.() ?? this.clock.now();
+  }
+
+  /**
+   * Writes down what Sotto actually said out loud, as one final turn on the
+   * conversation's timeline (V2-008a).
+   *
+   * Nothing is recorded unless the room heard it: a muted or unattended
+   * answer never opened an utterance, and a cut-off one holds only
+   * `spokenSoFar` — what playback confirmed — rather than the sentences the
+   * model was still writing.
+   */
+  private recordSpeech(
+    answer: Answer,
+    spoken: SpokenResult | undefined,
+    spokenText: string,
+    startMs: number | null,
+  ): void {
+    if (spoken?.spoke !== true || startMs === null) return;
+    const text = spoken.interrupted ? spoken.spokenSoFar : spokenText;
+    // Cut off before any report came back: nobody can say what was heard, so
+    // claiming a line would be worse than leaving the transcript short.
+    if (text.trim() === "") return;
+    const turn = sottoTurn({
+      utteranceId: answer.id,
+      text,
+      startMs,
+      interrupted: spoken.interrupted,
+    });
+    this.options.onTiming?.({
+      stage: "sotto_turn", atMs: this.clock.now(), answerId: answer.id,
+      turnId: turn.turnId, startMs, interrupted: spoken.interrupted,
+      characters: turn.text.length,
+    });
+    this.options.onSpoken?.(turn);
   }
 
   /** The name the group would use for whoever asked. */

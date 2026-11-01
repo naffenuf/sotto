@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TurnUpdate } from "../shared/turns.js";
+import { sottoTurn, type TurnUpdate } from "../shared/turns.js";
 import { WakeWatcher, type WakeTrigger } from "./wakeWatcher.js";
 
 /** One snapshot of a turn, with the fields the watcher does not read filled in. */
@@ -39,6 +39,21 @@ describe("WakeWatcher", () => {
     expect(watcher.listening).toBe(true);
     watcher.ignoreTurn("0:3");
     expect(listening).toEqual([true, false]);
+    expect(questions).toEqual([]);
+  });
+
+  it("never hears Sotto's own transcript line (V2-008a)", () => {
+    const { watcher, listening, questions } = watch();
+    // Its own answer says its name, and asks a question in passing.
+    watcher.acceptTurn(
+      sottoTurn({
+        utteranceId: "ans-1",
+        text: "Sotto, what do rivals charge? That is what you asked me.",
+        startMs: 4_000,
+        interrupted: false,
+      }),
+    );
+    expect(listening).toEqual([]);
     expect(questions).toEqual([]);
   });
 

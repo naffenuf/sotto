@@ -40,7 +40,7 @@ import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.j
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { defaultSettings, describeSource, sourceSlug } from "../../shared/session.js";
-import type { PauseState, TurnUpdate } from "../../shared/turns.js";
+import { isSottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
 import {
   EventReplaySource,
   fixtureEventsPath,
@@ -483,6 +483,7 @@ export class SessionManager {
       store,
       () => assembler.pauseState(),
       () => assembler.finalTurns(),
+      () => assembler.streamNow(),
       voice,
     );
     const assembler = this.assembler(info, clock, store, loops, voice);
@@ -571,6 +572,7 @@ export class SessionManager {
       store,
       () => assembler.pauseState(),
       () => assembler.finalTurns(),
+      () => assembler.streamNow(),
       voice,
     );
     const assembler = this.assembler(info, this.liveClock, store, loops, voice);
@@ -666,7 +668,11 @@ export class SessionManager {
         loops.board?.acceptTurn(turn);
         loops.observer?.acceptTurn(turn);
         if (turn.final && loops.board && loops.observer) {
-          loops.observer.observe(loops.board.board(), loops.board.uncoveredTurns());
+          // The board reads Sotto's own lines (V2-008a) and the observer must
+          // not: an interjection arguing with Sotto's last answer is the one
+          // contradiction nobody in the room needs pointing out.
+          const uncovered = loops.board.uncoveredTurns().filter((one) => !isSottoTurn(one));
+          loops.observer.observe(loops.board.board(), uncovered);
         }
         // The policy is the one that wants the partials too: a `speechEnd`
         // arrives as one, and it is what opens a pause (US-014).
@@ -771,6 +777,7 @@ export class SessionManager {
     store: StoreSlot,
     pauseState: () => PauseState,
     transcript: () => readonly TurnUpdate[],
+    streamNow: () => number,
     voice: VoiceOut | null,
   ): ModelLoops {
     const model = this.createModel();
@@ -858,6 +865,10 @@ export class SessionManager {
       // Real time: `ackMs` and `firstAudioMs` are latencies the room felt,
       // and a `max` replay's session clock stands still during a model call.
       wallClock: this.wallClock,
+      // V2-008a: Sotto's own line goes on the conversation's timeline, which
+      // in a live session is offset from the clock by the server's uptime.
+      streamNow,
+      onSpoken: (turn) => this.recordSottoSpeech(info, store, board, turn),
       board: () => board.board(),
       transcript,
       speakers: () => this.bus.speakerNames(),
@@ -877,6 +888,39 @@ export class SessionManager {
       onModelState,
     });
     return { modelClient: model, board, observer, verifier, policy, answers, deliveries };
+  }
+
+  /**
+   * Writes one line of Sotto's own speech into the conversation (V2-008a).
+   *
+   * It goes exactly where a human turn goes — the live transcript, the
+   * session folder's `transcript.md`, and the board, which reads it labeled
+   * `Sotto` so a fact Sotto established can reach the notes. It goes nowhere
+   * near the things that listen to the room: no wake or address check, no
+   * barge-in, no speaker introduction, no observer and no policy. Sotto
+   * reacting to its own voice is the one loop none of them could get out of,
+   * and the floor is already held for the length of playback by the voice
+   * state the policy reads.
+   *
+   * Addressed to the most recent session rather than only a running one, as
+   * cards and feedback are: a question typed after Stop (US-019) is answered
+   * aloud against the conversation that just happened, and that answer
+   * belongs in its transcript.
+   */
+  private recordSottoSpeech(
+    info: SessionInfo,
+    store: StoreSlot,
+    board: BoardUpdater,
+    turn: TurnUpdate,
+  ): void {
+    if (this.last?.sessionId !== info.id) return;
+    this.logger.log(
+      `[transcript] ${info.id} Sotto said ${turn.text.length} characters` +
+        `${turn.interrupted === true ? " before being cut off" : ""}`,
+    );
+    this.bus.publish({ type: "turn", turn });
+    store.writer?.appendTurn(turn);
+    board.acceptTurn(turn);
   }
 
   /**

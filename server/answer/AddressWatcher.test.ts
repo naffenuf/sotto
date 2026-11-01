@@ -3,7 +3,7 @@
  * the live races that instant fixture replay previously hid, without APIs.
  */
 import { describe, expect, it } from "vitest";
-import type { TurnUpdate } from "../../shared/turns.js";
+import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { SimulatedClock } from "../clock.js";
 import type { WakeTrigger } from "../wakeWatcher.js";
 import { ADDRESS_ARM_MS, ADDRESS_TIMEOUT_MS, AddressWatcher } from "./AddressWatcher.js";
@@ -53,6 +53,22 @@ describe("model-assisted addressing", () => {
     expect(t.timing).toContainEqual(expect.objectContaining({
       stage: "address", kind: "request", fallback: false,
     }));
+  });
+
+  it("never classifies Sotto's own transcript line (V2-008a)", async () => {
+    const t = setup(async () => ({ kind: "request", question: "anything" }));
+    t.watcher.acceptTurn(
+      sottoTurn({
+        utteranceId: "ans-1",
+        text: "Sotto here — what do rivals charge? Around twelve dollars.",
+        startMs: 4_000,
+        interrupted: false,
+      }),
+    );
+    await t.clock.settle();
+    expect(t.calls).toEqual([]);
+    expect(t.questions).toEqual([]);
+    expect(t.listening).toEqual([]);
   });
 
   it("does not classify name-free turns, possessives or sotto voce, and rejects mentions", async () => {

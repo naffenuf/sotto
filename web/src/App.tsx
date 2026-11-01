@@ -204,7 +204,7 @@ export function App() {
             </div>
           </div>
           {view === "backstage" && discussion ? <Backstage log={discussion.candidateLog ?? []} /> : view === "transcript" ? discussion ? (
-            <section className="history-transcript"><h2 className="panel__title">Transcript</h2><pre>{discussion.transcript.replaceAll("**", "") || "No transcript saved."}</pre></section>
+            <section className="history-transcript"><h2 className="panel__title">Transcript</h2><pre>{historyTranscript(discussion.transcript) || "No transcript saved."}</pre></section>
           ) : <TranscriptPanel turns={events.turns} speakers={events.speakers} onRename={onRenameSpeaker} highlight={cited} /> : <BoardPanel
             board={discussion ? discussion.board ?? emptyBoard() : events.board}
             changedIds={discussion ? [] : events.boardChangedIds}
@@ -297,4 +297,13 @@ function serverStatus(
     detail:
       health === "connected" ? "server is up but /ws/events is not" : "no answer from the server",
   };
+}
+
+/**
+ * `transcript.md` read as plain text: the file is markdown, and this view is a
+ * `<pre>`, so the emphasis around a speaker's name and around V2-008a's
+ * interrupted marker would otherwise be read out as punctuation.
+ */
+function historyTranscript(transcript: string): string {
+  return transcript.replaceAll("**", "").replaceAll("_(interrupted)_", "(interrupted)");
 }

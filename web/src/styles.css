@@ -1068,3 +1068,26 @@ body {
   font-size: 0.8125rem;
   color: var(--ink);
 }
+
+/*
+ * Sotto's own line in the transcript (V2-008a): what it said out loud, in its
+ * own voice rather than as one more speaker in the room. Indented and set off
+ * on the left so a reader can see both sides of the conversation at a glance.
+ */
+.turn--sotto {
+  margin-left: 0.75rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--accent);
+  color: var(--ink);
+}
+
+.turn--sotto .turn__text {
+  font-style: italic;
+}
+
+/* The room heard this much of it and no more. */
+.turn__interrupted {
+  color: var(--ink-dim);
+  font-size: 0.8125rem;
+  font-style: normal;
+}

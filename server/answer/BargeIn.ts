@@ -5,7 +5,7 @@
  * uses the first matching partial's position as the wake-word-end estimate.
  */
 import type { AsrFrameRecord } from "../../shared/asr.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import type { Clock } from "../clock.js";
 import { detectsAddress } from "../wake.js";
 import type { AskedQuestion } from "./AnswerAgent.js";
@@ -37,7 +37,9 @@ export class BargeIn {
 
   /** Receives non-echo snapshots privately, before any public transcript update. */
   accept(turn: TurnUpdate, record: AsrFrameRecord, duringPlayback: boolean): void {
-    if (this.commands.has(turn.turnId)) return;
+    // Sotto cannot interrupt itself: its own line (V2-008a) is not a voice in
+    // the room, and taking it for one would cancel the answer being spoken.
+    if (isSottoTurn(turn) || this.commands.has(turn.turnId)) return;
     const addressed = detectsAddress(turn.text);
     if (addressed && this.options.speaking() && !this.interrupted.has(turn.turnId)) {
       this.interrupted.add(turn.turnId);

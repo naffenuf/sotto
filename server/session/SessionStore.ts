@@ -4,7 +4,7 @@
  *     sessions/2026-10-27_1304-events-brainstorm/
  *       session.json       metadata, rewritten on every change
  *       events.jsonl       every raw transcription frame, as `npm run capture` writes them
- *       transcript.md      one line per final turn
+ *       transcript.md      one line per final turn, Sotto's own included (V2-008a)
  *       board.json/.md     the living board (US-009)
  *       candidates.jsonl   observer candidates and the policy's decision (US-012-US-014)
  *       feedback.jsonl     the user's verdict on delivered cards (US-015)
@@ -32,7 +32,7 @@ import {
   type SessionRecord,
   type SessionSettings,
 } from "../../shared/session.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 
 type Logger = Pick<Console, "log" | "warn">;
 
@@ -51,6 +51,9 @@ export const SESSION_FILES = {
   answers: "answers.jsonl",
   timing: "timing.jsonl",
 } as const;
+
+/** What marks a line of Sotto's speech the room only heard part of (V2-008a). */
+export const INTERRUPTED_MARKER = "_(interrupted)_";
 
 /** Subfolder generated HTML goes in (US-020). */
 export const ARTIFACTS_DIR = "artifacts";
@@ -114,11 +117,15 @@ export interface SessionStoreOptions {
 
 /** A final turn, kept so a rename can rewrite `transcript.md` from scratch. */
 interface TranscriptLine {
-  /** Diarization label, or `null` if the turn somehow never got one. */
+  /** Diarization label, {@link SOTTO_SPEAKER}, or `null` if there is none. */
   label: string | null;
   /** Milliseconds from the start of the session to the start of the turn. */
   offsetMs: number;
   text: string;
+  /** V2-008a: Sotto's own speech, which no rename ever touches. */
+  sotto?: true;
+  /** V2-008a: the room only heard this much of it. */
+  interrupted?: true;
 }
 
 export class SessionStore implements SessionWriter {
@@ -199,9 +206,24 @@ export class SessionStore implements SessionWriter {
       offsetMs: turn.startMs,
       // transcript.md is one line per turn, so the text has to stay on one.
       text: turn.text.replace(/\s+/g, " ").trim(),
+      ...(isSottoTurn(turn) ? { sotto: true as const } : {}),
+      ...(turn.interrupted === true ? { interrupted: true as const } : {}),
     };
-    this.lines.push(line);
-    this.appendLine(SESSION_FILES.transcript, this.transcriptLine(line));
+    // Sotto's own line is written when its utterance is over but placed where
+    // playback started (V2-008a), so it can land before a turn already here —
+    // a barge-in, in particular. The file stays in conversation order, which
+    // costs a whole rewrite only in that one case.
+    const at = this.lines.findIndex((existing) => existing.offsetMs > line.offsetMs);
+    if (at === -1) {
+      this.lines.push(line);
+      this.appendLine(SESSION_FILES.transcript, this.transcriptLine(line));
+    } else {
+      this.lines.splice(at, 0, line);
+      this.rewriteTranscript();
+    }
+    // Sotto is not one of the room's diarization labels and must never become
+    // a speaker somebody can rename.
+    if (line.sotto === true) return;
     if (line.label === null || this.record.speakers[line.label] !== undefined) return;
     this.record.speakers[line.label] = { name: null };
     this.writeSession();
@@ -262,8 +284,9 @@ export class SessionStore implements SessionWriter {
   /** The `**[mm:ss] Name-or-label:** text` line for one final turn. */
   private transcriptLine(line: TranscriptLine): string {
     const label = line.label ?? "?";
-    const name = this.record.speakers[label]?.name ?? label;
-    return `**[${clockStamp(line.offsetMs)}] ${name}:** ${line.text}`;
+    const name = line.sotto === true ? SOTTO_SPEAKER : (this.record.speakers[label]?.name ?? label);
+    const cut = line.interrupted === true ? ` ${INTERRUPTED_MARKER}` : "";
+    return `**[${clockStamp(line.offsetMs)}] ${name}:** ${line.text}${cut}`;
   }
 
   private rewriteTranscript(): void {

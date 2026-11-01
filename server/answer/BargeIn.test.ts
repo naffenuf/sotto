@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { SimulatedClock } from "../clock.js";
 import { SessionTranscription } from "../session/SessionTranscription.js";
+import { sottoTurn } from "../../shared/turns.js";
 import { detectsAddress } from "../wake.js";
 import { BargeIn } from "./BargeIn.js";
 import type { AskedQuestion } from "./AnswerAgent.js";
@@ -54,7 +55,7 @@ function setup(playingInitially = true, answering = false) {
     frame({ type: "speechEnd", turnId: id });
     frame({ type: "speechComplete", turnId: id, transcript: text });
   };
-  return { start, end, frame, commands, timing, publicText, listening, stops: () => stops };
+  return { watcher, start, end, frame, commands, timing, publicText, listening, stops: () => stops };
 }
 
 describe("barge-in at the transcription boundary", () => {
@@ -74,6 +75,24 @@ describe("barge-in at the transcription boundary", () => {
     expect(t.timing[0]).toMatchObject({
       stage: "barge_in", flushConfirmed: true, flushMs: 35, wakeToSilenceMs: 735,
     });
+  });
+
+  it("cannot be interrupted by Sotto's own transcript line (V2-008a)", () => {
+    const t = setup();
+    // The line Sotto is in the middle of saying, written down as a turn.
+    t.watcher.accept(
+      sottoTurn({
+        utteranceId: "ans-1",
+        text: "Sotto here — the price is twelve dollars.",
+        startMs: 1_000,
+        interrupted: false,
+      }),
+      { session: 0, atMs: 1_700, frame: { audioProcessedMs: 1_000 } },
+      true,
+    );
+    expect(t.stops()).toBe(0);
+    expect(t.commands).toEqual([]);
+    expect(t.listening).toEqual([]);
   });
 
   it("ignores Sotto's own name and unrelated side talk", () => {
