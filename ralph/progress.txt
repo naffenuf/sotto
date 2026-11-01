@@ -709,3 +709,46 @@
     out BEFORE the drain writes `endedAt`; a check that stops a session with
     fetch() has to reload before reading the list.
   NEXT: V2-019 (eval update). 3 stories left.
+
+[2026-11-01 03:00] V2-019 — completed — the eval covers the two v2 conversations, scores research moments against research cards, and gates research recall at 0.5.
+  WHAT IS NEW:
+  - server/eval/options.ts: V2_EVAL_FIXTURES (research-business-idea,
+    offsite-plan) join isEvalFixture, ranked last — they are the longest and
+    the most expensive conversations in the set.
+  - shared/eval.ts: ScoredLevel (glow|interject|research),
+    ResearchDeliveryRecord, ResearchRunRecord, FixtureRunRecord.research?.
+  - server/eval/runner.ts: readResearchLog + researchFrom (counts off
+    research.jsonl, cards deduped to their FIRST appearance), asJudgeCard,
+    and judgeAll now crosses policy deliveries with non-research moments and
+    research cards with research moments — nothing else.
+  - server/eval/judge.ts: JudgePair.delivery is a narrow JudgeCard, so a
+    research card is judged by the same prompt without pretending to be a
+    policy decision.
+  - server/eval/score.ts: MIN_RESEARCH_RECALL 0.5, researchRecall, the
+    research totals (moments, cards, packets, unsourced, local gate calls),
+    and a fourth gate.
+  - server/eval/report.ts: `research recall` and `research packets`
+    headlines, per-fixture + per-card research tables, the research recall
+    gate row, and `local calls (Glimmer, $0)` in the cost table.
+  MEASURED (eval/reports/2026-11-01_024909.md + -notes.md, one fixture):
+  - research-business-idea: 4 ideas -> 4 queued -> 3 packets, 0 unsourced.
+    research-packet-1 caught market-size-research-hook 0.1s into its window
+    (card at 67.3s, window 67.2-87.0s). competitor-gaps-research-hook missed:
+    the third packet is about what Otter and Fireflies DO, not where they
+    fall short. audience-contradiction caught. All five gates PASS.
+  - 6 judgment calls, all on Glimmer, median 25.4s, counted at $0.
+  - 2/2 policy deliveries in a pause; 2/3 research cards — the third was
+    brought forward because the group asked for it, mid-sentence, which is
+    exactly why research cards are measured on the pause and not gated on it.
+  WATCH OUT (V2-020):
+  - $1.01 and 62 model calls for ONE fixture, and 508s of wall clock. The
+    searches resend the whole request each round (V2-013), so budget several
+    dollars and the better part of an hour for the nine-fixture set, and
+    prefer `--fixtures` while iterating on prompts.
+  - npm run eval:report REWRITES a past report with today's sections. If you
+    rebuild an old run to read it, `git checkout` the file afterwards — the
+    historical reports are committed and belong to their own commit.
+  - A judge verdict is cached on headline+detail+fixture/moment+judge prompt,
+    so the research verdicts above are already on disk and a rerun is free
+    unless the packet's wording changes.
+  NEXT: V2-020 (tune with the Glimmer gate). 2 stories left.

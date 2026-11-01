@@ -1227,3 +1227,33 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `z.array(BoardOpSchema)` over strict objects, so one `add_decision` missing that field throws
   away the **whole** update, `set_summary` included — a board that silently stays empty while
   every loop downstream still runs.
+
+- **A research card is not a delivery, and the eval keeps the two apart.** V2-019 scores a
+  `research_hook` moment against research-ready cards and everything else against the policy's,
+  judging only those pairs (`judgeAll` in `server/eval/runner.ts`) — a crossover verdict would cost
+  a call the scoring could never use. So `SettingsScore` carries **two** recalls, `recall` over the
+  non-research moments (gate 0.7) and `researchRecall` over the hooks (`MIN_RESEARCH_RECALL` 0.5),
+  and a research card stays outside the two gates about interrupting people: it is not a decision
+  the policy took, and the pause gate is one it *would* break by design — a packet still waiting
+  when the conversation ends goes up anyway, and so does one the group asked for (measured: 2/3 in
+  a pause, the third brought forward mid-sentence by "Sotto, what did you find on competitors?").
+  Both are reported, neither is gated. The three filters that made this cheap were already there:
+  `deliveredLevel`, `interjections()` and `CARD_ID_PREFIX` all exclude a research card.
+- **`FixtureRunRecord.research` comes off `research.jsonl`, never off the stage.** Two of the three
+  packet outcomes never become a card at all — an `unsourced` packet is discarded and a `rejected`
+  idea never searches — and those are the numbers the report is asked for; and a packet *brought
+  forward* (V2-015) replaces its own stage card with a later `createdAtMs`, so the stage remembers
+  only when it was asked for, not when the group first saw it. `researchFrom` therefore walks the
+  log and keeps each packet's **first** `card` line. Measured on `research-business-idea`: 4 ideas,
+  4 queued, 3 packets, the first card at 67.3 s catching its hook 0.1 s into a 19.8 s window.
+- **One eval fixture with research in it costs a dollar.** 62 model calls, $1.01 and 508 s of wall
+  clock for `research-business-idea` alone, because a grounded call with a tool resends the whole
+  request each round (V2-013) and three searches dominate the bill. Glimmer's judgment is free and
+  the report counts it that way (`local calls (Glimmer, $0)`), while every Spark call the research
+  pipeline makes — planner, cloud gate, each search — is already in the metered tokens, since they
+  all come from the one `createModel` client. Use `--fixtures` while tuning prompts.
+- **`npm run eval:report <old id>` rewrites that report with today's sections.** A report is
+  committed and belongs to the commit it was measured at, so rebuilding one just to read it leaves
+  a spurious diff — `git checkout` the file afterwards. Scoring stays backwards compatible: a
+  pre-V2-019 record has no `research`, which reads as "nothing was looked up" and skips the new
+  gate with `no research moments in this run`.
