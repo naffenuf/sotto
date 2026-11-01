@@ -229,3 +229,47 @@
   NEXT: archived the human report as tasks/checkpoint-voice-fail-1.md, unchanged. V2-008 stays false.
   Do not start V2-009 until a human writes tasks/checkpoint-voice.md after the ten-minute, two-person
   room retest (echo leakage, barge-in latency, false barge-ins, side talk and RESULT: PASS/FAIL).
+
+[2026-10-31 23:20] V2-008 — completed — human checkpoint retest PASS; recorded, no code changed.
+  tasks/checkpoint-voice.md (attempt 2, written by the human at 22:59) says RESULT: PASS for the
+  22:52 mic session. No voice leaked into the transcript; the self-echo filter logged no matches,
+  because Chrome's echo cancellation removes Sotto before transcription ever sees it. Three
+  barge-ins, all classified new_question and answered, flushing 3-7 ms after detection. No false
+  barge-ins. Wake word works with no comma, mid-sentence, and split across a pause; mentions were
+  correctly ignored, including one during playback. DEFERRED, and the next human session with a
+  second person must check them: human side talk during Sotto's speech, and how transcription
+  labels two people talking at once. The report is a solo test and says so.
+
+[2026-10-31 23:20] V2-008a — completed — Sotto's own speech is a labeled turn on the stream timeline.
+  shared/turns.ts gained SOTTO_SPEAKER, isSottoTurn, sottoTurnId and sottoTurn(); `sotto` and
+  `interrupted` are optional fields on TurnUpdate, so the bus event, SessionStore and the panel
+  carry Sotto's line without a parallel type. SessionTranscription.streamNow() is now public (the
+  projection pauseState already used): last frame's atMs plus elapsed clock time, which is the only
+  answer available between frames and the one thing that keeps a live session's entry off server
+  uptime. AnswerAgent takes streamNow and onSpoken; it stamps the stream clock at the first
+  sentence handed to the voice and records the line after the utterance is over — spokenText when
+  complete, spokenSoFar when interrupted, nothing when muted, nothing when a cancel produced no
+  playback report, nothing for an acknowledgment (only say() is stamped, never acknowledge()).
+  Both the success and the failure path record, so a stream that broke mid-answer still writes down
+  what was heard. SessionManager.recordSottoSpeech publishes to the bus, appends to transcript.md
+  and feeds the board, guarded on this still being the most recent session (as cards are, so a
+  post-Stop typed answer lands in that conversation). The observer is filtered at the
+  board.uncoveredTurns() call site; the wake watcher, AddressWatcher and BargeIn each early-return
+  on isSottoTurn; server/eval/runner.ts and server/e2e/live.ts drop Sotto turns at collection, which
+  is the only place they could reach scoring or the latency map. SessionStore inserts by offsetMs
+  and rewrites the file when a line lands out of order (Sotto's can arrive after the barge-in that
+  cut it off) and never adds Sotto to record.speakers.
+  DELIBERATE: the PRD says answer context *may* include Sotto's lines; it does not. finalTurns()
+  stays human-only, because a measured 663-word spoken answer would crowd the ten-minute window,
+  and an interrupted answer is already handed to the follow-up through AnswerAgent.interrupted.
+  Revisit if a later story wants Sotto to quote itself.
+  Checked: npm run typecheck, npm test (63 files, 844 tests), npm run build. Browser:
+  npm run verify:transcript — a new scripts/verify-sotto-transcript.mjs with /ws/events mocked
+  (the complete-and-interrupted pair is not something a conversation produces reliably, and it
+  costs no model call), driven through the webapp-testing with_server.py helper; screenshot
+  /tmp/sotto-shots/sotto-transcript.png inspected: Sotto's rows indented under an accent rule in
+  italics, brown Sotto chip that cannot be renamed, "(interrupted)" on the cut-off one, and both
+  sitting in conversation order between the human turns. No real API, no microphone, no audio out.
+  NEXT: V2-008b (faster acknowledgment — start the Spark address check on the settled partial) is
+  the lowest unfinished priority. V2-008c follows it. The checkpoint's deferred two-person checks
+  are not a blocker for either.

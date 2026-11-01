@@ -852,3 +852,31 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   uses the wall clock and an AbortSignal, never an awaited replay timer. Track the whole address
   queue for replay, drain it before answers, and stop it with the session. Playback commands are
   owned by BargeIn and never get a second address classification.
+
+- **Sotto's own line is a turn, and the timeline it sits on is not the clock.** V2-008a writes every
+  utterance Sotto speaks aloud into the transcript as a final `TurnUpdate` with `speaker: "Sotto"`
+  and `sotto: true` (`sottoTurn()` in `shared/turns.ts`), placed at **playback start on the
+  transcription stream's timeline** — `SessionTranscription.streamNow()`, the last frame's `atMs`
+  plus elapsed clock time. A live session's `Clock` counts from the start of the *process*, so
+  using `clock.now()` here is the same bug V2-008 fixed in the answer context. The text is Sotto's
+  own (`spokenText`), or only `spokenSoFar` with `interrupted: true` when the room was cut off;
+  a muted answer, an utterance nothing reported playing, and an acknowledgment write nothing —
+  only `SpokenAnswer.say()` is stamped, never `acknowledge()`. Both the success and the failure
+  path record, so a stream that broke mid-answer still says what was heard.
+- **Routing is the whole story: what hears Sotto's line and what must not.** It goes to the bus,
+  to `transcript.md` and to the **board** (labeled `Sotto`, so a fact Sotto established reaches
+  the notes). It must not go to the **observer** (filtered at the `board.uncoveredTurns()` call
+  site — an interjection arguing with Sotto's own answer helps nobody), nor to the wake watcher,
+  `AddressWatcher`, `BargeIn`, the policy or speaker introductions, which each also early-return
+  on `isSottoTurn`. `server/eval/runner.ts` and `server/e2e/live.ts` drop it at collection, which
+  is the only route by which it could reach moment scoring or the `arrival − endMs` latency map.
+  The self-echo matcher never sees it at all: it is injected downstream of
+  `SessionTranscription.accept`. **Answer context deliberately excludes it** — the PRD says "may",
+  and a measured 663-word spoken answer would crowd the ten-minute window, while an interrupted
+  answer already reaches the follow-up through `AnswerAgent.interrupted`.
+- **A transcript is in conversation order, not arrival order.** Sotto's line is written when its
+  utterance ends but belongs where playback began, so it can land *after* the barge-in that cut it
+  off. `SessionStore.appendTurn` inserts by `offsetMs` and rewrites the whole file when the insert
+  is not at the end (the same move `renameSpeaker` makes), and `withTurn` in
+  `useSessionEvents.ts` inserts by `startMs` — a no-op for the room's turns, which arrive in order.
+  Sotto is never added to `record.speakers`, so nothing offers to rename it.
