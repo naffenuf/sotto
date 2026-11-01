@@ -101,3 +101,34 @@ once, with a card on the stage saying so.
 - The `max` replay cannot see any of this timing (simulated time stands still inside
   `clock.track`), so `questionToPacketMs` reads near zero in `npm run eval` and in
   `fastPath.integration.test.ts`. Only the e2e charges for a search.
+
+[2026-11-01 07:46] V3-015 — completed — Sotto says "I'll check the drive time" at the first gap,
+and closes the loop when nothing comes back.
+- `server/question/Reservations.ts` is the module, built like `Greeting`: a line waiting for a gap,
+  the policy's own `inPause` on corrected silence read off the policy's own getter, and the pause
+  armed the way `InterjectionPolicy` arms its re-checks (a timer for the rest of the pause, plus the
+  window's expiry; nothing at all while somebody is talking). `reserveLine`/`noAnswerLine` are pure
+  and local — no model call, which is the whole reason a claim can be made in five seconds.
+- **Budget**: `policy.ts` gained the pure `spendAllowed()` that `decide()` now shares, and
+  `InterjectionPolicy` gained `unpromptedAllowed()` + `noteSpokenContribution()`. A reservation is
+  *the* contribution; the answer V3-004 speaks is its completion. The spend is taken where the claim
+  is really made, so muted / no page attached spends nothing, and `cautious` says nothing at all.
+- **Yielding** is `SessionManager`'s `onHuman` (the echo-filtered side) calling `yieldToHuman()`.
+  A yield that arrives while the voice is still *opening* is remembered rather than lost, and a
+  session stopping is never mistaken for a yield — cancellation has its own flag, as V2-007 learned.
+- **Ordering surprise, and a real rule**: in a `max` replay the search *always* finishes before the
+  claim's pause timer can fire, because simulated time stands still inside `clock.track`. So a
+  model whose `grounded` throws tests the new `overtaken` rule (drop the claim: there is nothing
+  left to claim and the card already says so), not the claim. The SessionManager wiring test
+  therefore has a `grounded` that comes back.
+- **Live checkpoint** (`npm run e2e -- --fixtures offsite-plan`, 7/7, $0.6226 of $1.00): the claim
+  was **not said** — `no_gap`, which is the PRD's own fallback. Measured: question final 57.4 s,
+  classifier verdict 59.1 s (1.70 s), next final 63.3 s with the next speaker starting before
+  700 ms of quiet had accrued, window expired 64.1 s. So live the window is 5 s *minus* the
+  1.7–3.0 s classification, and this fixture has no gap in what is left. Nothing regressed:
+  question -> packet 13.2 s, 3 utterances, 1,333 characters.
+- Next (V3-004) should know: `ReservationsOptions.isCurrent` is the still-current seam to wire, the
+  `answering` guard is what keeps a claim off the top of an answer being written, and
+  `spokenContributionKinds` is where `"answer"` joins `reserve`/`no_answer`. If V3-016 finds recall
+  on reservations poor, the lever is the PRD's `RESERVE_WINDOW_MS` (a PRD change), never the gap
+  threshold, which is the policy's.

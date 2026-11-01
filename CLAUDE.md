@@ -1406,3 +1406,35 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   list, numbers rounded — and on `offsite-plan` the honest answer to both planted questions is
   "I couldn't find a straight answer … there's no farmhouse or starting point named", which is
   the model doing the right thing with an underspecified question, not a regression.
+
+- **A claim is written locally, and that is the only reason it is fast.** V3-015's reservation —
+  "I'll check the drive time", said at the first gap of `PAUSE_MS` inside `RESERVE_WINDOW_MS`
+  (5,000 ms) of the classifier's verdict — is `reserveLine(topic)` in
+  `server/question/Reservations.ts`, a pure function over the three-to-five-word `topic` V3-002
+  already produced. The module is `Greeting`'s shape: the gap is the policy's own `inPause` on
+  corrected silence, read off the policy's own getter so Sotto's playback counts as somebody
+  talking, and it is *armed* the way `InterjectionPolicy` arms its re-checks (a timer for the rest
+  of the pause plus the window's expiry; **nothing at all** while somebody is talking, because the
+  turn closing is what arrives next). Budget is the interjection budget: `spendAllowed()` in
+  `server/interject/policy.ts` is now pure and shared by `decide()` and the policy's new
+  `unpromptedAllowed()`/`noteSpokenContribution()`, so a claim and an interject ration each other —
+  and the spend is taken where the claim is *really* made, so a muted or unattached voice spends
+  nothing. Measured live (`npm run e2e -- --fixtures offsite-plan`, 7/7, $0.62): the claim was
+  **not said**, `no_gap`, which is the PRD's own fallback. Question final 57.4 s, verdict 59.1 s
+  (1.70 s of classification), next final 63.3 s with the next speaker starting before 700 ms of
+  quiet had accrued, window expired 64.1 s. **Live, the window is 5 s minus a 1.7–3.0 s
+  classification; in a `max` replay it is the whole 5 s**, because simulated time stands still
+  inside `clock.track`.
+- **Tracked work always beats a pause timer in a replay, which changes what a test proves.** A
+  `max` replay settles every tracked task before advancing the clock, so a research search — even
+  one that takes 20 s live — finishes *before* a claim waiting on 700 ms of simulated silence can
+  be said. A fake model whose `grounded` throws therefore exercises V3-015's `overtaken` rule (the
+  search got there first, so the claim is dropped rather than said and immediately taken back)
+  rather than the claim itself; the wiring test needs a `grounded` that comes back. Same shape as
+  the V2-008b lesson about `instantWallClock`: a fake clock decides which branch a test is really
+  on.
+- **A cancellation needs its own flag, not the end reason.** `Reservations` sets `yielded` only in
+  `yieldToHuman()`, so a session stopping mid-claim is recorded as `session_ended` rather than as
+  the room talking over Sotto — and a yield arriving while `voice.begin()` is still in flight
+  (~300 ms) is *remembered*, cancelling the utterance the moment it exists. The same reason V2-007
+  gave cancellation its own state instead of trusting the synthesis result.
