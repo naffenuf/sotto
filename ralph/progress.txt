@@ -400,3 +400,31 @@
   exists, and remember the PRD's success metric compares Glimmer-gate recall to Spark's within 0.1.
   Budget the gate's 17 s: it must stay off the critical path of a spoken answer.
   NEXT: V2-011 (new candidate types). 11 stories left.
+
+[2026-11-01 01:08] V2-011 — completed — Six candidate types; a research hook never reaches the policy.
+  - candidateTypes += unanswered_question, research_hook. dropped_thread is now an IDEA or a RISK
+    raised and abandoned; its old "who owns the data?" example moved to unanswered_question, which
+    is where the no-overlap criterion is actually enforced — in the prompt, since the type is just
+    an enum. moment-dropped's planted moment is an idea, so it is unaffected.
+  - Routing is one branch in SessionManager.modelLoops's onCandidate, beside the factual_error one:
+    a research_hook goes into ModelLoops.researchHooks (also on RunningSession), is logged once and
+    written to timing.jsonl as stage "research_hook", and the policy never hears of it.
+    V2-012 ATTACHES THE GATE TO THAT BRANCH — the hooks are already queued for it.
+  - Nothing else in the pipeline branches on candidate type (the policy, the card, the delivery and
+    the feedback log are all type-agnostic), so adding a type is three edits: candidateTypes, the
+    `type` description in observerCandidatesJsonSchema, and a section in observer.md.
+    shared/candidates.test.ts derives its enum assertion from candidateTypes and needed no change.
+  Checked: npm run typecheck, npm test (67 files, 917 tests), the new
+  npx vitest run --config vitest.integration.config.ts server/interject/candidateTypes.integration.test.ts
+  (4/4 in 618 s, both v2 fixtures replayed at max through the real model), and
+  observer.integration.test.ts re-run as a prompt regression check (5/5 in 147 s) — including its
+  "stays quiet enough" bar of <= 8 non-duplicate candidates, so the two extra types have not made
+  the observer chatty on the core fixtures. No browser check (no UI criterion); npm run build not
+  re-run (no new runtime file outside tests).
+  WATCH OUT: MAX_CANDIDATES_PER_RUN is still 3 and hooks now compete for those slots with
+  interjection candidates. If V2-019/V2-020 see recall drop on the core fixtures, that is the first
+  place to look — not the thresholds.
+  FOR V2-012: a hook's `headline` is the question to look up (observer.md says so in as many
+  words), `detail` the reasoning and `evidenceTurnIds` the turns it rests on — i.e. the raw material
+  for a ResearchIdea's { topic, question, why, sourceTurnIds } without another model call.
+  NEXT: V2-012 (research planner and gate). 10 stories left.

@@ -240,8 +240,8 @@
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (67 files, 917 tests) and the real-API integration test pass. candidateTypes is six long: unanswered_question (a direct question nobody answered before the talk moved on) and research_hook, with dropped_thread narrowed to an idea or a risk raised and abandoned \u2014 its old question example moved to the new type, so the two no longer overlap. Routing is one branch in SessionManager.modelLoops's onCandidate: a research_hook leaves the interjection path for good (collected in ModelLoops.researchHooks, logged once and written to timing.jsonl as stage \"research_hook\"), a factual_error still detours through the verifier, everything else goes to the policy. V2-012 attaches the gate to that branch. observer.md gained a section per type with one example each, plus the paragraph that a hook interrupts nobody (so the bar is \"would the answer be useful\" rather than \"is this worth stopping them for\") and the instruction to write the headline as the question to look up. New integration test server/interject/candidateTypes.integration.test.ts replays both v2 fixtures at max: 4/4 in 618 s \u2014 offsite-plan yields an unanswered_question about food, research-business-idea at least one research_hook, and no decision line in either session names a hook. observer.integration.test.ts re-run as a prompt regression check: 5/5 in 147 s, including the \u2264 8 non-duplicate candidates bar, so the two extra types did not make the observer chatty on the core fixtures."
     },
     {
       "id": "V2-012",

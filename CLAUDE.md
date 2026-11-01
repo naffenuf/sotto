@@ -980,3 +980,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   per card. `SessionManager.createGlimmer` defaults to `() => null` and `server/app.ts` supplies
   `glimmerFromEnv()`, exactly as it does for the voice: that is what keeps `npm test` off the local
   server as surely as it is off the network.
+
+- **Adding a candidate type is three edits, and two of the six never reach the policy's door.**
+  Nothing in the interjection pipeline branches on `CandidateType` — the policy, `delivery.ts`, the
+  card and `feedback.jsonl` are all type-agnostic — so V2-011's `unanswered_question` and
+  `research_hook` cost exactly `candidateTypes`, the `type` description inside
+  `observerCandidatesJsonSchema` (strict structured output *does* show descriptions to the model,
+  unlike Glimmer's compiled grammar) and a section in `server/prompts/observer.md`;
+  `shared/candidates.test.ts` derives its enum assertion from `candidateTypes` and needed no
+  change. The routing is one branch in `SessionManager.modelLoops`'s `onCandidate`: a
+  `factual_error` detours through the verifier, a **`research_hook` leaves the interjection path
+  for good** — it is an idea for the research gate (V2-012), so it is queued in
+  `ModelLoops.researchHooks`, logged as `stage: "research_hook"` in `timing.jsonl`, and the policy
+  never hears of it — and everything else goes straight to the policy. The no-overlap rule between
+  `dropped_thread` (an idea or a risk raised and abandoned) and `unanswered_question` (a direct
+  question nobody answered) lives only in the prompt, because the type is just an enum: moving
+  `dropped_thread`'s old "who owns the data?" example to the new type *is* the enforcement.
+  `MAX_CANDIDATES_PER_RUN` is still 3, so hooks now compete with interjection candidates for those
+  three slots — look there first if recall on the core fixtures drops.
