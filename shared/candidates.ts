@@ -2,11 +2,13 @@
  * What the observer noticed, and what the policy will decide about it
  * (PRD US-012–US-014).
  *
- * A **candidate** is one thing that might be worth saying out loud: a
- * contradiction, a factual error, an untested assumption, a dropped thread.
- * Noticing is cheap and saying something is expensive, so every candidate is
- * written down with its scores (`candidates.jsonl`) and only a few of them
- * ever reach the stage.
+ * A **candidate** is one thing the observer noticed: a contradiction, a
+ * factual error, an untested assumption, a dropped thread, a question nobody
+ * answered, or something worth looking up (V2-011). Noticing is cheap and
+ * saying something is expensive, so every candidate is written down with its
+ * scores (`candidates.jsonl`) and only a few of them ever reach the stage —
+ * and a `research_hook` is not for the stage at all, but for the research
+ * gate (V2-012).
  *
  * The limits in the PRD — ninety characters of headline, sixty words of
  * detail, twenty of "why now" — are asked for in the prompt and in the
@@ -19,20 +21,31 @@ import type { Citation, EvidenceQuote } from "./cards.js";
 import type { Decision, DecisionReason, PolicyDecision } from "./policy.js";
 
 /**
- * The four things the observer looks for.
+ * The six things the observer looks for.
  *
  * - `contradiction`: what was just said cannot hold together with something
  *   the group already settled or stated.
  * - `factual_error`: a checkable claim that looks wrong. Verified against the
  *   web before it ever reaches the group (US-013).
  * - `untested_assumption`: the plan rests on something nobody has checked.
- * - `dropped_thread`: a question or risk the group raised and walked away from.
+ * - `dropped_thread`: an idea or a risk the group raised and abandoned, now
+ *   bearing on where they have got stuck. A question nobody answered is an
+ *   `unanswered_question`, not this: the two were one type until V2-011 split
+ *   them, and they do not overlap.
+ * - `unanswered_question`: somebody asked the group something directly,
+ *   nobody answered it, and the conversation moved on.
+ * - `research_hook`: outside information would clearly settle something —
+ *   asked for out loud, or a number nobody in the room can back up. The one
+ *   type that never reaches the interjection policy: a hook is an *idea for
+ *   the research gate* (V2-012), not something to say to anybody.
  */
 export const candidateTypes = [
   "contradiction",
   "factual_error",
   "untested_assumption",
   "dropped_thread",
+  "unanswered_question",
+  "research_hook",
 ] as const;
 export type CandidateType = (typeof candidateTypes)[number];
 
@@ -319,7 +332,11 @@ export const observerCandidatesJsonSchema = {
               "contradiction: conflicts with something stated or decided. " +
               "factual_error: a checkable claim that looks wrong. " +
               "untested_assumption: the plan rests on something nobody checked. " +
-              "dropped_thread: a question or risk the group walked away from.",
+              "dropped_thread: an idea or a risk the group raised and abandoned. " +
+              "unanswered_question: a direct question nobody answered before the " +
+              "conversation moved on. " +
+              "research_hook: outside information would clearly help, and a web " +
+              "search could find it.",
             enum: [...candidateTypes],
           },
           headline: {

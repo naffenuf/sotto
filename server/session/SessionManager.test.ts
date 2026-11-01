@@ -532,6 +532,130 @@ describe("SessionManager, board and observer", () => {
     const ids = new Set(noticed.map((record) => record.candidate.id));
     for (const record of checked) expect(ids.has(record.candidateId)).toBe(true);
   });
+
+  /**
+   * V2-011's routing: a question nobody answered is an interjection like any
+   * other, and a research hook leaves the interjection path entirely — it is
+   * written down, logged and kept for the research gate (V2-012), and the
+   * policy never hears about it.
+   */
+  it("sends an unanswered question to the policy and a research hook nowhere near it", async () => {
+    /** Distinct subjects, so the duplicate rule passes every look on. */
+    const subjects = [
+      "the food",
+      "the projector",
+      "the drive home",
+      "the Thursday slot",
+      "the budget sign-off",
+      "the venue deposit",
+      "the hotel rooms",
+      "the dinner table",
+      "the whiteboards",
+      "the train tickets",
+    ];
+
+    /** One hook and one unanswered question per look, and no board items. */
+    class NoticingModel implements ModelClient {
+      private looks = 0;
+
+      async structured(call: StructuredCall): Promise<unknown> {
+        if (call.label === "board") return { operations: [] };
+        this.looks += 1;
+        const subject = subjects[(this.looks - 1) % subjects.length];
+        const shared = {
+          detail: "Nobody came back to it.",
+          whyNow: "They are about to move on",
+          evidenceTurnIds: ["0:0"],
+          relatedBoardItemIds: [],
+          scores: { relevance: 0.8, novelty: 0.7, importance: 0.6, confidence: 0.5 },
+        };
+        return {
+          candidates: [
+            { ...shared, type: "unanswered_question", headline: `Nobody answered who handles ${subject}` },
+            { ...shared, type: "research_hook", headline: `What does ${subject} cost per person?` },
+          ],
+        };
+      }
+
+      async prose(): Promise<never> {
+        throw new Error("nobody asks Sotto anything here");
+      }
+
+      async grounded(): Promise<never> {
+        throw new Error("a hook is never verified");
+      }
+    }
+
+    const bus = new EventBus(quiet);
+    const lines: CandidateLogLine[] = [];
+    const timing: Record<string, unknown>[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: (record: unknown) => lines.push(record as CandidateLogLine),
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendTiming: (event: Record<string, unknown>) => timing.push(event),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => new NoticingModel(),
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-contradiction" });
+    await ended;
+
+    const noticed = lines
+      .filter((line): line is CandidateLogRecord => line.kind === "candidate")
+      .map((record) => record.candidate);
+    const hooks = noticed.filter((candidate) => candidate.type === "research_hook");
+    const questions = noticed.filter((candidate) => candidate.type === "unanswered_question");
+    // Both kinds are written down before anything decides anything.
+    expect(hooks.length).toBeGreaterThan(0);
+    expect(questions.length).toBeGreaterThan(0);
+
+    const decided = lines.filter((line): line is DecisionLogRecord => line.kind === "decision");
+    const passed = new Set(
+      questions.filter((candidate) => candidate.duplicateOf === undefined).map((one) => one.id),
+    );
+    expect(decided.length).toBeGreaterThan(0);
+    for (const decision of decided) {
+      expect(decision.type).toBe("unanswered_question");
+      expect(passed.has(decision.candidateId), `${decision.candidateId} was decided unasked`).toBe(
+        true,
+      );
+    }
+    const hookIds = new Set(hooks.map((candidate) => candidate.id));
+    for (const decision of decided) {
+      expect(hookIds.has(decision.candidateId), "a research hook reached the policy").toBe(false);
+    }
+
+    // Each one that got through is in the timing log as a hook, which is the
+    // seam the research gate (V2-012) attaches to.
+    const logged = timing.filter((event) => event.stage === "research_hook");
+    expect(logged.map((event) => event.candidateId)).toEqual(
+      hooks.filter((candidate) => candidate.duplicateOf === undefined).map((one) => one.id),
+    );
+  });
 });
 
 describe("SessionManager, delivery and feedback", () => {

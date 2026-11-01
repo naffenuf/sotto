@@ -34,7 +34,7 @@ import {
 } from "../../shared/artifacts.js";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { StageCard } from "../../shared/cards.js";
-import type { CandidateType } from "../../shared/candidates.js";
+import type { Candidate, CandidateType } from "../../shared/candidates.js";
 import type { StatusState } from "../../shared/events.js";
 import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
@@ -222,6 +222,13 @@ interface ModelLoops {
   answers: AnswerAgent | null;
   /** Every card the policy delivered, by card id (US-015). */
   deliveries: Map<string, Delivered>;
+  /**
+   * The `research_hook` candidates this session noticed, oldest first
+   * (V2-011). They never go to the interjection policy: a hook is an idea to
+   * look something up, not something to say, so it waits here for the
+   * research gate (V2-012) to score it.
+   */
+  researchHooks: Candidate[];
 }
 
 /** One card that reached the stage, kept so feedback can be filed on it. */
@@ -298,6 +305,8 @@ interface RunningSession {
   greeting: Greeting | null;
   /** The cards this session has put on the stage, by card id (US-015). */
   deliveries: Map<string, Delivered>;
+  /** The research ideas the observer noticed, waiting for the gate (V2-011). */
+  researchHooks: Candidate[];
   /** The session's clock: simulated for a replay, live otherwise. */
   clock: Clock;
   /** What the transcription dot shows once the session is published. */
@@ -861,9 +870,10 @@ export class SessionManager {
    * The board writes `board.json`/`board.md` and pushes the board to every
    * attached browser; the observer looks on finalized turns using the latest
    * board plus uncovered turns. A claim that looks wrong goes to
-   * the verifier first and everything else straight to the policy, which
-   * decides whether and when it is worth saying. Every candidate, check and
-   * decision lands in `candidates.jsonl` on the way past. The answer agent
+   * the verifier first, a research hook leaves the interjection path
+   * altogether (V2-011), and everything else goes straight to the policy,
+   * which decides whether and when it is worth saying. Every candidate, check
+   * and decision lands in `candidates.jsonl` on the way past. The answer agent
    * hangs off the side of all that, reading the board and the transcript but
    * waiting for none of it.
    *
@@ -899,12 +909,16 @@ export class SessionManager {
         policy: null,
         answers: null,
         deliveries: new Map(),
+        researchHooks: [],
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
       if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
     };
     const deliveries = new Map<string, Delivered>();
+    // The hooks this session noticed, oldest first. They are already in
+    // `candidates.jsonl`; this is the queue V2-012's gate reads.
+    const researchHooks: Candidate[] = [];
     const onTiming = (event: Record<string, unknown>): void => store.writer?.appendTiming?.(event);
     const policy = new InterjectionPolicy({
       clock,
@@ -931,10 +945,14 @@ export class SessionManager {
       model,
       logger: this.logger,
       onRecord: (record) => store.writer?.appendCandidate(record),
-      // A claim that looks wrong is checked against the web before it can be
-      // said to anyone (US-013); everything else goes straight to the policy.
+      // Three destinations. A claim that looks wrong is checked against the
+      // web before it can be said to anyone (US-013); a research hook is an
+      // idea for the research gate (V2-011) and is never said to the room at
+      // all, so it leaves the interjection path here — V2-012 attaches the
+      // gate to this branch; and everything else goes straight to the policy.
       onCandidate: (candidate) => {
-        if (candidate.type === "factual_error") { onTiming({ stage: "verification_start", atMs: clock.now(), candidateId: candidate.id }); verifier.verify(candidate); }
+        if (candidate.type === "research_hook") { researchHooks.push(candidate); this.logger.log(`[research] hook ${candidate.id}: ${candidate.headline}`); onTiming({ stage: "research_hook", atMs: clock.now(), candidateId: candidate.id, headline: candidate.headline }); }
+        else if (candidate.type === "factual_error") { onTiming({ stage: "verification_start", atMs: clock.now(), candidateId: candidate.id }); verifier.verify(candidate); }
         else policy.accept(candidate);
       },
       onModelState,
@@ -993,7 +1011,7 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries };
+    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, researchHooks };
   }
 
   /**
