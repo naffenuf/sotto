@@ -1705,3 +1705,36 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   it is one of the three fixtures (`SPEECH_QUIET_FIXTURES`) the false-speech gate is measured on.
   `npm run eval:ceiling -- --speak` still keys off the *type*, so it needed no change and reports
   the new window as reachable (13.3 s wide, 1,109 ms of real quiet, 659 ms of margin at 450).
+
+- **A past session folder is a fixture capture, and that is the whole shadow run.**
+  `sessions/<folder>/events.jsonl` is written by `SessionStore` from the frames the realtime API
+  really sent, in exactly the format `npm run capture` writes — so V3-016's `npm run shadow`
+  replays a real meeting through the pipeline with one new seam
+  (`SessionManager.createReplaySource`, default `EventReplaySource.forFixture`, plus
+  `EventReplaySource.forPath`) and the eval's own `replayFixture`. Two things come free and are
+  worth knowing before building anything else on it: an `events` session **never builds a
+  `Greeting`**, so "the hello is suppressed" needed no code, and the echo filter already kept
+  Sotto's own speech out of `events.jsonl` (V2-006), so a shadow run hears only the room. What it
+  costs is what the conversation would have cost — 34–42 model calls and $0.39–0.62 for four
+  minutes — so `shadow/runs/<session>.json` is saved and `--report` rebuilds the markdown for
+  nothing, the same split `npm run eval:report` makes and for the same reason.
+- **Nothing said out loud is the designed answer at the default settings, and a report has to say
+  so.** Replaying a real 24-turn product conversation at `normal/normal` produced **zero**
+  unprompted lines: Sotto speaks unasked only for an `open_question` it can look up (V3-002,
+  V3-004), a read-back at frequency `often` (V3-013) or a verified factual error at boldness
+  `bold` (V3-008) — everything else it notices is a card. The same pipeline at `often/bold` on a
+  second real conversation said a read-back and raised the thing that mattered (a $900 caterer
+  against a $500 budget stated four minutes earlier). A shadow report that only showed the
+  default run would read as broken rather than as restrained, which is why the empty case spells
+  out the three routes and names the flags.
+- **"Almost said" is one list with three readers.** `SuppressedCandidate` lives in
+  `shared/candidates.ts` now, `SessionDigest.almostSaid()` computes it, and
+  `SessionManager.recordCandidate` — the one place every `candidates.jsonl` line already goes —
+  publishes it to the bus as a `suppressed` event, so `digest.md`'s "What Sotto almost said", the
+  shadow report's last section and the stage's tray can never drift. Two details: the publish is
+  guarded on `this.last` rather than `this.current`, because the policy's final look into the
+  trailing silence happens *after* Stop and is where most of what was held back is accounted for;
+  and the bus clears it on a session **starting**, like the cards, so a finished conversation's
+  restraint is still readable. The snapshot is **eleven** events plus one per card. A candidate
+  the observer dropped as `duplicateOf` is in the list too, reason "duplicate of cand-N" — not a
+  policy decision, but still a thing Sotto noticed and did not say.

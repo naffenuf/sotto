@@ -452,3 +452,48 @@ What the next iteration needs to know.
   36 min and the e2e ~$2.3; neither is in V3-010's criteria. V3-016 (shadow run) and V3-011 (the
   live checkpoint) are the next things that will exercise this, and V3-016 in particular should
   reuse `spokenRecords`/`SpokenScore` rather than re-reading `timing.jsonl` itself.
+
+[2026-11-01 11:25] V3-016 — completed — npm run shadow replays a past mic session through the
+whole v3 pipeline and writes tasks/shadow-<session>.md; the stage got the "almost said" tray.
+
+What was built:
+- `server/shadow/shadow.ts` (the replay and what it collects) and `server/shadow/report.ts`
+  (pure markdown over a `ShadowRunRecord`), driven by `scripts/shadow.ts`.
+  `npm run shadow -- <folder>` / `-- --list` / `-- <folder> --report` /
+  `-- <folder> --frequency often --boldness bold`.
+- One new seam: `SessionManager.createReplaySource` (default `EventReplaySource.forFixture`),
+  plus `EventReplaySource.forPath`. The replay itself is the eval's `replayFixture`, which
+  grew the same option. A past session folder's `events.jsonl` is the same file in the same
+  format as a fixture capture, so nothing else had to change.
+- The "almost said" tray: `SuppressedCandidate` moved from `server/session/digest.ts` into
+  `shared/candidates.ts`, a `suppressed` event joined `ServerEvent`, the bus remembers it
+  (snapshot is **eleven** events plus one per card) and clears it on a session *starting*, and
+  `SessionManager.recordCandidate` publishes `store.digest.almostSaid()` — guarded on `last`
+  rather than `current`, so the policy's final look after Stop reaches it.
+  `web/src/AlmostSaid.tsx` is the collapsed list under the cards; `/dev/cards` carries a sample.
+
+Measured, and committed as the two reports:
+- `tasks/shadow-2026-10-30_0919-mic.md` — normal/normal, 24 turns, 42 calls, $0.62. **Nothing
+  said out loud**, which is the designed answer at the defaults. 4 classifications (2 decision,
+  1 rhetorical, 1 none, no open_question), 2 turns addressed Sotto, 4 cards including
+  "We said one garden first — where does launching in all six fit?".
+- `tasks/shadow-2026-10-30_2141-mic.md` — often/bold, 11 turns, 34 calls, $0.39. One read-back
+  said, and a glow on "The $900 caterer — how does that fit within the $500 budget?" against a
+  budget stated four minutes earlier. This is the report with something to judge.
+
+For the next iteration:
+- **V3-011 is the next story and it is a human checkpoint**: `ralph.sh` stops until
+  `tasks/checkpoint-speaking.md` exists. Before that session a human has to mark up the two
+  shadow reports (replace each `_(welcome / not / wrong)_`). V3-011's notes now name them.
+- Neither real run **held anything back at the end** — every candidate was delivered or a
+  duplicate — so the tray's own list was empty in both. Its look was checked on `/dev/cards`
+  and its wiring by a new assertion in `SessionManager.test.ts`'s board-and-observer test
+  (which does produce `silent`/`below_threshold` decisions). Note the digest counts a
+  `duplicateOf` candidate as suppressed too, with reason "duplicate of cand-N".
+- `shadow/sessions/` and `shadow/runs/` are gitignored; `--report` rebuilds a committed report
+  from the run record for nothing, which is how both were re-rendered after the table markup
+  was fixed without paying for a second replay.
+- One `question` call in the first 0919 run came back `finish_reason: "length"` (2,000
+  completion tokens, 1,998 of them reasoning) and fell back to `none`. One in forty, as V3-002
+  measured; worth watching if it gets commoner.
+- `fixtures/scripts/launch-workshop.json` is still untracked and still not mine. Left alone.
