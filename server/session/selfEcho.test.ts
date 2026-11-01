@@ -35,6 +35,7 @@ function setup(withModel = true) {
     appendTiming: (record) => timing.push(record),
     appendAnswer: (answer) => answers.push(answer),
     appendResearch: () => {},
+    writePacket: () => {},
     renameSpeaker: () => {},
     setSettings: () => {},
     writeBoard: () => {},

@@ -632,7 +632,7 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `tools: [{type:"web_search"}, {type:"function", strict:true, …}]` together and completes
   normally, so there is no classification call. What *does* need handling is that a round ending
   in a `function_call` carries **no answer at all** — `reasoning`, a narration `message`, the
-  call, nothing else — so `MuseClient.prose` is a loop (`PROSE_MAX_ROUNDS` 3): run the handler,
+  call, nothing else — so `MuseClient.prose` is a loop (`TOOL_MAX_ROUNDS` 3): run the handler,
   push the `function_call` verbatim plus a `function_call_output`, ask again. Only the user
   message and the call/result pairs are resent; `store: false` means the model's own reasoning and
   narration are not kept anyway. The tools stay declared on the last round too — a request whose

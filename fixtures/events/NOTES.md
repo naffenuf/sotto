@@ -258,7 +258,7 @@ What *does* need handling is the shape of the turn that calls a tool:
   diagram on screen") and the `function_call`, and nothing else. The answer only exists
   after the result goes back as a `function_call_output` — a second round, measured at
   1.8 s and 310 output tokens, whose message id begins `msg_` as usual. Hence
-  `PROSE_MAX_ROUNDS`.
+  `TOOL_MAX_ROUNDS`.
 - **The follow-up turn needs three items, not the whole transcript**: the original user
   message, the `function_call` item verbatim, and the `function_call_output`. The model's
   own `reasoning` and narration items can be dropped (`store: false` means nothing is kept
@@ -267,6 +267,28 @@ What *does* need handling is the shape of the turn that calls a tool:
   arguments string arrived in **one** delta for a 6 kB document, so there is nothing to
   gain by reading it incrementally; the `function_call` item on the final response is what
   `prose` uses.
+
+### With strict structured output as well (V2-013)
+
+The research runner wants all three at once: a strict `json_schema` reply, `web_search`
+and `show_html`. **The API accepts that too.** Probed against the real endpoint with the
+packet schema and a competitor-pricing question: round one came back `completed` in
+12.2 s — `reasoning`, three narration `message`s, eight `web_search_call`s and a
+`function_call` carrying 6 kB of HTML, and **no JSON at all**, exactly as the prose shape
+does. Round two, with the `function_call` and a `function_call_output` appended and both
+tools still declared, returned the packet as JSON.
+
+Two things to know before using it:
+
+- **Each round searches for itself.** `store: false` means round two gets the user message
+  and the call pair and nothing else, so it ran nine more `web_search_call`s of its own.
+  Measured 56 k input tokens a round, so a packet with a visual costs roughly twice one
+  without (~$0.08 against ~$0.17 at Spark's prices). That is why
+  `server/prompts/research-packet.md` tells the model a visual costs it a round and to
+  skip it when unsure.
+- The citations still do not come from the annotations: the reply is pure JSON, so the
+  `sources` the model lists are the supply and they have to be resolved against
+  `include: ["web_search_call.action.sources"]` — US-013's rule, unchanged.
 
 Measured end to end on `ask-diagram` (`npm run verify:artifact`, one real answer): the
 model draws a 2.6–2.9 kB self-contained document with inline CSS and no external

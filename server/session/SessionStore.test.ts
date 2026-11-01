@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -319,6 +319,24 @@ describe("SessionStore files the later stories own", () => {
     ).toBe(true);
     expect(read(saved.dir, relative as string)).toBe("<p>hi</p>");
     expect(() => saved.writeArtifact("", "<p>hi</p>")).toThrow(/usable artifact file name/);
+  });
+
+  it("writes a research packet as JSON and markdown under research/ (V2-013)", () => {
+    const saved = store();
+    saved.writePacket("packet-1", { id: "packet-1", title: "Otter is $16.99" }, "# Otter is $16.99");
+    expect(JSON.parse(read(saved.dir, join("research", "packet-1.json")))).toEqual({
+      id: "packet-1",
+      title: "Otter is $16.99",
+    });
+    expect(read(saved.dir, join("research", "packet-1.md"))).toBe("# Otter is $16.99\n");
+  });
+
+  it("refuses a packet id the server would never have handed out", () => {
+    const warnings: string[] = [];
+    const saved = store({ warn: (line) => warnings.push(line) });
+    saved.writePacket("../../escape", {}, "# nope");
+    expect(existsSync(join(saved.dir, "research"))).toBe(false);
+    expect(warnings.join(" ")).toContain("refusing to write a research packet");
   });
 });
 

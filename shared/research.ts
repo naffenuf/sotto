@@ -16,8 +16,14 @@
  * rather than a ranking: everything it sees is written to `research.jsonl`,
  * and only the ideas above {@link RESEARCH_GATE_THRESHOLD} are queued for the
  * runner (V2-013), which the budget then starts at most a few of.
+ *
+ * What the runner makes of an idea is a {@link ResearchPacket} — a title, a
+ * teaser, a few key points and, above all, **sources**: a packet with none is
+ * thrown away, because a finding nobody can check is worse than silence.
  */
 import { z } from "zod";
+import type { Artifact } from "./artifacts.js";
+import type { Citation } from "./cards.js";
 import { clipChars, clipWords } from "./candidates.js";
 
 /** Where an idea came from. Recorded, because the two differ in quality. */
@@ -322,7 +328,7 @@ export interface ResearchGateRecord {
   error?: string;
 }
 
-/** One line of `research.jsonl`: a job the budget let start (V2-013 runs it). */
+/** One line of `research.jsonl`: a job the budget let start; the runner runs it. */
 export interface ResearchStartRecord {
   kind: "start";
   atMs: number;
@@ -333,9 +339,6 @@ export interface ResearchStartRecord {
   /** Jobs started in the last {@link RESEARCH_WINDOW_MS}, including this one. */
   startedInWindow: number;
 }
-
-/** Every kind of line `research.jsonl` holds. V2-013 adds the packet. */
-export type ResearchLogLine = ResearchIdeaRecord | ResearchGateRecord | ResearchStartRecord;
 
 /** How long the "jobs started" budget looks back. */
 export const RESEARCH_WINDOW_MS = 10 * 60_000;
@@ -386,4 +389,224 @@ export function hookIdea(hook: {
     why: clipWords(oneLine(why), WHY_MAX_WORDS),
     sourceTurnIds: [...hook.evidenceTurnIds],
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * The packet (V2-013): what one search came back with.
+ * ------------------------------------------------------------------ */
+
+/** Characters of title. It names the finding on a card, in a glance. */
+export const PACKET_TITLE_MAX_CHARS = 80;
+
+/** Words of teaser. The PRD's "one or two sentences", as a number. */
+export const PACKET_TEASER_MAX_WORDS = 40;
+
+/** Words of one key point. A finding, not a paragraph about it. */
+export const KEY_POINT_MAX_WORDS = 30;
+
+/** Key points one packet may carry. */
+export const MAX_KEY_POINTS = 5;
+
+/** Sources one packet may carry. One good page beats five weak ones. */
+export const MAX_PACKET_SOURCES = 5;
+
+/**
+ * One finished piece of background research.
+ *
+ * Exactly the PRD's fields. `sources` is the load-bearing one: a packet that
+ * resolved none of the pages it claimed to read is discarded rather than
+ * shown (see {@link ResearchPacketRecord}'s `unsourced`), because a research
+ * card is a claim about the world and the group has to be able to follow it
+ * back.
+ */
+export interface ResearchPacket {
+  /** Unique within the session: `packet-1`, `packet-2`, … */
+  id: string;
+  /** The {@link ResearchIdea} it answers. */
+  ideaId: string;
+  /** What the finding is called, on a card and in `research/<id>.md`. */
+  title: string;
+  /** One or two sentences: what the search found, as the card's one line. */
+  teaser: string;
+  /** The findings themselves, best first. */
+  keyPoints: string[];
+  /** Pages the search really returned, resolved the way a verdict's are. */
+  sources: Citation[];
+  /**
+   * HTML the model drew for this finding, when a table or a diagram said it
+   * better than a list (US-020's `show_html`).
+   *
+   * The PRD's `{ title, path }` plus the URL it is served from, which is what
+   * a card needs to put it in a frame (V2-014).
+   */
+  visual?: Artifact;
+  /** When it was finished, on the session clock. */
+  createdAtMs: number;
+  /** Real milliseconds the search took: a model call is wall-clock work. */
+  latencyMs: number;
+}
+
+/** Collapses whitespace and drops the blanks: every line of a packet is one line. */
+function lines(list: readonly string[], maxWords: number, limit: number): string[] {
+  const kept: string[] = [];
+  for (const raw of list) {
+    const text = clipWords(oneLine(raw), maxWords);
+    if (text !== "" && !kept.includes(text)) kept.push(text);
+    if (kept.length >= limit) break;
+  }
+  return kept;
+}
+
+/**
+ * One packet as the model returns it, with the stated limits applied.
+ *
+ * `sources` stays `unknown[]`: every URL has to be resolved against the pages
+ * the search actually returned before it can be shown to anybody (the same
+ * rule a verification's citations follow), and one unreadable entry must not
+ * throw away the good ones beside it.
+ */
+export const PacketReplySchema = z.strictObject({
+  title: z
+    .string()
+    .transform((text) => clipChars(oneLine(text), PACKET_TITLE_MAX_CHARS))
+    .refine((text) => text !== "", { message: "title is empty" }),
+  teaser: z
+    .string()
+    .transform((text) => clipWords(oneLine(text), PACKET_TEASER_MAX_WORDS))
+    .refine((text) => text !== "", { message: "teaser is empty" }),
+  keyPoints: z
+    .array(z.string())
+    .transform((list) => lines(list, KEY_POINT_MAX_WORDS, MAX_KEY_POINTS)),
+  sources: z.array(z.unknown()),
+});
+export type PacketReply = z.infer<typeof PacketReplySchema>;
+
+/** The `json_schema.name` a packet request sends. */
+export const RESEARCH_PACKET_SCHEMA_NAME = "research_packet";
+
+/**
+ * {@link PacketReplySchema} as a JSON Schema, in the subset strict structured
+ * output accepts. Muse Spark reads these descriptions — measured, so they are
+ * part of the prompt — and the limits they state are enforced after the fact
+ * by the zod schema above; `shared/research.test.ts` holds the two in
+ * agreement.
+ */
+export const researchPacketJsonSchema = {
+  type: "object",
+  properties: {
+    title: {
+      type: "string",
+      description:
+        `What the finding is called, in at most ${PACKET_TITLE_MAX_CHARS} characters. ` +
+        `Name the answer, not the search: "Otter and Fireflies charge $8-19 a seat", not "Competitor pricing research".`,
+    },
+    teaser: {
+      type: "string",
+      description:
+        `One or two sentences — at most ${PACKET_TEASER_MAX_WORDS} words — saying what you found. ` +
+        `It is the only line somebody reads before deciding whether to open the rest.`,
+    },
+    keyPoints: {
+      type: "array",
+      description:
+        `The findings themselves, best first: at most ${MAX_KEY_POINTS}, each at most ` +
+        `${KEY_POINT_MAX_WORDS} words. Numbers, names, dates, rules — never advice.`,
+      items: { type: "string" },
+    },
+    sources: {
+      type: "array",
+      description:
+        `The pages you actually read, best first: at most ${MAX_PACKET_SOURCES}. ` +
+        `At least one — a finding with no source is thrown away unread.`,
+      items: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description:
+              "The full URL exactly as the search gave it to you, path and query included. Never a URL that was not in your search results.",
+          },
+          title: { type: "string", description: "The page's own title." },
+        },
+        required: ["url", "title"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["title", "teaser", "keyPoints", "sources"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * What became of one research job.
+ *
+ * - `ready`: a sourced packet, written to `research/<id>.json` and `.md`.
+ * - `unsourced`: it came back with nothing the search had really returned, so
+ *   it was discarded. The PRD asks for this to be logged by name.
+ * - `failed`: the call did not come back, or its reply did not fit.
+ */
+export const researchPacketOutcomes = ["ready", "unsourced", "failed"] as const;
+export type ResearchPacketOutcome = (typeof researchPacketOutcomes)[number];
+
+/** One line of `research.jsonl`: what a job came back with (V2-013). */
+export interface ResearchPacketRecord {
+  kind: "packet";
+  /** When the job finished, on the session clock. */
+  atMs: number;
+  ideaId: string;
+  /** The question it was answering, so the file reads on its own. */
+  question: string;
+  outcome: ResearchPacketOutcome;
+  /** The packet itself, when there is one. */
+  packet?: ResearchPacket;
+  /** What an `unsourced` packet would have been called. */
+  title?: string;
+  /** Real milliseconds the job took. */
+  latencyMs: number;
+  /** Whether the model searched at all, as the API reported it. */
+  searched: boolean;
+  /** Why there is no packet, when there is none. */
+  error?: string;
+}
+
+/** Every kind of line `research.jsonl` holds. */
+export type ResearchLogLine =
+  | ResearchIdeaRecord
+  | ResearchGateRecord
+  | ResearchStartRecord
+  | ResearchPacketRecord;
+
+/**
+ * A packet id the server itself would have handed out, and nothing else.
+ *
+ * The id becomes a file name in `research/`, so this is a gate rather than a
+ * description — the same rule `ARTIFACT_FILE_PATTERN` is for generated
+ * HTML.
+ */
+export const PACKET_ID_PATTERN = /^packet-[0-9]+$/;
+
+/** `research/packet-1.json`, relative to the session folder. */
+export function packetFileName(id: string, extension: "json" | "md"): string {
+  return `${id}.${extension}`;
+}
+
+/**
+ * One packet as `research/<id>.md`: the thing a person reads.
+ *
+ * The question goes in because the file is read without the log beside it,
+ * and the sources go in as links because that is the whole point of a packet.
+ */
+export function renderPacketMarkdown(packet: ResearchPacket, question: string): string {
+  const blocks = [`# ${packet.title}`, `_${question}_`, packet.teaser];
+  if (packet.keyPoints.length > 0) {
+    blocks.push(packet.keyPoints.map((point) => `- ${point}`).join("\n"));
+  }
+  if (packet.visual !== undefined) {
+    blocks.push("## Visual", `${packet.visual.title} — \`${packet.visual.path}\``);
+  }
+  blocks.push(
+    "## Sources",
+    packet.sources.map((source) => `- [${source.title}](${source.url})`).join("\n"),
+  );
+  return `${blocks.join("\n\n")}\n`;
 }

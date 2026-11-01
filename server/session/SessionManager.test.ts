@@ -14,10 +14,13 @@ import type {
   CandidateLogRecord,
   DecisionLogRecord,
 } from "../../shared/candidates.js";
+import { MAX_JOBS_PER_WINDOW } from "../../shared/research.js";
 import type {
   ResearchGateRecord,
   ResearchIdeaRecord,
   ResearchLogLine,
+  ResearchPacketRecord,
+  ResearchStartRecord,
 } from "../../shared/research.js";
 import type { FeedbackLogRecord } from "../../shared/feedback.js";
 import { TYPED_ASKER, type AnswerLogRecord } from "../../shared/answers.js";
@@ -358,6 +361,7 @@ describe("SessionManager, board and observer", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -481,6 +485,7 @@ describe("SessionManager, board and observer", () => {
           citations: [],
           searchedUrls: ["https://example.com/launch"],
           searched: true,
+          functionCalls: 0,
         };
       }
     }
@@ -499,6 +504,7 @@ describe("SessionManager, board and observer", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -564,6 +570,7 @@ describe("SessionManager, board and observer", () => {
     /** One hook and one unanswered question per look, and no board items. */
     class NoticingModel implements ModelClient {
       private looks = 0;
+      searches = 0;
 
       async structured(call: StructuredCall): Promise<unknown> {
         if (call.label === "board") return { operations: [] };
@@ -592,8 +599,24 @@ describe("SessionManager, board and observer", () => {
         throw new Error("nobody asks Sotto anything here");
       }
 
-      async grounded(): Promise<never> {
-        throw new Error("a hook is never verified");
+      /** V2-013: a hook is never verified, but an approved idea is searched. */
+      async grounded(call: GroundedCall): Promise<GroundedReply> {
+        if (call.label !== "research-packet") {
+          throw new Error("a hook is never verified");
+        }
+        this.searches += 1;
+        return {
+          value: {
+            title: `What ${this.searches} costs`,
+            teaser: "It costs about the same as the last one.",
+            keyPoints: ["About £40 a head"],
+            sources: [{ url: "https://example.com/prices", title: "Prices" }],
+          },
+          citations: [],
+          searchedUrls: ["https://example.com/prices"],
+          searched: true,
+          functionCalls: 0,
+        };
       }
     }
 
@@ -601,6 +624,7 @@ describe("SessionManager, board and observer", () => {
     const lines: CandidateLogLine[] = [];
     const research: ResearchLogLine[] = [];
     const timing: Record<string, unknown>[] = [];
+    const packetFiles: { id: string; markdown: string }[] = [];
     const writer = {
       dir: "/tmp/not-a-real-folder",
       appendEvent: () => {},
@@ -612,16 +636,19 @@ describe("SessionManager, board and observer", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: (record: unknown) => research.push(record as ResearchLogLine),
+      writePacket: (id: string, _packet: unknown, markdown: string) =>
+        packetFiles.push({ id, markdown }),
       appendTiming: (event: Record<string, unknown>) => timing.push(event),
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
+    const model = new NoticingModel();
     const sessions = new SessionManager({
       bus,
       apiKey: "test-key",
       logger: quiet,
       createStore: () => writer,
-      createModel: () => new NoticingModel(),
+      createModel: () => model,
       replaySpeed: "max",
       wallClock: instantWallClock(),
     });
@@ -684,6 +711,32 @@ describe("SessionManager, board and observer", () => {
     const fresh = ideas.filter((record) => record.duplicateOf === undefined);
     expect(scored.map((record) => record.ideaId)).toEqual(fresh.map((record) => record.idea.id));
     expect(scored.every((record) => record.decision === "queued")).toBe(true);
+
+    // V2-013: and the budget starts three of them, each of which comes back
+    // as a sourced packet written into the session folder.
+    const starts = research.filter(
+      (record): record is ResearchStartRecord => record.kind === "start",
+    );
+    expect(starts).toHaveLength(MAX_JOBS_PER_WINDOW);
+    const packets = research.filter(
+      (record): record is ResearchPacketRecord => record.kind === "packet",
+    );
+    expect(packets).toHaveLength(MAX_JOBS_PER_WINDOW);
+    expect(packets.every((record) => record.outcome === "ready")).toBe(true);
+    expect(packets.map((record) => record.ideaId)).toEqual(starts.map((record) => record.ideaId));
+    expect(packets[0]?.packet?.sources).toEqual([
+      { url: "https://example.com/prices", title: "Prices" },
+    ]);
+    expect(model.searches).toBe(MAX_JOBS_PER_WINDOW);
+    expect(packetFiles.map((file) => file.id)).toEqual(["packet-1", "packet-2", "packet-3"]);
+    expect(packetFiles[0]?.markdown).toContain("https://example.com/prices");
+    // A packet's text is in research.jsonl and in research/<id>.md, so the
+    // diagnostic log keeps only its shape.
+    const packetTiming = timing.filter((event) => event.stage === "research_packet");
+    expect(packetTiming).toHaveLength(MAX_JOBS_PER_WINDOW);
+    expect(packetTiming[0]?.packet).toBeUndefined();
+    expect(packetTiming[0]?.packetId).toBe("packet-1");
+    expect(packetTiming[0]?.sources).toBe(1);
   });
 });
 
@@ -764,6 +817,7 @@ describe("SessionManager, delivery and feedback", () => {
       appendFeedback: (record: unknown) => feedback.push(record as FeedbackLogRecord),
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -949,6 +1003,7 @@ describe("SessionManager, answers", () => {
       appendFeedback: () => {},
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
       appendResearch: () => {},
+      writePacket: () => {},
       appendTiming: (record: Record<string, unknown>) => timing.push(record),
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
@@ -1102,6 +1157,7 @@ describe("SessionManager, Sotto's speech in the transcript (V2-008a)", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1194,6 +1250,7 @@ describe("SessionManager, typed questions", () => {
       appendFeedback: () => {},
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1364,6 +1421,7 @@ describe("SessionManager, chattiness", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1582,6 +1640,7 @@ describe("SessionManager, speaker names", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1694,6 +1753,7 @@ describe("SessionManager and generated artifacts (US-020)", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string, html: string) => {
         written.push([fileName, html]);
         return options.fail === true ? null : `artifacts/${fileName}`;
@@ -1861,6 +1921,7 @@ describe("SessionManager, the opening hello (V2-009)", () => {
       appendFeedback: () => {},
       appendAnswer: () => {},
       appendResearch: () => {},
+      writePacket: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;

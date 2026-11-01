@@ -349,8 +349,10 @@ describe("ResearchManager: the budget", () => {
     expect(started).toHaveLength(MAX_JOBS_PER_WINDOW);
 
     // Nothing arriving says the window has moved on, so a timer has to.
+    // `settle()` is deliberately not used: a running job is tracked on the
+    // clock (V2-013), so settling would wait for the held one forever.
     clock.advanceBy(RESEARCH_WINDOW_MS + 1);
-    await clock.settle();
+    await tick();
     expect(started).toHaveLength(4);
     expect(manager.startedInWindow()).toBe(1);
     const starts = startRecords(records);

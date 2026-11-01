@@ -81,6 +81,16 @@ export interface GroundedCall extends StructuredCall {
    * default) or `high`.
    */
   searchContextSize?: "low" | "medium" | "high";
+  /**
+   * Tools the model may call before it writes the JSON (V2-013).
+   *
+   * Probed against the real API: a strict `json_schema` reply, `web_search`
+   * and a `function` tool are all accepted in one request, and a round that
+   * ends in a tool call carries **no reply at all** — exactly as with
+   * {@link MuseClient.prose}. So {@link MuseClient.grounded} is the same loop
+   * whenever this is set, and a caller never sees a `function_call` item.
+   */
+  functions?: readonly FunctionTool[];
 }
 
 /**
@@ -113,8 +123,8 @@ export interface FunctionTool {
 }
 
 /**
- * Rounds of "the model calls a tool, we answer it, it writes" one prose call
- * may take before the answer has to be text.
+ * Rounds of "the model calls a tool, we answer it, it writes" one call may
+ * take before the reply has to be the answer.
  *
  * Measured: when the model calls `show_html` it ends that turn with no answer
  * at all — only its own narration — so a second round is not optional, it is
@@ -125,7 +135,7 @@ export interface FunctionTool {
  * answer the withholding was meant to protect. A model that draws on all three
  * rounds therefore ends as a handled error, not as a silent empty answer.
  */
-export const PROSE_MAX_ROUNDS = 3;
+export const TOOL_MAX_ROUNDS = 3;
 
 /**
  * One streamed, searching call whose reply is **prose** (US-018).
@@ -215,6 +225,12 @@ export interface GroundedReply {
    * reached without searching is worth telling apart in a log.
    */
   searched: boolean;
+  /**
+   * How many {@link GroundedCall.functions} calls ran. The results went back
+   * to the model; a caller that cares what a tool did knows it from its own
+   * handler.
+   */
+  functionCalls: number;
 }
 
 /**
@@ -419,64 +435,128 @@ export class MuseClient implements ModelClient {
     }
   }
 
+  /**
+   * The grounded call, which is a loop whenever there are function tools.
+   *
+   * A round is one response. Without tools there is exactly one, which is
+   * every caller before V2-013. With them, a round the model finished by
+   * calling a tool carries **no reply at all** — its own narration and the
+   * call, and nothing else (probed against the real API, the same shape
+   * {@link MuseClient.prose} measured) — so the handler runs, its result goes
+   * back as a `function_call_output`, and the JSON comes from the first round
+   * that ends without one. Citations and searched pages accumulate across the
+   * rounds, because `store: false` means each round searches for itself.
+   */
   async grounded(call: GroundedCall): Promise<GroundedReply> {
-    const response = await this.responses.create({
-      model: this.model,
-      instructions: call.system,
-      input: call.user,
-      max_output_tokens: call.maxTokens ?? DEFAULT_MAX_TOKENS,
-      tools: [{ type: "web_search", search_context_size: call.searchContextSize ?? "medium" }],
-      // Without this the search calls come back with the query and nothing
-      // else, and there is no way to tell a page the model read from one it
-      // made up.
-      include: ["web_search_call.action.sources"],
-      text: {
-        format: {
-          type: "json_schema",
-          name: call.schemaName,
-          strict: true,
-          schema: call.schema as Record<string, unknown>,
+    const tools = call.functions ?? [];
+    const rounds = tools.length === 0 ? 1 : TOOL_MAX_ROUNDS;
+    const byName = new Map(tools.map((tool) => [tool.name, tool]));
+    // Only the request and the tool calls with their results are resent: the
+    // model's own reasoning and narration items are its working (measured).
+    const input: OpenAI.Responses.ResponseInputItem[] = [{ role: "user", content: call.user }];
+    const citations = new Map<string, Citation>();
+    const searchedUrls: string[] = [];
+    let searched = false;
+    let functionCalls = 0;
+
+    for (let round = 1; round <= rounds; round += 1) {
+      const response = await this.responses.create({
+        model: this.model,
+        instructions: call.system,
+        input: [...input],
+        max_output_tokens: call.maxTokens ?? DEFAULT_MAX_TOKENS,
+        tools: [
+          { type: "web_search", search_context_size: call.searchContextSize ?? "medium" },
+          ...functionTools(tools),
+        ],
+        // Without this the search calls come back with the query and nothing
+        // else, and there is no way to tell a page the model read from one it
+        // made up.
+        include: ["web_search_call.action.sources"],
+        text: {
+          format: {
+            type: "json_schema",
+            name: call.schemaName,
+            strict: true,
+            schema: call.schema as Record<string, unknown>,
+          },
         },
-      },
-      // Nothing here is a multi-turn conversation, and the brainstorm belongs
-      // to the people having it: no reason to leave it on someone's server.
-      store: false,
-    });
+        // Nothing here is a multi-turn conversation, and the brainstorm belongs
+        // to the people having it: no reason to leave it on someone's server.
+        store: false,
+      });
 
-    const { text, citations, searchedUrls, searched } = readGrounded(response);
-    const reasoning = response.usage?.output_tokens_details?.reasoning_tokens;
-    this.logger.log(
-      `[model] ${call.label}: ${response.status ?? "no status"}` +
-        `, ${response.usage?.output_tokens ?? 0} output tokens` +
-        (reasoning === undefined ? "" : ` (${reasoning} reasoning)`) +
-        `, ${searched ? `${searchedUrls.length} page(s) searched` : "no search"}` +
-        `, ${citations.length} annotated citation(s)`,
+      const output = readGrounded(response);
+      for (const citation of output.citations) {
+        if (!citations.has(citation.url)) citations.set(citation.url, citation);
+      }
+      for (const url of output.searchedUrls) {
+        if (!searchedUrls.includes(url)) searchedUrls.push(url);
+      }
+      searched = searched || output.searched;
+
+      const calls = (response.output ?? []).filter(
+        (item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === "function_call",
+      );
+      const reasoning = response.usage?.output_tokens_details?.reasoning_tokens;
+      this.logger.log(
+        `[model] ${call.label}: ${response.status ?? "no status"}` +
+          (rounds === 1 ? "" : ` (round ${round}/${rounds})`) +
+          `, ${response.usage?.output_tokens ?? 0} output tokens` +
+          (reasoning === undefined ? "" : ` (${reasoning} reasoning)`) +
+          `, ${output.searched ? `${output.searchedUrls.length} page(s) searched` : "no search"}` +
+          `, ${output.citations.length} annotated citation(s)` +
+          (rounds === 1 ? "" : `, ${calls.length} tool call(s)`),
+      );
+      this.reportUsage(call.label, {
+        input: response.usage?.input_tokens,
+        output: response.usage?.output_tokens,
+        reasoning,
+      });
+
+      // The Responses API's version of running out of budget: a 200, a status
+      // of `incomplete`, and whatever text had been produced so far.
+      if (response.status !== undefined && response.status !== "completed") {
+        const why = response.incomplete_details?.reason ?? response.error?.message ?? "no detail";
+        throw new ModelCallError(
+          `${call.label}: the response came back ${response.status} (${why})` +
+            `; raise maxTokens above ${call.maxTokens ?? DEFAULT_MAX_TOKENS} if it ran out of room`,
+        );
+      }
+
+      if (calls.length === 0) {
+        if (output.text.trim() === "") {
+          throw new ModelCallError(`${call.label}: the model returned no text`);
+        }
+        try {
+          return {
+            value: JSON.parse(output.text) as unknown,
+            citations: [...citations.values()],
+            searchedUrls,
+            searched,
+            functionCalls,
+          };
+        } catch (error) {
+          throw new ModelCallError(
+            `${call.label}: the model's reply was not JSON (${error instanceof Error ? error.message : String(error)}): ${output.text.slice(0, 200)}`,
+          );
+        }
+      }
+
+      for (const made of calls) {
+        functionCalls += 1;
+        input.push(made);
+        input.push({
+          type: "function_call_output",
+          call_id: made.call_id,
+          output: await this.runFunction(call.label, byName, made),
+        });
+      }
+    }
+
+    throw new ModelCallError(
+      `${call.label}: the model called a tool on all ${rounds} rounds and never replied`,
     );
-    this.reportUsage(call.label, {
-      input: response.usage?.input_tokens,
-      output: response.usage?.output_tokens,
-      reasoning,
-    });
-
-    // The Responses API's version of running out of budget: a 200, a status of
-    // `incomplete`, and whatever text had been produced so far.
-    if (response.status !== undefined && response.status !== "completed") {
-      const why = response.incomplete_details?.reason ?? response.error?.message ?? "no detail";
-      throw new ModelCallError(
-        `${call.label}: the response came back ${response.status} (${why})` +
-          `; raise maxTokens above ${call.maxTokens ?? DEFAULT_MAX_TOKENS} if it ran out of room`,
-      );
-    }
-    if (text.trim() === "") {
-      throw new ModelCallError(`${call.label}: the model returned no text`);
-    }
-    try {
-      return { value: JSON.parse(text) as unknown, citations, searchedUrls, searched };
-    } catch (error) {
-      throw new ModelCallError(
-        `${call.label}: the model's reply was not JSON (${error instanceof Error ? error.message : String(error)}): ${text.slice(0, 200)}`,
-      );
-    }
   }
 
   /**
@@ -491,7 +571,7 @@ export class MuseClient implements ModelClient {
    */
   async prose(call: ProseCall): Promise<ProseReply> {
     const tools = call.functions ?? [];
-    const rounds = tools.length === 0 ? 1 : PROSE_MAX_ROUNDS;
+    const rounds = tools.length === 0 ? 1 : TOOL_MAX_ROUNDS;
     const byName = new Map(tools.map((tool) => [tool.name, tool]));
     // Only the user message, the tool calls and their results are resent: the
     // model's reasoning and narration items are its own working, and the
@@ -584,13 +664,7 @@ export class MuseClient implements ModelClient {
         // Confirmed against the real API: `web_search` and a function tool in
         // one request are accepted, so the PRD's intent-routing fallback is
         // not needed (`fixtures/events/NOTES.md`).
-        ...functions.map((tool) => ({
-          type: "function" as const,
-          name: tool.name,
-          description: tool.description,
-          strict: true,
-          parameters: tool.parameters as Record<string, unknown>,
-        })),
+        ...functionTools(functions),
       ],
       include: ["web_search_call.action.sources"],
       store: false,
@@ -670,6 +744,19 @@ export class MuseClient implements ModelClient {
       return `${made.name} failed (${detail}). Answer in words instead.`;
     }
   }
+}
+
+/** The `tools` entries for a request's function tools, declared strictly. */
+function functionTools(
+  tools: readonly FunctionTool[],
+): OpenAI.Responses.FunctionTool[] {
+  return tools.map((tool) => ({
+    type: "function" as const,
+    name: tool.name,
+    description: tool.description,
+    strict: true,
+    parameters: tool.parameters as Record<string, unknown>,
+  }));
 }
 
 /** `, 962 reasoning` for a log line, or nothing when the API did not say. */

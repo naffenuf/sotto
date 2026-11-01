@@ -10,7 +10,7 @@ import { VERIFY_MAX_TOKENS, VERIFY_TRACK_LABEL, Verifier, renderVerificationRequ
 
 /** A grounded reply, with everything the tests do not care about defaulted. */
 function reply(overrides: Partial<GroundedReply> & { value: unknown }): GroundedReply {
-  return { citations: [], searchedUrls: [], searched: true, ...overrides };
+  return { citations: [], searchedUrls: [], searched: true, functionCalls: 0, ...overrides };
 }
 
 /** The usual shape of a verdict, as the model returns it. */

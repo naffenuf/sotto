@@ -9,7 +9,7 @@ import {
   DEFAULT_MAX_TOKENS,
   ModelCallError,
   MuseClient,
-  PROSE_MAX_ROUNDS,
+  TOOL_MAX_ROUNDS,
   SPARK_MODEL,
   type ChatCompletions,
   type FunctionTool,
@@ -225,7 +225,7 @@ describe("MuseClient.grounded", () => {
     const body = fake.bodies[0] as ResponseParams;
     expect(body.model).toBe(SPARK_MODEL);
     expect(body.instructions).toBe("You check one claim.");
-    expect(body.input).toBe("## The claim");
+    expect(body.input).toEqual([{ role: "user", content: "## The claim" }]);
     expect(body.max_output_tokens).toBe(DEFAULT_MAX_TOKENS);
     expect(body.tools).toEqual([{ type: "web_search", search_context_size: "medium" }]);
     // Without this the search calls report their query and nothing else.
@@ -802,7 +802,7 @@ describe("MuseClient.prose with function tools (US-020)", () => {
     await expect(museClient.prose({ ...proseCall, functions: [tool] })).rejects.toThrow(
       /called a tool on all 3 rounds/,
     );
-    expect(fake.bodies).toHaveLength(PROSE_MAX_ROUNDS);
+    expect(fake.bodies).toHaveLength(TOOL_MAX_ROUNDS);
   });
 
   it("makes exactly one round when there are no function tools", async () => {
@@ -813,5 +813,115 @@ describe("MuseClient.prose with function tools (US-020)", () => {
     expect(reply.functionCalls).toBe(0);
     expect(fake.bodies).toHaveLength(1);
     expect(fake.bodies[0]?.tools).toEqual([{ type: "web_search", search_context_size: "medium" }]);
+  });
+});
+
+/** The non-streaming responses endpoint, with a reply per round. */
+class FakeGroundedRounds implements Responses {
+  readonly bodies: ResponseParams[] = [];
+
+  constructor(private readonly replies: Partial<Response>[]) {}
+
+  async create(body: ResponseParams): Promise<Response> {
+    this.bodies.push(structuredClone(body));
+    const reply = this.replies[this.bodies.length - 1];
+    if (reply === undefined) throw new Error(`unexpected round ${this.bodies.length}`);
+    return {
+      id: `r${this.bodies.length}`,
+      created_at: 0,
+      model: SPARK_MODEL,
+      object: "response",
+      output: [],
+      output_text: "",
+      status: "completed",
+      error: null,
+      incomplete_details: null,
+      ...reply,
+    } as Response;
+  }
+}
+
+function groundedRounds(replies: Partial<Response>[]): {
+  museClient: MuseClient;
+  fake: FakeGroundedRounds;
+} {
+  const fake = new FakeGroundedRounds(replies);
+  return { museClient: new MuseClient({ responses: fake, logger: silent }), fake };
+}
+
+describe("MuseClient.grounded with function tools (V2-013)", () => {
+  it("declares the function beside web_search, with the schema still strict", async () => {
+    const { tool } = showHtml();
+    const { museClient, fake } = groundedRounds([{ output: [message('{"verdict":"right"}')] }]);
+    await museClient.grounded({ ...groundedCall, functions: [tool] });
+
+    expect(fake.bodies[0]?.tools).toEqual([
+      { type: "web_search", search_context_size: "medium" },
+      {
+        type: "function",
+        name: "show_html",
+        description: "Show something.",
+        strict: true,
+        parameters: tool.parameters,
+      },
+    ]);
+    expect(fake.bodies[0]?.text).toEqual({
+      format: {
+        type: "json_schema",
+        name: VERIFICATION_SCHEMA_NAME,
+        strict: true,
+        schema: verificationJsonSchema,
+      },
+    });
+  });
+
+  it("runs the tool and asks again, because the round that called it has no reply", async () => {
+    const { tool, calls } = showHtml('"Pricing" is saved.');
+    const { museClient, fake } = groundedRounds([
+      // Probed against the real API: narration, searches, a tool call, and no
+      // JSON at all.
+      {
+        output: [
+          message("Pulling the current pricing."),
+          searchCall("https://otter.ai/pricing"),
+          functionCall("show_html", '{"title":"Pricing","html":"<table/>"}'),
+        ],
+      },
+      { output: [searchCall("https://fireflies.ai/pricing"), message('{"verdict":"right"}')] },
+    ]);
+    const reply = await museClient.grounded({ ...groundedCall, functions: [tool] });
+
+    expect(calls).toEqual([{ title: "Pricing", html: "<table/>" }]);
+    expect(reply.value).toEqual({ verdict: "right" });
+    expect(reply.functionCalls).toBe(1);
+    // Each round searches for itself (`store: false`), so the pages add up.
+    expect(reply.searchedUrls).toEqual([
+      "https://otter.ai/pricing",
+      "https://fireflies.ai/pricing",
+    ]);
+    expect(fake.bodies).toHaveLength(2);
+    // Only the request and the call with its result are resent.
+    const input = fake.bodies[1]?.input as { type?: string; output?: string }[];
+    expect(input).toHaveLength(3);
+    expect(input[1]?.type).toBe("function_call");
+    expect(input[2]).toMatchObject({ type: "function_call_output", output: '"Pricing" is saved.' });
+  });
+
+  it("makes exactly one round, with no function tool, when none is offered", async () => {
+    const { museClient, fake } = groundedRounds([{ output: [message('{"verdict":"right"}')] }]);
+    const reply = await museClient.grounded(groundedCall);
+    expect(reply.functionCalls).toBe(0);
+    expect(fake.bodies).toHaveLength(1);
+    expect(fake.bodies[0]?.tools).toEqual([{ type: "web_search", search_context_size: "medium" }]);
+  });
+
+  it("gives up once the model has used every round on tool calls", async () => {
+    const { tool } = showHtml();
+    const drawing = { output: [functionCall("show_html", "{}")] };
+    const { museClient, fake } = groundedRounds([drawing, drawing, drawing]);
+    await expect(museClient.grounded({ ...groundedCall, functions: [tool] })).rejects.toThrow(
+      /called a tool on all 3 rounds/,
+    );
+    expect(fake.bodies).toHaveLength(TOOL_MAX_ROUNDS);
   });
 });

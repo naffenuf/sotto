@@ -24,6 +24,8 @@ export const PROMPTS = {
   researchPlanner: "research-planner",
   /** Deciding whether one research idea is worth a search (V2-012). */
   researchGate: "research-gate",
+  /** Looking one research idea up and packaging what it found (V2-013). */
+  researchPacket: "research-packet",
   /** Checking a claim against the web before raising it (US-013). */
   verify: "verify",
   /** Answering a question somebody asked Sotto out loud (US-018). */

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  KEY_POINT_MAX_WORDS,
+  MAX_KEY_POINTS,
+  MAX_PACKET_SOURCES,
   MAX_PLANNER_IDEAS,
+  PACKET_ID_PATTERN,
+  PACKET_TEASER_MAX_WORDS,
+  PACKET_TITLE_MAX_CHARS,
+  PacketReplySchema,
+  RESEARCH_PACKET_SCHEMA_NAME,
   PlannerIdeaSchema,
   PlannerReplySchema,
   QUESTION_MAX_CHARS,
@@ -12,11 +20,15 @@ import {
   WHY_MAX_WORDS,
   findDuplicateIdea,
   hookIdea,
+  packetFileName,
+  renderPacketMarkdown,
   researchGateJsonSchema,
+  researchPacketJsonSchema,
   researchPlannerJsonSchema,
   researchScore,
   topicFromQuestion,
   type ResearchIdea,
+  type ResearchPacket,
 } from "./research.js";
 
 /** Keywords strict structured output rejects, and the union form it wants. */
@@ -283,5 +295,135 @@ describe("hookIdea", () => {
 
   it("falls back to the question when it is all filler", () => {
     expect(topicFromQuestion("what is it to us")).not.toBe("");
+  });
+});
+
+describe("researchPacketJsonSchema", () => {
+  it("is in the subset strict structured output accepts", () => {
+    closedAndRequired(researchPacketJsonSchema);
+  });
+
+  it("describes the same fields PacketReplySchema validates", () => {
+    const schemaKeys = Object.keys(researchPacketJsonSchema.properties);
+    const zodKeys = Object.keys(PacketReplySchema.shape);
+    expect(schemaKeys.sort()).toEqual(zodKeys.sort());
+  });
+
+  it("names the stated limits in its descriptions, since no keyword can carry them", () => {
+    const properties = researchPacketJsonSchema.properties as Record<string, JsonSchemaNode>;
+    expect(properties.title?.description).toContain(String(PACKET_TITLE_MAX_CHARS));
+    expect(properties.teaser?.description).toContain(String(PACKET_TEASER_MAX_WORDS));
+    expect(properties.keyPoints?.description).toContain(String(MAX_KEY_POINTS));
+    expect(properties.keyPoints?.description).toContain(String(KEY_POINT_MAX_WORDS));
+    expect(properties.sources?.description).toContain(String(MAX_PACKET_SOURCES));
+  });
+
+  it("has a name the request can send", () => {
+    expect(RESEARCH_PACKET_SCHEMA_NAME).toMatch(/^[a-z_]+$/);
+  });
+});
+
+describe("PacketReplySchema", () => {
+  const valid = {
+    title: "Otter and Fireflies charge $8-19 a seat",
+    teaser: "Otter Pro is $16.99 a month, or $8.33 on annual billing; Fireflies Pro is $18 or $10.",
+    keyPoints: ["Otter Pro: $16.99 monthly, $8.33 annual", "Fireflies Pro: $18 monthly, $10 annual"],
+    sources: [{ url: "https://otter.ai/pricing", title: "Pricing | Otter.ai" }],
+  };
+
+  it("accepts a packet and leaves it alone", () => {
+    expect(PacketReplySchema.parse(valid)).toEqual(valid);
+  });
+
+  it("collapses whitespace and clips the stated limits", () => {
+    const parsed = PacketReplySchema.parse({
+      ...valid,
+      title: `  ${"title ".repeat(40)}`,
+      teaser: Array.from({ length: PACKET_TEASER_MAX_WORDS + 10 }, (_, i) => `w${i}`).join("\n"),
+      keyPoints: Array.from({ length: MAX_KEY_POINTS + 3 }, (_, i) => `point ${i}`),
+    });
+    expect(parsed.title.length).toBeLessThanOrEqual(PACKET_TITLE_MAX_CHARS);
+    expect(parsed.teaser.split(" ")).toHaveLength(PACKET_TEASER_MAX_WORDS);
+    expect(parsed.teaser).not.toContain("\n");
+    expect(parsed.keyPoints).toHaveLength(MAX_KEY_POINTS);
+  });
+
+  it("drops blank and repeated key points rather than showing them", () => {
+    const parsed = PacketReplySchema.parse({
+      ...valid,
+      keyPoints: ["  ", "Otter Pro is $16.99", "Otter Pro is $16.99"],
+    });
+    expect(parsed.keyPoints).toEqual(["Otter Pro is $16.99"]);
+  });
+
+  it("rejects a packet with no title or no teaser: there is nothing to show", () => {
+    expect(PacketReplySchema.safeParse({ ...valid, title: " " }).success).toBe(false);
+    expect(PacketReplySchema.safeParse({ ...valid, teaser: "" }).success).toBe(false);
+  });
+
+  it("types the sources as unknown, so one bad source does not lose the others", () => {
+    const parsed = PacketReplySchema.parse({
+      ...valid,
+      sources: [valid.sources[0], { nonsense: true }],
+    });
+    expect(parsed.sources).toHaveLength(2);
+  });
+});
+
+describe("a packet's file names", () => {
+  it("only accepts an id the server itself handed out", () => {
+    expect(PACKET_ID_PATTERN.test("packet-1")).toBe(true);
+    expect(PACKET_ID_PATTERN.test("packet-12")).toBe(true);
+    expect(PACKET_ID_PATTERN.test("../../etc/passwd")).toBe(false);
+    expect(PACKET_ID_PATTERN.test("packet-1/../x")).toBe(false);
+    expect(PACKET_ID_PATTERN.test("packet-")).toBe(false);
+  });
+
+  it("spells both halves of one packet", () => {
+    expect(packetFileName("packet-2", "json")).toBe("packet-2.json");
+    expect(packetFileName("packet-2", "md")).toBe("packet-2.md");
+  });
+});
+
+describe("renderPacketMarkdown", () => {
+  const packet = (overrides: Partial<ResearchPacket> = {}): ResearchPacket => ({
+    id: "packet-1",
+    ideaId: "idea-1",
+    title: "Otter charges $16.99 a seat",
+    teaser: "Monthly billing is $16.99; annual is $8.33.",
+    keyPoints: ["Pro: $16.99 monthly", "Business: $30 monthly"],
+    sources: [{ url: "https://otter.ai/pricing", title: "Pricing | Otter.ai" }],
+    createdAtMs: 120_000,
+    latencyMs: 14_200,
+    ...overrides,
+  });
+
+  it("leads with the title, the question and the teaser", () => {
+    const markdown = renderPacketMarkdown(packet(), "What does Otter charge per seat?");
+    expect(markdown.startsWith("# Otter charges $16.99 a seat")).toBe(true);
+    expect(markdown).toContain("_What does Otter charge per seat?_");
+    expect(markdown).toContain("Monthly billing is $16.99");
+    expect(markdown.endsWith("\n")).toBe(true);
+  });
+
+  it("lists the key points and links every source", () => {
+    const markdown = renderPacketMarkdown(packet(), "What does Otter charge?");
+    expect(markdown).toContain("- Pro: $16.99 monthly");
+    expect(markdown).toContain("## Sources");
+    expect(markdown).toContain("- [Pricing | Otter.ai](https://otter.ai/pricing)");
+  });
+
+  it("names the visual and where it was written, when there is one", () => {
+    const markdown = renderPacketMarkdown(
+      packet({ visual: { title: "Per-seat pricing", path: "artifacts/01-pricing.html", url: "/api/x" } }),
+      "What does Otter charge?",
+    );
+    expect(markdown).toContain("## Visual");
+    expect(markdown).toContain("Per-seat pricing");
+    expect(markdown).toContain("artifacts/01-pricing.html");
+  });
+
+  it("leaves the visual heading out when there is none", () => {
+    expect(renderPacketMarkdown(packet(), "q")).not.toContain("## Visual");
   });
 });

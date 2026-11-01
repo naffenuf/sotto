@@ -23,9 +23,9 @@
  * with {@link Clock.track}, which is what makes a `max`-speed replay wait for
  * it without the pipeline ever awaiting it.
  *
- * The runner itself is V2-013's: this story starts jobs through the injected
- * {@link ResearchManagerOptions.run}, and with none supplied an approved idea
- * sits in the queue — which is exactly what the budget is counting.
+ * The search itself is {@link ResearchRunner}'s (V2-013), reached through the
+ * injected {@link ResearchManagerOptions.run}; with none supplied an approved
+ * idea simply sits in the queue, which is what the budget's tests count.
  */
 import type { Board } from "../../shared/board.js";
 import type { Candidate } from "../../shared/candidates.js";
@@ -51,6 +51,9 @@ import { ResearchPlanner } from "./ResearchPlanner.js";
 /** The label the gate queue is tracked under on the clock. */
 export const RESEARCH_TRACK_LABEL = "research";
 
+/** The label one running job is tracked under on the clock. */
+export const JOB_TRACK_LABEL = "research-job";
+
 type Logger = Pick<Console, "log" | "warn">;
 
 export interface ResearchManagerOptions {
@@ -66,7 +69,8 @@ export interface ResearchManagerOptions {
   onRecord: (record: ResearchLogLine) => void;
   /**
    * Starts one research job and resolves when it has finished, whatever it
-   * found (V2-013). Absent here, so an approved idea waits in the queue.
+   * found — {@link ResearchRunner.run} (V2-013). Absent, an approved idea
+   * waits in the queue, which is what the budget's tests count.
    */
   run?: (idea: ResearchIdea) => Promise<unknown>;
   /** The model status dot, shared with the board loop and the observer. */
@@ -300,11 +304,17 @@ export class ResearchManager {
     const run = this.run;
     if (run === undefined) return;
     this.starts.push(this.clock.now());
-    const job = run(idea).finally(() => {
+    const job = this.job(run, idea).finally(() => {
       this.inFlight.delete(job);
+      // A finished job frees a concurrency slot, which may let the next
+      // queued idea start.
       this.pumpJobs();
     });
     this.inFlight.add(job);
+    // Registered on the clock, like the gate queue: a `max`-speed replay has
+    // to stop for a search, so that the packet lands in the conversation that
+    // asked for it rather than after the end of it.
+    void this.clock.track(JOB_TRACK_LABEL, job);
     this.onRecord({
       kind: "start",
       atMs: this.clock.now(),
@@ -314,6 +324,27 @@ export class ResearchManager {
       startedInWindow: this.recentStarts().length,
     });
     this.logger.log(`[research] started ${idea.id}: ${idea.question}`);
+  }
+
+  /**
+   * One job, which never rejects.
+   *
+   * The runner turns its own failures into a `failed` line in
+   * `research.jsonl`, so this only catches the unexpected — and it has to,
+   * because the budget counts jobs by their promises and {@link flush} awaits
+   * them: an unhandled rejection here would take Stop down with it.
+   */
+  private async job(
+    run: (idea: ResearchIdea) => Promise<unknown>,
+    idea: ResearchIdea,
+  ): Promise<void> {
+    try {
+      await run(idea);
+    } catch (error) {
+      this.logger.warn(
+        `[research] job ${idea.id} threw: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /** Start times still inside the window, oldest first. */

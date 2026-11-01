@@ -38,6 +38,7 @@ import type { CandidateType } from "../../shared/candidates.js";
 import type { StatusState } from "../../shared/events.js";
 import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
+import type { ResearchLogLine } from "../../shared/research.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { defaultSettings, describeSource, sourceSlug } from "../../shared/session.js";
 import { isSottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
@@ -62,6 +63,7 @@ import { MuseClient, type ModelClient } from "../model/client.js";
 import type { GlimmerClient } from "../model/GlimmerClient.js";
 import { JudgmentRouter } from "../model/judgment.js";
 import { ResearchManager } from "../research/ResearchManager.js";
+import { ResearchRunner } from "../research/ResearchRunner.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
@@ -232,6 +234,14 @@ interface ModelLoops {
    * planner inside it proposes ideas of its own every two minutes.
    */
   research: ResearchManager | null;
+  /**
+   * The search itself, and the packets it produced (V2-013).
+   *
+   * Kept beside the manager because the packets are what a research card is
+   * made of (V2-014) and what a spoken briefing is built from (V2-015); the
+   * manager only decides *whether* to look something up.
+   */
+  researchRunner: ResearchRunner | null;
 }
 
 /** One card that reached the stage, kept so feedback can be filed on it. */
@@ -917,6 +927,7 @@ export class SessionManager {
         answers: null,
         deliveries: new Map(),
         research: null,
+        researchRunner: null,
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
@@ -978,11 +989,36 @@ export class SessionManager {
       },
       onModelState,
     });
+    // Every line of `research.jsonl`, from either half, mirrored into
+    // `timing.jsonl` — minus a packet's own text, which is already in
+    // `research.jsonl` and in `research/<id>.md`.
+    const onResearch = (record: ResearchLogLine): void => {
+      store.writer?.appendResearch(record);
+      const detail =
+        record.kind === "packet"
+          ? { ...record, packet: undefined, packetId: record.packet?.id, sources: record.packet?.sources.length ?? 0 }
+          : record;
+      onTiming({ stage: `research_${record.kind}`, ...detail });
+    };
+    // The search (V2-013): one grounded call per approved idea, writing
+    // `research/<id>.json`, `research/<id>.md` and any visual into this
+    // session's folder. It is handed to the manager as its `run`, so the
+    // budget decides when one starts.
+    const researchRunner = new ResearchRunner({
+      clock,
+      model,
+      wallClock: this.wallClock,
+      logger: this.logger,
+      onModelState,
+      onRecord: onResearch,
+      onPacket: (packet, markdown) => store.writer?.writePacket(packet.id, packet, markdown),
+      onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
+    });
     // The background half (V2-012): hooks and the planner's own ideas, gated
     // by whichever model judgment runs on, and started a few at a time. It
     // reads the board the same way the observer does and waits for nothing —
-    // the gate registers itself on the clock, so a replay waits for it
-    // without the pipeline ever awaiting it.
+    // the gate and the jobs register themselves on the clock, so a replay
+    // waits for them without the pipeline ever awaiting them.
     const research = new ResearchManager({
       clock,
       model,
@@ -991,7 +1027,8 @@ export class SessionManager {
       wallClock: this.wallClock,
       logger: this.logger,
       onModelState,
-      onRecord: (record) => { store.writer?.appendResearch(record); onTiming({ stage: `research_${record.kind}`, ...record }); },
+      onRecord: onResearch,
+      run: (idea) => researchRunner.run(idea),
     });
     // Its own queue, on purpose: an answer must not wait behind a board
     // update, and the group must not wait for the board loop to let go of the
@@ -1030,7 +1067,7 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, research };
+    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, research, researchRunner };
   }
 
   /**

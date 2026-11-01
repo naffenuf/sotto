@@ -9,6 +9,8 @@
  *       candidates.jsonl   observer candidates and the policy's decision (US-012-US-014)
  *       feedback.jsonl     the user's verdict on delivered cards (US-015)
  *       answers.jsonl      one record per answer (US-018)
+ *       research.jsonl     ideas, gate verdicts, job starts and packets (V2-012, V2-013)
+ *       research/          one finished research packet each, as JSON and markdown (V2-013)
  *       artifacts/         generated HTML (US-020)
  *
  * The folder is the build's audit trail: a session can be checked, and the
@@ -32,6 +34,7 @@ import {
   type SessionRecord,
   type SessionSettings,
 } from "../../shared/session.js";
+import { PACKET_ID_PATTERN, packetFileName } from "../../shared/research.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 
 type Logger = Pick<Console, "log" | "warn">;
@@ -58,6 +61,9 @@ export const INTERRUPTED_MARKER = "_(interrupted)_";
 
 /** Subfolder generated HTML goes in (US-020). */
 export const ARTIFACTS_DIR = "artifacts";
+
+/** Subfolder finished research packets go in (V2-013). */
+export const RESEARCH_DIR = "research";
 
 /** How many folders of the same name and minute to try before giving up. */
 const MAX_FOLDER_ATTEMPTS = 100;
@@ -88,8 +94,16 @@ export interface SessionWriter {
   appendFeedback(feedback: unknown): void;
   /** Appends one answer record (US-018). */
   appendAnswer(answer: unknown): void;
-  /** Appends one research idea, gate verdict or job start (V2-012). */
+  /** Appends one research idea, gate verdict, job start or packet (V2-012). */
   appendResearch(record: unknown): void;
+  /**
+   * Writes one finished research packet as `research/<id>.json` and
+   * `research/<id>.md` (V2-013).
+   *
+   * The id becomes a file name, so it has to be one the server handed out;
+   * anything else is refused the way an artifact's name is.
+   */
+  writePacket(id: string, packet: unknown, markdown: string): void;
   /** Diagnostic events on the pipeline clock. */
   appendTiming?(event: unknown): void;
   /**
@@ -265,6 +279,22 @@ export class SessionStore implements SessionWriter {
 
   appendResearch(record: unknown): void {
     this.appendLine(SESSION_FILES.research, JSON.stringify(record));
+  }
+
+  writePacket(id: string, packet: unknown, markdown: string): void {
+    if (!PACKET_ID_PATTERN.test(id)) {
+      this.logger.warn(`[session] refusing to write a research packet called ${id}`);
+      return;
+    }
+    const made = this.guard(RESEARCH_DIR, () => {
+      mkdirSync(join(this.dir, RESEARCH_DIR), { recursive: true });
+    });
+    if (!made) return;
+    this.writeAtomic(
+      join(RESEARCH_DIR, packetFileName(id, "json")),
+      `${JSON.stringify(packet, null, 2)}\n`,
+    );
+    this.writeAtomic(join(RESEARCH_DIR, packetFileName(id, "md")), endWithNewline(markdown));
   }
 
   appendTiming(event: unknown): void {
