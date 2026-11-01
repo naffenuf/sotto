@@ -797,3 +797,64 @@
     judge cache is keyed on headline+detail+fixture/moment+judge.md, so a
     rerun whose wording changes pays for the judge again (0 cached both runs).
   NEXT: V2-021 (end-to-end update for voice and research). 1 story left.
+
+[2026-11-01 05:10] V2-021 — completed — npm run e2e covers voice and research:
+  five conversations, 55/55 checks, $2.3409 of $4.20, exit 0.
+  The code was already written by an iteration that was cut off before it
+  could run anything; this one reviewed it, measured it, and corrected the
+  budget table from the real numbers. ALL 21 V2 STORIES NOW PASS.
+  WHAT THE CHECK RUNS NOW: what server/app.ts runs. createGlimmer (the local
+  gate) and createVoice = meteredVoice(nullSinkVoice(() => new Speaker(...)))
+  — the real ElevenLabs socket, real streaming, real alignment, audio
+  discarded. This is the only check on a real wall clock, which is the whole
+  reason the gate and the searches are wired in here: simulated time does not
+  move inside clock.track, so npm run eval charges them nothing.
+  FULL RUN (e2e/sessions/2026-11-01_045328, log not committed):
+    brainstorm             10/10  $0.2471  121s audio / 180s wall
+    moment-contradiction    9/9   $0.3371  122s / 199s
+    ask-search             11/11  $0.4700   48s /  69s
+    ask-diagram            12/12  $0.1513   42s /  57s
+    research-business-idea 13/13  $1.1354  175s / 213s
+    total 55/55, $2.3409 = $1.9025 model (131 calls) + $0.0254 ASR
+    (508s) + $0.4129 speech (4,542 characters); budget $4.2000.
+  research-business-idea, the three new assertions: 5 ideas, 4 queued, 3
+  sourced packets saved in research/, a research-ready card at 118.8s against
+  the wake question at 169s, and a briefing that used all 3 packets — 1,581
+  characters spoken, first audio 0.3s, ackMs null.
+  ackMs IS NULL ON A BRIEFING BY DESIGN (V2-015 skips both the acknowledgment
+  and the holding line), so the report prints "ack —, first audio 0.3s" and a
+  reader has to look at firstAudioMs to see that Sotto answered. ask-search
+  and ask-diagram, which really search, show ack 0.2s and first audio
+  2.0s/3.2s.
+  THE COST GATE CHANGED SHAPE (tasks/decisions.md): the core PRD's flat $0.50
+  MAX_RUN_COST_USD is gone, replaced by FIXTURE_BUDGET_USD — $0.70 a core
+  conversation, $1.60 for the research one — summed over whatever --fixtures
+  asked for, so one fixture is gated on its own cost rather than on the set's
+  headroom. ElevenLabs is priced at half a credit a character on Flash
+  (estimateTtsCostUsd in server/eval/cost.ts, ~$0.09 a thousand on the
+  Creator plan); the characters are counted exactly at the voice seam and
+  printed, so a reader on another plan can reprice it.
+  WATCH OUT:
+  - LENGTH PREDICTS NOTHING; SEARCHES PREDICT EVERYTHING. ask-search is 48
+    seconds and cost three times brainstorm's two minutes, because the
+    research planner spent two searches in it and brainstorm's two ideas were
+    both rejected by the gate. Every fixture runs the planner now, and a
+    grounded call with a tool declared resends its whole request each round
+    (V2-013), so one search is ~50k input tokens. That is why ask-search's
+    allowance went 0.6 -> 0.7: $0.4700 measured, and one more search would
+    have failed the run on price with every assertion holding.
+  - V2-020'S WARNING IS CONFIRMED LIVE. Both planted contradictions were
+    delivered *after* their deadline — moment-contradiction at 31.9s and
+    research-business-idea's audience-contradiction at 50.1s — against
+    windows of ~12-29s. The gate took 26-34s on Glimmer in this run (34.3s
+    on cand-7). The eval cannot see this because its clock stands still
+    inside a tracked call. The e2e check does not gate on moment latency, so
+    it still passes; if anyone wants those moments caught in a room, the
+    lever is DEFAULT_GATE_MODE = "spark", never a looser threshold.
+  - The observer looks on every final turn, coalescing while in flight (the
+    call site is SessionManager's onUpdate, not BoardUpdater.onUpdate as the
+    older CLAUDE.md note says). 26-29 observer calls in a 38-line
+    conversation is most of the input tokens. Pre-existing and out of this
+    story's scope, but it is the first place to look if the bill matters.
+  - A full run is ~12 min and ~$2.35. Use --fixtures while iterating;
+    research-business-idea alone is $0.70-$1.14 and ~3.5 min.

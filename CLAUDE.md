@@ -1281,3 +1281,38 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   was never searched. Neither outcome is the candidate gate's doing: a `research_hook`
   never reaches it (V2-011). Read `research.jsonl`'s idea/gate/start lines before blaming
   a prompt, and remember the research-recall gate moves in steps of 0.33 on three moments.
+
+- **The end-to-end check is the only clock that charges for thinking, so that is where the
+  gate and the voice live.** V2-021 gives `npm run e2e` `createGlimmer` and
+  `createVoice` — `meteredVoice(nullSinkVoice(() => new Speaker(...)))`, the real ElevenLabs
+  socket with the audio thrown away, so the streaming, the alignment and the latencies are
+  live and nothing comes out of a speaker. Simulated time does not move inside
+  `clock.track`, so `npm run eval` gets the local gate's 26–34 s and a search's 15 s for
+  free; a room does not. Measured live, and it confirms V2-020's warning: both planted
+  contradictions were delivered **after** their deadline (31.9 s and 50.1 s against windows
+  of ~12–29 s) with every assertion still passing, because the check does not gate on
+  moment latency. If those moments have to be caught in a room the lever is
+  `DEFAULT_GATE_MODE = "spark"`, never a looser threshold.
+- **"Sotto spoke and knows what was heard" is one assertion, and it reads the transcript.**
+  A line labelled `Sotto` exists only because something reported *playing* the utterance
+  (V2-008a writes nothing for a muted or unheard one), so `E2eObserved.sottoTurns` being
+  non-empty is the proof the alignment came back and `spokenSoFar` was read — which is why
+  `live.ts` keeps Sotto's turns apart from the room's rather than counting them in. The hello
+  gives every conversation one, so every fixture gets the check for nothing.
+- **Length predicts nothing about an e2e fixture's cost; searches predict everything.** Every
+  fixture runs the research planner now, and a grounded call with a tool declared resends its
+  whole request each round (V2-013), so one search is ~50k input tokens: 48-second
+  `ask-search` searched twice and cost $0.4700, three times what two minutes of `brainstorm`
+  cost searching not at all. Hence `FIXTURE_BUDGET_USD` in `server/e2e/report.ts` — $0.70 a
+  core conversation, $1.60 for `research-business-idea` — summed over whatever `--fixtures`
+  asked for, so one fixture is gated on its own bill rather than on the set's headroom
+  (`MAX_RUN_COST_USD` is gone). ElevenLabs is half a credit a character on Flash
+  (`estimateTtsCostUsd`, ~$0.09 a thousand on the Creator plan); the characters are counted
+  exactly at the voice seam and printed beside the estimate, because the per-credit price is
+  the plan's and a reader may be on another. A full run: 55/55 checks, $2.3409, 508 s of
+  audio in ~12 minutes.
+- **`ackMs` is null on a briefing, and that is the result rather than a gap.** A question
+  Sotto has already done the research for skips the acknowledgment *and* V2-008c's holding
+  line and goes straight to speech (V2-015), so the report prints `ack —, first audio 0.3s`
+  and anything asking "did Sotto answer out loud" has to read `firstAudioMs`. The two
+  fixtures that really search show `ack 0.2s` and first audio at 2.0–3.2 s.
