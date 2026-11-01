@@ -1,0 +1,414 @@
+{
+  "project": "Sotto",
+  "branchName": "ralph/sotto-v2",
+  "description": "Sotto v2: a voice in the room. Sotto answers out loud via ElevenLabs when addressed (fast acknowledgment, no length cap), can be interrupted by saying 'Sotto', ignores its own voice, greets the room, researches in the background with sourced packets and quiet research-ready cards plus spoken briefings, gates candidates with Muse Glimmer running locally (Spark fallback), adds frequency/boldness controls and an end-of-session digest. Unprompted contributions stay on screen. Full spec: tasks/prd-sotto-v2.md (wins over tasks/prd-sotto-core.md where they disagree).",
+  "userStories": [
+    {
+      "id": "V2-001",
+      "title": "Replace Chatterbox with ElevenLabs for test audio",
+      "description": "As a developer, I want test conversations rendered by ElevenLabs so fixture generation is fast, uses distinct voices, and has no Python dependency.",
+      "acceptanceCriteria": [
+        "npm run fixture:render -- <name> (scripts/render-fixture.ts) renders fixtures/scripts/<name>.json to fixtures/audio/<name>.wav (mono 16-bit PCM 24 kHz) and <name>.timing.json via ElevenLabs text-to-speech with output_format pcm_24000",
+        "Speaker letters map to distinct ElevenLabs voices via fixtures/voices.json (defaults: two clearly different library voices)",
+        "Pauses between lines are inserted as silence; timing files keep the existing format so npm run fixtures:check passes",
+        "fixtures/make_fixture.py is deleted; Chatterbox is removed from fixtures/README.md and CLAUDE.md",
+        "Existing fixture WAVs, timing files and captured events are kept unchanged (not re-rendered)",
+        "Integration test (real API): rendering a 10-line test script works end to end",
+        "ELEVENLABS_API_KEY is read only by server-side/script code, never logged or sent to the browser",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Done. All 9 criteria met; npm run typecheck, npm test (700 tests), npm run fixtures:check (9 fixtures, all unchanged) and the real-API integration test all pass. Renderer is scripts/render-fixture.ts -> server/audio/renderScript.ts (assembly, unit-tested with a fake synth) -> server/voice/elevenlabs.ts (the TTS seam, output_format=pcm_24000). Measured 19.4s of audio in 3.5s on eleven_flash_v2_5 — faster than real time, so V2-002 can render, capture and check in one iteration. The ElevenLabs key in .env is scoped to synthesis: no voices_read and no user_read, so voice ids are configuration in fixtures/voices.json (A=Rachel, B=Adam) rather than looked up. Each utterance comes back padded with near-silence (54-91ms head, 268-371ms tail), trimmed before pauseAfterMs is inserted. Also raised Vitest's testTimeout to 15s: the brainstorm capture replay in SessionManager.test.ts and app.test.ts takes 4.3-5.5s, either side of the old 5s default, and npm test was already red at random on the clean tree before this story."
+    },
+    {
+      "id": "V2-002",
+      "title": "New test conversations: research-business-idea and offsite-plan",
+      "description": "As a developer, I need test conversations that exercise research hooks, unanswered questions and dependency-style contradictions.",
+      "acceptanceCriteria": [
+        "Fixture schema moment types add unanswered_question and research_hook; expectedLevel adds research (a research-ready card must appear within the window)",
+        "research-business-idea (2–3 min, speakers Craig and EJ, natural back-and-forth): two people brainstorm a meeting tool; moments: research_hook (market size / who's funded), research_hook (top competitors and gaps), contradiction ('smaller teams' vs 'enterprise clinics'); near the end one asks 'Sotto, what did you find on competitors?'",
+        "offsite-plan (2–3 min, Craig and EJ): moments: contradiction (Alex free Thursday afternoon, then can't do Thursday at all), unanswered_question ('who's handling food?' never answered), research_hook (drive time / venue availability); ends with a dependency-list request",
+        "Both rendered with npm run fixture:render, captured with npm run capture, and committed; npm run fixtures:check passes",
+        "Same two conversations added as human-readable live scripts fixtures/live-scripts/05-research-business-idea.md and 06-offsite-plan.md",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Done. All 6 criteria met; npm run typecheck, npm test (706 tests) and npm run fixtures:check (11 fixtures) pass. research-business-idea is 175.2s (38 lines) and offsite-plan 167.5s (37 lines), both Craig (B = Adam) and EJ (A = Rachel) — a script carries no names, so the letters are the voices. Schema: momentTypes += unanswered_question, research_hook; expectedLevels += research, with a superRefine rule that research <-> research_hook (a research hook is caught by a research-ready card, never by the policy). score.ts's levelRank now ranks research above interject so an interjection matched to a research moment scores caught_low until V2-019 implements research matching; the two fixtures are NOT in the eval set yet (isEvalFixture only takes brainstorm, no-wake and moment-*), which is V2-019's first criterion. npm run eval:ceiling: 6/6 planted moments reachable at PAUSE_MS 700 with 780-1,453 ms of corrected quiet left in each window — the first render had two windows at 701/708 ms, so the in-window pauses were widened and both fixtures re-rendered and re-captured. Needed outside the stated criteria: `sato` added to DEFAULT_WAKE_SPELLINGS, because research-business-idea's wake line transcribes as \" Sato, what did you find on competitors? \" on two captures of two renders and would otherwise never trigger V2-005/V2-015. offsite-plan's wake line lost its comma and matches only on the surviving question mark. Both in events/NOTES.md."
+    },
+    {
+      "id": "V2-003",
+      "title": "ElevenLabs speech service",
+      "description": "As the system, I need to turn text into streaming speech quickly, stop it instantly, and know exactly what was spoken.",
+      "acceptanceCriteria": [
+        "server/voice/Speaker.ts streams text to ElevenLabs input-streaming WebSocket (/v1/text-to-speech/{voice_id}/stream-input), model eleven_flash_v2_5, output pcm_24000, emitting audio chunks as they arrive (check https://elevenlabs.io/docs for the current protocol)",
+        "Accepts text incrementally (sentence by sentence) so speech starts before the full text exists",
+        "Requests alignment data and tracks which characters have been played, so after a stop the exact spoken-so-far text is known",
+        "cancel() stops the stream immediately and discards pending audio",
+        "Voice from ELEVENLABS_VOICE_ID, else a documented calm default library voice",
+        "Unit tests with a mocked ElevenLabs socket: incremental text, cancel mid-stream, spoken-so-far tracking",
+        "Integration test (real API): one sentence yields non-empty PCM; time to first audio chunk logged",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Speaker is single-use (one per utterance): start() -> append(text) -> finish(), or cancel(). Auth rides the xi-api-key upgrade header, never a message. Real API measured: first audio chunk 299 ms after start(), 2.65 s utterance in 398 ms. spokenSoFar() needs notePlayedMs()/notePlayedAll() from the browser (V2-004) - with no playback report it is deliberately empty. Default voice: River SAz9YHcvj6GT2YYXdXww (probed valid with this key, as are Sarah EXAVITQu4vr4xnSDxMaL, Charlotte XB0fDUnXU5powFXDhCwa, Lily pFZP5JQG7iQjIQuC4Bku)."
+    },
+    {
+      "id": "V2-004",
+      "title": "Browser playback, speaking state, Stop and Mute",
+      "description": "As a user, I want to hear Sotto through the laptop speakers, see when it's speaking, and stop or mute it.",
+      "acceptanceCriteria": [
+        "Server forwards speech audio over /ws/voice; the browser plays it gaplessly with Web Audio in the SAME page that captures the mic (so Chrome echo cancellation can reference it)",
+        "Mic capture keeps echoCancellation: true and other processing settings unchanged",
+        "Browser reports playback started/position/ended; the server exposes a speaking state on the event bus",
+        "UI: speaking indicator on the stage, Stop button while speaking, Mute voice toggle (muted = screen only) saved in session settings",
+        "A dev-only route triggers a test utterance for verification",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright: trigger test utterance, see speaking indicator and Stop, click Stop, indicator clears)"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Completed. VoiceHub forwards PCM over /ws/voice, receives browser playback reports and publishes voice state; Web Audio schedules playback on the microphone page. Stop and session-persisted mute cancel playback. Dev-only POST /api/voice/test is enabled by SOTTO_DEV=1. Verified typecheck, build, 723 unit tests, and a real ElevenLabs muted-headless browser check with screenshot, including Stop, mute across reload, and normal completion. V2-005 must share the VoiceHub currently created in server/app.ts with the answer pipeline. Human audio/echo verification remains at V2-008."
+    },
+    {
+      "id": "V2-005",
+      "title": "Spoken answers",
+      "description": "As a user, when I ask Sotto something, I want a spoken answer that starts fast and is as long as it needs to be.",
+      "acceptanceCriteria": [
+        "On a wake question, a short pre-synthesized acknowledgment ('Mm-hm.', 'Let me check.' — chosen by whether search is likely) plays within 1.5 s unless the answer's first sentence is ready first",
+        "server/prompts/answer.md asks for a spoken reply of whatever length suits the question in a meeting (NO word cap), written to be heard (no markdown, no URLs read aloud), plus on-screen material: headline <= 90 chars, optional detail, sources",
+        "Spoken text streams from Muse Spark into the Speaker sentence by sentence; speech starts before the full answer is generated",
+        "Answer card still appears with headline, detail, sources; the spoken text is viewable as 'transcript of answer'",
+        "When voice is muted, behavior matches the core build (screen only)",
+        "answers.jsonl records firstAudioMs, ackMs, full spoken text, and spokenSoFar if interrupted",
+        "Integration test (events replay): ask-search produces an answer whose speech starts, firstAudioMs logged",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Done. All 9 criteria met; npm run typecheck, npm test (757 tests), npm run build and the real-API integration test (6 tests, model + ElevenLabs) pass. An answer is now two halves in one prose reply — `Say this:` then `Show this:` — parsed by splitSpokenAnswer in shared/answers.ts; the spoken half streams into the voice a sentence at a time (server/answer/sentences.ts) while the screen half still gives the card its headline, detail and sources. A reply with no screen half falls back to screenFromSpoken, so the card is never empty. SpokenAnswer (server/answer/SpokenAnswer.ts) runs two utterances on one promise chain: the acknowledgment (ack.ts: \"Mm-hm.\" when the question is about the conversation, \"Let me check.\" otherwise), then the answer, whose opening is what cuts the acknowledgment off. The seam is VoiceOut/VoiceUtterance in server/voice/voiceOut.ts: VoiceHub implements it (new begin(), incremental append, a bounded wait for the page's final playback report after a cancel so spokenSoFar is real), and nullSinkVoice is the same real ElevenLabs socket with the audio discarded, which is what the integration test and V2-021 speak through. SessionManager takes createVoice and app.ts now builds the VoiceHub before the SessionManager and passes it in, so answers speak through the same hub the browser's /ws/voice is attached to. ackMs/firstAudioMs are measured on an injected wallClock, never the session clock (a max replay's session clock stands still during a model call). Measured on ask-search through the real API: ackMs 461 ms, firstAudioMs 11,012 ms, 732 characters spoken, latencyMs 0 (replay). Muted or with no page attached, begin() returns null and the answer is screen only, exactly as the core build was — unit-tested. npm run verify:voice (V2-004's check) still passes through the refactored hub. Note for a later iteration: npm run verify:cards had two stale assertions predating this story (it expects a dark body background and a `source-select` in the header, neither of which the UI has had since V2-004); its layout block also crashed because the transcript and the notes are now tabs rather than stacked, which this story repaired so the check could run at all. The two stale theme/header assertions are still red and were left alone."
+    },
+    {
+      "id": "V2-006",
+      "title": "Self-echo suppression",
+      "description": "As a user, I don't want Sotto's own voice in the transcript, on the board, or triggering anything.",
+      "acceptanceCriteria": [
+        "During playback and 1.5 s after, transcribed turns that fuzzy-match (token overlap >= 0.6) text Sotto spoke in that window are marked selfEcho and excluded from transcript, board, observer, wake detection and session files (logged to timing.jsonl only)",
+        "Wake detections matching Sotto's own recent speech (e.g. its hello saying 'I'm Sotto') are ignored",
+        "Non-matching turns during playback (side talk) stay in the transcript but trigger no wake question, interjection delivery or research (barge-in is V2-007)",
+        "Pure, unit-tested matcher: exact echo, partial echo, echo with ASR errors, unrelated side talk, side talk quoting a few of Sotto's words",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Completed by Codex. V2-006 uses a pure token-multiset overlap matcher (>= 0.6) and VoiceOut.playback(), supplied by VoiceHub from actual Speaker playback/alignment reports, through playback plus a 1,500 ms wall-clock tail. SessionTranscription filters both live and replay input before UI turns, saved raw frames, transcript, introductions, board, observer, wake detection and answer context; echoes are marked selfEcho only in timing.jsonl. Partials inside the echo window wait for final text so a short matching prefix can still become human side talk. Raw frames are buffered and released in original order, including overlapping turns. Human side talk remains context but cannot trigger a wake question, even if it finalizes after playback ends; policy delivery is held through playback and rechecked on playback end or a late echo final. Checked npm run typecheck and npm test: 59 files, 781 tests pass. Fixed pre-existing dummy-key model calls in session/route unit-test helpers by injecting an offline emptyModel; no real API calls are needed for this story. For V2-007, add a private partial-turn barge-in hook inside SessionTranscription without exposing echo partials to UI or saved files. Research is not implemented yet; its later gate must also consult playback().playing. Human room/echo verification remains at V2-008."
+    },
+    {
+      "id": "V2-007",
+      "title": "Barge-in and follow-ups",
+      "description": "As a participant, I want to cut Sotto off by saying its name, and redirect or resume it.",
+      "acceptanceCriteria": [
+        "While speaking, wake detection runs on PARTIAL turns; a valid detection immediately cancels speech (Speaker cancel + browser flush); wake-word-end-to-silence latency is computed from transcription audio positions and logged to timing.jsonl (target < 1.5 s)",
+        "Optional ducking: a non-echo human speech partial during playback drops volume to 30% until the turn resolves; restored if not a barge-in",
+        "After the turn is final, the command is classified (structured output): stop ('Sotto, stop' / 'thanks Sotto') -> silence; new_question -> answer it; continue ('Sotto, go on') -> resume from spokenSoFar",
+        "Interrupted answers are recorded with spokenSoFar, and follow-up context tells the model it was cut off",
+        "Unit tests on a simulated clock: barge-in on a partial stops playback; each command type; barge-in during the acknowledgment; stop then new question",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Completed by Codex. Private non-echo partials reach BargeIn before public transcript release; an addressed partial immediately cancels the active Speaker, flushes browser audio and permanently stops that answer's speech feeder, including acknowledgment/socket-opening races. Final commands use validated Muse Spark structured output for stop, new_question and continue, with no duplicate wake question. Interrupted answers retain spokenSoFar; follow-ups receive the full interrupted answer plus the heard prefix, and continue skips acknowledgment and resumes after that prefix. VoiceHub now waits for playback or cancellation before recording an answer, so interruption after synthesis completion is captured too. timing.jsonl records browser-confirmed flushMs and wakeToSilenceMs; the wake end is explicitly estimated from the first matching partial's audioProcessedMs because ASR provides no per-word timestamps. Missing flush confirmation produces null latency, never a claimed success. Optional ducking omitted. npm run typecheck and npm test pass: 61 files, 801 tests, all offline. Real-room latency and echo behavior remain for V2-008; tasks/checkpoint-voice.md is absent, so the next iteration must stop for the human checkpoint."
+    },
+    {
+      "id": "V2-008",
+      "title": "HUMAN CHECKPOINT: live voice test",
+      "description": "As the team, we need to confirm in a real room that echo cancellation and barge-in work before building on them.",
+      "checkpoint": "tasks/checkpoint-voice.md",
+      "acceptanceCriteria": [
+        "The loop does not start this story until tasks/checkpoint-voice.md exists (ralph.sh enforces this)",
+        "A human runs a 10-minute live session with laptop speakers and at least two people, and records in tasks/checkpoint-voice.md: voice leakage into the transcript, barge-in latency, false barge-ins, and RESULT: PASS or RESULT: FAIL with notes",
+        "If RESULT: PASS: set passes true and summarize the findings in notes",
+        "If RESULT: FAIL: fix the listed problems in this iteration, commit, rename the file to tasks/checkpoint-voice-fail-<n>.md (so the loop stops again for a retest), and leave passes false with notes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "RESULT: PASS, recorded by the human in tasks/checkpoint-voice.md (attempt 2, 2026-10-31 22:52 session, sessions/2026-10-31_2252-mic, ~4 minutes). No Sotto speech reached the transcript and the self-echo filter logged no matches: Chrome's echo cancellation removes it before transcription. Three barge-ins, each classified new_question and answered; flush 3-7 ms after detection, which felt immediate once the ~0.6-0.7 s transcription lag is added. No false barge-ins. The wake word works with no comma, mid-sentence and split across a pause; mentions ('Soto, I was going to ask you about that', 'Soto's being a bit cherry' during an answer) were ignored. The attempt-1 fixes all held: conversation context after the clock fix, 663 spoken words uncut, 'I'm Craig' naming the speaker. DEVIATION, recorded by the human: this was a solo test, not two people, so human side talk during Sotto's speech and how transcription labels two people talking at once are DEFERRED to the first session with a second person and still need checking. Latency measured but not blocking: name to acknowledgment ~4 s (V2-008b), acknowledgment to first real sentence 3.5-4.7 s conversation-only and 8-13 s searching (V2-008c)."
+    },
+    {
+      "id": "V2-008a",
+      "title": "Sotto's speech in the transcript",
+      "description": "As a user, I want what Sotto said aloud to appear in the transcript as Sotto's own lines, so the record shows both sides of the conversation.",
+      "acceptanceCriteria": [
+        "Every utterance Sotto speaks aloud (answers, briefings, later the hello; not short acknowledgments) appears as a final transcript entry labeled Sotto",
+        "Text is Sotto's own source text, not the mic transcription; an interrupted utterance shows only spokenSoFar, marked interrupted; muted answers add no entry",
+        "Placed at playback start on the turn timeline (stream clock, same as human turns), not the server clock; test with a live clock offset from the stream timeline",
+        "Shown in the live transcript with a distinct Sotto style, written to transcript.md, and shown in the discussion-history view",
+        "Ignored by wake/address classification, barge-in, the self-echo matcher's human side, speaker introductions and eval turn matching",
+        "Board update sees Sotto entries (labeled Sotto); the observer does not; answer context may",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Sotto line appears with its style; a stopped utterance shows only the heard part)"
+      ],
+      "priority": 8.5,
+      "passes": true,
+      "notes": "Sotto's own utterances are final turns labeled Sotto. sottoTurn()/isSottoTurn() in shared/turns.ts; `sotto` and `interrupted` are optional fields on TurnUpdate so the bus, the store and the panel need no second type. AnswerAgent stamps SessionTranscription.streamNow() when the first sentence goes to the voice (playback start to within ElevenLabs' measured 299 ms first chunk) and records the line after the utterance ends: its own source text, or only spokenSoFar when cut off, and nothing at all when muted, when nothing was heard, or for an acknowledgment. SessionManager.recordSottoSpeech publishes to the bus, appends to transcript.md and feeds the board; the observer's uncovered turns are filtered, and the wake watcher, AddressWatcher, BargeIn, the eval runner and server/e2e/live.ts each guard themselves. SessionStore keeps transcript.md in conversation order (Sotto's line can arrive after the barge-in that cut it off, so an out-of-order insert rewrites the file) and never registers Sotto as a renameable speaker. The browser indents the row under an accent rule in italics with a disabled Sotto chip and an '(interrupted)' marker; the history view reads the same file with the emphasis stripped. DELIBERATE CHOICE on 'answer context may include them': it does NOT. finalTurns() stays human-only, because a 663-word spoken answer would dominate the ten-minute window, and an interrupted answer is already carried into the follow-up separately. Checks: npm run typecheck, npm test (63 files, 844 tests), npm run build, npm run verify:transcript (mocked /ws/events, screenshot inspected). No real API, microphone or audible output was used."
+    },
+    {
+      "id": "V2-008b",
+      "title": "Faster response to being addressed",
+      "description": "As a user, when I say \"Sotto, ...\", I want the acknowledgment right after I stop talking, not 4 seconds later.",
+      "acceptanceCriteria": [
+        "When a partial with the name (existing word check) has settled, start the Spark address check on the partial; at most one early check in flight per turn",
+        "On the final turn, reuse the early result if the final only extends the checked partial, else recheck; mentions never acknowledge; name_only arming unchanged",
+        "Acknowledgment plays as soon as the turn is final and the result is request, never while the person is still talking",
+        "Target: speechEnd arrival to first acknowledgment audio <= 1.5 s when the early check finished; timing.jsonl records address_early (started/reused/rechecked) and speechEndToAckMs",
+        "Barge-in during playback unchanged",
+        "Offline simulated-clock tests with a fake classifier: early start, reuse, recheck on changed final, no ack while speaking, mention, name_only",
+        "Typecheck passes"
+      ],
+      "priority": 8.6,
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (63 files, 862 tests), npm run build and the real-API integration test (server/answer/address.integration.test.ts, 20/21) pass. The early check is in AddressWatcher: a named partial is classified when it reaches ADDRESS_EARLY_WORDS (4) words after the name, or after ADDRESS_SETTLE_MS (600 ms) of unchanged text for shorter turns, one check in flight per turn; the final reuses the verdict. Measured on the captures before writing a line: mid-speech partials arrive a median 310 ms apart (p75 482, p90 641), so a 300 ms settle fires mid-sentence, and the last partial of a turn (which carries the complete text in 270 of 273 turns) lands only a median 882 ms before speechEnd arrives - so a settle rule alone can never cover a 2.5 s check. Four words after the name is reached 1,752-4,865 ms ahead on the six captured named turns. Real Spark, four wake captures: check started 2.0-4.9 s before speechEnd, took 1,895-2,986 ms, and the final waited 0.07-0.69 ms - so speechEnd-to-ack is now the acknowledgment synthesis alone (461 ms measured in V2-005), inside the 1.5 s target; no fallbacks, and all four questions complete. A reuse keeps the verdict but not the wording: an extended request re-derives its question from the final text with the new wake.questionAfterName (loose: any whole-word spelling, skipping possessives and 'voce'), which is what makes ask-diagram (+8 words) and offsite-plan (+11) safe. name_only is rechecked on any extension (the request is the rest of the sentence) and a mention on more than ADDRESS_EXTENSION_WORDS (3), since nothing waits on a mention. timing.jsonl: address_early (started/reused/rechecked with extraWords, earlyMs, waitedMs) and answer_voice (ackMs/firstAudioMs/speechEndToAskMs/speechEndToAckMs/speechEndToAnswerMs); speechEnd real time comes from the closing partial (endMs set, still final:false) and rides to the answer agent as WakeTrigger.heardAtMs -> AskedQuestion.heardAtMs. Barge-in is untouched: held partials are never published during playback, onHuman runs before onUpdate so BargeIn owns a turn first, and ignoreTurn/stop abort any early check. One test change beyond the story: the SessionManager ask-search replay now uses systemClock as its wall clock, because instantWallClock fires a 6 s timeout in a microtask and was timing every classification out - that test had been exercising the lexical fallback (latencyMs 6000, fallback true) rather than the classifier. Pre-existing model flake, not from this story: the integration case previous 'EJ: Soto' + 'never mind' returned request once (5,963 ms) and mention on a rerun (4,333 ms)."
+    },
+    {
+      "id": "V2-008c",
+      "title": "First line while researching",
+      "description": "As a user, when Sotto has to search, I want it to start talking sensibly right away instead of a long silence after the acknowledgment.",
+      "acceptanceCriteria": [
+        "For a question likely to need search, start a fast conversation-only first line in parallel (Muse Spark, no tools, low reasoning), grounded in the conversation and general knowledge, with no specific claims that need the search (no figures, dates, quotes)",
+        "Spoken after the acknowledgment; the searched answer continues from it without repeating it (it gets the first line as context)",
+        "If the searched answer's first sentence is ready first, skip the first line",
+        "First line and continuation are one utterance for barge-in and spokenSoFar",
+        "Card unchanged (from the searched answer); the spoken transcript of the answer includes both parts",
+        "Target: acknowledgment to first real sentence <= 4 s on search questions; answers.jsonl records firstLineMs and the continuation's first audio",
+        "Offline simulated-clock tests (ordering, skip when the answer comes first, cancellation across both) plus an integration probe of real timing on a search question",
+        "Typecheck passes"
+      ],
+      "priority": 8.7,
+      "passes": true,
+      "notes": "Done. All 8 criteria met; npm run typecheck, npm test (64 files, 874 tests), npm run build and the real-API integration probe (npx vitest run --config vitest.integration.config.ts server/answer/answer.integration.test.ts, 7/7, real Spark + real ElevenLabs) pass. server/answer/firstLine.ts is the second call — Spark structured, no tools, reasoning_effort low, 2k tokens, server/prompts/firstline.md, which forbids every kind of specific and treats \"\" as a valid reply meaning \"nothing worth saying without the facts\". It is only made when a voice is configured, the question is searchLikely() and it is not a V2-007 continue. SpokenAnswer.sayFirstLine puts the line in the ANSWER's utterance, not a third one, so a barge-in is one cancellation and spokenSoFar reads across both halves — and opening it is still what cuts the acknowledgment off, which is the PRD's \"unless the answer's first sentence is ready first\" as a mechanism rather than a special case. The skip is a synchronous `answering` flag set inside say(), because `opened` is only true once the promise chain runs a step; feed() also aborts the holding call the moment the answer says a sentence of its own. The one judgement call: the criteria say the two calls run in parallel AND that the searched answer gets the first line as context, which the API cannot do mid-flight (the prose request is built once). So the searched call waits up to FIRST_LINE_CONTEXT_WAIT_MS for the line — 4 s, on the WALL clock, measured: the line reached the voice 1.9-3.3 s after the question across four real runs, and the line is about five seconds of speech, so the head start is hidden behind speech the room is already hearing. 1.5 s and 3 s both expired just short and threw the context away for nothing. A line that misses the cap is still spoken, just without the answer knowing. timing.jsonl's answer_voice now carries firstLineInContext so a run can be checked. MEASURED (ask-search, real model + ElevenLabs, four runs): ackMs 257-275, firstLineMs 2,631-3,545, ack -> first real sentence 1,979 / 2,366 / 2,481 / 2,741 ms (target 4,000), continuationMs 15,686-31,493. Real output: \"You're asking about those meal planning and fridge scanner apps and monthly versus one-time unlock — let me get the numbers.\" then straight into \"Mealime Pro is about two dollars ninety nine cents a month...\" — no repetition. answers.jsonl gains firstLineMs and continuationMs (both required on Answer); firstAudioMs keeps its meaning (the answer utterance's first audio = the first line's, since it opens it) so nothing downstream had to change. continuationMs needed one new optional seam, VoiceUtterance.audioMs(), because within one utterance the continuation is heard where the line's audio ends. NOTE for V2-021: this adds one cheap structured call per spoken searched answer, so the e2e cost budget ($0.50, measured at $0.4826) needs re-measuring. NOTE for a later story: the first line covers the first ~5 s of the wait, not all of it — there is still ~10 s of silence between the end of the line and the continuation on a hard search. The PRD does not ask for more."
+    },
+    {
+      "id": "V2-009",
+      "title": "Opening hello and introductions",
+      "description": "As a group, we want Sotto to introduce itself and learn who's here, so it feels like a participant and not a hidden recorder.",
+      "acceptanceCriteria": [
+        "On session start (mic or WAV), Sotto speaks a short hello: who it is, that it's listening, how to address it ('just say Sotto'), and an invitation to introduce yourselves; text in server/prompts/hello.md; shown as a card instead when voice is muted",
+        "If any active speaker label has no name 2 minutes after start, one on-screen nudge ('I'd love to know who's here') appears at the next pause; never repeated",
+        "The hello is excluded from transcript and board via V2-006",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright: start a session, see the hello card and speaking indicator)"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Done. All 5 criteria met; npm run typecheck, npm test (65 files, 895 tests), npm run build and npm run verify:hello (real wav session, real ElevenLabs) pass. server/prompts/hello.md is read verbatim, not generated, so a session with no MODEL_API_KEY still says hello. server/session/Greeting.ts owns both halves; it is built in SessionManager.startLive only — an `events` replay is never greeted (the PRD says 'mic or WAV'), which also keeps a card the policy never delivered out of npm run eval. New `notice` card variant (shared/cards.ts, NOTICE_CARD_IDS): no label, no feedback row, and neither eval's deliveriesFrom nor e2e's interjections() counts it, since both already filter on interject|glow. Criterion 3 reading: V2-009 predates V2-008a, and 'excluded ... by V2-006' can only mean the microphone's echo of the hello, which selfEcho.test.ts now checks. V2-008a is later and explicitly lists 'and later the hello' among Sotto's transcript lines, so the hello IS a Sotto turn — but it is deliberately NOT fed to the board, which is where V2-009 and V2-008a can both be satisfied (the hello establishes no fact). Known unrelated breakage: npm run verify:cards fails on two stale assertions (dark body background, header source selector) that an earlier UI story removed; the card rendering part passes, including the two new notice samples on /dev/cards."
+    },
+    {
+      "id": "V2-010",
+      "title": "Glimmer client with Spark fallback",
+      "description": "As the system, I need a local model client for fast, private judgment calls.",
+      "acceptanceCriteria": [
+        "server/model/GlimmerClient.ts calls the OpenAI-compatible endpoint at GLIMMER_BASE_URL with GLIMMER_MODEL, supports JSON-Schema structured output (or grammar-constrained JSON, whichever the local server supports), validated with zod",
+        "Health check at session start; if Glimmer is unreachable, a warning is logged and every Glimmer role falls back to Muse Spark; a status dot shows 'judgment: local / cloud'",
+        "ralph/preflight.sh's Glimmer check sends a trivial structured request",
+        "Integration test (real local server; skipped with a clear message if GLIMMER_BASE_URL is unset): a structured request returns valid JSON; latency logged",
+        "If Glimmer is not running when this story is attempted, mark it blocked with notes and move on",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (67 files, 916 tests), npm run build, the real-local-server integration test (5/5) and npm run verify:judgment (real browser, dot reads \"judgment: local\") all pass. server/model/GlimmerClient.ts is the structured-call seam (keep_alive 30m, reasoning_effort low, finish_reason checked, <|eot|> stripped); server/model/judgment.ts is the per-session JudgmentRouter that health-checks once and falls back to Muse Spark with a warning. Measured: health 38 ms, a four-field gate call 17.0 s. The session-start check is a MODELS LISTING, not a generation — a cold structured request is ~44 s and the dot must not hang on it; warm() pays that load in the background. preflight.sh does send the structured request (5 s warm). V2-012 should take its gate client from RunningSession.judgment (await router.client()), and wire createGlimmer into server/eval/runner.ts and server/e2e/live.ts, which currently default to null and therefore judge in the cloud."
+    },
+    {
+      "id": "V2-011",
+      "title": "New candidate types: unanswered_question and research_hook",
+      "description": "As the system, I need to notice unanswered questions and research-worthy moments, not just contradictions and errors.",
+      "acceptanceCriteria": [
+        "candidateTypes adds unanswered_question (asked directly, nobody answered, conversation moved on) and research_hook (outside information would clearly help: explicit 'we should look up X' or implicit, e.g. an unbacked market-size claim)",
+        "dropped_thread is redefined as an idea or risk raised and abandoned (no overlap with unanswered_question)",
+        "server/prompts/observer.md defines both new types with one example each",
+        "unanswered_question candidates go through the interjection policy (on screen only); research_hook candidates go to the research gate (V2-012), not the policy",
+        "Integration test (events replay): offsite-plan yields an unanswered_question candidate about food; research-business-idea yields >= 1 research_hook",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (67 files, 917 tests) and the real-API integration test pass. candidateTypes is six long: unanswered_question (a direct question nobody answered before the talk moved on) and research_hook, with dropped_thread narrowed to an idea or a risk raised and abandoned — its old question example moved to the new type, so the two no longer overlap. Routing is one branch in SessionManager.modelLoops's onCandidate: a research_hook leaves the interjection path for good (collected in ModelLoops.researchHooks, logged once and written to timing.jsonl as stage \"research_hook\"), a factual_error still detours through the verifier, everything else goes to the policy. V2-012 attaches the gate to that branch. observer.md gained a section per type with one example each, plus the paragraph that a hook interrupts nobody (so the bar is \"would the answer be useful\" rather than \"is this worth stopping them for\") and the instruction to write the headline as the question to look up. New integration test server/interject/candidateTypes.integration.test.ts replays both v2 fixtures at max: 4/4 in 618 s — offsite-plan yields an unanswered_question about food, research-business-idea at least one research_hook, and no decision line in either session names a hook. observer.integration.test.ts re-run as a prompt regression check: 5/5 in 147 s, including the ≤ 8 non-duplicate candidates bar, so the two extra types did not make the observer chatty on the core fixtures."
+    },
+    {
+      "id": "V2-012",
+      "title": "Research planner and gate",
+      "description": "As the system, I want to decide what's worth researching, from explicit hooks and from the conversation itself, without researching everything.",
+      "acceptanceCriteria": [
+        "Research ideas come from research_hook candidates and from a planner run every 2 minutes (injected Clock) when >= 3 new final turns arrived; the planner asks Muse Spark for <= 2 concrete, checkable items given board + recent turns; prompt server/prompts/research-planner.md with examples across business, scheduling, cooking, technical topics (no per-topic playbooks)",
+        "Idea shape: { id, topic, question, why, sourceTurnIds }; deduplicated against earlier ideas and packets",
+        "Gate (Glimmer, Spark fallback) scores each idea: useful to this group now, not already known in the conversation, answerable by web search; above-threshold ideas are queued",
+        "Budget: <= 3 research jobs started per 10 minutes, <= 2 running at once",
+        "Every idea and gate decision logged to research.jsonl",
+        "Unit tests: dedupe, budget, gate threshold",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Done. All 8 criteria met; npm run typecheck, npm test (71 files, 985 tests), npm run build and the new server/research/research.integration.test.ts (4/4 in 61 s, real Muse Spark + real local Glimmer) all pass. Three files: shared/research.ts (idea shape, both strict JSON schemas, researchScore = geometric mean of useful/unknown/answerable, RESEARCH_GATE_THRESHOLD 0.6, the dedupe and the budget constants), server/research/ResearchPlanner.ts (every 2 min with >= 3 new final turns, Muse Spark, <= 2 items) and server/research/ResearchGate.ts (one judgment call per idea through JudgmentRouter.client(), so Glimmer with Spark fallback), tied together by server/research/ResearchManager.ts: dedupe -> gate (serialized, clock.track'ed) -> budget (<= 2 running, <= 3 per 10 min, with a timer for when the window moves) -> run(idea), which is V2-013's to supply and is absent here, so an approved idea waits in queued(). Logged to research.jsonl (SESSION_FILES.research, SessionWriter.appendResearch) as idea/gate/start lines, and mirrored into timing.jsonl as research_idea/research_gate/research_start. MEASURED on the real models: the gate on local Glimmer is 19-39 s a call and discriminates exactly as intended (0.71-0.86 queued for a drive time / sales cycle question; 0.19-0.46 rejected for 'would our team rather', answerable 0.05-0.15), scores always in range. The planner proposes 2 sharp items on a stretch where a figure is being leaned on and nobody asks out loud, and ZERO on the stretch where they say 'somebody should check that' - which is the prompt doing what it says (that case is the observer's research_hook). Both halves of the integration test are built from the fixtures' own words for that reason. FOR V2-013: supply `run` to ResearchManagerOptions; the budget already counts starts. FOR V2-019/V2-020: research now adds model calls to every eval/e2e run (one planner look per 2 min, one gate call per non-duplicate idea), and server/eval/runner.ts + server/e2e/live.ts still do not pass createGlimmer, so their gates run on Spark and cost money."
+    },
+    {
+      "id": "V2-013",
+      "title": "Research runner and packets",
+      "description": "As the system, I want each approved research idea turned into a short, sourced packet ready to present.",
+      "acceptanceCriteria": [
+        "Runner calls the Responses API (Muse Spark, web_search, plus show_html when a visual helps) producing ResearchPacket { id, ideaId, title, teaser (1–2 sentences), keyPoints[], sources[{url,title}], visual?{title,path}, createdAtMs, latencyMs }",
+        "Packets with zero sources are discarded and logged as unsourced",
+        "Saved to research/<id>.json and research/<id>.md in the session folder; visuals in artifacts/",
+        "Runs in its own queue; never blocks answers, board updates or the observer",
+        "Integration test (events replay): research-business-idea yields >= 1 packet with >= 1 source before the wake question at the end",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (72 files, 1,020 tests), npm run build (research-packet.md copied to dist) and the real-API integration test (server/research/packet.integration.test.ts, 3/3) all pass. server/research/ResearchRunner.ts is one grounded call per approved idea: web_search + the packet's strict schema + show_html, sources resolved against searchedUrls with US-013's resolveCitation/searchedIndex, zero-source packets discarded as `unsourced` and a call that did not come back logged as `failed` (the runner never throws). shared/research.ts carries ResearchPacket, PacketReplySchema/researchPacketJsonSchema, ResearchPacketRecord (the fourth kind in research.jsonl), PACKET_ID_PATTERN and renderPacketMarkdown. SessionWriter gained writePacket (research/<id>.json + .md, id gated the way an artifact name is); visuals go through the same saveArtifact seam as an answer's, so they land in artifacts/ and share the numbering. MuseClient.grounded is now the same tool-round loop as prose (TOOL_MAX_ROUNDS, renamed from PROSE_MAX_ROUNDS) and GroundedReply gained functionCalls; probed against the real API first — strict json_schema + web_search + a function tool are accepted together, and a round ending in a function_call carries no JSON at all (fixtures/events/NOTES.md). ResearchManager.start now registers each job with clock.track, without which a max replay races past the search and the packet lands after the conversation. MEASURED on a real research-business-idea replay (local Glimmer gate): 5 ideas (3 hooks, 2 planner), gate queued 0.82/0.85/0.83 and rejected 0.54/0.53 (18-29 s a call, local), three sourced packets ready at 67 s, 90 s and 110 s in 12.9/20.7/16.6 s with 2-4 sources and 5 key points each, all before the wake question at 168 s. No visual was drawn in any of the three — the prompt tells the model a visual costs it a round — so the show_html path is covered by unit tests plus the standalone probe rather than by this replay. A packet costs ~56k input tokens a round (~$0.08, ~$0.17 with a visual), which V2-019's and V2-021's cost gates will feel. Note that drainLoops awaits research.flush(), so Stop waits for a search in flight (up to ~20 s) — deliberate, since V2-018's digest lists the research produced."
+    },
+    {
+      "id": "V2-014",
+      "title": "Research-ready cards",
+      "description": "As a user, I want to see quietly that research is ready, without being interrupted.",
+      "acceptanceCriteria": [
+        "Each packet appears as a compact on-screen card 'Research ready: <title>' with the teaser, delivered only during a pause (same rule as interjections), never spoken",
+        "Clicking expands key points, sources and the visual on the stage",
+        "Research cards have their own budget, separate from interjections (and later respect the frequency control)",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright: replay research-business-idea events, see a research card, expand it)"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "Done. All 5 criteria met; npm run typecheck, npm test (1032 tests) and npm run verify:research (a real research-business-idea events replay at 1x, real Spark + local Glimmer gate) all pass. server/research/ResearchCards.ts is the holder: packets wait for inPause(pauseState()) — the policy's own rule and the same getter, so Sotto's playback counts as somebody talking — and spend their own budget (RESEARCH_CARD_COOLDOWN_MS 60 s, MAX_RESEARCH_CARDS_PER_WINDOW 4 per 15 min, in shared/research.ts, separate from US-014's 3 min / 3 per 15 min). Nothing is ever dropped: flush() at the end of the session shows whatever is still waiting, because a packet is about the world rather than about a moment. Fifth CardVariant `research` with a new StageCard.teaser; collapsible like a glow, key points inline (not behind a second toggle), sources as citations, visual as an artifact frame. Card id is `research-<packetId>`, NOT under CARD_ID_PREFIX, so feedback can never find a candidate behind it and the eval/e2e delivery filters (interject|glow) ignore it untouched. Every card is a `card` line in research.jsonl. MEASURED in the browser: the first packet's card went up at 67.3 s of the conversation having waited 50 ms for a pause, 90 px tall closed, 5 key points and 5 resolved sources open. The replay drew no visual (as in V2-013), so the opened-with-a-visual case is checked on /dev/cards, which now has two research samples and a static sample artifact in web/public/dev/."
+    },
+    {
+      "id": "V2-015",
+      "title": "Spoken research briefings",
+      "description": "As a user, when I ask 'Sotto, what did you find?', I want a spoken briefing from the prepared research, with visuals on screen.",
+      "acceptanceCriteria": [
+        "The answer agent receives the session's research packets (titles, teasers, key points, sources) as context with every wake question",
+        "When the question refers to available research, Sotto gives a spoken briefing built from the packet (may still search to fill gaps), and the packet's card and visual come forward on the stage while it speaks",
+        "Briefings are interruptible like any answer (V2-007)",
+        "answers.jsonl records which packets were used",
+        "Integration test (events replay): the wake question in research-business-idea yields an answer that uses >= 1 packet and cites its sources; firstAudioMs logged with and without packets",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": "Measured on a real research-business-idea replay (max, real Spark, local Glimmer gate, real ElevenLabs through a null sink): 3 packets at 67/94/114 s; the wake question briefed from packet-2, 4 sources, no search at all, firstAudioMs 392 and no acknowledgment; the same question with the packets taken away searched first and reached a real sentence at 4,342 ms. The brought-forward card is checked in the browser on /dev/cards (npm run verify:briefing), because no packet in any run so far has drawn a visual."
+    },
+    {
+      "id": "V2-016",
+      "title": "Glimmer as the judgment gate",
+      "description": "As the system, I want candidate interjections scored locally by Glimmer instead of trusting the proposing model's own scores.",
+      "acceptanceCriteria": [
+        "Observer (Muse Spark) still proposes; Glimmer scores each candidate on four questions — true (supported by transcript), new (not already said or on the board), worth saying (would a thoughtful participant raise it), still relevant (conversation hasn't moved on) — each a 0–1 probability via structured output; prompt server/prompts/gate.md",
+        "The policy score uses Glimmer scores when present (mapping documented in server/interject/policy.ts), replacing observer relevance/novelty/importance/confidence",
+        "candidates.jsonl records observer scores, Glimmer scores and gate: glimmer | spark-fallback",
+        "npm run eval -- --gate spark|glimmer runs either; the report shows recall, precision, false interjects and median gate latency",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": true,
+      "notes": "Done. All 6 criteria met; npm run typecheck, npm test (74 files, 1,084 tests), npm run build, and two real one-fixture eval runs (moment-contradiction): --gate glimmer (eval/reports/2026-11-01_014212.md, plus notes) and --gate spark (2026-11-01_014432.md), all four eval gates PASS in both. server/interject/CandidateGate.ts scores every candidate but a research_hook on its way to the policy through JudgmentRouter.client(); scoresFromGate in policy.ts is the documented mapping (true->confidence, new->novelty, worthSaying->importance, stillRelevant->relevance) and the formula/thresholds are unchanged. A failed call keeps the observer's scores rather than dropping the candidate. candidates.jsonl gains a kind:\"gate\" line with observerScores, gateScores, gate and latencyMs. MEASURED: the local gate took 26.4 s and scored the planted contradiction 0.75 (observer said 0.95); still interjected, caught in a pause. A max replay spends no session-clock time on a tracked call, so the report's median gate latency is the only place the gate's cost on a live moment appears — V2-020 should read it before tuning. scripts/eval.ts passes glimmerFromEnv into the replay (the runner itself still defaults to none, so npm test never dials the local server). The full seven-fixture A/B is V2-020; integration suite not re-run (the eval runs cover the same wiring with real Spark and real Glimmer)."
+    },
+    {
+      "id": "V2-017",
+      "title": "Frequency and boldness controls",
+      "description": "As a user, I want to control how often Sotto contributes and how sure it must be, separately.",
+      "acceptanceCriteria": [
+        "chattiness is replaced by frequency (rare | normal | often -> cooldown 5 / 3 / 1.5 min, budget 2 / 3 / 5 per 15 min) and boldness (cautious | normal | bold -> glow/interject thresholds equal to today's quiet / normal / active; cautious allows only contradiction and verified factual_error, normal and bold allow all types)",
+        "normal/normal reproduces today's normal chattiness exactly (unit test)",
+        "Two compact UI controls replace the chattiness control, saved in session settings; research cards respect frequency",
+        "Eval accepts --frequency and --boldness; --chattiness removed; old reports still render",
+        "Unit tests for the mapping",
+        "Tests pass",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright screenshot of both controls)"
+      ],
+      "priority": 17,
+      "passes": true,
+      "notes": "Done. All 8 criteria met; npm run typecheck, npm test (1104 tests), npm run build and the browser check all pass. chattiness is gone from the live code: shared/policy.ts now carries frequency (rare|normal|often -> FREQUENCY_LIMITS: cooldown 300/180/90 s, budget 2/3/5 per 15 min, plus the research-card pair 120/60/30 s and 2/4/6) and boldness (cautious|normal|bold -> BOLDNESS_THRESHOLDS, which are the old quiet/normal/active pairs in that order). normal/normal is the old normal exactly, held to it by a four-assertion describe block in server/interject/policy.test.ts. Boldness is the first thing in the policy that reads a candidate's TYPE: decide() takes `type` and `verified`, boldnessAllows applies CAUTIOUS_TYPES, and `boldness` is a new DecisionReason checked after the score so a worthless candidate still logs below_threshold. PolicyDecision carries `settings` and `limits` where it carried `chattiness`. Research cards respect frequency: ResearchCards takes `limits` and grew setLimits(), which SessionManager.setPolicySettings calls beside InterjectionPolicy.setSettings. UI: two compact header selectors (frequency-select, boldness-select), each its own POST /api/session/settings; the route and SessionSettings take frequency/boldness and reject chattiness with a 400. Eval: --frequency and --boldness, each taking `all`, run as a CROSS PRODUCT (nine groups for all x all); --chattiness is gone; ChattinessScore -> SettingsScore, scoreChattiness -> scoreSettings, grouped by policySettingsLabel. Old records still render: FixtureRunRecord/EvalRunRecord keep an optional deprecated `chattiness` beside the new optional `settings`, and settingsOf/settingsAsked map quiet->cautious, active->bold, frequency normal - verified by re-rendering eval/reports/2026-10-29_053832.md from its pre-V2-017 run record (exit 0, correct numbers), then restoring the committed file so the historical report stands as recorded. Browser: npm run verify:controls (replacing the dead verify:chattiness, which still used the source-select V2-009 removed) drives both selectors through a real brainstorm replay - levels, defaults, one setting moving without the other, survival of a reload, and both in session.json - screenshot at /tmp/sotto-shots/controls.png, looked at. Not re-run: test:integration, eval and e2e, none of which this story's criteria name."
+    },
+    {
+      "id": "V2-018",
+      "title": "End-of-session digest",
+      "description": "As a group, we want a record of what Sotto did and almost did, plus the research and open items.",
+      "acceptanceCriteria": [
+        "On Stop, digest.md is written with sections: Summary, Decisions, Open questions, What Sotto said (answers and briefings, marking interrupted ones), On-screen interjections, What Sotto almost said (top 5 suppressed candidates by score with reasons), Research produced (titles, teasers, sources)",
+        "Backstage view for a past discussion shows the digest",
+        "'Sotto, wrap us up' during a session speaks a short summary from the same sections, interruptible",
+        "Integration test (events replay of offsite-plan): digest.md has all seven section headings and >= 1 suppressed candidate with a reason",
+        "Tests pass",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Playwright: Backstage shows the digest for a replayed session)"
+      ],
+      "priority": 18,
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (1127), npm run build, the real-API integration test (server/session/digest.integration.test.ts, an offsite-plan replay: 311 s, seven sections, five held-back candidates each with a reason) and npm run verify:digest in a real browser all pass. digest.md is written by SessionManager.finish() just before store.writer.end(), from server/session/digest.ts's SessionDigest - a COLLECTOR fed at the same call sites the session folder's logs are written from (StoreSlot.digest), never a reader of the folder, so the digest exists for a session whose folder could not be opened. Suppressed candidates take their score and reason from the policy's own last decision, else the gate's verdict, else candidateScore() of the observer's four; a research_hook is never 'almost said' (it left the interjection path in V2-011). 'Sotto, wrap us up' is matched lexically (asksForWrapUp, the same shape as V2-015's asksForResearch), answered by server/session/WrapUp.ts from spokenSummary() with NO model call, spoken through an ordinary VoiceOut utterance (so a barge-in cancels it like any other) or shown as a notice card when muted, and written to the transcript as a Sotto turn. Typed into the Ask box it takes the same path while a session is running. Backstage shows digest.md as text (the card markdown renderer has no headings). ONE thing beyond the stated criteria was needed: listHistory/readHistory take { replays: true }, which server/app.ts passes when SOTTO_DEV=1, because the criterion asks for Backstage to show a REPLAYED session's digest and the list was microphone-only. A production build still lists mic sessions only. Not re-run this iteration: the rest of test:integration, npm run eval, npm run e2e."
+    },
+    {
+      "id": "V2-019",
+      "title": "Eval update: new conversations, research, gate",
+      "description": "As a developer, I want the eval to cover the new conversations, research, and the Glimmer gate.",
+      "acceptanceCriteria": [
+        "npm run eval includes research-business-idea and offsite-plan",
+        "Research moments (expectedLevel research) count as caught if a matching research card (judge call) is delivered within the window",
+        "Report adds research recall, packets per conversation, unsourced packet count, gate type",
+        "Gates: recall >= 0.7 over non-research moments, zero false interjects on brainstorm and no-wake, 100% deliveries during pauses, research recall >= 0.5",
+        "Cost estimate includes research calls; Glimmer calls counted at $0",
+        "Scoring changes unit-tested",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": true,
+      "notes": "Done. All 8 criteria met; npm run typecheck, npm test (1152 tests) and npm run build pass, and one real one-fixture run (eval/reports/2026-11-01_024909.md, with notes) proves the plumbing end to end. isEvalFixture now takes research-business-idea and offsite-plan (V2_EVAL_FIXTURES), last in the order because they are the longest. A research_hook is caught by a research-ready card and nothing else, so judgeAll crosses policy deliveries with non-research moments and research cards with research moments only — no judge call for a pair the scoring could not use — and score.ts keeps two recalls: `recall` over the non-research moments (gate 0.7, unchanged) and `researchRecall` over the hooks (MIN_RESEARCH_RECALL 0.5). A research card is deliberately outside the precision and pause gates: it is not a decision the policy took, and the one it would break is by design (a packet still waiting at the end goes up anyway, and so does one the group asked for) — both are measured and in the report. FixtureRunRecord.research comes off the session folder's research.jsonl, not off the stage, because an unsourced packet and a rejected idea never become cards and because a brought-forward packet replaces its own card with a later time (researchFrom keeps the first appearance). Report adds: research recall and `research packets` headlines, a per-fixture research table, a per-card table, a research recall gate row and `local calls (Glimmer, $0)` in the cost table — research calls at Spark are already in the metered tokens because the planner, the cloud gate and the runner all use the one createModel client. MEASURED on research-business-idea: 4 ideas -> 4 queued -> 3 packets, 0 unsourced; research-packet-1 caught market-size-research-hook at 67.3s, 0.1s into its window; competitor-gaps-research-hook missed (the third packet is about what Otter and Fireflies DO, not where they fall short — wording, which V2-020 may sharpen); 6 judgment calls all on Glimmer, median 25.4s, $0; 2/2 policy deliveries in a pause, 2/3 research cards (the brought-forward one went up while the asker was talking). COST WARNING for V2-020: $1.01 and 62 model calls for that ONE fixture, mostly the three searches, so the nine-fixture set is several dollars and ~8 min per long fixture of wall clock."
+    },
+    {
+      "id": "V2-020",
+      "title": "Tune with the Glimmer gate",
+      "description": "As the team, we want the Glimmer-gated system to meet targets before the demo.",
+      "acceptanceCriteria": [
+        "Run npm run eval -- --gate glimmer; iterate only on server/prompts/gate.md, observer.md, research-planner.md and gate thresholds until all V2-019 gates pass",
+        "Never edit fixtures, moment annotations, the judge prompt or scoring code to reach targets",
+        "Also run --gate spark once with the final prompts; commit both reports; record the default gate and why in tasks/decisions.md",
+        "If Glimmer can't pass after 5 eval rounds, Spark stays the default gate, Glimmer stays selectable, the gap is written in notes, and the story passes if the Spark report passes",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": true,
+      "notes": "Done, with no prompt change: all five V2-019 gates passed on the first `--gate glimmer` round over the whole nine-fixture set (eval/reports/2026-11-01_030103.md) — moment recall 7/9 (0.78), research recall 2/3 (0.67), 0 false interjects on brainstorm/no-wake, 9/9 deliveries in a pause, 0 failed replays; $3.71, 351 model calls, 36 min. Criterion 1 is therefore satisfied vacuously (nothing to iterate), so observer.md, gate.md, research-planner.md and every threshold are byte-identical to V2-019 — which is what makes the `--gate spark` comparison (eval/reports/2026-11-01_034450.md, $3.92) a test of the gate rather than of two different Sottos. Spark FAILS research recall (1/3) while beating Glimmer on moment recall (9/9 vs 7/9) and precision (5/6 vs 4/5), so DEFAULT_GATE_MODE stays `glimmer` and tasks/decisions.md says why. Hand-written notes files sit beside both reports. TWO MEASURED RISKS for V2-021, both written up rather than fixed: (1) the gate`s 23.7 s median latency (20.5-28.5, 12/12 calls local) is FREE in a max replay because simulated time does not move during a tracked call, and the planted windows are 11.8-28.7 s wide (median ~21) — a candidate held 23.7 s misses 7 of 12, so npm run e2e is the only check that can see it; if live is bad, make Spark the default rather than loosening a threshold. (2) The research-recall gate is decided by research-business-idea alone (both runs missed offsite-plan`s hook) in steps of 0.33: the research budget is 3 searches per 10 min and that conversation is under 3 min, and under Spark the observer split one out-loud request into two hooks (market size, who`s funded), spending a slot, so the ideal question (user complaints, approved at 0.90, inside the window at 113.8 s) was never searched. One hook per thing the group asked for is the sharpest remaining lever in observer.md. Glimmer`s own disagreements with the observer: it suppressed the verified Instagram launch-year error (importance 0.35 -> 0.18, relevance 0.90 -> 0.45) and the nightly-photo assumption (importance 0.80 -> 0.55), losing both moments, and suppressed one candidate the observer was 0.70 sure of that matched nothing (confidence -> 0.18). 7/9 is one miss above the gate, so recall under Glimmer is fragile."
+    },
+    {
+      "id": "V2-021",
+      "title": "End-to-end update for voice and research",
+      "description": "As a developer, I want the end-to-end check to cover voice and research.",
+      "acceptanceCriteria": [
+        "npm run e2e adds research-business-idea (WAV, real transcription): >= 1 research card before the wake question, a spoken briefing using a packet, ackMs and firstAudioMs reported",
+        "Speech runs headless with audio to a null sink; timing and spoken-so-far tracking still work",
+        "Prints per fixture: ack latency, first-audio latency, research packets, estimated cost including ElevenLabs characters",
+        "Exits non-zero on failure",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": true,
+      "notes": "Done. All 5 criteria met; npm run typecheck, npm test (1175 tests) and a full `npm run e2e` all pass: 55/55 checks, $2.3409 of a $4.2000 budget, 508 s of audio in ~12 min of wall clock, exit 0. A previous iteration was cut off mid-story with the code written and unproven; this one measured it. research-business-idea is the fifth fixture and runs last (3 min of audio, searches, a spoken briefing): 13/13 checks — 5 ideas, 4 queued, 3 sourced packets on disk, a research-ready card at 118.8 s against the question at 169 s, and a briefing that used all 3 packets, 1,581 characters spoken, first audio 0.3 s and ackMs null (V2-015 skips the acknowledgment, so a reader needs firstAudioMs to see it answered). The check now runs what server/app.ts runs: createGlimmer (so the gate's ~26-34 s is paid in real seconds, which no max replay can measure) and createVoice as meteredVoice(nullSinkVoice(...)) — the real ElevenLabs socket with the audio discarded. Every fixture gets a `voice` check: utterances, characters and at least one transcript line labelled Sotto, which exists only because something reported *playing* the utterance, so it is the proof spoken-so-far tracking worked. The cost gate changed shape (tasks/decisions.md): the flat $0.50 MAX_RUN_COST_USD became FIXTURE_BUDGET_USD, $0.70 per core conversation and $1.60 for the research one, summed over the fixtures asked for, so --fixtures <one> is gated on that one. Measured per fixture: brainstorm $0.2471, moment-contradiction $0.3371, ask-search $0.4700, ask-diagram $0.1513, research-business-idea $1.1354. ElevenLabs is priced at half a credit a character on Flash (estimateTtsCostUsd), $0.4129 of the run. Two things worth knowing next: ask-search, 48 s long, cost three times brainstorm's two minutes because the planner spent two searches in it — length predicts nothing, searches predict everything; and moment-contradiction's and research-business-idea's planted moments are both delivered *after* the deadline here (31.9 s and 50.1 s), which is the Glimmer gate's 26-34 s of judgment landing in a ~20 s window, exactly as V2-020's report warned."
+    }
+  ]
+}

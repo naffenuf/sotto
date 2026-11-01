@@ -1,5 +1,7 @@
 # PRD: Sotto v2 — A Voice in the Room
 
+> **Superseded in part by [`prd-sotto-v3.md`](prd-sotto-v3.md)**: Sotto now speaks up unprompted to answer what the room wonders, keeps a conversation open for follow-ups, and asks probing questions at decision points; corrections stay on screen. Where they disagree, v3 wins.
+
 ## Supersedes
 
 This PRD changes parts of [`prd-sotto-core.md`](prd-sotto-core.md) (all 28 core stories are built). **Where the two disagree, this PRD wins.** Everything not listed here still stands, together with the core PRD's "Changes since this PRD" section.

@@ -23,7 +23,7 @@ check ".env has ELEVENLABS_API_KEY" "grep -qE '^ELEVENLABS_API_KEY=.+' '$PROJECT
 GLIMMER_URL=$(grep -E '^GLIMMER_BASE_URL=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2- || true)
 GLIMMER_MODEL=$(grep -E '^GLIMMER_MODEL=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2- || true)
 if [[ -z "$GLIMMER_URL" || -z "$GLIMMER_MODEL" ]]; then
-  echo "  WARN     GLIMMER_BASE_URL/GLIMMER_MODEL not set in .env (judgment calls fall back to Muse Spark; see tasks/prd-sotto-v2.md Prerequisites)"
+  echo "  WARN     GLIMMER_BASE_URL/GLIMMER_MODEL not set in .env (judgment calls fall back to Muse Spark; see tasks/prd-sotto-v3.md Prerequisites)"
 else
   # A trivial *structured* request, not just a models listing: the thing a
   # judgment role needs is grammar-constrained JSON back. A cold load is ~44 s
