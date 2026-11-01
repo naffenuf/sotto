@@ -569,12 +569,32 @@ export interface ResearchPacketRecord {
   error?: string;
 }
 
+/** One line of `research.jsonl`: a packet that reached the stage (V2-014). */
+export interface ResearchCardRecord {
+  kind: "card";
+  /** When the card went out, on the session clock. */
+  atMs: number;
+  packetId: string;
+  ideaId: string;
+  /** The packet's own title, so the file reads without the packet beside it. */
+  title: string;
+  /** How long it waited for a pause and a budget slot. */
+  heldForMs: number;
+  /** Packets still waiting behind it. */
+  waiting: number;
+  /** Cards shown in the last {@link RESEARCH_CARD_WINDOW_MS}, including this one. */
+  shownInWindow: number;
+  /** True when the conversation ended and the card went out anyway. */
+  atSessionEnd?: boolean;
+}
+
 /** Every kind of line `research.jsonl` holds. */
 export type ResearchLogLine =
   | ResearchIdeaRecord
   | ResearchGateRecord
   | ResearchStartRecord
-  | ResearchPacketRecord;
+  | ResearchPacketRecord
+  | ResearchCardRecord;
 
 /**
  * A packet id the server itself would have handed out, and nothing else.
@@ -610,3 +630,55 @@ export function renderPacketMarkdown(packet: ResearchPacket, question: string): 
   );
   return `${blocks.join("\n\n")}\n`;
 }
+
+/* ------------------------------------------------------------------ *
+ * The card (V2-014): how a finished packet reaches the room.
+ * ------------------------------------------------------------------ */
+
+/** Prefix of a research card's id, so a log line says what it refers to. */
+export const RESEARCH_CARD_ID_PREFIX = "research-";
+
+/**
+ * The id the card for one packet gets.
+ *
+ * Derived from the packet rather than counted, exactly as a delivered
+ * interjection's is, so pushing the same packet twice replaces its card
+ * instead of stacking a second copy — and deliberately *not* under
+ * `CARD_ID_PREFIX`: a research card is not a decision the policy took, so
+ * `POST /api/feedback` must never find a candidate behind it.
+ */
+export function researchCardId(packetId: string): string {
+  return `${RESEARCH_CARD_ID_PREFIX}${packetId}`;
+}
+
+/** What a research card is called on the stage, in the PRD's own words. */
+export const RESEARCH_CARD_PREFIX = "Research ready:";
+
+/** The card's one line: the prefix and the packet's title. */
+export function researchCardHeadline(title: string): string {
+  return `${RESEARCH_CARD_PREFIX} ${title}`;
+}
+
+/**
+ * How long after one research card the next one waits.
+ *
+ * Its own budget, separate from the interjection one (US-014's
+ * {@link COOLDOWN_MS} is three minutes) and deliberately shorter, because the
+ * two cost the group different things: an interjection asks for the floor,
+ * while a research card is a line that appears on a screen nobody has to look
+ * at. A minute is long enough that two searches finishing together do not
+ * land in the same pause, which is the only way a quiet card is loud.
+ */
+export const RESEARCH_CARD_COOLDOWN_MS = 60_000;
+
+/** The window the research card budget is counted over. */
+export const RESEARCH_CARD_WINDOW_MS = 15 * 60_000;
+
+/**
+ * How many research cards that window allows.
+ *
+ * The search budget already caps packets at {@link MAX_JOBS_PER_WINDOW} per
+ * {@link RESEARCH_WINDOW_MS}, so this is the backstop rather than the brake:
+ * it is what stops a long conversation turning into a feed.
+ */
+export const MAX_RESEARCH_CARDS_PER_WINDOW = 4;

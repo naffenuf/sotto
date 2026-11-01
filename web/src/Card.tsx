@@ -1,5 +1,5 @@
 /**
- * One card, in four variants (US-011, V2-009).
+ * One card, in five variants (US-011, V2-009, V2-014).
  *
  * The headline carries the message and everything else is opt-in: the detail
  * is behind "details ▾", and a `glow` is a single muted line until somebody
@@ -12,6 +12,12 @@
  * speaking size rather than across-the-table size, with no label above it and
  * no feedback buttons under it: there was no decision to speak to have an
  * opinion about.
+ *
+ * A `research` card (V2-014) is a finished background search. Closed, it is
+ * "Research ready: …" and the teaser; open, it is the key points, the visual
+ * the search drew and the sources — all of it at once, because one click is
+ * the whole interaction. Like a notice it carries no feedback buttons: the
+ * server only files a verdict against a card the policy decided to deliver.
  *
  * Calm is a requirement, not a preference: no sound, no modal, nothing that
  * moves except the thinking indicator.
@@ -28,6 +34,14 @@ import {
 
 /** The label above an interjection — Sotto raising its hand, quietly. */
 const NOTICED = "Sotto noticed…";
+
+/** The label above an opened research card (V2-014). */
+const RESEARCHED = "Sotto looked this up…";
+
+/** The variants that are one line until somebody opens them. */
+function isCollapsible(variant: StageCard["variant"]): boolean {
+  return variant === "glow" || variant === "research";
+}
 
 /** The three buttons under a delivered card (US-015), in the PRD's order. */
 const FEEDBACK: Readonly<Record<FeedbackVerdict, { icon: string; label: string }>> = {
@@ -60,24 +74,29 @@ export function Card({
   onFeedback,
 }: CardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const glowCollapsed = card.variant === "glow" && !expanded;
 
-  if (glowCollapsed) {
+  if (isCollapsible(card.variant) && !expanded) {
+    const research = card.variant === "research";
     return (
       <button
         type="button"
-        className="card card--glow card--collapsed"
+        className={`card card--${card.variant} card--collapsed`}
         data-testid="card"
-        data-variant="glow"
+        data-variant={card.variant}
         data-state={card.state}
         data-expanded="false"
         aria-expanded={false}
         onClick={() => setExpanded(true)}
-        title="Open this quiet thought"
+        title={research ? "Open what Sotto found" : "Open this quiet thought"}
       >
-        <span className="card__glow-dot" aria-hidden="true" />
-        <span className="card__glow-line" data-testid="card-headline">
-          {card.state === "thinking" && card.headline === "" ? "thinking…" : card.headline}
+        <span className={research ? "card__research-mark" : "card__glow-dot"} aria-hidden="true">
+          {research ? "⌕" : null}
+        </span>
+        <span className="card__collapsed-lines">
+          <span className="card__glow-line" data-testid="card-headline">
+            {card.state === "thinking" && card.headline === "" ? "thinking…" : card.headline}
+          </span>
+          <Teaser card={card} />
         </span>
         {card.state === "thinking" && <Thinking />}
       </button>
@@ -90,10 +109,11 @@ export function Card({
       data-testid="card"
       data-variant={card.variant}
       data-state={card.state}
-      data-expanded={card.variant === "glow" ? "true" : undefined}
+      data-expanded={isCollapsible(card.variant) ? "true" : undefined}
     >
       <CardLabel card={card} onCollapse={() => setExpanded(false)} />
       <Headline card={card} />
+      <Teaser card={card} />
       {card.whyNow !== undefined && card.whyNow !== "" && (
         <p className="card__why" data-testid="card-why">
           <span className="card__why-label">why now</span> {card.whyNow}
@@ -107,7 +127,7 @@ export function Card({
         <>
           <Evidence card={card} onQuoteClick={onQuoteClick} />
           <Artifacts card={card} />
-          <Details card={card} />
+          <Details card={card} inline={card.variant === "research"} />
           <Spoken card={card} />
           <Sources card={card} />
         </>
@@ -135,8 +155,8 @@ function CardLabel({ card, onCollapse }: { card: StageCard; onCollapse: () => vo
       </p>
     );
   }
-  // A glow the reader opened keeps a way back, so the stage can go quiet again.
-  if (card.variant === "glow") {
+  // A card the reader opened keeps a way back, so the stage can go quiet again.
+  if (isCollapsible(card.variant)) {
     return (
       <button
         type="button"
@@ -145,7 +165,8 @@ function CardLabel({ card, onCollapse }: { card: StageCard; onCollapse: () => vo
         aria-expanded
         onClick={onCollapse}
       >
-        {NOTICED} <span aria-hidden="true">▴</span>
+        {card.variant === "research" ? RESEARCHED : NOTICED}{" "}
+        <span aria-hidden="true">▴</span>
       </button>
     );
   }
@@ -264,7 +285,9 @@ function Feedback({
   // what the policy (US-014) learns from — and the server only records one
   // against a card it decided to deliver, so a button here would have nothing
   // to file.
-  if (card.variant === "answer" || card.variant === "notice") return null;
+  if (card.variant === "answer" || card.variant === "notice" || card.variant === "research") {
+    return null;
+  }
   return (
     <div className="card__feedback" data-testid="card-feedback">
       {feedbackVerdicts.map((verdict) => (
@@ -347,11 +370,39 @@ function ArtifactFrame({ artifact }: { artifact: CardArtifact }) {
   );
 }
 
-/** "details ▾", and the markdown it opens. */
-function Details({ card }: { card: StageCard }) {
+/**
+ * The one or two sentences under a research card's headline (V2-014).
+ *
+ * Shown closed as well as open, because it is what somebody reads before
+ * deciding whether to open the rest.
+ */
+function Teaser({ card }: { card: StageCard }) {
+  const teaser = card.teaser ?? "";
+  if (teaser.trim() === "") return null;
+  return (
+    <span className="card__teaser" data-testid="card-teaser">
+      {teaser}
+    </span>
+  );
+}
+
+/**
+ * "details ▾", and the markdown it opens — or the markdown on its own.
+ *
+ * `inline` is the research card (V2-014): opening it is the one click, so its
+ * key points are not behind a second toggle.
+ */
+function Details({ card, inline = false }: { card: StageCard; inline?: boolean }) {
   const [open, setOpen] = useState(false);
   const detail = card.detailMd ?? "";
   if (detail.trim() === "") return null;
+  if (inline) {
+    return (
+      <div className="card__markdown card__markdown--inline" data-testid="card-details">
+        <Markdown source={detail} />
+      </div>
+    );
+  }
   return (
     <div className="card__details">
       <button

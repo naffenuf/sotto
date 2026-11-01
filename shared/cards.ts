@@ -17,6 +17,10 @@
  * - `answer`: a reply to a question, spoken (US-017) or typed (US-019).
  * - `interject`: Sotto raising its hand — same size as an answer, accented.
  * - `glow`: a quiet thought, one muted line until somebody opens it.
+ * - `research`: background research that is ready to read (V2-014). Compact
+ *   and closed like a glow — "Research ready: …" plus the teaser — and it
+ *   opens into the key points, the sources and any visual. Never spoken, and
+ *   never a decision the policy took, so it carries no feedback buttons.
  * - `notice`: Sotto talking about itself rather than about the conversation —
  *   the opening hello when the voice is muted, and the one nudge for names
  *   (V2-009). Plain, unaccented, and carrying no feedback buttons: there is no
@@ -24,7 +28,7 @@
  *   also why the eval harness and the end-to-end checks never count one as a
  *   delivery.
  */
-export const cardVariants = ["answer", "interject", "glow", "notice"] as const;
+export const cardVariants = ["answer", "interject", "glow", "notice", "research"] as const;
 export type CardVariant = (typeof cardVariants)[number];
 
 /**
@@ -88,6 +92,14 @@ export interface StageCard {
   createdAtMs: number;
   /** The line that carries the message. Empty while there is only `thinking`. */
   headline: string;
+  /**
+   * `research`: the one or two sentences under the headline (V2-014).
+   *
+   * The packet's teaser, which is the only thing somebody reads before
+   * deciding whether to open the rest, so it is shown closed as well as open
+   * — unlike {@link detailMd}, which is what opening it is for.
+   */
+  teaser?: string;
   /** `answer`: what was asked. */
   question?: string;
   /** `answer`: who asked — a speaker's name, or `"typed"` (US-019). */
@@ -111,7 +123,10 @@ export interface StageCard {
   evidence?: EvidenceQuote[];
   /** Numbered sources, deduplicated by URL before they get here. */
   citations?: Citation[];
-  /** `answer`: HTML the model drew, rendered in a sandboxed frame (US-020). */
+  /**
+   * `answer`/`research`: HTML the model drew, rendered in a sandboxed frame
+   * (US-020) — on a research card, the packet's one visual (V2-013).
+   */
   artifacts?: CardArtifact[];
   /** `state: "error"`: the muted line shown in place of the content. */
   message?: string;

@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  A stand-in for the HTML a search draws beside a finding (US-020, V2-014),
+  so `/dev/cards` can show an opened research card with its visual in the
+  frame. The real ones are written into the session folder and served from
+  there with a restrictive CSP; this one is a static file and is only ever
+  loaded by the dev page.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>What a BAA has to cover</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 12px 14px;
+        font: 13px/1.5 ui-sans-serif, -apple-system, "Helvetica Neue", sans-serif;
+        color: #25231f;
+        background: #faf9f6;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 8px;
+        border-bottom: 1px solid #e5e0d8;
+      }
+      th {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #656158;
+      }
+    </style>
+  </head>
+  <body>
+    <table>
+      <thead>
+        <tr>
+          <th>Clause</th>
+          <th>What it has to say</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Permitted uses</td>
+          <td>Exactly what the recording may be used for, and nothing wider</td>
+        </tr>
+        <tr>
+          <td>Safeguards</td>
+          <td>Encryption at rest and in transit, named in the contract</td>
+        </tr>
+        <tr>
+          <td>Subcontractors</td>
+          <td>Every downstream processor bound by the same terms</td>
+        </tr>
+        <tr>
+          <td>Breach notice</td>
+          <td>Who tells whom, and inside how many days</td>
+        </tr>
+        <tr>
+          <td>Return or destruction</td>
+          <td>What happens to the recordings when the contract ends</td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

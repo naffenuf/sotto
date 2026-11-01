@@ -62,6 +62,7 @@ import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import type { GlimmerClient } from "../model/GlimmerClient.js";
 import { JudgmentRouter } from "../model/judgment.js";
+import { ResearchCards } from "../research/ResearchCards.js";
 import { ResearchManager } from "../research/ResearchManager.js";
 import { ResearchRunner } from "../research/ResearchRunner.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
@@ -242,6 +243,13 @@ interface ModelLoops {
    * manager only decides *whether* to look something up.
    */
   researchRunner: ResearchRunner | null;
+  /**
+   * How a finished packet reaches the stage (V2-014).
+   *
+   * Quietly: a compact card, only in a pause, on a budget of its own. It is
+   * the last stage of the research pipeline and the only one the room sees.
+   */
+  researchCards: ResearchCards | null;
 }
 
 /** One card that reached the stage, kept so feedback can be filed on it. */
@@ -320,6 +328,8 @@ interface RunningSession {
   deliveries: Map<string, Delivered>;
   /** The research planner, gate and job budget (V2-012). */
   research: ResearchManager | null;
+  /** The quiet cards the packets become (V2-014). */
+  researchCards: ResearchCards | null;
   /** The session's clock: simulated for a replay, live otherwise. */
   clock: Clock;
   /** What the transcription dot shows once the session is published. */
@@ -386,7 +396,9 @@ export class SessionManager {
     // V2-006: playback can end after generation, with no new ASR frame to
     // re-check held cards. The bus has already folded the voice state here.
     this.bus.subscribe((event) => {
-      if (event.type === "voice") this.current?.policy?.playbackChanged();
+      if (event.type !== "voice") return;
+      this.current?.policy?.playbackChanged();
+      this.current?.researchCards?.playbackChanged();
     });
     this.liveClock = options.liveClock ?? systemClock;
     this.wallClock = options.wallClock ?? systemClock;
@@ -526,6 +538,7 @@ export class SessionManager {
     running.address?.stop();
     running.greeting?.stop();
     running.research?.stop();
+    running.researchCards?.stop();
     running.judgment.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
@@ -736,6 +749,7 @@ export class SessionManager {
         // The last echo can close after playback ended. Re-read the pause
         // without counting Sotto as another human turn toward expiry.
         loops.policy?.playbackChanged();
+        loops.researchCards?.playbackChanged();
       },
       onUpdate: (turn, suppressTriggers) => {
         if (turn.final) store.writer?.appendTiming?.({ stage: "turn_final", atMs: clock.now(), turnId: turn.turnId, turnStartMs: turn.startMs, turnEndMs: turn.endMs });
@@ -763,8 +777,10 @@ export class SessionManager {
           loops.observer.observe(loops.board.board(), uncovered);
         }
         // The policy is the one that wants the partials too: a `speechEnd`
-        // arrives as one, and it is what opens a pause (US-014).
+        // arrives as one, and it is what opens a pause (US-014) — and a
+        // research card waits for the same pause (V2-014).
         loops.policy?.acceptTurn(turn);
+        loops.researchCards?.acceptTurn(turn);
         // And so does the wake phrase: the indicator is the point of reading
         // a partial at all (US-017).
         // V2-007 privately owns interrupted commands; ordinary side talk stays suppressed.
@@ -928,6 +944,7 @@ export class SessionManager {
         deliveries: new Map(),
         research: null,
         researchRunner: null,
+        researchCards: null,
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
@@ -1000,6 +1017,22 @@ export class SessionManager {
           : record;
       onTiming({ stage: `research_${record.kind}`, ...detail });
     };
+    // The quiet end of the research pipeline (V2-014): a compact card per
+    // packet, shown only in a pause — the policy's own rule, read off the
+    // policy's own getter, so Sotto's voice counts as somebody talking — and
+    // on a budget of its own. The card is published while this session still
+    // owns the stage, which an answer's is too: a search that finishes in the
+    // last seconds of a conversation is read after Stop, not before it.
+    const researchCards = new ResearchCards({
+      clock,
+      pauseState,
+      logger: this.logger,
+      onRecord: (record) => onResearch(record),
+      onDeliver: (card, packet) => {
+        if (this.last?.sessionId === info.id) this.bus.publishCard(card);
+        onTiming({ stage: "research_publish", atMs: clock.now(), packetId: packet.id, cardId: card.id, published: this.last?.sessionId === info.id });
+      },
+    });
     // The search (V2-013): one grounded call per approved idea, writing
     // `research/<id>.json`, `research/<id>.md` and any visual into this
     // session's folder. It is handed to the manager as its `run`, so the
@@ -1011,7 +1044,11 @@ export class SessionManager {
       logger: this.logger,
       onModelState,
       onRecord: onResearch,
-      onPacket: (packet, markdown) => store.writer?.writePacket(packet.id, packet, markdown),
+      onPacket: (packet, markdown) => {
+        store.writer?.writePacket(packet.id, packet, markdown);
+        // The one place a packet becomes something the room can see.
+        researchCards.accept(packet);
+      },
       onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
     });
     // The background half (V2-012): hooks and the planner's own ideas, gated
@@ -1067,7 +1104,7 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, research, researchRunner };
+    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, research, researchRunner, researchCards };
   }
 
   /**
@@ -1375,6 +1412,10 @@ async function drainLoops(
   // still being written.
   await loops.answers?.flush();
   beforePolicy?.();
+  // Everything the searches found goes up now, pause or no pause: a packet is
+  // about the world rather than about a moment, and the stage is read after
+  // Stop (V2-014).
+  loops.researchCards?.flush();
   // Last, and synchronous: the conversation has ended in silence, so the
   // policy gets one look at that final pause and then accounts for whatever
   // is still waiting.

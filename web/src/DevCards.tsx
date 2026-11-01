@@ -186,6 +186,56 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
       },
     },
     {
+      title: "research — closed",
+      note:
+        "What a finished background search looks like before anybody opens it" +
+        " (V2-014): \u201cResearch ready: \u2026\u201d, the teaser, and no feedback buttons.",
+      card: {
+        id: "r-ready",
+        variant: "research",
+        state: "ready",
+        createdAtMs: now,
+        headline: "Research ready: Otter, Fireflies and Granola charge $8\u201319 a seat",
+        teaser:
+          "All three publish per-seat pricing with a free tier, and two of them" +
+          " charge extra for the features you were describing.",
+        detailMd:
+          "- Otter Business is $20 a seat a month, $16 billed annually\n" +
+          "- Fireflies Pro is $18 a seat, with an $10 annual tier\n" +
+          "- Granola is $10 a seat a month for the team plan\n" +
+          "- All three keep a free tier capped at 30\u2013800 minutes a month\n" +
+          "- Only Granola prices a Mac-only desktop client separately",
+        citations: [
+          { url: "https://example.com/otter-pricing", title: "Otter.ai — Pricing" },
+          { url: "https://example.com/fireflies-pricing", title: "Fireflies.ai pricing" },
+          { url: "https://example.com/granola-pricing", title: "Granola pricing" },
+        ],
+      },
+    },
+    {
+      title: "research — open",
+      note: "One click: the key points, the visual the search drew, and the sources.",
+      card: {
+        id: "r-open",
+        variant: "research",
+        state: "ready",
+        createdAtMs: now,
+        headline: "Research ready: HIPAA lets you record a clinic visit with consent",
+        teaser:
+          "Recording is allowed under a business associate agreement; the" +
+          " recording itself counts as PHI and has to be encrypted at rest.",
+        detailMd:
+          "- A BAA with the clinic is required before any recording is stored\n" +
+          "- Recordings are PHI: encryption at rest and in transit is mandatory\n" +
+          "- Patient consent is a state-law question, not a HIPAA one",
+        artifacts: [{ title: "What a BAA has to cover", url: "/dev/sample-artifact.html" }],
+        citations: [
+          { url: "https://example.com/hhs-baa", title: "HHS — Business Associate Contracts" },
+          { url: "https://example.com/state-consent", title: "Two-party consent by state" },
+        ],
+      },
+    },
+    {
       title: "notice — hello",
       note:
         "What a muted session shows instead of saying hello (V2-009): no label," +
@@ -231,6 +281,7 @@ export function DevCards() {
     { ...card("i-ready", cases), id: "stage-i", receivedAtMs: now - 4_000 },
     { ...card("a-ready", cases), id: "stage-a", receivedAtMs: now - 20_000 },
     { ...card("g-ready", cases), id: "stage-g", receivedAtMs: now - 1_000 },
+    { ...card("r-ready", cases), id: "stage-r", receivedAtMs: now - 9_000 },
     {
       ...card("g-ready", cases),
       id: "stage-quiet-1",
@@ -272,7 +323,10 @@ export function DevCards() {
               <p className="dev__note">{one.note}</p>
               {/* The expanded glows are shown too, since that is a state of
                   the card a reader reaches with one click. */}
-              <Card card={one.card} defaultExpanded={one.card.id === "g-error"} />
+              <Card
+                card={one.card}
+                defaultExpanded={one.card.id === "g-error" || one.card.id === "r-open"}
+              />
             </div>
           ))}
         </div>
