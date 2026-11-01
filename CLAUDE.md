@@ -1103,3 +1103,38 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   **visual** (none of V2-013's three did, and none here), so the opened-card-with-a-frame case is
   checked on `/dev/cards`, which now carries closed and open research samples and frames
   `web/public/dev/sample-artifact.html`.
+
+- **A briefing is the fastest answer Sotto gives, because it is the one with nothing to
+  wait for.** V2-015 hands `AnswerAgent` every `ResearchPacket` the session has made —
+  context for *every* question, like the board — and a question that *asks* what Sotto
+  found (`asksForResearch`, word patterns rather than a classification call) becomes a
+  briefing: the packets it is about come forward and the spoken half opens with
+  `briefingOpener`, a line written **locally**. That is the load-bearing choice.
+  Measured on a real `research-business-idea` replay: the briefing skipped the
+  acknowledgment *and* V2-008c's holding-line call and reached real speech in
+  **392 ms**, while the same question with the packets taken away acknowledged at 241 ms
+  and reached a real sentence at **4,342 ms** — and searched for 22 s to do it, where the
+  briefing searched not at all. The opener rides the existing `sayFirstLine` plumbing, so
+  the prose call is still told what the room has already heard. One consequence worth
+  knowing: **`ackMs` is null on a briefing**, so anything reading it as "did Sotto
+  respond" has to read `firstAudioMs` too.
+- **A packet's pages are citable even when the answer searched for nothing.** The
+  briefing's source URLs are added to `searchedIndex` beside this call's own, because
+  they were already resolved against a real search when the packet was made, and the
+  packet's sources go onto the card whether the model listed them or not — a finding the
+  group cannot follow back is exactly what V2-013 throws packets away over. Without this
+  every citation of a no-search briefing is dropped as "a page it never opened".
+- **Matching a question to a packet is stems minus the asking words.** "what did you find
+  on competitors?" is a question about *competitors*; leave "find" in and every packet
+  matches every question. `packetsForBriefing` strips an `ASKING_WORDS` set, stems the
+  rest, and scores **coverage of the question** (not Jaccard — a packet is paragraphs and
+  a question is three words). Nothing matching is not a failure: it falls back to the most
+  recent packets, which is what "what did you find?" means anyway, and the model sees all
+  of them regardless.
+- **`forward` is how a card comes back to the top.** `StageCard.forward` is set on the one
+  push that happens because somebody asked (`ResearchCards.bringForward`), and it is the
+  only thing that re-stamps `receivedAtMs` in `foldCard` — every other repeat push keeps
+  its place and its collapsed state, which is what stops a streaming answer jumping the
+  stack. `foldCard` moved from `useSessionEvents` into `stageView.ts` to be unit-tested.
+  A brought-forward card spends none of the research-card budget and never starts its
+  cooldown: the budget is about *unsolicited* cards.

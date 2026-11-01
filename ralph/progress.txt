@@ -552,3 +552,40 @@
   NEXT: V2-015 (spoken research briefings) — `ModelLoops.researchRunner.packets()` is the
   supply, and `ResearchCards` is where a packet's card would be brought forward while Sotto
   speaks. 7 stories left.
+
+[2026-11-01 01:30] V2-015 — completed — the research is context for every question, and a question that asks for it is a briefing that starts talking in 392 ms.
+  WHAT IS NEW:
+  - shared/research.ts "the briefing" section: asksForResearch (word patterns, no
+    classification call), packetRelevance/packetsForBriefing (stems, with the asking
+    words stripped; falls back to the most recent packets when the question names no
+    subject), briefingOpener, renderPacketsForAnswer, packetSourceUrls.
+  - AnswerAgent: `packets` and `onBriefing` options. Every question gets every packet in
+    context. A briefing skips the acknowledgment AND the V2-008c holding-line call and
+    opens with the locally written opener through the same `sayFirstLine` plumbing, so
+    the model is still told what the room already heard. `packetIds`/`usedPacketIds` on
+    every answer record; the briefing's pages are added to the resolution index and to
+    the card's citations.
+  - ResearchCards.bringForward: the asked-for packet's card goes out again with
+    `forward: true`, leaves the queue, and spends none of the unsolicited budget.
+  - web: `StageCard.forward` → foldCard (moved out of useSessionEvents into stageView,
+    where it is now unit-tested) re-stamps receivedAtMs so the card returns to the top,
+    and Card opens itself and takes `.card--forward`. New /dev/cards sample + `npm run
+    verify:briefing` (no API, ~10 s).
+  MEASURED (real max replay, real Spark, local Glimmer gate, real ElevenLabs null sink,
+  477 s, 4/4 integration assertions):
+  - 3 packets at 67/94/114 s of a 175 s conversation; the wake question at the end
+    briefed from packet-2 ("Otter, Fireflies, built-ins offer search, not contradiction
+    tracking") — the topical match picked it out of three.
+  - The briefing made NO search: 1,807 output tokens, 4 citations, all from the packet.
+  - firstAudioMs 392 (ackMs null). The control — same question, same board, same
+    transcript, packets taken away — acknowledged at 241 ms and reached a real sentence
+    at 4,342 ms. That 11x is the whole point of the story and is why the opener is
+    written locally rather than by a model.
+  WATCH OUT:
+  - The opener replaces the acknowledgment, so `ackMs` is null on a briefing. Anything
+    that reads ackMs as "did Sotto respond quickly" must read firstAudioMs too.
+  - `usedPacketIds` = the briefing's packets ∪ any packet whose source the answer cited.
+    `packetIds` is everything it was given. V2-018's digest wants the first.
+  NEXT: V2-016 (Glimmer as the judgment gate) — JudgmentRouter.client() is already the
+  seam the research gate uses, so the interjection gate is the same move one layer up.
+  6 stories left.

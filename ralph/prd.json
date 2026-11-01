@@ -307,8 +307,8 @@
         "Typecheck passes"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Measured on a real research-business-idea replay (max, real Spark, local Glimmer gate, real ElevenLabs through a null sink): 3 packets at 67/94/114 s; the wake question briefed from packet-2, 4 sources, no search at all, firstAudioMs 392 and no acknowledgment; the same question with the packets taken away searched first and reached a real sentence at 4,342 ms. The brought-forward card is checked in the browser on /dev/cards (npm run verify:briefing), because no packet in any run so far has drawn a visual."
     },
     {
       "id": "V2-016",
