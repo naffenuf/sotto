@@ -428,3 +428,52 @@
   words), `detail` the reasoning and `evidenceTurnIds` the turns it rests on — i.e. the raw material
   for a ResearchIdea's { topic, question, why, sourceTurnIds } without another model call.
   NEXT: V2-012 (research planner and gate). 10 stories left.
+
+[2026-11-01 01:25] V2-012 — completed — Research planner and gate: ideas in, most of them filtered out.
+  - shared/research.ts is the vocabulary: ResearchIdea { id, topic, question, why, sourceTurnIds }
+    exactly as the PRD names it (origin, candidateId and the gate's verdict live on the log records,
+    not on the idea), both hand-written strict JSON schemas beside their zod schemas with
+    shared/research.test.ts holding the two honest, findDuplicateIdea (same topicKey, or >= 0.6
+    Jaccard on the question's content words), hookIdea (a hook's headline IS the question, so no
+    second model call), and researchScore = cbrt(useful * unknown * answerable) against
+    RESEARCH_GATE_THRESHOLD 0.6 — a geometric mean, so one low answer sinks an idea while a merely
+    good one keeps its own level (0.7^3 = 0.34 would not).
+  - server/research/ResearchPlanner.ts: a lazily-armed, re-armed interval timer (2 min), a look only
+    when >= 3 new final turns arrived, Muse Spark, <= 2 items, one call in flight, clock.track'ed,
+    turns put back on failure. flush() deliberately does NOT take a final look: a conversation that
+    has ended has nothing left for a search to inform.
+  - server/research/ResearchGate.ts: one judgment call per idea via JudgmentRouter.client(), so
+    Glimmer when it is there and Spark when it is not; reasoningEffort low, 4,096 tokens, latency on
+    the WALL clock. It never throws — "failed" is a decision and it stops the idea, because an
+    unscored idea must not spend a search slot.
+  - server/research/ResearchManager.ts is the wiring: submit -> dedupe -> gate queue (serialized:
+    Glimmer is one local GPU) -> job queue -> budget. Both caps are there and unit-tested; the
+    ten-minute window frees with the clock and nothing would notice, so it arms a timer for the
+    moment the oldest start ages out. `run` is V2-013's seam and is absent, so an approved idea sits
+    in queued() — which is exactly what the budget tests count.
+  - SessionManager: `researchHooks: Candidate[]` is gone, replaced by `research: ResearchManager`,
+    built after the board (it needs board.board()). Hooks go to research.acceptHook, final turns to
+    research.acceptTurn (it drops Sotto's own), research.stop() beside greeting/judgment on Stop,
+    and research.flush() in drainLoops after the verifier.
+  Checked: npm run typecheck, npm test (71 files, 985 tests — the SessionManager "research hook
+  nowhere near the policy" test now also asserts 8 ideas and 8 gate verdicts reached
+  research.jsonl), npm run build (both new prompts copied to dist), and
+  npx vitest run --config vitest.integration.config.ts server/research/research.integration.test.ts
+  (4/4 in 61 s, real Spark + real local Glimmer). No browser check: no UI criterion.
+  MEASURED, and the planner's quietness is the headline: it proposed TWO sharp items (HIPAA
+  recording rules, clinic procurement certifications) on research-business-idea lines 28-33, where a
+  nine-month sales cycle is being leaned on and nobody asks for anything — and ZERO on offsite-plan
+  lines 10-14, where they say "somebody should check the drive", four runs out of four. That is the
+  prompt obeying its own first paragraph: an out-loud request is the observer's research_hook, and
+  the planner is for the question they have not thought to ask. Do not "fix" that by loosening
+  research-planner.md; measure it on a stretch with no request in it.
+  Three dead ends on the way, all recorded in CLAUDE.md: a synthetic six-turn snippet tells you
+  about the snippet; "it is not on the board" in a prompt reads as excluding an *unanswered* board
+  question (now spelled out in both prompts); and the schema's own
+  "an empty array is a perfectly good answer" description was a second, stronger nudge than the
+  prompt's — Spark reads descriptions, so they are part of the prompt.
+  WATCH OUT: research adds model calls to every run now — one planner look per 2 min of
+  conversation, one gate call per non-duplicate idea — and server/eval/runner.ts and
+  server/e2e/live.ts still do not pass createGlimmer, so their gates run on Spark and are billed.
+  V2-019's cost gate and V2-021's $0.50 e2e budget are the two places that will notice first.
+  NEXT: V2-013 (research runner and packets) — supply `run` to ResearchManagerOptions. 9 stories left.

@@ -998,3 +998,45 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `dropped_thread`'s old "who owns the data?" example to the new type *is* the enforcement.
   `MAX_CANDIDATES_PER_RUN` is still 3, so hooks now compete with interjection candidates for those
   three slots — look there first if recall on the core fixtures drops.
+
+- **Research is three stages, and two of them exist to say no.** V2-012's `server/research/` is
+  `ResearchManager` (dedupe → gate → budget) over `ResearchPlanner` (Muse Spark, every 2 min with
+  ≥ 3 new final turns, ≤ 2 items) and `ResearchGate` (one judgment call per idea through
+  `JudgmentRouter.client()`, so Glimmer when it is there and Spark when it is not). `shared/
+  research.ts` carries the shape the PRD names — `{ id, topic, question, why, sourceTurnIds }`, with
+  origin, the candidate it came from and the verdict on the *log records* rather than on the idea —
+  plus `researchScore`, the **geometric mean** of `useful`/`unknown`/`answerable` against a 0.6
+  threshold: one low answer sinks an idea (a question no search can answer is worthless however
+  interesting) while a merely good one keeps its own level, which a plain product would not
+  (0.7³ = 0.34). Measured on real local Glimmer: 19–39 s a call, scores always in range, 0.71–0.86
+  for a checkable question and 0.19–0.46 for "would our team rather…" (`answerable` 0.05–0.15). The
+  gate **never throws** — `failed` is a decision and it stops the idea, because an unscored idea must
+  not spend a search slot. `run` is V2-013's seam: absent, an approved idea sits in `queued()`.
+- **A hook's headline is already the question, so a hook costs no model call.** `hookIdea` reads
+  `question` off `Candidate.headline` (`observer.md` demands the question there in as many words),
+  `why` off `whyNow` with `detail` as the fallback, and a short topic off the question's first three
+  content words — which is what makes two hooks asking the same thing collide in `topicKey`, while a
+  planner idea on the same subject is caught by the question's Jaccard overlap instead.
+- **The planner is quiet where the observer is loud, and that is the design.** It proposed two sharp
+  items (HIPAA recording rules, clinic procurement certifications) on `research-business-idea` lines
+  28–33, where a nine-month sales cycle is being leaned on and nobody asks for anything, and
+  **zero** on `offsite-plan` lines 10–14, where they say "somebody should check the drive" — four
+  runs out of four. That stretch is the observer's `research_hook`, and `research-planner.md`'s first
+  paragraph says so. Never read a planner regression off a stretch that contains an out-loud request.
+- **Three ways to make a prompt silent without noticing.** Measuring V2-012's planner cost three
+  attempts, all of them the prompt rather than the code: a **synthetic snippet** tells you about the
+  snippet, so both halves of `research.integration.test.ts` are built from the fixtures' own words;
+  "**it is not on the board**" reads as excluding an *unanswered* board question, which is the
+  clearest sign the group needs the answer (now spelled out in `research-planner.md` and
+  `research-gate.md`); and the **JSON Schema's `description` is part of the prompt** on Muse Spark —
+  an `ideas` array described as "an empty array is a perfectly good answer" was a stronger nudge than
+  the prompt's own framing, and outvoted it. (On Glimmer the opposite trap: the description is never
+  read at all, so ranges live in the prompt.)
+- **`research.jsonl` is the record, and the budget's two caps fail differently.** `SESSION_FILES.
+  research` / `SessionWriter.appendResearch` take `idea`, `gate` and `start` lines (V2-013 adds the
+  packet), mirrored into `timing.jsonl` as `research_*`. The concurrency cap (2) frees when a job
+  finishes, which calls back into the pump; the ten-minute cap (3) frees **with the clock, and
+  nothing arrives to say so**, so `ResearchManager` arms a timer for the moment the oldest start ages
+  out — the same shape as the policy's pause re-check. Dedupe is against every idea the session ever
+  had, which is also the dedupe against earlier packets the PRD asks for, since a packet's idea is
+  still in that list.
