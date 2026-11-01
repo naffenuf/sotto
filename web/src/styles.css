@@ -1037,6 +1037,18 @@ body {
   color: var(--ink-dim);
 }
 
+/* V3-004: the room answered it first, so the card says whether the search
+   agrees rather than Sotto saying it out loud. One line, above the teaser, and
+   weighted so it reads before the teaser does. */
+.card__note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #4d6b5a;
+}
+
 /* Read, not announced: a finding is worth less shouting than an interjection,
    so an opened research card's headline sits a size down. */
 .card--research .card__headline {

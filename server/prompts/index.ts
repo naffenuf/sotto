@@ -40,6 +40,8 @@ export const PROMPTS = {
   address: "address",
   /** Tells a question the room needs looked up from one it is thinking aloud (V3-002). */
   question: "question",
+  /** Whether the room is still waiting for an answer Sotto went and found (V3-004). */
+  stillCurrent: "still-current",
   /** Deciding whether a delivered card raises a planted moment (US-016). */
   judge: "judge",
   /**

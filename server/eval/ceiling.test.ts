@@ -3,14 +3,20 @@ import type { MomentRecord } from "../../shared/eval.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import {
   CEILING_THRESHOLDS_MS,
+  SPEAK_MOMENT_TYPES,
+  SPEAK_READY_OFFSETS_MS,
   ceilingTable,
   isReachable,
   longestSilence,
   lookTimes,
   momentReach,
+  speakReach,
+  speakThresholdMs,
   type MomentReach,
+  type SpeakReach,
 } from "./ceiling.js";
 import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
+import { SPEAK_PAUSE_MS } from "../interject/policy.js";
 import { turnIntervals } from "./pause.js";
 
 function turn(turnId: string, startMs: number, endMs: number | null): TurnUpdate {
@@ -183,5 +189,61 @@ describe("ceilingTable", () => {
   it("reports every default threshold, lowest first", () => {
     const rows = ceilingTable(reaches);
     expect(rows.map((row) => row.pauseMs)).toEqual([...CEILING_THRESHOLDS_MS]);
+  });
+});
+
+describe("speakReach and speakThresholdMs (V3-004)", () => {
+  it("measures the quiet in the whole window: an open question waits for no look", () => {
+    const reach = speakReach("fx", moment({ type: "research_hook" }), conversation);
+    expect(reach.fixture).toBe("fx");
+    expect(reach.momentId).toBe("m1");
+    expect(reach.windowMs).toEqual({ fromMs: 3_500, untilMs: 9_500 });
+    // The gaps between these turns are 500 ms of reported silence, which is
+    // 500 ms plus the endpointer's hangover of real quiet.
+    expect(reach.bestSilenceMs).toBe(499 + ENDPOINTER_HANGOVER_MS);
+  });
+
+  it("reports what the search costs, as the quiet left once it is ready", () => {
+    const reach = speakReach("fx", moment({ deadlineTurnEndMs: 20_000 }), conversation);
+    expect(reach.silenceByReady.map((entry) => entry.offsetMs)).toEqual([
+      ...SPEAK_READY_OFFSETS_MS,
+    ]);
+    // Nothing is said after 9,500, so the quiet only grows from there.
+    expect(reach.silenceByReady.find((entry) => entry.offsetMs === 15_000)).toEqual({
+      offsetMs: 15_000,
+      bestSilenceMs: 20_000 - 9_500 + ENDPOINTER_HANGOVER_MS,
+    });
+    // A search that comes back after the deadline has run out of window.
+    expect(reach.silenceByReady.at(-1)?.bestSilenceMs).toBe(0);
+  });
+
+  it("has no window, and no quiet, when the moment's lines never resolved", () => {
+    const reach = speakReach("fx", moment({ deadlineTurnEndMs: null }), conversation);
+    expect(reach.windowMs).toBeNull();
+    expect(reach.bestSilenceMs).toBe(0);
+    expect(reach.silenceByReady).toEqual([]);
+  });
+
+  it("picks the largest threshold the tightest window can afford", () => {
+    const reaches: SpeakReach[] = [
+      { fixture: "a", momentId: "m1", windowMs: null, bestSilenceMs: 1_725, silenceByReady: [] },
+      { fixture: "a", momentId: "m2", windowMs: null, bestSilenceMs: 968, silenceByReady: [] },
+      { fixture: "b", momentId: "m3", windowMs: null, bestSilenceMs: 1_340, silenceByReady: [] },
+    ];
+    // The measured answer for the shipped fixtures: 968 − 500.
+    expect(speakThresholdMs(reaches)).toBe(468);
+    expect(speakThresholdMs(reaches, 0)).toBe(968);
+    expect(speakThresholdMs([])).toBeNull();
+  });
+
+  it("is what SPEAK_PAUSE_MS was chosen under", () => {
+    const reaches: SpeakReach[] = [
+      { fixture: "a", momentId: "m1", windowMs: null, bestSilenceMs: 968, silenceByReady: [] },
+    ];
+    expect(SPEAK_PAUSE_MS).toBeLessThanOrEqual(speakThresholdMs(reaches) ?? 0);
+  });
+
+  it("names only the moment type that is the room wondering aloud", () => {
+    expect([...SPEAK_MOMENT_TYPES]).toEqual(["research_hook"]);
   });
 });

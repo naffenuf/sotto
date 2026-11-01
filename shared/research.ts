@@ -821,6 +821,19 @@ export function researchCardHeadline(title: string): string {
   return `${RESEARCH_CARD_PREFIX} ${title}`;
 }
 
+/**
+ * The line a research card carries when the room answered the question itself
+ * before Sotto could say what it found (V3-004).
+ *
+ * Nothing is said out loud in either case — the group has the answer and does
+ * not need it twice — but which of the two it is matters a great deal, so the
+ * card says so in one line that can be read at a glance and read again later.
+ */
+export const RESEARCH_CONFIRMED_NOTE = "Confirmed: this matches what the room said.";
+
+/** And the other way: a correction, on screen, where it can be read twice. */
+export const RESEARCH_DISAGREES_NOTE = "This differs from what the room said.";
+
 /** What the card says while the search is still running (V3-003). */
 export const RESEARCH_LOOKING_PREFIX = "Looking up:";
 

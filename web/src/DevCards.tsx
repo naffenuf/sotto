@@ -11,6 +11,10 @@ import { Card } from "./Card.js";
 import { Stage } from "./Stage.js";
 import { QUIET_TRAY_MS, type StageCardView } from "./stageView.js";
 import type { StageCard } from "../../shared/index.js";
+import {
+  RESEARCH_CONFIRMED_NOTE,
+  RESEARCH_DISAGREES_NOTE,
+} from "../../shared/research.js";
 
 const DETAIL_MD = `Three vendors publish a **per-seat** price, and all three bundle analytics
 into the top tier:
@@ -261,6 +265,52 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
           { url: "https://example.com/hhs-baa", title: "HHS — Business Associate Contracts" },
           { url: "https://example.com/state-consent", title: "Two-party consent by state" },
         ],
+      },
+    },
+    {
+      title: "research — the room answered it first",
+      note:
+        "V3-004: somebody in the room answered the question before Sotto could" +
+        " say what it found, so nothing was said out loud and the card carries" +
+        " the verdict instead. A replay will not reliably produce either half of" +
+        " this pair.",
+      card: {
+        id: "r-confirmed",
+        variant: "research",
+        state: "ready",
+        createdAtMs: now,
+        headline: "Research ready: The drive is two hours ten without traffic",
+        note: RESEARCH_CONFIRMED_NOTE,
+        teaser:
+          "The quickest route is two hours ten each way, which is what EJ said" +
+          " before the search came back.",
+        detailMd: [
+          "- Two hours ten via the motorway, outside rush hour",
+          "- Two hours forty on a Thursday afternoon",
+        ].join("\n"),
+        citations: [{ url: "https://example.com/route", title: "Route — two hours ten" }],
+      },
+    },
+    {
+      title: "research — and it disagrees",
+      note:
+        "The other half: the correction goes on screen, where it can be read" +
+        " twice, rather than being argued with out loud.",
+      card: {
+        id: "r-disagrees",
+        variant: "research",
+        state: "ready",
+        createdAtMs: now,
+        headline: "Research ready: The drive is three hours, not an hour and a half",
+        note: RESEARCH_DISAGREES_NOTE,
+        teaser:
+          "Every route planner puts it at two hours fifty to three hours ten" +
+          " each way, against the hour and a half the room was working from.",
+        detailMd: [
+          "- Two hours fifty via the motorway, outside rush hour",
+          "- Three hours ten on a Thursday afternoon",
+        ].join("\n"),
+        citations: [{ url: "https://example.com/route", title: "Route — two hours fifty" }],
       },
     },
     {

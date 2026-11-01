@@ -136,6 +136,16 @@ export interface StageCard {
   /** `state: "error"`: the muted line shown in place of the content. */
   message?: string;
   /**
+   * `research`: one short line about the card's own standing (V3-004).
+   *
+   * Set when somebody in the room answered the question before Sotto could
+   * say what it found, so nothing was said out loud: `confirmed` when the
+   * search agrees with them, and the fact that it does not when it does not.
+   * Shown closed as well as open, like {@link teaser} — it is the reason the
+   * card is worth a glance at all.
+   */
+  note?: string;
+  /**
    * `research`: bring this card back to the top of the stage, open (V2-015).
    *
    * Set on the one push that happens because somebody *asked* for the

@@ -2521,6 +2521,10 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
       if (call.label === "address") return { kind: "mention", question: "" };
       if (call.label === "board") return { operations: [] };
       if (call.label === "research-planner") return { ideas: [] };
+      // V3-004: the room is still on the venue, so the answer is worth saying.
+      if (call.label === "still-current") {
+        return { verdict: "current", agrees: false, why: "still planning the day" };
+      }
       return { candidates: [] };
     }
 
@@ -2605,5 +2609,81 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     expect(voice.utterances).toContain("I'll check the drive time.");
     const mine = published.filter(isSottoTurn).map((turn) => turn.text);
     expect(mine).toContain("I'll check the drive time.");
+  }, 60_000);
+
+  /**
+   * V3-004 through the whole pipeline: the packet the fast path produced is
+   * spoken to the room at a real pause, after the claim and never before it,
+   * and the card is still there with its sources.
+   */
+  it("speaks the answer to the room and leaves the card with its sources", async () => {
+    const bus = new EventBus(quiet);
+    const model = new SearchingModel();
+    const timing: Record<string, unknown>[] = [];
+    const voice = new ClaimingVoice();
+    const published: TurnUpdate[] = [];
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "turn") published.push(event.turn);
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => timingWriter(timing),
+      createModel: () => model,
+      createVoice: () => voice,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "offsite-plan" });
+    await ended;
+
+    const answers = timing.filter(
+      (record) => record["stage"] === "spoken_contribution" && record["kind"] === "answer",
+    );
+    expect(answers).toHaveLength(1);
+    expect(answers[0]).toMatchObject({
+      kind: "answer",
+      spoken: true,
+      text: "On the drive time: It's about two and a quarter hours.",
+      yielded: false,
+    });
+    expect(answers[0]?.["questionToSpeechMs"]).toBeGreaterThanOrEqual(0);
+    // The verdict it decided on was the cached one (V3-004) — and in a `max`
+    // replay it is the no-call one: simulated time stands still inside the
+    // search, so no final turn arrives between the question and the packet,
+    // and "nobody has spoken since" needs no model.
+    expect(answers[0]?.["stillCurrent"]).toMatchObject({
+      verdict: "current",
+      latencyMs: 0,
+      turns: 0,
+    });
+
+    // Said out loud, and in the transcript as Sotto's, after the claim.
+    const mine = published.filter(isSottoTurn).map((turn) => turn.text);
+    expect(mine.indexOf("I'll check the drive time.")).toBeLessThan(
+      mine.indexOf("On the drive time: It's about two and a quarter hours."),
+    );
+    // And the card is still the card, with the pages behind it.
+    const research = cards.filter((card) => card.variant === "research");
+    expect(research.at(-1)?.citations?.map((one) => one.url)).toEqual([
+      "https://maps.example.com/route",
+    ]);
+
+    // The question is closed out, so the still-current watcher stops paying
+    // for verdicts about it: the rest of the conversation is 20 more final
+    // turns, and a run that left it watching made fifty checks.
+    const checks = timing.filter((record) => record["stage"] === "still_current");
+    expect(checks.length).toBeLessThan(4);
   }, 60_000);
 });

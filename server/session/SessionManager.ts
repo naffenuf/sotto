@@ -44,7 +44,11 @@ import {
   type Frequency,
   type PolicySettings,
 } from "../../shared/policy.js";
-import type { ResearchLogLine } from "../../shared/research.js";
+import {
+  RESEARCH_CONFIRMED_NOTE,
+  RESEARCH_DISAGREES_NOTE,
+  type ResearchLogLine,
+} from "../../shared/research.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { defaultSettings, describeSource, sourceSlug } from "../../shared/session.js";
 import { isSottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
@@ -78,6 +82,8 @@ import { AddressWatcher } from "../answer/AddressWatcher.js";
 import { classifyQuestion, type OpenQuestion } from "../question/question.js";
 import { QuestionWatcher } from "../question/QuestionWatcher.js";
 import { Reservations } from "../question/Reservations.js";
+import { StillCurrentWatcher } from "../question/StillCurrentWatcher.js";
+import { classifyStillCurrent } from "../question/stillCurrent.js";
 import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { Greeting } from "./Greeting.js";
@@ -305,6 +311,15 @@ interface ModelLoops {
    * there would be nothing for it to claim.
    */
   reservations: Reservations | null;
+  /**
+   * Whether the room still wants an answer Sotto went and found (V3-004), or
+   * `null` with no model client.
+   *
+   * Never in the critical path: it keeps a verdict per waiting answer, so the
+   * instant between a pause being noticed and an utterance being opened costs
+   * no model call.
+   */
+  stillCurrent: StillCurrentWatcher | null;
 }
 
 /** One card that reached the stage, kept so feedback can be filed on it. */
@@ -359,6 +374,8 @@ interface RunningSession {
   questions: QuestionWatcher | null;
   /** V3-015: the claims waiting for a gap, silenced with the session. */
   reservations: Reservations | null;
+  /** V3-004: the cached "is the room still on this?", retired with the session. */
+  stillCurrent: StillCurrentWatcher | null;
   /** Where this session's judgment calls run: local Glimmer or Spark (V2-010). */
   judgment: JudgmentRouter;
   info: SessionInfo;
@@ -622,6 +639,7 @@ export class SessionManager {
     running.research?.stop();
     running.researchCards?.stop();
     running.reservations?.stop();
+    running.stillCurrent?.stop();
     running.judgment.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
@@ -820,7 +838,12 @@ export class SessionManager {
       clock,
       speaking: () => voice?.playback?.().playing === true || this.bus.voiceState().speaking,
       answering: () => (loops.answers?.pending() ?? 0) > 0,
-      interrupt: () => loops.answers?.interrupt() ?? voice?.interrupt?.() ?? Promise.resolve(null),
+      interrupt: () => {
+        // V2-007 on top of V3-004: in practice the first human partial has
+        // already yielded, so this mostly records which rule did it.
+        loops.reservations?.interrupt();
+        return loops.answers?.interrupt() ?? voice?.interrupt?.() ?? Promise.resolve(null);
+      },
       command: (asked) => loops.answers?.command(asked),
       onTiming: (record) => store.writer?.appendTiming?.(record),
       onListening: (listening) => {
@@ -881,8 +904,12 @@ export class SessionManager {
         // research card waits for the same pause (V2-014).
         loops.policy?.acceptTurn(turn);
         loops.researchCards?.acceptTurn(turn);
-        // And so does a claim waiting for its gap (V3-015).
+        // And so does a claim waiting for its gap (V3-015), and the answer
+        // waiting for a real pause behind it (V3-004).
         loops.reservations?.acceptTurn(turn);
+        // V3-004: every later final turn is another look at whether the room
+        // still wants an answer that is waiting to be said.
+        loops.stillCurrent?.acceptTurn(turn);
         // And so does the wake phrase: the indicator is the point of reading
         // a partial at all (US-017).
         // V2-007 privately owns interrupted commands; ordinary side talk stays suppressed.
@@ -1108,6 +1135,7 @@ export class SessionManager {
         researchCards: null,
         questions: null,
         reservations: null,
+        stillCurrent: null,
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
@@ -1234,6 +1262,19 @@ export class SessionManager {
     // allowance, because a claim asks for the floor exactly as an
     // interjection does. The answer that follows it (V3-004) is its
     // completion rather than a second contribution.
+    // V3-004: whether the room still wants an answer Sotto went and found.
+    // One cheap Spark call when the packet lands and after every later final
+    // turn, cached — so the instant between noticing a pause and opening an
+    // utterance costs no model call, which is the whole point of it.
+    const stillCurrent = new StillCurrentWatcher({
+      clock,
+      // Real time: the latency being recorded is wall-clock work, and a
+      // `max`-speed replay's clock stands still inside a model call.
+      wallClock: this.wallClock,
+      classify: (input, signal) => classifyStillCurrent(model, input, signal),
+      speakers: () => this.bus.speakerNames(),
+      onTiming,
+    });
     const reservations = new Reservations({
       clock,
       voice,
@@ -1242,13 +1283,34 @@ export class SessionManager {
       settings: () => policy.settings(),
       allowed: () => policy.unpromptedAllowed(),
       noteContribution: () => policy.noteSpokenContribution(),
+      stillCurrent: (ideaId) => stillCurrent.verdict(ideaId),
+      // Somebody in the room answered it first (V3-004): nothing is said, and
+      // the card carries whether the search agrees with them.
+      onAnswered: (ideaId, state) => {
+        const packet = researchRunner.packets().find((one) => one.ideaId === ideaId);
+        if (packet === undefined) return;
+        researchCards.annotate(
+          packet,
+          state.agrees ? RESEARCH_CONFIRMED_NOTE : RESEARCH_DISAGREES_NOTE,
+        );
+      },
       // Opening an utterance stops whatever was being said, so a claim waits
       // while Sotto is still writing somebody's answer. The getter closes
       // over the `const` below and is only ever called once a question has
       // been noticed, which is long after this returns.
       answering: () => (answers.pending() ?? 0) > 0,
       onSpoken: (turn) => this.recordSottoSpeech(info, store, null, turn),
-      onRecord: (record) => onTiming({ ...record }),
+      onRecord: (record) => {
+        onTiming({ ...record });
+        // V3-004: once the answer has been said, shown or written off, nothing
+        // more will be said about this question — so stop paying for a verdict
+        // on every remaining final turn. A measured run that left the watcher
+        // running made fifty checks about two questions it had already
+        // answered on screen.
+        if (record.kind === "answer" && record.retrying !== true) {
+          stillCurrent.forget(record.ideaId);
+        }
+      },
       logger: this.logger,
     });
     // The search (V2-013): one grounded call per approved idea, writing
@@ -1276,6 +1338,19 @@ export class SessionManager {
         store.writer?.writePacket(packet.id, packet, markdown);
         // The one place a packet becomes something the room can see.
         researchCards.accept(packet);
+        // V3-004: and, for a question the room wondered aloud, something it
+        // can hear. The still-current check starts here rather than at the
+        // pause, so that by the time a pause arrives the verdict is cached.
+        const asked = reservations.questionFor(packet.ideaId);
+        const spoken = packet.spokenAnswer?.trim() ?? "";
+        if (asked !== null && spoken !== "") {
+          stillCurrent.watch(packet.ideaId, {
+            question: asked.question,
+            answer: spoken,
+            askedAtMs: asked.askedAtMs,
+          });
+        }
+        reservations.answer(packet);
       },
       onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
     });
@@ -1359,7 +1434,7 @@ export class SessionManager {
       onOpenQuestion: (question) =>
         this.noticeQuestion(info, store, question, research, researchCards, reservations),
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations, stillCurrent };
   }
 
   /**
@@ -1413,8 +1488,13 @@ export class SessionManager {
       reservations?.claim(started.idea, question);
     }
     // The answer exists already: show it as though they had asked for it,
-    // which is what they did (V2-015's own rule, and no second search).
-    else if (started.outcome === "reused") researchCards.reuse(started.idea, started.packet);
+    // which is what they did (V2-015's own rule, and no second search) — and
+    // say it, since the room wondered aloud and Sotto has the answer (V3-004).
+    else if (started.outcome === "reused") {
+      researchCards.reuse(started.idea, started.packet);
+      reservations?.noteQuestion(started.idea, question);
+      reservations?.answer(started.packet);
+    }
   }
 
   /**
@@ -1658,6 +1738,7 @@ export class SessionManager {
     running.greeting?.stop();
     running.research?.stop();
     running.reservations?.stop();
+    running.stillCurrent?.stop();
     running.wrapUp.stop();
     running.judgment.stop();
     // Not `running.answers`: a question typed after Stop is answered against
@@ -1748,6 +1829,10 @@ async function drainLoops(
   // from: every idea gets its gate verdict written down even though nothing
   // will be searched now. The planner does not take a final look (V2-012).
   await loops.research?.flush();
+  // And the claims again: the last packet out of that flush may have had an
+  // answer worth saying (V3-004), and whatever gets said belongs in the
+  // transcript it was said into.
+  await loops.reservations?.flush();
   // An answer asked in the last seconds of a conversation is still owed to
   // whoever asked for it, and the policy must not be left thinking one is
   // still being written.

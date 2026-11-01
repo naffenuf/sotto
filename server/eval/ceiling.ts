@@ -133,6 +133,101 @@ export function isReachable(reach: MomentReach, pauseMs: number): boolean {
   return reach.lookAtMs !== null && reach.bestSilenceMs >= pauseMs;
 }
 
+/**
+ * The margin a speak threshold has to leave (PRD V3-004).
+ *
+ * The pause a planted open question offers has to clear the threshold by this
+ * much, so the number is not sitting on the one conversation it was measured
+ * against — the quiet in a window is an upper bound on what the live pipeline
+ * will see, since the board's lag, a turn arriving late and the next speaker
+ * starting early all eat into it.
+ */
+export const SPEAK_MARGIN_MS = 500;
+
+/**
+ * The planted moment types that are the room wondering something aloud.
+ *
+ * A `research_hook` is exactly V3-002's `open_question`: a question somebody
+ * asks the room that a lookup can settle. An `unanswered_question` is one only
+ * the group can answer and a `contradiction` is nobody's question at all, so
+ * neither is a moment V3-004 would ever speak into.
+ */
+export const SPEAK_MOMENT_TYPES = ["research_hook"] as const;
+
+/**
+ * Readiness offsets the quiet is also reported at (V3-004).
+ *
+ * The fast path takes a measured 13–28 s from the question going final to a
+ * sourced packet, so the pause the answer can really take is the quiet *after*
+ * that, not the quiet in the whole window. It is reported beside the window's
+ * own best silence rather than used to pick the threshold, because the PRD's
+ * rule is about the window — and because a packet that is ready after the
+ * deadline has run out of window at any threshold.
+ */
+export const SPEAK_READY_OFFSETS_MS = [0, 10_000, 15_000, 20_000] as const;
+
+/** One planted open question, and the quiet it offers an answer (V3-004). */
+export interface SpeakReach {
+  fixture: string;
+  momentId: string;
+  /** The window on the session clock, or `null` when its turns never resolved. */
+  windowMs: { fromMs: number; untilMs: number } | null;
+  /** The longest real quiet anywhere inside that window. */
+  bestSilenceMs: number;
+  /** The same, counting only from `offsetMs` after the question went final. */
+  silenceByReady: { offsetMs: number; bestSilenceMs: number }[];
+}
+
+/**
+ * Places one planted open question against the silences of its own replay.
+ *
+ * Unlike {@link momentReach} there is no observer look in it: an open question
+ * goes straight from the classifier to a search (V3-002, V3-003) and never
+ * waits for a board update, so the whole window is available in principle and
+ * {@link SPEAK_READY_OFFSETS_MS} is what says what the search costs.
+ */
+export function speakReach(
+  fixture: string,
+  moment: MomentRecord,
+  turns: readonly TurnUpdate[],
+): SpeakReach {
+  const fromMs = moment.triggerTurnEndMs;
+  const untilMs = moment.deadlineTurnEndMs;
+  const base = { fixture, momentId: moment.id };
+  if (fromMs === null || untilMs === null) {
+    return { ...base, windowMs: null, bestSilenceMs: 0, silenceByReady: [] };
+  }
+  const intervals = turnIntervals(turns);
+  return {
+    ...base,
+    windowMs: { fromMs, untilMs },
+    bestSilenceMs: longestSilence(intervals, fromMs, untilMs),
+    silenceByReady: SPEAK_READY_OFFSETS_MS.map((offsetMs) => ({
+      offsetMs,
+      bestSilenceMs:
+        fromMs + offsetMs >= untilMs
+          ? 0
+          : longestSilence(intervals, fromMs + offsetMs, untilMs),
+    })),
+  };
+}
+
+/**
+ * The largest speak threshold that leaves every one of these questions a pause
+ * with `marginMs` to spare, which is the PRD's rule for {@link SPEAK_PAUSE_MS}.
+ *
+ * `null` when there is nothing to measure. Negative when even the margin
+ * cannot be met — reported as such rather than clamped, because a threshold of
+ * zero would hide the fact that the rule failed.
+ */
+export function speakThresholdMs(
+  reaches: readonly SpeakReach[],
+  marginMs: number = SPEAK_MARGIN_MS,
+): number | null {
+  if (reaches.length === 0) return null;
+  return Math.min(...reaches.map((reach) => reach.bestSilenceMs)) - marginMs;
+}
+
 /** The pause thresholds the ceiling is reported at, lowest first. */
 export const CEILING_THRESHOLDS_MS: readonly number[] = [
   100, 150, 200, 250, 300, 400, 500, 1_000, 1_500,

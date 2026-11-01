@@ -137,6 +137,7 @@ export function Card({
           <span className="card__glow-line" data-testid="card-headline">
             {collapsedLine(card)}
           </span>
+          <Note card={card} />
           <Teaser card={card} />
         </span>
         {card.state === "thinking" && <Thinking />}
@@ -154,6 +155,7 @@ export function Card({
     >
       <CardLabel card={card} onCollapse={() => setExpanded(false)} />
       <Headline card={card} />
+      <Note card={card} />
       <Teaser card={card} />
       {card.whyNow !== undefined && card.whyNow !== "" && (
         <p className="card__why" data-testid="card-why">
@@ -408,6 +410,24 @@ function ArtifactFrame({ artifact }: { artifact: CardArtifact }) {
         loading="lazy"
       />
     </figure>
+  );
+}
+
+/**
+ * The one line about a research card's own standing (V3-004).
+ *
+ * Shown closed as well as open, above the teaser: when somebody in the room
+ * answered the question first, whether the search agrees with them is the
+ * thing worth reading, and it is the only thing said about it — nothing was
+ * spoken.
+ */
+function Note({ card }: { card: StageCard }) {
+  const note = card.note ?? "";
+  if (note.trim() === "") return null;
+  return (
+    <span className="card__note" data-testid="card-note">
+      {note}
+    </span>
   );
 }
 

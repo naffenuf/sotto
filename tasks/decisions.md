@@ -242,3 +242,45 @@ settings. Relly's "any participant can silence it" is now in the hello.
 
 **Where it lives:** the PRD's "Related work", V3-017, V3-009, V3-012,
 FR-V3-9/10 and the build order.
+
+---
+
+## 2026-11-01 — `SPEAK_PAUSE_MS` is 450 ms, and the measurement says why
+
+**What changed:** V3-004's threshold for *speaking* an answer to the room is
+450 ms of corrected silence, not the 700 ms everything Sotto shows unasked
+waits for and not the ~1,000 ms the PRD expected. `inPause(pause, pauseMs)`
+takes the threshold as an argument; `SPEAK_PAUSE_MS` lives beside `PAUSE_MS` in
+`server/interject/policy.ts`.
+
+**The measurement** (`npm run eval:ceiling -- --speak`, free, no API call).
+The three planted open questions — a `research_hook` is exactly V3-002's
+`open_question` — and the longest real quiet anywhere inside each one's window:
+
+| fixture / moment | window | longest quiet | margin at 450 |
+| --- | --- | --- | --- |
+| `offsite-plan` / venue-logistics | 57.2–83.6 s (26.4 s) | 1,340 ms | 890 ms |
+| `research-business-idea` / market-size | 67.3–89.8 s (22.6 s) | 1,725 ms | 1,275 ms |
+| `research-business-idea` / competitor-gaps | 110.1–138.1 s (28.0 s) | 968 ms | 518 ms |
+
+The PRD's rule is the largest threshold leaving every one of them ≥ 500 ms of
+margin: 968 − 500 = **468 ms**, so 450 as a round number. `competitor-gaps` is
+the binding window, and at 1,000 ms it would have had 0 ms of margin at all —
+the PRD's expectation came from the 930–1,610 ms US-023 measured inside the
+*interjection* windows, which are not these.
+
+**Two things worth knowing about 450.** It is below the floor the endpointer
+correction puts on corrected silence: `TurnAssembler.pauseState` counts silence
+from `speechEnd − ENDPOINTER_HANGOVER_MS` (650 ms), so `silentForMs` reads 650
+the instant a turn closes and any threshold under that means "the first moment
+the transcription says nobody is talking". That is the intent — what keeps Sotto
+off somebody's sentence is `pause.speaking`, not the threshold — and it is the
+right trade for the one thing Sotto says that the room is actually waiting for.
+And the window is narrower still than the table suggests: the fast path takes
+13–28 s from the question to a sourced packet, and the quiet left *after* that
+is 697–968 ms (`--speak` prints it per readiness offset), which is why 1,000
+would have failed in practice as well as on the rule.
+
+**Where it lives:** `server/interject/policy.ts` (`SPEAK_PAUSE_MS`, `inPause`),
+`server/eval/ceiling.ts` (`speakReach`, `speakThresholdMs`, `SPEAK_MARGIN_MS`,
+`SPEAK_MOMENT_TYPES`), `scripts/eval-ceiling.ts` (`--speak`), PRD V3-004.

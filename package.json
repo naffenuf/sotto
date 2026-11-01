@@ -35,6 +35,7 @@
     "verify:hello": "node scripts/verify-hello.mjs",
     "verify:judgment": "node scripts/verify-judgment.mjs",
     "verify:research": "node scripts/verify-research.mjs",
+    "verify:speak": "node scripts/verify-speak.mjs",
     "verify:briefing": "node scripts/verify-briefing.mjs",
     "verify:digest": "node scripts/verify-digest.mjs"
   },

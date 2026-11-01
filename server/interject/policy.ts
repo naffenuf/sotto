@@ -69,6 +69,33 @@ import type { PauseState } from "../../shared/turns.js";
  */
 export const PAUSE_MS = 700;
 
+/**
+ * How long the room must really have been quiet before Sotto will *speak* the
+ * answer to something the group wondered aloud (PRD V3-004).
+ *
+ * Measured rather than guessed, with `npm run eval:ceiling -- --speak`: the
+ * largest threshold that leaves every planted open question a pause inside its
+ * own window with {@link SPEAK_MARGIN_MS} to spare. Over the three
+ * `research_hook` moments of `offsite-plan` and `research-business-idea` the
+ * longest real quiet in a window is 1,340, 1,725 and 968 ms, so the binding
+ * one is `competitor-gaps` at 968 and the answer is 468 — 450 as a round
+ * number, with margins of 890, 1,275 and 518 ms. `tasks/decisions.md` records
+ * the run.
+ *
+ * Two things are worth knowing about that number. The PRD expected something
+ * near 1,000 ms, from the 930–1,610 ms of quiet US-023 measured inside the
+ * *interjection* windows; the open-question windows are narrower in their
+ * quietest stretch, and 1,000 would have cost `competitor-gaps` its window
+ * outright. And 450 is *below* the floor the endpointer correction puts on
+ * corrected silence — `silentForMs` reads {@link ENDPOINTER_HANGOVER_MS}
+ * (650 ms) the instant a turn closes — so in practice this threshold means
+ * "the first moment the transcription says nobody is talking". That is the
+ * point: an answer the room is still waiting for has a window measured in
+ * seconds, and it is `pause.speaking` rather than the threshold that keeps
+ * Sotto off somebody's sentence.
+ */
+export const SPEAK_PAUSE_MS = 450;
+
 /** How long a candidate may wait for a pause before it is no longer about now. */
 export const STALE_MS = 90_000;
 
@@ -199,9 +226,17 @@ export function levelFor(score: number, thresholds: BoldnessThresholds): Candida
   return "silent";
 }
 
-/** Whether this is a moment Sotto may speak into. */
-export function inPause(pause: PauseState): boolean {
-  return !pause.speaking && pause.silentForMs >= PAUSE_MS;
+/**
+ * Whether this is a moment Sotto may speak into.
+ *
+ * `pauseMs` defaults to {@link PAUSE_MS}, which is the threshold everything
+ * Sotto *shows* unasked waits for. V3-004 passes {@link SPEAK_PAUSE_MS}
+ * instead: an answer the room asked for has a window measured in seconds, so
+ * it takes the first gap the transcription reports rather than the comfortable
+ * one. Nobody talking is required either way.
+ */
+export function inPause(pause: PauseState, pauseMs: number = PAUSE_MS): boolean {
+  return !pause.speaking && pause.silentForMs >= pauseMs;
 }
 
 /**

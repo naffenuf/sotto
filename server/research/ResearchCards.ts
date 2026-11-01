@@ -101,6 +101,15 @@ export class ResearchCards {
   private readonly questionCards = new Map<string, { cardId: string; askedAtMs: number }>();
   /** Packets whose card is on the stage, so a second one is not a surprise. */
   private readonly delivered = new Set<string>();
+  /**
+   * The card each packet is on, by packet id (V3-004).
+   *
+   * Written down rather than derived, because a packet answering a question
+   * the room wondered aloud fills in the *question's* card
+   * ({@link researchQuestionCardId}) rather than taking one of its own, so
+   * {@link annotate} cannot work the id out from the packet.
+   */
+  private readonly cardIds = new Map<string, { cardId: string; atMs: number }>();
   /** When each card went up, oldest first: the cooldown and the window. */
   private readonly shownAtMs: number[] = [];
   private cancelTimer: (() => void) | undefined;
@@ -319,10 +328,30 @@ export class ResearchCards {
           already ? "brought forward" : "shown now, because they asked for it"
         }: ${packet.title}`,
       );
+      this.cardIds.set(packet.id, { cardId: researchCardId(packet.id), atMs: nowMs });
       this.onDeliver({ ...cardForPacket(packet, nowMs), forward: true }, packet);
     }
     // The queue may have lost the packet a timer was armed for.
     this.review();
+  }
+
+  /**
+   * Somebody in the room answered the question before Sotto could say what it
+   * found (V3-004), so the card carries the verdict instead.
+   *
+   * The card is already on the stage and keeps its place and its collapsed
+   * state — `forward` is deliberately not set, because nothing was asked for
+   * and nothing is being read out. It spends no slot and starts no cooldown
+   * for the same reason: this is the card it already was, with one more line.
+   */
+  annotate(packet: ResearchPacket, note: string): void {
+    const shown = this.cardIds.get(packet.id);
+    if (this.stopped || shown === undefined) return;
+    this.logger.log(`[research] ${shown.cardId}: ${note}`);
+    this.onDeliver(
+      { ...cardForPacket(packet, shown.atMs), id: shown.cardId, note },
+      packet,
+    );
   }
 
   /** No more cards. Idempotent. */
@@ -387,6 +416,7 @@ export class ResearchCards {
     this.logger.log(
       `[research] ${asked.cardId} filled in after ${nowMs - asked.askedAtMs} ms: ${packet.title}`,
     );
+    this.cardIds.set(packet.id, { cardId: asked.cardId, atMs: nowMs });
     this.onDeliver({ ...cardForPacket(packet, nowMs), id: asked.cardId }, packet);
   }
 
@@ -395,6 +425,7 @@ export class ResearchCards {
     this.shownAtMs.push(nowMs);
     this.delivered.add(packet.id);
     const card = cardForPacket(packet, nowMs);
+    this.cardIds.set(packet.id, { cardId: card.id, atMs: nowMs });
     this.onRecord({
       kind: "card",
       atMs: nowMs,

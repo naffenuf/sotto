@@ -7,6 +7,19 @@
  *
  *     the search came back with nothing -> next gap -> "Nothing solid on the
  *                                                      drive time, sorry."
+ *     the search came back with an answer -> real pause -> "On the drive time:
+ *                                                      about two hours fifteen."
+ *
+ * The third line is V3-004 and it is the one the whole fast path is for: a
+ * sourced one- or two-sentence answer, said to the room at a real pause while
+ * the question is still what the room is thinking about. It differs from the
+ * claim in four ways, all of them because it is worth more and arrives later:
+ * it waits for {@link SPEAK_PAUSE_MS} rather than the policy's gap, it expires
+ * on {@link ANSWER_STALE_MS} or {@link ANSWER_STALE_TURNS} rather than on a
+ * five-second window, it is retried once after a human voice cuts it off, and
+ * it is not said at all unless the cached still-current verdict says the room
+ * still wants it. It spends nothing when the claim already did: the claim and
+ * its answer are one contribution.
  *
  * The point is social rather than technical: somebody wonders something
  * aloud, and a colleague who is about to look it up says so, which is what
@@ -40,13 +53,14 @@
  * into the transcript, and the claim is over. Being talked over while saying
  * "I'll check that" is the room telling Sotto it has the floor back.
  */
-import { sottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
-import { RESEARCH_NO_ANSWER, type ResearchIdea } from "../../shared/research.js";
+import { isSottoTurn, sottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
+import { RESEARCH_NO_ANSWER, type ResearchIdea, type ResearchPacket } from "../../shared/research.js";
 import type { PolicySettings } from "../../shared/policy.js";
 import type { Clock } from "../clock.js";
-import { PAUSE_MS, inPause } from "../interject/policy.js";
+import { PAUSE_MS, SPEAK_PAUSE_MS, inPause } from "../interject/policy.js";
 import type { SpendVerdict } from "../interject/policy.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
+import type { StillCurrentState } from "./StillCurrentWatcher.js";
 
 type Logger = Pick<Console, "log" | "warn">;
 
@@ -64,8 +78,30 @@ export const RESERVE_WINDOW_MS = 5_000;
 /** The label a reservation's speech is tracked under on the clock. */
 export const RESERVE_TRACK_LABEL = "reserve";
 
-/** The kinds of unprompted line this module says; V3-004 adds the answer. */
-export const spokenContributionKinds = ["reserve", "no_answer"] as const;
+/**
+ * How long a sourced answer is still worth saying out loud (PRD V3-004).
+ *
+ * Ninety seconds from the packet being ready, the same number the policy's
+ * {@link STALE_MS} gives a candidate — and for the same reason: after that it
+ * is Sotto raising a topic rather than answering one. The card stays either
+ * way, so nothing is lost but the sentence.
+ */
+export const ANSWER_STALE_MS = 90_000;
+
+/** And the faster of the two: six more final turns is a different subject. */
+export const ANSWER_STALE_TURNS = 6;
+
+/**
+ * How many times a human voice may cut an answer off before it gives up.
+ *
+ * Twice. The first is somebody who happened to start talking at the same
+ * instant, which a different pause fixes; the second is the room telling Sotto
+ * it does not want to hear this, and the card is the only sign from there.
+ */
+export const MAX_ANSWER_YIELDS = 2;
+
+/** The kinds of unprompted line this module says. */
+export const spokenContributionKinds = ["reserve", "no_answer", "answer"] as const;
 export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
 
 /**
@@ -75,7 +111,13 @@ export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
  * - `cooldown` / `budget`: the frequency setting's, spent on something else.
  * - `no_gap`: nobody stopped talking inside {@link RESERVE_WINDOW_MS}.
  * - `unheard`: muted, or no page attached to play it — the card is the sign.
- * - `moved_on`: the closing line only; the room is somewhere else now.
+ * - `moved_on`: the room is somewhere else now, so the card is the only sign.
+ * - `answered`: somebody present answered the question and the search agrees,
+ *   so the card says `confirmed` and nothing is said (V3-004).
+ * - `disagrees`: somebody present answered it and the search does not agree.
+ *   The correction belongs on the screen, where it can be read twice.
+ * - `expired`: ninety seconds or six final turns went by without a pause.
+ * - `yielded`: cut off by a voice in the room twice (V3-004).
  * - `overtaken`: the search came back with nothing before the claim could be
  *   made, so there is nothing left to claim.
  * - `session_ended`: still waiting for a gap when the conversation stopped.
@@ -87,6 +129,10 @@ export const reserveSkipReasons = [
   "no_gap",
   "unheard",
   "moved_on",
+  "answered",
+  "disagrees",
+  "expired",
+  "yielded",
   "overtaken",
   "session_ended",
 ] as const;
@@ -111,11 +157,23 @@ export interface SpokenContributionRecord {
   text: string;
   /**
    * The question turn going final to the first audio of this line, on the
-   * session clock. Only on a line that was really said.
+   * session clock. Only on a claim or a closing line that was really said.
    */
   questionToReserveMs?: number;
+  /** The same for an answer (V3-004): wondering aloud to hearing it back. */
+  questionToSpeechMs?: number;
+  /** How long this line waited for a pause to be said in (V3-004). */
+  pauseWaitMs?: number;
+  /** The cached verdict the decision to speak was made on (V3-004). */
+  stillCurrent?: StillCurrentState;
   /** True when a human voice cut it off (V3-004's rule). */
   yielded?: boolean;
+  /** How many times a voice in the room has cut this line off (V3-004). */
+  yields?: number;
+  /** True when it was the barge-in that cancelled it (V2-007 on top). */
+  bargedIn?: boolean;
+  /** True on an answer that was cut off and will be tried again (V3-004). */
+  retrying?: boolean;
   /** What the room actually heard, when that is less than {@link text}. */
   heard?: string;
   /** Why nothing was said, when nothing was. */
@@ -153,16 +211,46 @@ export interface ReservationsOptions {
    */
   answering?: () => boolean;
   /**
-   * Whether the room is still on the question (V3-004's seam).
+   * The cached verdict about whether the room still wants this answer
+   * (V3-004), read off {@link StillCurrentWatcher}.
    *
-   * Read when the closing line is about to be said, which is the only place
-   * V3-015 needs it: a group that moved on three turns ago does not want
-   * "nothing solid on the drive time". Absent, every question is current,
-   * which is what it is until V3-004's check exists.
+   * Read synchronously, in the instant between noticing a pause and opening
+   * an utterance, which is why it is a cache and not a call: the PRD's "no
+   * model call between pause detected and first audio". Absent, or
+   * `undefined` for a question nobody is watching, means current — a missing
+   * verdict must cost judgment rather than speech.
    */
-  isCurrent?: (ideaId: string) => boolean;
+  stillCurrent?: (ideaId: string) => StillCurrentState | undefined;
+  /**
+   * Somebody in the room answered the question themselves (V3-004).
+   *
+   * The answer is not said; the card says so instead — `confirmed` when the
+   * search agrees with them, and the correction on screen when it does not.
+   */
+  onAnswered?: (ideaId: string, state: StillCurrentState) => void;
   windowMs?: number;
   logger?: Logger;
+}
+
+/** One question the room wondered aloud, as the lines about it are built from. */
+export interface Asked {
+  /** The turn it was heard in. */
+  turnId: string;
+  /** Three to five words naming it, which every line is written from. */
+  topic: string;
+  /** The question itself, which the still-current check is made against. */
+  question: string;
+  /** Session clock when the turn went final; every latency counts from here. */
+  askedAtMs: number;
+}
+
+/** When a line waiting for a gap stops being worth saying. */
+interface Expiry {
+  afterMs: number;
+  /** Final turns since it started waiting; the faster of the two wins. */
+  afterTurns?: number;
+  /** What the log calls it, which is not the same thing for all three kinds. */
+  reason: ReserveSkipReason;
 }
 
 /** One line waiting for a gap to be said in. */
@@ -176,11 +264,18 @@ interface Pending {
   askedAtMs: number;
   /**
    * When this line started waiting. For a reservation that is the
-   * classifier's verdict, and {@link RESERVE_WINDOW_MS} runs from here.
+   * classifier's verdict, and {@link RESERVE_WINDOW_MS} runs from here; for an
+   * answer it is the packet being ready.
    */
   sinceMs: number;
-  /** Whether it is given up on once the window has passed. */
-  expires: boolean;
+  /** How quiet the room has to be before this line is said. */
+  pauseMs: number;
+  /** When it is given up on, or `null` for a line that waits as long as it takes. */
+  expiry: Expiry | null;
+  /** Final turns gone by since {@link sinceMs}. */
+  turnsWaited: number;
+  /** How many times a voice in the room has cut this line off. */
+  yields: number;
 }
 
 export class Reservations {
@@ -189,8 +284,20 @@ export class Reservations {
   private readonly windowMs: number;
   /** Lines waiting for a gap, oldest first. */
   private waiting: Pending[] = [];
+  /** Every open question this session has heard, by idea id (V3-004). */
+  private readonly questions = new Map<string, Asked>();
   /** Questions whose claim the room actually heard, by idea id. */
   private readonly claimed = new Map<string, Pending>();
+  /**
+   * Questions whose claim really spent the frequency's allowance.
+   *
+   * The claim and its answer are one contribution (V3-015's rule), so an
+   * answer behind a claim the room heard charges nothing. A claim that was
+   * never said — muted, no gap — spent nothing, so its answer pays.
+   */
+  private readonly spent = new Set<string>();
+  /** Answers already handed over, so a packet pushed twice says one thing. */
+  private readonly answered = new Set<string>();
   /** The utterance a human voice would cancel, while there is one. */
   private utterance: VoiceUtterance | undefined;
   /**
@@ -202,6 +309,8 @@ export class Reservations {
   private opening = false;
   /** Set by {@link yieldToHuman}, so a stop is never mistaken for a yield. */
   private yielded = false;
+  /** Set by {@link interrupt}: the yield was the barge-in's (V2-007). */
+  private bargedIn = false;
   /** Everything being said, in order; `flush` waits on it. */
   private speaking: Promise<void> = Promise.resolve();
   private cancelTimer: (() => void) | undefined;
@@ -219,19 +328,113 @@ export class Reservations {
    */
   claim(idea: ResearchIdea, asked: { turnId: string; topic: string; askedAtMs: number }): void {
     if (this.stopped) return;
-    const topic = asked.topic.trim() === "" ? idea.topic : asked.topic;
+    const question = this.noteQuestion(idea, asked);
+    if (question === null) return;
     this.waiting.push({
-      kind: "reserve",
-      ideaId: idea.id,
-      turnId: asked.turnId,
-      topic,
-      text: reserveLine(topic),
-      askedAtMs: asked.askedAtMs,
-      sinceMs: this.clock.now(),
-      expires: true,
+      ...this.line(idea.id, question, "reserve", reserveLine(question.topic)),
+      pauseMs: PAUSE_MS,
+      expiry: { afterMs: this.windowMs, reason: "no_gap" },
     });
     this.review();
   }
+
+  /**
+   * Remembers an open question without claiming it out loud (V3-004).
+   *
+   * What {@link answer} needs is the question's own words and the moment it
+   * was asked, and those arrive at the classifier's verdict rather than with
+   * the packet twenty seconds later. {@link claim} registers it on the way
+   * past; a question whose answer Sotto already had (V3-003's `reused`) is
+   * registered here, because there is nothing to claim but there is still
+   * something to say.
+   */
+  noteQuestion(
+    idea: ResearchIdea,
+    asked: { turnId: string; topic: string; askedAtMs: number },
+  ): Asked | null {
+    if (this.stopped) return null;
+    const existing = this.questions.get(idea.id);
+    if (existing !== undefined) return existing;
+    const question: Asked = {
+      turnId: asked.turnId,
+      topic: asked.topic.trim() === "" ? idea.topic : asked.topic,
+      question: idea.question,
+      askedAtMs: asked.askedAtMs,
+    };
+    this.questions.set(idea.id, question);
+    return question;
+  }
+
+  /** The open question behind one idea, for the still-current check (V3-004). */
+  questionFor(ideaId: string): Asked | null {
+    return this.questions.get(ideaId) ?? null;
+  }
+
+  /**
+   * A sourced answer to one of the room's own questions is ready (V3-004):
+   * say it at the next real pause.
+   *
+   * Does nothing for a packet nobody asked for out loud — the planner's and
+   * the observer's ideas are research cards and have always been (V2-014) —
+   * and nothing for a packet whose model left the spoken line blank, which is
+   * the one field of a packet written to be heard rather than read.
+   */
+  answer(packet: ResearchPacket): void {
+    if (this.stopped || this.answered.has(packet.ideaId)) return;
+    const question = this.questions.get(packet.ideaId);
+    const spoken = packet.spokenAnswer?.trim() ?? "";
+    if (question === undefined || spoken === "") return;
+    this.answered.add(packet.ideaId);
+    this.waiting.push({
+      ...this.line(packet.ideaId, question, "answer", answerLine(question.topic, spoken)),
+      pauseMs: SPEAK_PAUSE_MS,
+      expiry: {
+        afterMs: ANSWER_STALE_MS,
+        afterTurns: ANSWER_STALE_TURNS,
+        reason: "expired",
+      },
+    });
+    this.review();
+  }
+
+  /** One line about one question, waiting from now, with nothing yet decided. */
+  private line(
+    ideaId: string,
+    question: Asked,
+    kind: SpokenContributionKind,
+    text: string,
+  ): Pending {
+    return {
+      kind,
+      ideaId,
+      turnId: question.turnId,
+      topic: question.topic,
+      text,
+      askedAtMs: question.askedAtMs,
+      sinceMs: this.clock.now(),
+      pauseMs: PAUSE_MS,
+      expiry: null,
+      turnsWaited: 0,
+      yields: 0,
+    };
+  }
+
+  /**
+   * Whether saying this line spends the frequency's cooldown and allowance
+   * (V2-017).
+   *
+   * A claim asks for the floor, so it pays. The closing line and the answer
+   * are the *completion* of a claim the room heard, so they pay only when no
+   * claim was ever made — muted, or no gap inside the window. Read at the
+   * moment of speaking rather than when the line was queued, because the
+   * claim may have been said in between.
+   */
+  private charges(line: Pending): boolean {
+    if (line.kind === "reserve") return true;
+    if (line.kind === "no_answer") return false;
+    return !this.spent.has(line.ideaId);
+  }
+
 
   /**
    * The search behind a claim came back with nothing showable (V3-003).
@@ -264,7 +467,9 @@ export class Reservations {
       kind: "no_answer",
       text: noAnswerLine(claim.topic),
       sinceMs: this.clock.now(),
-      expires: false,
+      turnsWaited: 0,
+      pauseMs: PAUSE_MS,
+      expiry: null,
     });
     this.review();
   }
@@ -283,7 +488,15 @@ export class Reservations {
    * Takes one turn snapshot. Every snapshot counts, partials included: a
    * `speechEnd` arrives as a partial and it is the one that opens a pause.
    */
-  acceptTurn(_turn: TurnUpdate): void {
+  acceptTurn(turn: TurnUpdate): void {
+    // A final turn is also one of the six an answer may wait through
+    // (V3-004). Sotto's own line is not one of them: it is in the transcript
+    // (V2-008a) but it is not the room moving on.
+    if (turn.final && !isSottoTurn(turn)) {
+      for (const line of this.waiting) {
+        if (line.turnId !== turn.turnId) line.turnsWaited += 1;
+      }
+    }
     this.review();
   }
 
@@ -310,6 +523,20 @@ export class Reservations {
     this.utterance?.cancel();
   }
 
+  /**
+   * The barge-in cancelled it (V2-007, which still applies on top of V3-004).
+   *
+   * In practice the first human partial has already yielded by the time the
+   * barge-in has classified anything, so this mostly records *which* rule did
+   * it. It is still the cancellation for an utterance opened in the
+   * milliseconds between the two.
+   */
+  interrupt(): void {
+    if (!this.opening) return;
+    this.bargedIn = true;
+    this.yieldToHuman();
+  }
+
   /** Resolves once everything being said has been said and written down. */
   async flush(): Promise<void> {
     await this.speaking;
@@ -334,16 +561,34 @@ export class Reservations {
     if (this.stopped || this.waiting.length === 0) return;
     const nowMs = this.clock.now();
     const pause = this.options.pauseState();
-    // One line at a time: two utterances would be one utterance, since
-    // opening the second stops the first.
-    const gap = inPause(pause) && this.options.answering?.() !== true;
+    const free = this.options.answering?.() !== true;
     const keep: Pending[] = [];
+    // One line at a time: two utterances would be one utterance, since
+    // opening the second stops the first. Deliberately *not* in strict queue
+    // order — a claim whose gap has not come must not hold up an answer whose
+    // has, since the two wait on different thresholds and for different
+    // lengths of time.
+    let said = false;
+    // An answer waits behind the claim on its own question, however much
+    // sooner its own gap arrives: "On the drive time: …" ahead of "I'll check
+    // the drive time" would be nonsense, and the claim's window is five
+    // seconds at the most. (In a `max` replay this is every time — simulated
+    // time stands still inside a tracked model call, so a twenty-second search
+    // comes back before a seven-hundred-millisecond pause timer fires.)
+    const claiming = new Set(
+      this.waiting.filter((line) => line.kind === "reserve").map((line) => line.ideaId),
+    );
     for (const line of this.waiting) {
-      if (line.expires && nowMs - line.sinceMs >= this.windowMs) {
-        this.skip(line, "no_gap");
+      const expired = this.expiry(line, nowMs);
+      if (expired !== null) {
+        this.skip(line, expired);
         continue;
       }
-      if (!gap || keep.length > 0 || this.opening) {
+      if (said || this.opening || !free || !inPause(pause, line.pauseMs)) {
+        keep.push(line);
+        continue;
+      }
+      if (line.kind === "answer" && claiming.has(line.ideaId)) {
         keep.push(line);
         continue;
       }
@@ -353,9 +598,21 @@ export class Reservations {
         continue;
       }
       this.say(line, nowMs);
+      said = true;
     }
     this.waiting = keep;
     this.schedule(nowMs, pause);
+  }
+
+  /** Whether this line has waited too long, and what the log calls that. */
+  private expiry(line: Pending, nowMs: number): ReserveSkipReason | null {
+    const expiry = line.expiry;
+    if (expiry === null) return null;
+    if (nowMs - line.sinceMs >= expiry.afterMs) return expiry.reason;
+    if (expiry.afterTurns !== undefined && line.turnsWaited >= expiry.afterTurns) {
+      return expiry.reason;
+    }
+    return null;
   }
 
   /** Everything but the gap that can stop a line being said. */
@@ -363,10 +620,20 @@ export class Reservations {
     // A cautious session contributes on screen only, which is the same
     // promise {@link boldnessAllows} keeps for a candidate.
     if (this.options.settings().boldness === "cautious") return "boldness";
-    if (line.kind === "no_answer") {
-      return this.options.isCurrent?.(line.ideaId) === false ? "moved_on" : null;
+    // Whether the room still wants this (V3-004). Read, never asked for: the
+    // verdict is already cached, so nothing between here and the first audio
+    // waits on a model. Not asked about a claim: that lives inside a
+    // five-second window, and no room moves on inside five seconds.
+    const current = line.kind === "reserve" ? undefined : this.options.stillCurrent?.(line.ideaId);
+    if (current?.verdict === "moved_on") return "moved_on";
+    if (current?.verdict === "answered") {
+      // Somebody present answered it. The card carries the verdict either
+      // way: `confirmed` when the search agrees, the correction when it does
+      // not — read twice on a screen rather than argued with out loud.
+      if (line.kind === "answer") this.options.onAnswered?.(line.ideaId, current);
+      return current.agrees ? "answered" : "disagrees";
     }
-    // The closing line is the claim's completion, so only a claim is charged.
+    if (!this.charges(line)) return null;
     const spend = this.options.allowed();
     return spend === "ok" ? null : spend;
   }
@@ -375,6 +642,7 @@ export class Reservations {
   private say(line: Pending, nowMs: number): void {
     this.opening = true;
     this.yielded = false;
+    this.bargedIn = false;
     this.speaking = this.clock.track(
       RESERVE_TRACK_LABEL,
       this.speaking.then(() => this.speak(line, nowMs)),
@@ -408,12 +676,14 @@ export class Reservations {
     // this is where the line belongs on the conversation's timeline.
     const startMs = this.options.streamNow();
     utterance.append(line.text);
-    if (line.kind === "reserve") {
-      // The claim has been made, so this is the contribution (V2-017). The
-      // answer that follows it is its completion, not a second one.
+    if (this.charges(line)) {
+      // Asking for the floor is the contribution (V2-017), and the spend is
+      // taken where the words are really handed over: a claim nobody could
+      // hear spends nothing. A claim already charged for pays for its answer.
       this.options.noteContribution();
-      this.claimed.set(line.ideaId, line);
+      if (line.kind === "reserve") this.spent.add(line.ideaId);
     }
+    if (line.kind === "reserve") this.claimed.set(line.ideaId, line);
     this.logger.log(`[reserve] ${line.kind}: ${line.text}`);
     let spoken: VoiceSpoken | undefined;
     try {
@@ -424,7 +694,15 @@ export class Reservations {
     this.utterance = undefined;
     this.opening = false;
     const yielded = this.yielded;
+    const bargedIn = this.bargedIn;
     const heard = spoken === undefined ? "" : yielded ? spoken.spokenSoFar : spoken.text;
+    const yields = line.yields + (yielded ? 1 : 0);
+    const current = this.options.stillCurrent?.(line.ideaId);
+    // Cut off by a voice in the room, with a try left: the answer is still
+    // the answer, so it waits for another pause (V3-004). Twice is the room
+    // saying it does not want to hear this, and the card is then the only
+    // sign.
+    const retrying = yielded && line.kind === "answer" && yields < MAX_ANSWER_YIELDS;
     this.options.onRecord({
       stage: "spoken_contribution",
       kind: line.kind,
@@ -434,21 +712,38 @@ export class Reservations {
       topic: line.topic,
       spoken: true,
       text: line.text,
-      questionToReserveMs: decidedAtMs - line.askedAtMs,
+      ...(line.kind === "answer"
+        ? {
+            questionToSpeechMs: decidedAtMs - line.askedAtMs,
+            pauseWaitMs: decidedAtMs - line.sinceMs,
+            ...(current === undefined ? {} : { stillCurrent: current }),
+          }
+        : { questionToReserveMs: decidedAtMs - line.askedAtMs }),
       yielded,
+      ...(yields === 0 ? {} : { yields }),
+      ...(bargedIn ? { bargedIn } : {}),
+      ...(retrying ? { retrying } : {}),
       ...(heard === line.text ? {} : { heard }),
     });
+    if (retrying) {
+      this.waiting.unshift({ ...line, yields });
+    } else if (yielded && line.kind === "answer") {
+      this.skip({ ...line, yields }, "yielded");
+    }
     // Cut off before the page reported anything: nobody can say what was
     // heard, so the transcript stays short rather than claiming a line.
-    if (heard.trim() === "") return;
-    this.options.onSpoken(
-      sottoTurn({
-        utteranceId: reserveUtteranceId(line.kind, line.ideaId),
-        text: heard,
-        startMs,
-        interrupted: yielded,
-      }),
-    );
+    if (heard.trim() !== "") {
+      this.options.onSpoken(
+        sottoTurn({
+          // A retry is its own row: the first attempt is what the room heard
+          // of it, and replacing that would lose it.
+          utteranceId: reserveUtteranceId(line.kind, line.ideaId, line.yields),
+          text: heard,
+          startMs,
+          interrupted: yielded,
+        }),
+      );
+    }
     // The gap this took is over, and the next line may now be sayable.
     this.review();
   }
@@ -456,15 +751,18 @@ export class Reservations {
   /** Writes down a line that was never said, and why. */
   private skip(line: Pending, reason: ReserveSkipReason): void {
     this.logger.log(`[reserve] ${line.kind} not said (${reason}): ${line.text}`);
+    const nowMs = this.clock.now();
     this.options.onRecord({
       stage: "spoken_contribution",
       kind: line.kind,
-      atMs: this.clock.now(),
+      atMs: nowMs,
       ideaId: line.ideaId,
       turnId: line.turnId,
       topic: line.topic,
       spoken: false,
       text: line.text,
+      ...(line.kind === "answer" ? { pauseWaitMs: nowMs - line.sinceMs } : {}),
+      ...(line.yields === 0 ? {} : { yields: line.yields }),
       reason,
     });
   }
@@ -479,9 +777,13 @@ export class Reservations {
     this.disarm();
     if (this.waiting.length === 0) return;
     const due: number[] = [];
-    if (!pause.speaking && pause.silentForMs < PAUSE_MS) due.push(PAUSE_MS - pause.silentForMs);
     for (const line of this.waiting) {
-      if (line.expires) due.push(Math.max(1, line.sinceMs + this.windowMs - nowMs));
+      if (!pause.speaking && pause.silentForMs < line.pauseMs) {
+        due.push(line.pauseMs - pause.silentForMs);
+      }
+      if (line.expiry !== null) {
+        due.push(Math.max(1, line.sinceMs + line.expiry.afterMs - nowMs));
+      }
     }
     if (due.length === 0) return;
     this.cancelTimer = this.clock.setTimeout(() => {
@@ -496,9 +798,39 @@ export class Reservations {
   }
 }
 
-/** The utterance id a reservation's transcript line is derived from (V2-008a). */
-export function reserveUtteranceId(kind: SpokenContributionKind, ideaId: string): string {
-  return `${kind}-${ideaId}`;
+/**
+ * The utterance id a reservation's transcript line is derived from (V2-008a).
+ *
+ * `attempt` numbers a retry after a yield (V3-004), so the first attempt's row
+ * — what the room heard of it — is not replaced by the second's.
+ */
+export function reserveUtteranceId(
+  kind: SpokenContributionKind,
+  ideaId: string,
+  attempt = 0,
+): string {
+  return attempt === 0 ? `${kind}-${ideaId}` : `${kind}-${ideaId}-${attempt + 1}`;
+}
+
+/**
+ * "On the drive time: about two hours fifteen from the city." — the answer,
+ * addressed to the room (V3-004).
+ *
+ * Never by name. Diarization labels are remapped on every reconnect
+ * (`speakerMappingUncertain`), so "Craig, you asked about the drive time"
+ * risks telling the wrong person they asked something; naming nobody costs
+ * nothing. The topic goes first because the question was twenty seconds ago
+ * and the room needs to know which one this answers.
+ */
+export function answerLine(topic: string, spokenAnswer: string): string {
+  const answer = spokenAnswer.replace(/\s+/g, " ").trim();
+  if (answer === "") return "";
+  // Said rather than read, so it ends in a full stop even when the model's
+  // line did not: ElevenLabs reads punctuation as prosody, and a sentence
+  // that runs off the end is heard as one.
+  const said = /[.?!]$/.test(answer) ? answer : `${answer}.`;
+  const object = asObject(topic);
+  return object === "that" ? said : `On ${object}: ${said}`;
 }
 
 /** "I'll check the drive time." — the claim, from the classifier's topic. */
