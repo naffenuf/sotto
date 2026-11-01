@@ -58,7 +58,7 @@ import {
   type ReplaySpeed,
 } from "../asr/EventReplaySource.js";
 import { RealtimeTranscriptionClient } from "../asr/realtimeClient.js";
-import type { AudioSource } from "../audio/AudioSource.js";
+import { recordedSource, type AudioSource } from "../audio/AudioSource.js";
 import { MicSource } from "../audio/MicSource.js";
 import { WavReplaySource } from "../audio/WavReplaySource.js";
 import { AnswerAgent } from "../answer/AnswerAgent.js";
@@ -802,7 +802,9 @@ export class SessionManager {
     let audio: AudioSource;
     if (source.kind === "mic") {
       mic = new MicSource();
-      audio = mic;
+      // The room as the server hears it goes to `audio.wav` (V3-011), so a
+      // live session can be replayed, or kept as a take.
+      audio = recordedSource(mic, (chunk) => store.writer?.appendAudio?.(chunk));
     } else {
       try {
         audio = WavReplaySource.forFixture(source.fixture, this.liveClock);

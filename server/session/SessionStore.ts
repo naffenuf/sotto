@@ -25,6 +25,8 @@
  * guarded, and a file that fails is reported once and then written to in hope.
  */
 import { closeSync, existsSync, mkdirSync, openSync, renameSync, writeFileSync, writeSync } from "node:fs";
+import { AUDIO_SAMPLE_RATE } from "../../shared/audio.js";
+import { encodeWav } from "../audio/wav.js";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AsrFrameRecord } from "../../shared/asr.js";
@@ -43,6 +45,9 @@ type Logger = Pick<Console, "log" | "warn">;
 /** Where session folders go, unless a caller (or a test) says otherwise. */
 export const SESSIONS_DIR = fileURLToPath(new URL("../../sessions/", import.meta.url));
 
+/** The one shape audio takes on the server, as `audio.wav` is written. */
+const AUDIO_WAV_FORMAT = { channels: 1, sampleRate: AUDIO_SAMPLE_RATE, bitsPerSample: 16 } as const;
+
 /** Every file a session folder can hold, so each name is spelled once. */
 export const SESSION_FILES = {
   session: "session.json",
@@ -56,6 +61,8 @@ export const SESSION_FILES = {
   research: "research.jsonl",
   digest: "digest.md",
   timing: "timing.jsonl",
+  /** The room as the server heard it (V3-011): PCM16 mono 24 kHz, mic sessions only. */
+  audio: "audio.wav",
 } as const;
 
 /** What marks a line of Sotto's speech the room only heard part of (V2-008a). */
@@ -117,6 +124,13 @@ export interface SessionWriter {
   /** Diagnostic events on the pipeline clock. */
   appendTiming?(event: unknown): void;
   /**
+   * Appends raw PCM16 mono 24 kHz audio to `audio.wav` (V3-011): the room
+   * exactly as the server received it, after the browser's echo cancellation,
+   * so a live session is also a take. The RIFF header is completed by
+   * {@link SessionWriter.end}; until then the file reads as an empty WAV.
+   */
+  appendAudio?(chunk: Buffer): void;
+  /**
    * Writes an HTML artifact and returns its path relative to the folder, or
    * `null` if it could not be written (US-020).
    *
@@ -167,6 +181,8 @@ export class SessionStore implements SessionWriter {
   /** Files already reported as unwritable, so a bad disk is logged once each. */
   private readonly reported = new Set<string>();
   private ended = false;
+  /** Bytes of PCM written to `audio.wav` so far; its header is patched at the end. */
+  private audioBytes = 0;
 
   private constructor(
     dir: string,
@@ -324,12 +340,41 @@ export class SessionStore implements SessionWriter {
     return made && this.writeAtomic(relative, html) ? relative : null;
   }
 
+  appendAudio(chunk: Buffer): void {
+    if (this.ended) return;
+    const file = SESSION_FILES.audio;
+    this.guard(file, () => {
+      let fd = this.handles.get(file);
+      if (fd === undefined) {
+        fd = openSync(join(this.dir, file), "w");
+        this.handles.set(file, fd);
+        writeSync(fd, encodeWav(Buffer.alloc(0), AUDIO_WAV_FORMAT));
+      }
+      writeSync(fd, chunk);
+      this.audioBytes += chunk.length;
+    });
+  }
+
   end(): void {
     if (this.ended) return;
     this.ended = true;
     this.record.endedAt = this.now().toISOString();
     this.writeSession();
+    this.finishAudio();
     for (const file of [...this.handles.keys()]) this.closeHandle(file);
+  }
+
+  /** Writes the real sizes into the RIFF header, now that the length is known. */
+  private finishAudio(): void {
+    const file = SESSION_FILES.audio;
+    const fd = this.handles.get(file);
+    if (fd === undefined) return;
+    this.guard(file, () => {
+      const header = encodeWav(Buffer.alloc(0), AUDIO_WAV_FORMAT);
+      header.writeUInt32LE(36 + this.audioBytes, 4);
+      header.writeUInt32LE(this.audioBytes, 40);
+      writeSync(fd, header, 0, header.length, 0);
+    });
   }
 
   /** The `**[mm:ss] Name-or-label:** text` line for one final turn. */

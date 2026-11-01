@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AUDIO_CHUNK_BYTES, type AudioEndReason, type AudioSink } from "./AudioSource.js";
+import { AUDIO_CHUNK_BYTES, recordedSource, type AudioEndReason, type AudioSink } from "./AudioSource.js";
 import { MIC_BUFFER_LIMIT_BYTES, MicSource } from "./MicSource.js";
 
 /** Collects what a source produces, as the transcription client would. */
@@ -112,5 +112,32 @@ describe("MicSource", () => {
     const mic = new MicSource();
     mic.start(collector());
     expect(() => mic.start(collector())).toThrow(/already running/);
+  });
+});
+
+describe("recordedSource", () => {
+  it("hands every chunk to the recorder and the sink alike, padding included", () => {
+    const mic = new MicSource();
+    const recorded: Buffer[] = [];
+    const source = recordedSource(mic, (chunk) => recorded.push(Buffer.from(chunk)));
+    const sink = collector();
+    source.start(sink);
+    mic.attach();
+    mic.write(audio(AUDIO_CHUNK_BYTES + 100));
+    mic.endInput();
+    expect(sink.chunks.length).toBe(2);
+    expect(recorded.length).toBe(2);
+    expect(Buffer.concat(recorded).equals(Buffer.concat(sink.chunks))).toBe(true);
+    expect(recorded[1]?.length).toBe(AUDIO_CHUNK_BYTES);
+    expect(sink.ended).toBe("complete");
+  });
+
+  it("stops the source it wraps", () => {
+    const mic = new MicSource();
+    const source = recordedSource(mic, () => undefined);
+    const sink = collector();
+    source.start(sink);
+    source.stop();
+    expect(sink.ended).toBe("stopped");
   });
 });

@@ -37,3 +37,33 @@ export interface AudioSource {
   /** Stops early. Idempotent; ends the sink with `"stopped"` if it was running. */
   stop(): void;
 }
+
+/**
+ * A source whose every chunk is also handed to `record` on its way to the
+ * sink (V3-011): how a live session's audio reaches the session folder
+ * without the transcription client knowing. The recorder sees exactly what
+ * the sink sees, including the zero-padded last chunk, so a recording is
+ * sample-for-sample what was transcribed.
+ */
+export function recordedSource(
+  inner: AudioSource,
+  record: (chunk: Buffer) => void,
+): AudioSource {
+  return {
+    sampleRate: inner.sampleRate,
+    start(sink: AudioSink): void {
+      inner.start({
+        onChunk(chunk: Buffer): void {
+          record(chunk);
+          sink.onChunk(chunk);
+        },
+        onEnd(reason: AudioEndReason): void {
+          sink.onEnd(reason);
+        },
+      });
+    },
+    stop(): void {
+      inner.stop();
+    },
+  };
+}

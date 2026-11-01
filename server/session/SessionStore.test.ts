@@ -1,4 +1,5 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { parseWav } from "../audio/wav.js";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -371,5 +372,37 @@ describe("SessionStore durability", () => {
     const root = join(tempRoot(), "nested", "sessions");
     expect(store({ root }).dir).toContain("nested");
     mkdirSync(root, { recursive: true });
+  });
+});
+
+describe("SessionStore audio.wav", () => {
+  it("writes the chunks it is handed as one PCM16 mono 24 kHz WAV, sized at the end", () => {
+    const saved = store();
+    const first = Buffer.alloc(3840, 1);
+    const second = Buffer.alloc(3840, 2);
+    saved.appendAudio(first);
+    saved.appendAudio(second);
+    // Until the end the header says "empty": a reader that opens it mid-session sees a WAV.
+    const open = parseWav(readFileSync(join(saved.dir, SESSION_FILES.audio)));
+    expect(open.data.length).toBe(0);
+    saved.end();
+    const wav = parseWav(readFileSync(join(saved.dir, SESSION_FILES.audio)));
+    expect([wav.channels, wav.sampleRate, wav.bitsPerSample]).toEqual([1, 24_000, 16]);
+    expect(wav.data.equals(Buffer.concat([first, second]))).toBe(true);
+  });
+
+  it("writes no audio.wav for a session that was never handed audio", () => {
+    const saved = store();
+    saved.end();
+    expect(existsSync(join(saved.dir, SESSION_FILES.audio))).toBe(false);
+  });
+
+  it("ignores audio that arrives after the end", () => {
+    const saved = store();
+    saved.appendAudio(Buffer.alloc(3840, 1));
+    saved.end();
+    saved.appendAudio(Buffer.alloc(3840, 2));
+    const wav = parseWav(readFileSync(join(saved.dir, SESSION_FILES.audio)));
+    expect(wav.data.length).toBe(3840);
   });
 });
