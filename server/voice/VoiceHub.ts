@@ -183,6 +183,7 @@ export class VoiceHub implements VoiceOut {
         else speaker.cancel();
       },
       firstAudioMs: (): number | null => speaker.firstAudioMs,
+      audioMs: (): number => speaker.audioMs,
       // One `.then`, not an `await`: the `end` frame has to reach the page in
       // the same microtask the synthesis finished in, or a report racing it
       // arrives before the hub knows every character was sent.

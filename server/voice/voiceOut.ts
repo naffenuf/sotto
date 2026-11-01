@@ -48,6 +48,16 @@ export interface VoiceUtterance {
    * is wanted long before the utterance is over.
    */
   firstAudioMs(): number | null;
+  /**
+   * Milliseconds of speech synthesized so far (V2-008c).
+   *
+   * Everything appended to one utterance is heard in the order it was handed
+   * over, so this also says *where* the next piece will be heard: an answer
+   * that opened with a holding line reaches its searched continuation at the
+   * utterance's first audio plus this. Optional, because a voice that only
+   * records the text has no audio to measure.
+   */
+  audioMs?(): number;
   /** Stops now and throws away what has not been heard. */
   cancel(): void;
 }
@@ -96,6 +106,7 @@ export function nullSinkVoice(create: () => Speaker): VoiceOut {
         append: (text) => speaker.append(text),
         cancel: () => speaker.cancel(),
         firstAudioMs: () => speaker.firstAudioMs,
+        audioMs: () => speaker.audioMs,
         finish: () =>
           speaker.finish().then((result) => {
             if (result.reason === "complete") speaker.notePlayedAll();

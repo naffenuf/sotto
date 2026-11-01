@@ -60,7 +60,8 @@ import { searchedIndex, resolveCitation } from "../interject/Verifier.js";
 import { citationTitle, type FunctionTool, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
-import { chooseAcknowledgment } from "./ack.js";
+import { chooseAcknowledgment, searchLikely } from "./ack.js";
+import { writeFirstLine } from "./firstLine.js";
 import { splitSentences } from "./sentences.js";
 import { SpokenAnswer, type SpokenResult } from "./SpokenAnswer.js";
 import { classifyCommand } from "./command.js";
@@ -102,6 +103,29 @@ export const ANSWER_MAX_TOKENS = 12_288;
  * finished answer is read from the response's last message either way.
  */
 export const ANSWER_ITEM_PREFIX = "msg_";
+
+/**
+ * How long the searched answer waits for the holding line before going out
+ * without it (V2-008c).
+ *
+ * The two calls run together, but the second one is worth a moment's head
+ * start: a continuation that was *told* what the room has already heard does
+ * not repeat it, and nothing else can tell it — the searched call is built
+ * once, long before the line it would have to be told about exists.
+ *
+ * Four seconds, from measurement rather than taste. Across four real
+ * `ask-search` runs the line reached the voice **1.9–3.3 s** after the
+ * question, and the line itself is about five seconds of speech — so a head
+ * start inside that is hidden behind speech the room is already listening to
+ * and costs the room nothing. 1.5 s and 3 s both expired just short of some of
+ * those and threw the context away for nothing. Four is also the PRD's target
+ * for the acknowledgment-to-first-sentence wait: a line slower than this has
+ * already missed its own point, so there is nothing to gain by waiting longer.
+ *
+ * On the **wall** clock, like every other number the room feels: a `max`-speed
+ * replay's session clock does not move while a model call is in flight.
+ */
+export const FIRST_LINE_CONTEXT_WAIT_MS = 4_000;
 
 /**
  * What the model is told `show_html` is for (US-020).
@@ -325,6 +349,8 @@ export class AnswerAgent {
       spokenText: "",
       ackMs: null,
       firstAudioMs: null,
+      firstLineMs: null,
+      continuationMs: null,
     };
     this.logger.log(`[answer] ${answer.id} ${answer.askedBy} asked: ${question}`);
     this.options.onTiming?.({ stage: "answer_queued", atMs: this.clock.now(), answerId: answer.id, turnId: asked.turnId });
@@ -399,6 +425,32 @@ export class AnswerAgent {
     // silence after somebody says Sotto's name reads as "it didn't hear me".
     if (!asked.resume) speech?.acknowledge(chooseAcknowledgment(answer.question));
 
+    // V2-008c: a searched answer leaves the room in silence for eight to
+    // thirteen seconds after the acknowledgment. A second, far cheaper call
+    // writes one orienting sentence from the conversation alone, said while
+    // the search is still running — and the searched answer is told what it
+    // was, so it carries straight on rather than starting again.
+    const holding = new AbortController();
+    /** The holding line, once it has really been taken by the voice. */
+    let firstLineText = "";
+    /** Whether the searched call was told about it; see {@link FIRST_LINE_CONTEXT_WAIT_MS}. */
+    let inContext = false;
+    /** Everything the room hears, which is the holding line and then the answer. */
+    const aloud = (): string =>
+      firstLineText === "" ? spokenText : `${firstLineText} ${spokenText}`;
+    const wantsFirstLine = this.wantsFirstLine(queued);
+    const firstLine = (wantsFirstLine ? this.holdingLine(queued, holding.signal) : noLine())
+      .then((line) => {
+        if (line === "" || speech?.sayFirstLine(line) !== true) return;
+        firstLineText = line;
+        spokeAtStreamMs ??= this.streamNow();
+        this.options.onTiming?.({
+          stage: "answer_first_line", atMs: this.clock.now(), answerId: answer.id,
+          turnId: asked.turnId, words: line.split(/\s+/).length,
+        });
+        this.push({ ...answer, spokenText: aloud(), latencyMs: this.elapsed(answer) });
+      });
+
     /** True once the whole spoken half has gone to the voice. */
     let said = false;
     /**
@@ -417,6 +469,9 @@ export class AnswerAgent {
         return false;
       }
       const rest = halves.spoken.slice(spokenText.length);
+      // The answer has written a sentence of its own: whatever the holding
+      // line was going to be, it is too late to be worth saying.
+      if (rest.trim() !== "") holding.abort();
       if (halves.spokenComplete) {
         said = true;
         spokenText = halves.spoken;
@@ -436,12 +491,18 @@ export class AnswerAgent {
     };
 
     try {
+      // A moment's head start, so the continuation can be told what the room
+      // has already heard. Bounded: a slow line never holds the answer up.
+      if (wantsFirstLine) await this.atMost(firstLine, FIRST_LINE_CONTEXT_WAIT_MS);
+      // Whether it got there in time, which is the one thing that decides
+      // whether the continuation can know not to say it again.
+      inContext = firstLineText !== "";
       const reply = await this.model.prose({
         label: ANSWER_TRACK_LABEL,
         system: loadPrompt(PROMPTS.answer),
-        user: this.render(answer, asked.resume === true),
+        user: this.render(answer, asked.resume === true, firstLineText),
         maxTokens: ANSWER_MAX_TOKENS,
-        functions: this.functions(answer, artifacts, () => pushedHeadline, () => spokenText),
+        functions: this.functions(answer, artifacts, () => pushedHeadline, aloud),
         onText: ({ itemId, text }) => {
           // Narration, not the answer: see ANSWER_ITEM_PREFIX.
           if (!itemId.startsWith(ANSWER_ITEM_PREFIX)) return;
@@ -457,7 +518,7 @@ export class AnswerAgent {
           this.push({
             ...answer,
             headline: pushedHeadline,
-            spokenText,
+            spokenText: aloud(),
             artifacts: [...artifacts],
             latencyMs: this.elapsed(answer),
           });
@@ -469,7 +530,7 @@ export class AnswerAgent {
       feed({ ...halves, spokenComplete: true });
       const text = halves.screen === "" ? screenFromSpoken(halves.spoken) : splitAnswer(halves.screen);
       const spoken = await speech?.done();
-      this.recordVoiceLatency(answer, queued, spoken);
+      this.recordVoiceLatency(answer, queued, spoken, inContext);
       const done: Answer = {
         ...answer,
         headline: text.headline,
@@ -478,10 +539,10 @@ export class AnswerAgent {
         artifacts: [...artifacts],
         status: "done",
         latencyMs: this.elapsed(answer),
-        spokenText,
+        spokenText: aloud(),
         ...voiceTimings(spoken),
       };
-      this.recordSpeech(answer, spoken, spokenText, spokeAtStreamMs);
+      this.recordSpeech(answer, spoken, aloud(), spokeAtStreamMs);
       this.finish(done, asked);
       this.logger.log(
         `[answer] ${done.id} answered in ${done.latencyMs} ms` +
@@ -498,7 +559,7 @@ export class AnswerAgent {
       // voice off mid-sentence would be the only audible sign of a failure
       // the card is about to explain anyway.
       const spoken = await speech?.done();
-      this.recordVoiceLatency(answer, queued, spoken);
+      this.recordVoiceLatency(answer, queued, spoken, inContext);
       const failed: Answer = {
         ...answer,
         // Whatever reached the stage stays there — including a diagram that
@@ -508,18 +569,79 @@ export class AnswerAgent {
         artifacts: [...artifacts],
         status: "error",
         latencyMs: this.elapsed(answer),
-        spokenText,
+        spokenText: aloud(),
         ...voiceTimings(spoken),
         error: detail,
       };
-      this.recordSpeech(answer, spoken, spokenText, spokeAtStreamMs);
+      this.recordSpeech(answer, spoken, aloud(), spokeAtStreamMs);
       this.logger.warn(`[answer] ${answer.id} failed: ${detail}`);
       this.failedSinceIdle = true;
       this.options.onModelState?.("error", detail);
       this.finish(failed, asked);
     } finally {
+      // Nothing may outlive the answer it belongs to: a `max`-speed replay
+      // tracks this whole method, and a line arriving after it would have
+      // nowhere to be said.
+      holding.abort();
+      await firstLine;
       if (this.activeSpeech === speech) this.activeSpeech = undefined;
     }
+  }
+
+  /**
+   * Whether this question gets a holding line (V2-008c).
+   *
+   * Only a question that looks like a search leaves a gap worth filling —
+   * "what did we decide" is answered from the board in a second or two. There
+   * is no point writing one with no voice configured, since nothing would say
+   * it, and a `continue` after a barge-in is already mid-sentence.
+   */
+  private wantsFirstLine(queued: Queued): boolean {
+    if (this.options.voice === undefined) return false;
+    if (queued.asked.resume === true) return false;
+    return searchLikely(queued.answer.question);
+  }
+
+  /** The holding line for one question, or `""`. Never rejects. */
+  private async holdingLine(queued: Queued, signal: AbortSignal): Promise<string> {
+    const { answer } = queued;
+    try {
+      const line = await writeFirstLine(
+        this.model,
+        renderFirstLineRequest(
+          this.options.board(),
+          recentTurns(this.options.transcript()),
+          this.options.speakers(),
+          answer,
+        ),
+        signal,
+      );
+      // Abandoned while it was being written: the answer is already talking.
+      return signal.aborted ? "" : line;
+    } catch (error) {
+      if (!signal.aborted) {
+        this.logger.warn(`[answer] ${answer.id} had no first line: ${message(error)}`);
+      }
+      return "";
+    }
+  }
+
+  /**
+   * Waits for `work`, but never longer than `ms` of real time.
+   *
+   * The timer is on the wall clock, never the session's: a tracked task may
+   * not await one of the session clock's timers, and this runs inside one.
+   */
+  private async atMost(work: Promise<unknown>, ms: number): Promise<void> {
+    let reached!: () => void;
+    const deadline = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    // Both, always: cancelling a timer is not resolving its promise.
+    const cancel = this.wallClock.setTimeout(() => reached(), ms);
+    await Promise.race([work.then(() => {}, () => {}), deadline]);
+    cancel();
+    reached();
   }
 
   /**
@@ -660,6 +782,8 @@ export class AnswerAgent {
     answer: Answer,
     queued: Queued,
     spoken: SpokenResult | undefined,
+    /** V2-008c: whether the searched call was told about the holding line. */
+    firstLineInContext: boolean,
   ): void {
     if (spoken === undefined) return;
     const heardAtMs = queued.asked.heardAtMs;
@@ -671,6 +795,13 @@ export class AnswerAgent {
     this.options.onTiming?.({
       stage: "answer_voice", atMs: this.clock.now(), answerId: answer.id,
       turnId: queued.asked.turnId, ackMs: spoken.ackMs, firstAudioMs: spoken.firstAudioMs,
+      firstLineMs: spoken.firstLineMs, continuationMs: spoken.continuationMs,
+      firstLineInContext,
+      // The PRD's V2-008c target, in the units it sets it in: the room waited
+      // this long after the acknowledgment for a real sentence.
+      ackToAnswerMs: spoken.ackMs === null || spoken.firstAudioMs === null
+        ? null
+        : spoken.firstAudioMs - spoken.ackMs,
       speechEndToAskMs: toAsk, speechEndToAckMs: from(spoken.ackMs),
       speechEndToAnswerMs: from(spoken.firstAudioMs),
     });
@@ -684,9 +815,11 @@ export class AnswerAgent {
   }
 
   /** The user message for one question. */
-  private render(answer: Answer, resume: boolean): string {
+  private render(answer: Answer, resume: boolean, firstLine: string): string {
     const turns = recentTurns(this.options.transcript());
-    const request = renderAnswerRequest(this.options.board(), turns, this.options.speakers(), answer);
+    const request = renderAnswerRequest(
+      this.options.board(), turns, this.options.speakers(), answer, firstLine,
+    );
     if (this.interrupted === undefined) return request;
     return `${request}\n\n## Your previous answer was cut off\n${JSON.stringify({
       question: this.interrupted.question,
@@ -738,12 +871,21 @@ export class AnswerAgent {
  * which is true but is already said by `firstAudioMs` being null.
  */
 function voiceTimings(spoken: SpokenResult | undefined): Partial<Answer> {
-  if (spoken === undefined) return { ackMs: null, firstAudioMs: null };
+  if (spoken === undefined) {
+    return { ackMs: null, firstAudioMs: null, firstLineMs: null, continuationMs: null };
+  }
   return {
     ackMs: spoken.ackMs,
     firstAudioMs: spoken.firstAudioMs,
+    firstLineMs: spoken.firstLineMs,
+    continuationMs: spoken.continuationMs,
     ...(spoken.interrupted ? { spokenSoFar: spoken.spokenSoFar } : {}),
   };
+}
+
+/** No holding line, already settled — the shape {@link writeFirstLine} returns. */
+function noLine(): Promise<string> {
+  return Promise.resolve("");
 }
 
 /**
@@ -829,8 +971,58 @@ export function renderAnswerRequest(
   turns: readonly TurnUpdate[],
   speakers: SpeakerNames,
   answer: Answer,
+  /**
+   * V2-008c: the holding line the room is already hearing, when there is one.
+   * This is the only way the searched answer can know not to say it again.
+   */
+  firstLine = "",
 ): string {
   const blocks = [
+    ...contextBlocks(board, turns, speakers, answer),
+    ...(firstLine === ""
+      ? []
+      : [
+          "## You have already started answering out loud, with this",
+          firstLine,
+          "The room has heard that. Carry straight on from it: do not repeat it," +
+            " do not rephrase it, and do not restate the question.",
+        ]),
+    `Answer it out loud under "${SPOKEN_HEADING_TEXT}", then put the headline,` +
+      ` the detail and the pages you used under "${SCREEN_HEADING_TEXT}".`,
+  ];
+  return blocks.join("\n\n");
+}
+
+/**
+ * The user message for the holding line (V2-008c): the same context the
+ * searched answer gets, asked for one sentence instead of an answer.
+ *
+ * It needs the conversation for the same reason the answer does — the line has
+ * to be *about* what they are talking about to be worth saying — and the board
+ * because that is where "the thing they just described" is written down.
+ */
+export function renderFirstLineRequest(
+  board: Board,
+  turns: readonly TurnUpdate[],
+  speakers: SpeakerNames,
+  answer: Answer,
+): string {
+  return [
+    ...contextBlocks(board, turns, speakers, answer),
+    "You are about to look that up, which will take a few seconds. Write the one or" +
+      " two sentences you say while you do, or an empty string if there is nothing" +
+      " worth saying without the facts. Do not answer the question.",
+  ].join("\n\n");
+}
+
+/** The board, the conversation and the question — what both calls are given. */
+function contextBlocks(
+  board: Board,
+  turns: readonly TurnUpdate[],
+  speakers: SpeakerNames,
+  answer: Answer,
+): string[] {
+  return [
     "## The group's board",
     renderBoardMarkdown(board).trim(),
     "## What they have been saying",
@@ -843,10 +1035,7 @@ export function renderAnswerRequest(
       ? "## Somebody just typed this question to you"
       : `## ${answer.askedBy} just asked you, out loud`,
     answer.question,
-    `Answer it out loud under "${SPOKEN_HEADING_TEXT}", then put the headline,` +
-      ` the detail and the pages you used under "${SCREEN_HEADING_TEXT}".`,
   ];
-  return blocks.join("\n\n");
 }
 
 /** `Maya (01:23): text` — a name, because the answer may have to use it. */

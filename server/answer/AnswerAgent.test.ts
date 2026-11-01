@@ -10,9 +10,11 @@ import type { SpeechEndReason } from "../voice/Speaker.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
 import { ACK_SEARCH } from "./ack.js";
 import type { ProseCall, ProseReply, ModelClient, StructuredCall } from "../model/client.js";
+import { FIRST_LINE_LABEL } from "./firstLine.js";
 import {
   ANSWER_ITEM_PREFIX,
   ANSWER_MAX_TOKENS,
+  FIRST_LINE_CONTEXT_WAIT_MS,
   ANSWER_TRACK_LABEL,
   AnswerAgent,
   cardForAnswer,
@@ -34,13 +36,34 @@ class FakeModel implements ModelClient {
   readonly calls: ProseCall[] = [];
   readonly commands: unknown[] = [];
   readonly classifications: StructuredCall[] = [];
+  /** The holding-line calls (V2-008c), kept apart from the classifications. */
+  readonly firstLineCalls: StructuredCall[] = [];
+  /** What each holding-line call answers; empty means "nothing worth saying". */
+  readonly firstLines: (() => Promise<string>)[] = [];
 
   constructor(readonly replies: ((call: ProseCall) => Promise<ProseReply>)[]) {}
 
   async structured(call: StructuredCall): Promise<unknown> {
+    if (call.label === FIRST_LINE_LABEL) {
+      this.firstLineCalls.push(call);
+      const next = this.firstLines.shift();
+      return { line: next === undefined ? "" : await next() };
+    }
     this.classifications.push(call);
     if (this.commands.length === 0) throw new Error("unexpected structured call");
     return this.commands.shift();
+  }
+
+  /** A holding line that only arrives when the test says so. */
+  heldFirstLine(): { write: (line: string) => void } {
+    const gate = { write: (_line: string) => {} };
+    this.firstLines.push(
+      () =>
+        new Promise<string>((resolve) => {
+          gate.write = resolve;
+        }),
+    );
+    return gate;
   }
 
   async grounded(): Promise<never> {
@@ -88,6 +111,11 @@ class FakeUtterance implements VoiceUtterance {
 
   firstAudioMs(): number | null {
     return this.said.length === 0 ? null : this.toFirstAudioMs;
+  }
+
+  /** Speech synthesized so far: a tenth of a second per character, flat. */
+  audioMs(): number {
+    return this.said.join(" ").length * 100;
   }
 
   cancel(): void {
@@ -521,6 +549,9 @@ describe("AnswerAgent out loud (V2-005)", () => {
       const { h, voice } = spoken([]);
       const held = h.model.held();
       h.agent.ask({ question: "What do rivals charge?", askedBy: "A", turnId: "0:1" });
+      // The searched call goes out behind the holding line (V2-008c), so it
+      // is not in flight until the microtasks around that have run.
+      await microtasks();
       held.call()?.onText?.({ itemId: ANSWER_ITEM, text: STREAM[3] as string });
       await microtasks();
       const utterance = voice.utterances.at(-1)!;
@@ -769,6 +800,143 @@ describe("AnswerAgent out loud (V2-005)", () => {
     expect(h.records[0]?.detailMd).toBe("Evernote is $25.");
     expect(voice.utterances[1]?.text()).toBe("They charge $12 a seat. Evernote is $25.");
   });
+
+  describe("the first line while it searches (V2-008c)", () => {
+    const FIRST_LINE =
+      "You're asking what the other meeting tools charge. Let me pull the actual numbers.";
+
+    /** Everything the room hears, which is the line and then the answer. */
+    const BOTH = `${FIRST_LINE} ${SAID}`;
+
+    /** A reply that streams the whole of {@link STREAM} and then finishes. */
+    const streamed = async (call: ProseCall): Promise<ProseReply> => {
+      for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+      return reply({ text: STREAM.at(-1) as string });
+    };
+
+    it("says it after the acknowledgment and continues from it in one utterance", async () => {
+      const { h, voice } = spoken([streamed]);
+      h.model.firstLines.push(async () => FIRST_LINE);
+      h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+      await h.clock.settle();
+
+      // Two utterances, not three: the acknowledgment, then the answer — of
+      // which the first line is the opening, which is what makes a barge-in
+      // one cancellation and `spokenSoFar` one reading.
+      expect(voice.utterances).toHaveLength(2);
+      expect(voice.utterances[1]?.said).toEqual([FIRST_LINE, SAID]);
+
+      // The holding call is given the conversation and asked for a line, not
+      // an answer; the searched call is told what the room already heard.
+      expect(h.model.firstLineCalls).toHaveLength(1);
+      expect(h.model.firstLineCalls[0]?.user).toContain("what do rivals charge?");
+      expect(h.model.firstLineCalls[0]?.user).toContain("Do not answer the question");
+      expect(h.model.calls[0]?.user).toContain(FIRST_LINE);
+      expect(h.model.calls[0]?.user).toContain("already started answering out loud");
+
+      // The card is the searched answer's, unchanged; only the transcript of
+      // what was said holds both parts.
+      const record = h.records[0];
+      expect(record?.headline).toBe("Rivals charge $5-$25 a seat");
+      expect(record?.detailMd).toBe("- Notion $12");
+      expect(record?.spokenText).toBe(BOTH);
+      expect(h.cards.at(-1)?.spokenText).toBe(BOTH);
+    });
+
+    it("logs when the line was heard and when the searched answer followed it", async () => {
+      const { h } = spoken([streamed]);
+      h.model.firstLines.push(async () => FIRST_LINE);
+      h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+      await h.clock.settle();
+
+      const record = h.records[0];
+      // The acknowledgment at 300 ms, then the answer's utterance a second
+      // later — which the first line is the start of, so the two agree.
+      expect(record?.ackMs).toBe(300);
+      expect(record?.firstAudioMs).toBe(1_300);
+      expect(record?.firstLineMs).toBe(1_300);
+      // The continuation is heard where the line's speech ends, because the
+      // two are one utterance and are played in the order they went over.
+      expect(record?.continuationMs).toBe(1_300 + FIRST_LINE.length * 100);
+      expect(h.timing).toContainEqual(expect.objectContaining({
+        stage: "answer_first_line", answerId: "ans-1", turnId: "0:2",
+      }));
+      expect(h.timing).toContainEqual(expect.objectContaining({
+        stage: "answer_voice", firstLineMs: 1_300, ackToAnswerMs: 1_000,
+      }));
+    });
+
+    it("skips it when the searched answer's first sentence is ready first", async () => {
+      const { h, voice } = spoken([streamed]);
+      const late = h.model.heldFirstLine();
+      h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+      // The line never arrives inside its head start, so the searched answer
+      // goes out without it and says its own first sentence.
+      h.wall.advanceBy(FIRST_LINE_CONTEXT_WAIT_MS);
+      await microtasks();
+      late.write(FIRST_LINE);
+      await h.clock.settle();
+
+      expect(voice.utterances[1]?.said).toEqual([SAID]);
+      expect(h.model.calls[0]?.user).not.toContain("already started answering out loud");
+      const record = h.records[0];
+      expect(record?.spokenText).toBe(SAID);
+      expect(record?.firstLineMs).toBeNull();
+      // With no line in front of it, the continuation *is* the answer's first
+      // audio — here a head start later than the test above.
+      expect(record?.continuationMs).toBe(record?.firstAudioMs);
+      expect(record?.continuationMs).toBe(FIRST_LINE_CONTEXT_WAIT_MS + 1_300);
+    });
+
+    it("writes none at all for a question the conversation already answers", async () => {
+      const { h, voice } = spoken([streamed]);
+      h.model.firstLines.push(async () => FIRST_LINE);
+      h.agent.ask({ question: "what did we decide about pricing?", askedBy: "A", turnId: "0:2" });
+      await h.clock.settle();
+
+      expect(h.model.firstLineCalls).toHaveLength(0);
+      expect(voice.utterances[1]?.said).toEqual([SAID]);
+      expect(h.records[0]?.firstLineMs).toBeNull();
+    });
+
+    it("is stopped by the same barge-in the answer is, and read back with it", async () => {
+      const { h, voice } = spoken([]);
+      const held = h.model.held();
+      h.model.firstLines.push(async () => FIRST_LINE);
+      h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+      await microtasks();
+      // Being said, while the search is still running.
+      expect(voice.utterances).toHaveLength(2);
+      expect(voice.utterances[1]?.said).toEqual([FIRST_LINE]);
+
+      const spoke = voice.utterances[1]!;
+      spoke.heard = "You're asking what the other meeting tools charge.";
+      await h.agent.interrupt();
+      held.answer(reply({ text: STREAM.at(-1) as string }));
+      await h.clock.settle();
+
+      // One cancellation, and nothing opened afterwards to say the rest in.
+      expect(voice.utterances).toHaveLength(2);
+      const record = h.records[0];
+      expect(record?.spokenSoFar).toBe("You're asking what the other meeting tools charge.");
+      // What it meant to say is still both halves; what was heard is not.
+      expect(record?.spokenText).toBe(BOTH);
+    });
+
+    it("says nothing extra when the holding call fails", async () => {
+      const { h, voice } = spoken([streamed]);
+      h.model.firstLines.push(async () => {
+        throw new Error("the holding line timed out");
+      });
+      h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2" });
+      await h.clock.settle();
+
+      expect(voice.utterances[1]?.said).toEqual([SAID]);
+      expect(h.records[0]?.status).toBe("done");
+      expect(h.records[0]?.firstLineMs).toBeNull();
+      expect(h.warnings.join(" ")).toContain("had no first line");
+    });
+  });
 });
 
 describe("Sotto's speech in the transcript (V2-008a)", () => {
@@ -1016,6 +1184,8 @@ function cardAnswer(overrides: Partial<Answer>): Answer {
     spokenText: "",
     ackMs: null,
     firstAudioMs: null,
+    firstLineMs: null,
+    continuationMs: null,
     ...overrides,
   };
 }

@@ -24,6 +24,8 @@ export const PROMPTS = {
   verify: "verify",
   /** Answering a question somebody asked Sotto out loud (US-018). */
   answer: "answer",
+  /** The holding sentence said while a searched answer is written (V2-008c). */
+  firstLine: "firstline",
   /** Classifies a spoken interruption without answering it (V2-007). */
   command: "command",
   /** Distinguishes a spoken request from a mention despite missing punctuation (V2-008). */

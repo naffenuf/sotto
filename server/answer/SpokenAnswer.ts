@@ -17,6 +17,14 @@
  * before the first one's socket had opened. Nothing is ever awaited by the
  * caller except {@link SpokenAnswer.done}.
  *
+ * V2-008c put a third piece of text in the same two utterances: a **holding
+ * line** written while the searched answer is still being searched for. It
+ * goes into the *answer's* utterance, not a third one, so a barge-in cancels
+ * one thing and `spokenSoFar` reads back across both halves — and so opening
+ * it is still what cuts the acknowledgment off. {@link SpokenAnswer.sayFirstLine}
+ * is therefore {@link SpokenAnswer.say} with one extra rule: it loses the race
+ * if the answer has already started.
+ *
  * The timings are read off a **real** clock, not the session's: `ackMs` and
  * `firstAudioMs` are latencies a person in the room felt, and a `max`-speed
  * replay's session clock does not move while a model call is in flight.
@@ -43,6 +51,18 @@ export interface SpokenResult {
   ackMs: number | null;
   /** The question arriving to the answer's own first audio, in real ms. */
   firstAudioMs: number | null;
+  /**
+   * The question arriving to the holding line's first audio, in real ms, or
+   * `null` when none was said (V2-008c). Set to the same moment as
+   * {@link firstAudioMs}, which the holding line is the start of.
+   */
+  firstLineMs: number | null;
+  /**
+   * The question arriving to the first audio of whatever followed the holding
+   * line, in real ms — the whole answer when there was no holding line, and
+   * `null` when nothing was said.
+   */
+  continuationMs: number | null;
   /** What the room heard before it was cut off; empty unless it was. */
   spokenSoFar: string;
   /** Whether speech stopped before the end of the words it was given. */
@@ -70,6 +90,16 @@ export class SpokenAnswer {
   private given = "";
   /** True once the answer's own utterance has been asked for. */
   private opened = false;
+  /** V2-008c: the holding line, once it has been taken. */
+  private firstLine = "";
+  /**
+   * Set the instant {@link say} is called, before the chain has run a step.
+   * A holding line arriving in the same tick as the answer's own first
+   * sentence has to lose, and `opened` is only true once the step runs.
+   */
+  private answering = false;
+  /** Where the continuation went over: real time, and audio already queued. */
+  private continuation: { atMs: number; audioMs: number | null } | undefined;
   /** True once the voice said there was nowhere to be heard, or failed. */
   private silent = false;
   private stopped = false;
@@ -105,7 +135,31 @@ export class SpokenAnswer {
   say(text: string): void {
     const piece = text.trim();
     if (piece === "" || this.stopped) return;
-    this.queued = this.queued === "" ? piece : `${this.queued} ${piece}`;
+    // The first sentence of the searched answer, after a holding line, is the
+    // continuation the log measures.
+    const continues = !this.answering && this.firstLine !== "";
+    this.answering = true;
+    this.enqueue(piece, continues);
+  }
+
+  /**
+   * The holding line, said while the searched answer is still being written
+   * (V2-008c). Returns whether it was taken: it is dropped if the answer has
+   * already started saying itself, if speech has been cancelled, or if nothing
+   * would be heard at all.
+   */
+  sayFirstLine(text: string): boolean {
+    const line = text.trim();
+    if (line === "") return false;
+    if (this.stopped || this.silent || this.answering || this.firstLine !== "") return false;
+    this.firstLine = line;
+    this.enqueue(line, false);
+    return true;
+  }
+
+  /** Queues text, opening the answer's utterance if it is not open yet. */
+  private enqueue(text: string, continues: boolean): void {
+    this.queued = this.queued === "" ? text : `${this.queued} ${text}`;
     this.step(async () => {
       if (this.stopped || this.silent) return;
       if (this.answer === undefined) {
@@ -114,6 +168,13 @@ export class SpokenAnswer {
         const utterance = await this.open();
         if (utterance === null) return;
         this.answer = { utterance, beganAtMs };
+      }
+      // Measured where the text really goes over, not where it was written.
+      if (continues && this.continuation === undefined) {
+        this.continuation = {
+          atMs: this.options.wallClock.now(),
+          audioMs: this.answer.utterance.audioMs?.() ?? null,
+        };
       }
       this.drain(this.answer.utterance);
     });
@@ -154,6 +215,8 @@ export class SpokenAnswer {
       spoke: this.answer !== undefined,
       ackMs: this.latency(this.ack),
       firstAudioMs: this.latency(this.answer),
+      firstLineMs: this.firstLine === "" ? null : this.latency(this.answer),
+      continuationMs: this.continuationLatency(),
       spokenSoFar: this.result?.reason === "cancelled" ? this.result.spokenSoFar : "",
       interrupted: this.stopped || this.result?.reason === "cancelled",
     };
@@ -165,6 +228,26 @@ export class SpokenAnswer {
     const toFirstAudio = open.utterance.firstAudioMs();
     if (toFirstAudio === null) return null;
     return Math.max(0, open.beganAtMs - this.options.askedAtMs) + toFirstAudio;
+  }
+
+  /**
+   * When the searched half of the answer became audible (V2-008c).
+   *
+   * With no holding line it is the utterance's own first audio. With one, the
+   * two are in one utterance and heard in order, so the continuation starts
+   * where the holding line's speech ends — the audio synthesized before it
+   * went over — and in any case not before the moment it went over.
+   */
+  private continuationLatency(): number | null {
+    const open = this.answer;
+    if (open === undefined) return null;
+    const start = this.latency(open);
+    if (this.firstLine === "") return start;
+    const handed = this.continuation;
+    if (handed === undefined) return null;
+    const wentOver = Math.max(0, handed.atMs - this.options.askedAtMs);
+    if (start === null || handed.audioMs === null) return Math.round(wentOver);
+    return Math.round(Math.max(wentOver, start + handed.audioMs));
   }
 
   /** Hands over everything written since the last time. */

@@ -56,6 +56,8 @@ const fixture = "ask-search";
 interface Replayed {
   answers: AnswerLogRecord[];
   cards: StageCard[];
+  /** `timing.jsonl`, where the voice latencies are written (V2-008b, V2-008c). */
+  timing: Record<string, unknown>[];
 }
 
 async function replay(root: string, name: string): Promise<Replayed> {
@@ -97,11 +99,19 @@ async function replay(root: string, name: string): Promise<Replayed> {
   // The log is only opened on the first append, so a missing file means
   // nothing was ever asked — which for this fixture is the failure.
   expect(existsSync(path), `nothing was written to ${SESSION_FILES.answers}`).toBe(true);
-  const answers = readFileSync(path, "utf8")
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => JSON.parse(line) as AnswerLogRecord);
-  return { answers, cards };
+  const lines = (file: string): unknown[] => {
+    const at = join(root, folders[0] as string, file);
+    if (!existsSync(at)) return [];
+    return readFileSync(at, "utf8")
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => JSON.parse(line) as unknown);
+  };
+  return {
+    answers: lines(SESSION_FILES.answers) as AnswerLogRecord[],
+    cards,
+    timing: lines(SESSION_FILES.timing) as Record<string, unknown>[],
+  };
 }
 
 describe.skipIf(apiKey === "")(`the answer agent after replaying ${fixture}`, () => {
@@ -188,6 +198,41 @@ describe.skipIf(apiKey === "")(`the answer agent after replaying ${fixture}`, ()
     expect(answer.firstAudioMs!).toBeGreaterThan(answer.ackMs!);
     // Nothing cut it off, so there is no partial to record.
     expect(answer.spokenSoFar).toBeUndefined();
+  });
+
+  it.skipIf(voiceKey === "")("says a first line while it searches, inside the four-second target", () => {
+    const answer = result.answers[0]!;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[first line] ackMs=${answer.ackMs} firstLineMs=${answer.firstLineMs}` +
+        ` continuationMs=${answer.continuationMs}` +
+        ` ackToFirstSentenceMs=${
+          answer.firstAudioMs === null || answer.ackMs === null
+            ? null
+            : answer.firstAudioMs - answer.ackMs
+        }`,
+    );
+    expect(answer.firstLineMs, "nothing was said while it searched").not.toBeNull();
+    // One utterance: the holding line is what opens the answer's own.
+    expect(answer.firstLineMs).toBe(answer.firstAudioMs);
+    // And the searched half follows it, never before it.
+    expect(answer.continuationMs).not.toBeNull();
+    expect(answer.continuationMs!).toBeGreaterThan(answer.firstLineMs!);
+    // The PRD's V2-008c target: the room waits at most four seconds after
+    // the acknowledgment for a real sentence.
+    expect(answer.firstLineMs! - answer.ackMs!).toBeLessThanOrEqual(4_000);
+    // And it reached the searched call in time to be continued from, which is
+    // the only way that call can know not to say it again.
+    expect(
+      result.timing.find((event) => event.stage === "answer_voice"),
+      "no answer_voice line was written",
+    ).toMatchObject({ firstLineInContext: true });
+    // The line is the start of what was said, and it was written before
+    // anything had been looked up — so it may not quote a price.
+    const opening = answer.spokenText.split(/(?<=[.!?])\s/)[0] ?? "";
+    // eslint-disable-next-line no-console
+    console.log(`[first line] said: ${JSON.stringify(answer.spokenText.slice(0, 400))}`);
+    expect(opening, answer.spokenText).not.toMatch(/\$\s?\d/);
   });
 
   it.skipIf(voiceKey === "")("still puts the headline, the detail and the sources on the card", () => {

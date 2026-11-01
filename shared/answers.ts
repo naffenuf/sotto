@@ -115,6 +115,29 @@ export interface Answer {
   /** The question arriving to the first audio of the answer itself, in real ms. */
   firstAudioMs: number | null;
   /**
+   * The question arriving to the first audio of the **holding line** — the
+   * orienting sentence said while a searched answer is still being written
+   * (V2-008c) — in real ms.
+   *
+   * `null` when none was said: the question did not look like a search, the
+   * voice was muted, or the searched answer's own first sentence got there
+   * first. When it is set it is the same moment as {@link firstAudioMs}: the
+   * holding line and the answer it introduces are one utterance, and the
+   * holding line is what opens it.
+   */
+  firstLineMs: number | null;
+  /**
+   * The question arriving to the first audio of the **searched** half of the
+   * answer, in real ms — the continuation after the holding line, or the whole
+   * answer when there was no holding line.
+   *
+   * Everything in one utterance is heard in the order it was handed over, so
+   * this is the holding line's first audio plus the speech synthesized before
+   * the continuation went over, and never earlier than the moment it did.
+   * `null` when nothing was said out loud.
+   */
+  continuationMs: number | null;
+  /**
    * What the room actually heard, when speech was cut off before the end
    * (the Stop button, V2-004; a barge-in, V2-007). Absent when all of it was
    * spoken, or when none of it was.
