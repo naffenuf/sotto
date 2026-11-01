@@ -36,9 +36,11 @@ export interface BoardPanelProps {
   /** True while an update is in flight, so the header shows a spinner. */
   updating: boolean;
   historical?: boolean;
+  /** Without its own title row: the fold it sits in carries the title and the freshness. */
+  bare?: boolean;
 }
 
-export function BoardPanel({ board, changedIds, updatedAt, updating, historical = false }: BoardPanelProps) {
+export function BoardPanel({ board, changedIds, updatedAt, updating, historical = false, bare = false }: BoardPanelProps) {
   const highlighted = useHighlight(changedIds, updatedAt);
   const [showDropped, setShowDropped] = useState(false);
   const dropped = droppedCount(board);
@@ -51,10 +53,12 @@ export function BoardPanel({ board, changedIds, updatedAt, updating, historical 
 
   return (
     <section className="board" data-testid="board">
-      <div className="board__header">
-        <h2 className="panel__title">Summary</h2>
-        {!historical && <BoardFreshness updatedAt={updatedAt} updating={updating} />}
-      </div>
+      {!bare && (
+        <div className="board__header">
+          <h2 className="panel__title">Summary</h2>
+          {!historical && <BoardFreshness updatedAt={updatedAt} updating={updating} />}
+        </div>
+      )}
       <div className="board__body">
         {boardIsEmpty(board) ? (
           <p className="board__empty" data-testid="board-empty">
@@ -134,7 +138,7 @@ interface BoardFreshnessProps {
 }
 
 /** "updated 12s ago", ticking, with a spinner while a call is out. */
-function BoardFreshness({ updatedAt, updating }: BoardFreshnessProps) {
+export function BoardFreshness({ updatedAt, updating }: BoardFreshnessProps) {
   const ago = useAgo(updatedAt);
 
   return (

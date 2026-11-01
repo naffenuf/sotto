@@ -406,3 +406,26 @@ describe("SessionStore audio.wav", () => {
     expect(wav.data.length).toBe(3840);
   });
 });
+
+describe("SessionStore transcript runs", () => {
+  it("folds a speaker's continuation after a breath into the line before it", () => {
+    const saved = store();
+    saved.appendTurn(turn({ turnId: "0:0", startMs: 20_604, endMs: 31_293, text: "see if the" }));
+    saved.appendTurn(turn({ turnId: "0:1", startMs: 31_807, endMs: 35_478, text: "audio was recording." }));
+    saved.appendTurn(turn({ turnId: "0:2", speaker: "B", startMs: 36_000, endMs: 37_000, text: "It did." }));
+    saved.appendTurn(turn({ turnId: "0:3", startMs: 50_000, endMs: 51_000, text: "Much later." }));
+    expect(lines(read(saved.dir, SESSION_FILES.transcript))).toEqual([
+      "**[00:21] A:** see if the audio was recording.",
+      "**[00:36] B:** It did.",
+      "**[00:50] A:** Much later.",
+    ]);
+  });
+
+  it("keeps the merged line when a speaker is renamed afterwards", () => {
+    const saved = store();
+    saved.appendTurn(turn({ turnId: "0:0", startMs: 0, endMs: 1_000, text: "First" }));
+    saved.appendTurn(turn({ turnId: "0:1", startMs: 1_500, endMs: 2_000, text: "second." }));
+    saved.renameSpeaker("A", "Craig");
+    expect(read(saved.dir, SESSION_FILES.transcript)).toBe("**[00:00] Craig:** First second.\n");
+  });
+});

@@ -4,12 +4,15 @@ const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto("http://127.0.0.1:5173", { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: "Discussion notes" }).waitFor();
-  if (await page.locator('[data-testid="source-select"]').count()) throw new Error("source selector still visible");
-  if (await page.locator('[data-testid="transcript"]').count()) throw new Error("transcript should be hidden initially");
-  await page.getByRole("button", { name: "Transcript", exact: true }).click();
+  // The current discussion stacks the transcript over the notes; both are up from the start.
   await page.locator('[data-testid="transcript"]').waitFor();
-  await page.getByRole("button", { name: "Discussion notes", exact: true }).click();
+  await page.locator('[data-testid="board"]').waitFor();
+  if (await page.locator('[data-testid="source-select"]').count()) throw new Error("source selector still visible");
+  await page.getByTestId("notes-toggle").click();
+  if (await page.locator('[data-testid="board"]').count()) throw new Error("notes should fold away");
+  await page.getByTestId("notes-toggle").click();
+  await page.locator('[data-testid="board"]').waitFor();
+  // Nothing running, so the history list is open.
   const item = page.locator(".history-item").first();
   await item.waitFor();
   await item.click();

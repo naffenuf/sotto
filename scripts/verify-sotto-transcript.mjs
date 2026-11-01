@@ -83,8 +83,6 @@ push({ type: "status", status: { channel: "transcription", state: "active" } });
 push({ type: "speakers", speakers: { A: "Craig", B: "EJ" } });
 for (const turn of TURNS) push({ type: "turn", turn });
 
-// The transcript is behind its own tab; the board is what the sidebar opens on.
-await page.locator('.discussion-tabs button:text-is("Transcript")').click();
 await page.waitForFunction(
   (count) => document.querySelectorAll('[data-testid="turn"]').length === count,
   TURNS.length,

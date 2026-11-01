@@ -38,6 +38,7 @@ import {
   type SessionSettings,
 } from "../../shared/session.js";
 import { PACKET_ID_PATTERN, packetFileName } from "../../shared/research.js";
+import { continuesRun, type RunEdge } from "../../shared/transcript.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 
 type Logger = Pick<Console, "log" | "warn">;
@@ -162,11 +163,18 @@ interface TranscriptLine {
   label: string | null;
   /** Milliseconds from the start of the session to the start of the turn. */
   offsetMs: number;
+  /** Where the (last merged) turn ended, so the next one can decide whether it continues it. */
+  endMs: number | null;
   text: string;
   /** V2-008a: Sotto's own speech, which no rename ever touches. */
   sotto?: true;
   /** V2-008a: the room only heard this much of it. */
   interrupted?: true;
+}
+
+/** What the merge rule reads off a saved line. */
+function edge(line: TranscriptLine): RunEdge {
+  return { speaker: line.label, startMs: line.offsetMs, endMs: line.endMs, sotto: line.sotto === true };
 }
 
 export class SessionStore implements SessionWriter {
@@ -247,6 +255,7 @@ export class SessionStore implements SessionWriter {
       // — the realtime client reports frame times that way and a replay sets
       // the clock to the capture's own `atMs` — so the offset is the time.
       offsetMs: turn.startMs,
+      endMs: turn.endMs,
       // transcript.md is one line per turn, so the text has to stay on one.
       text: turn.text.replace(/\s+/g, " ").trim(),
       ...(isSottoTurn(turn) ? { sotto: true as const } : {}),
@@ -257,7 +266,15 @@ export class SessionStore implements SessionWriter {
     // a barge-in, in particular. The file stays in conversation order, which
     // costs a whole rewrite only in that one case.
     const at = this.lines.findIndex((existing) => existing.offsetMs > line.offsetMs);
-    if (at === -1) {
+    const last = this.lines[this.lines.length - 1];
+    if (at === -1 && last !== undefined && continuesRun(edge(last), edge(line))) {
+      // The same person carrying on after a breath: one paragraph, not two
+      // (shared/transcript.ts). The line already on disk has to change, so
+      // the file is rewritten, as it is for a rename.
+      last.text = `${last.text} ${line.text}`;
+      last.endMs = line.endMs;
+      this.rewriteTranscript();
+    } else if (at === -1) {
       this.lines.push(line);
       this.appendLine(SESSION_FILES.transcript, this.transcriptLine(line));
     } else {

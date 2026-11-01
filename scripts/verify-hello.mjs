@@ -103,7 +103,6 @@ try {
   await speaking.waitFor({ state: "hidden", timeout: 60_000 });
 
   // And it is in the transcript as Sotto's own line (V2-008a).
-  await page.locator('.discussion-tabs button:text-is("Transcript")').click();
   const mine = page.locator('[data-testid="turn"][data-sotto="true"]');
   await mine.first().waitFor({ timeout: 30_000 });
   const line = (await mine.first().locator(".turn__text").textContent())?.trim() ?? "";

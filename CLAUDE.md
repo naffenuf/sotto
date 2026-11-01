@@ -1738,3 +1738,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   restraint is still readable. The snapshot is **eleven** events plus one per card. A candidate
   the observer dropped as `duplicateOf` is in the list too, reason "duplicate of cand-N" — not a
   policy decision, but still a thing Sotto noticed and did not say.
+
+- **A transcript row is a run, and the pipeline never sees one.** The endpointer closes a turn at
+  every breath ("…see if the" / "audio was recording", 514 ms apart on a real mic session), so
+  `shared/transcript.ts`'s `mergeRuns`/`continuesRun` fold consecutive turns from the same speaker
+  ≤ `MERGE_GAP_MS` (2 s, `endMs` → next `startMs`) into one paragraph — in `transcript.md`
+  (`SessionStore.appendTurn` extends the last line and rewrites the file, as a rename does) and in
+  `TranscriptPanel`, where each turn is a `.turn__segment` with its own `data-turn-id` so a cited
+  quote still lands on the exact turn. Sotto's lines never merge. Everything that counts turns —
+  the classifier, the board cadence, `sourceTurnIds`, the e2e's transcript-line gate (which reads
+  bus turns, not the file) — is untouched; `endMs: null` never merges, which is why the old store
+  tests (built with `endMs: null`) still write one line per turn.
+- **The sidebar stacks; only a previous discussion has tabs.** The current discussion is the
+  transcript (flexible) over two `Fold`s — notes (`notes-toggle`, `BoardPanel bare` with
+  `BoardFreshness` in the fold row) and previous discussions (`history-toggle`, closed while a
+  session runs) — remembered per browser by `useStoredFlag` (`localStorage`, `sotto:*`, guarded).
+  The column is `minmax(18rem, 32%)` for the demo. Playwright checks that used to click a
+  "Transcript" tab for the *current* discussion no longer can; `verify-history-ui.mjs` toggles the
+  fold instead. The tabs still exist for a previous discussion.

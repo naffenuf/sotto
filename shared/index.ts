@@ -41,6 +41,8 @@ export type {
 } from "./fixtures.js";
 export { SOTTO_SPEAKER, isSottoTurn, sottoTurn, sottoTurnId } from "./turns.js";
 export type { PauseState, TurnUpdate } from "./turns.js";
+export { MERGE_GAP_MS, continuesRun, mergeRuns } from "./transcript.js";
+export type { RunEdge, TranscriptRun } from "./transcript.js";
 export {
   BOARD_OPS_SCHEMA_NAME,
   BoardOpSchema,

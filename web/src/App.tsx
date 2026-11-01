@@ -24,7 +24,9 @@ import {
 import { AskBox } from "./AskBox.js";
 import { MicCapture, requestMicrophone, startMicCapture } from "./audio/micCapture.js";
 import { useVoicePlayback } from "./audio/useVoicePlayback.js";
-import { BoardPanel } from "./BoardPanel.js";
+import { BoardFreshness, BoardPanel } from "./BoardPanel.js";
+import { Fold } from "./Fold.js";
+import { useStoredFlag } from "./useStoredFlag.js";
 import { Backstage } from "./Backstage.js";
 import { SessionControls } from "./SessionControls.js";
 import type { HistoryDetail, HistoryEntry } from "../../shared/history.js";
@@ -40,7 +42,12 @@ export function App() {
   const events = useSessionEvents();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [discussion, setDiscussion] = useState<HistoryDetail | null>(null);
+  /** Which of a previous discussion's views is open; the current one stacks them instead. */
   const [view, setView] = useState<"board" | "transcript" | "backstage">("board");
+  /** The notes fold under the transcript: open unless this browser closed it. */
+  const [notesOpen, setNotesOpen] = useStoredFlag("notes-open", true);
+  /** The history fold: closed while a session runs, unless this browser chose otherwise. */
+  const [historyOpenChoice, setHistoryOpen] = useStoredFlag("history-open", events.session === null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useVoicePlayback(setProblem);
@@ -213,31 +220,52 @@ export function App() {
           <div className="discussion-header">
             <span className="discussion-eyebrow">{discussion ? "PREVIOUS DISCUSSION" : "CURRENT DISCUSSION"}</span>
             {discussion && <button className="discussion-return" onClick={() => { setDiscussion(null); setView("board"); }}>← Back to current</button>}
-            <div className="discussion-tabs" aria-label="Discussion view">
-              <button aria-pressed={view === "board"} onClick={() => setView("board")}>Discussion notes</button>
-              <button aria-pressed={view === "transcript"} onClick={() => setView("transcript")}>Transcript</button>
-              {discussion && <button aria-pressed={view === "backstage"} onClick={() => setView("backstage")}>Backstage</button>}
-            </div>
+            {discussion && (
+              <div className="discussion-tabs" aria-label="Discussion view">
+                <button aria-pressed={view === "board"} onClick={() => setView("board")}>Discussion notes</button>
+                <button aria-pressed={view === "transcript"} onClick={() => setView("transcript")}>Transcript</button>
+                <button aria-pressed={view === "backstage"} onClick={() => setView("backstage")}>Backstage</button>
+              </div>
+            )}
           </div>
-          {view === "backstage" && discussion ? <Backstage log={discussion.candidateLog ?? []} digest={discussion.digest ?? ""} /> : view === "transcript" ? discussion ? (
-            <section className="history-transcript"><h2 className="panel__title">Transcript</h2><pre>{historyTranscript(discussion.transcript) || "No transcript saved."}</pre></section>
-          ) : <TranscriptPanel turns={events.turns} speakers={events.speakers} onRename={onRenameSpeaker} highlight={cited} /> : <BoardPanel
-            board={discussion ? discussion.board ?? emptyBoard() : events.board}
-            changedIds={discussion ? [] : events.boardChangedIds}
-            updatedAt={discussion ? 0 : events.boardReceivedAtMs}
-            historical={discussion !== null}
-            // The model dot goes `connecting` for exactly as long as a board
-            // update is out (`BoardUpdater.onModelState`), so it is also the
-            // panel's spinner.
-            updating={!discussion && statuses.model.state === "connecting"}
-          />}
+          {discussion ? (
+            view === "backstage" ? <Backstage log={discussion.candidateLog ?? []} digest={discussion.digest ?? ""} /> : view === "transcript" ? (
+              <section className="history-transcript"><h2 className="panel__title">Transcript</h2><pre>{historyTranscript(discussion.transcript) || "No transcript saved."}</pre></section>
+            ) : <BoardPanel board={discussion.board ?? emptyBoard()} changedIds={[]} updatedAt={0} historical updating={false} />
+          ) : (
+            <>
+              {/* The conversation and the board at once: the transcript takes
+                  what the folds leave, so a viewer sees words land and the
+                  notes fill in the same frame. */}
+              <TranscriptPanel turns={events.turns} speakers={events.speakers} onRename={onRenameSpeaker} highlight={cited} />
+              <Fold
+                name="notes"
+                title="Discussion notes"
+                open={notesOpen}
+                onToggle={setNotesOpen}
+                // The model dot goes `connecting` for exactly as long as a board
+                // update is out (`BoardUpdater.onModelState`), so it is also the
+                // panel's spinner.
+                aside={<BoardFreshness updatedAt={events.boardReceivedAtMs} updating={statuses.model.state === "connecting"} />}
+              >
+                <BoardPanel
+                  board={events.board}
+                  changedIds={events.boardChangedIds}
+                  updatedAt={events.boardReceivedAtMs}
+                  updating={statuses.model.state === "connecting"}
+                  bare
+                />
+              </Fold>
+            </>
+          )}
           {discussion && view !== "backstage" && discussion.contributions.length > 0 && <section className="history-contributions"><h2 className="panel__title">Sotto’s contributions</h2>{discussion.contributions.map((item, index) => <article key={index}><small>{item.kind}</small><strong>{item.headline}</strong><p>{item.detail}</p></article>)}</section>}
-          <section className="history-list" aria-label="Previous discussions">
-            <h2 className="panel__title">Previous discussions</h2>
-            {historyError && <p>{historyError}</p>}
-            {!historyError && history.length === 0 && <p>No previous discussions yet.</p>}
-            {history.map((item) => <button key={item.folder} className="history-item" aria-current={discussion?.folder === item.folder ? "true" : undefined} onClick={() => { void fetchDiscussion(item.folder).then((value) => { setDiscussion(value); setView("board"); setHistoryError(null); }).catch(() => setHistoryError("Could not open that discussion.")); }}><span>{item.title}</span><time>{new Date(item.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></button>)}
-          </section>
+          <Fold name="history" title="Previous discussions" open={historyOpenChoice} onToggle={setHistoryOpen}>
+            <div className="history-list" aria-label="Previous discussions">
+              {historyError && <p>{historyError}</p>}
+              {!historyError && history.length === 0 && <p>No previous discussions yet.</p>}
+              {history.map((item) => <button key={item.folder} className="history-item" aria-current={discussion?.folder === item.folder ? "true" : undefined} onClick={() => { void fetchDiscussion(item.folder).then((value) => { setDiscussion(value); setView("board"); setHistoryError(null); }).catch(() => setHistoryError("Could not open that discussion.")); }}><span>{item.title}</span><time>{new Date(item.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></button>)}
+            </div>
+          </Fold>
         </aside>
         <Stage
           cards={events.cards}

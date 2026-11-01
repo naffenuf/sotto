@@ -66,8 +66,6 @@ try {
   const sessionId = started.body.session.id;
   console.log(`replaying ${FIXTURE} as ${sessionId}; waiting for Sotto to answer…`);
 
-  // The transcript is behind its own tab; the board is what the sidebar opens on.
-  await page.locator('.discussion-tabs button:text-is("Transcript")').click();
   // An unprompted interjection earlier in the conversation spends the
   // frequency's cooldown (V2-017), and V3-004 counts against the same one — so
   // a run where the policy interjected before the question has nothing left to

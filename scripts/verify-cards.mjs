@@ -163,12 +163,10 @@ app.on("console", (m) => m.type() === "error" && consoleErrors.push(`[app] ${m.t
 app.on("pageerror", (e) => consoleErrors.push(`[app] ${e}`));
 await app.goto(url, { waitUntil: "networkidle" });
 await app.waitForSelector('[data-testid="stage"]');
-// The sidebar shows the notes and the transcript as tabs rather than stacked,
-// so the transcript has to be asked for before it can be measured.
+// The sidebar stacks the transcript over the notes, so both can be measured.
 const boardBox = await app
   .locator('[data-testid="board"]')
   .evaluate((node) => node.getBoundingClientRect().toJSON());
-await app.locator(".discussion-tabs button", { hasText: "Transcript" }).click();
 await app.waitForSelector('[data-testid="transcript"]');
 const layout = await app.evaluate((board) => {
   const width = document.querySelector(".layout").getBoundingClientRect().width;

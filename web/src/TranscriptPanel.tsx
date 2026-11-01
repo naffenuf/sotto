@@ -11,10 +11,14 @@
  * card (US-015) asks this panel to show that turn, which means scrolling to
  * it, marking it, and stopping following the live edge — the reader has gone
  * back to check something and should not be yanked forward again.
+ *
+ * A row is a run, not a turn (`shared/transcript.ts`): one person carrying on
+ * after a breath is one paragraph, with each turn a segment inside it so a
+ * cited turn can still be pointed at.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { SOTTO_SPEAKER, isSottoTurn } from "../../shared/index.js";
-import type { SpeakerNames, TurnUpdate } from "../../shared/index.js";
+import { SOTTO_SPEAKER, mergeRuns } from "../../shared/index.js";
+import type { SpeakerNames, TranscriptRun, TurnUpdate } from "../../shared/index.js";
 
 /** How close to the bottom still counts as following the conversation. */
 const AT_BOTTOM_PX = 48;
@@ -100,7 +104,9 @@ export function TranscriptPanel({
     if (highlight === null) return;
     const node = list.current;
     if (node === null) return;
-    const row = node.querySelector(`[data-turn-id="${CSS.escape(highlight.turnId)}"]`);
+    const row = node
+      .querySelector(`[data-turn-id="${CSS.escape(highlight.turnId)}"]`)
+      ?.closest('[data-testid="turn"]') ?? null;
     // A cited turn can be off the end of the capped list; there is then
     // nothing to scroll to, and nothing to apologise for either.
     if (row === null) return;
@@ -151,56 +157,14 @@ export function TranscriptPanel({
             Nothing yet. Start a session and the conversation shows up here.
           </p>
         ) : (
-          turns.map((turn) => (
-            <p
-              key={turn.turnId}
-              className={`turn ${turn.final ? "turn--final" : "turn--partial"}${
-                isSottoTurn(turn) ? " turn--sotto" : ""
-              }${turn.turnId === highlight?.turnId ? " turn--cited" : ""}`}
-              data-testid="turn"
-              data-turn-id={turn.turnId}
-              data-cited={turn.turnId === highlight?.turnId ? true : undefined}
-              data-final={turn.final}
-              data-speaker={turn.speaker ?? ""}
-              data-sotto={isSottoTurn(turn) ? true : undefined}
-              data-interrupted={turn.interrupted === true ? true : undefined}
-            >
-              <button
-                type="button"
-                className="turn__chip"
-                data-testid="speaker-chip"
-                // Sotto's chip is the accent, which needs light ink on it; the
-                // room's colours are all pale.
-                style={{
-                  background: speakerColor(turn.speaker),
-                  color: isSottoTurn(turn) ? "#fdfbf7" : "#11100e",
-                }}
-                // Sotto is not one of the room's labels, so there is no name
-                // to give it (V2-008a).
-                disabled={turn.speaker === null || isSottoTurn(turn)}
-                title={
-                  isSottoTurn(turn)
-                    ? "Sotto said this out loud"
-                    : turn.speaker === null
-                      ? "waiting for the speaker label"
-                      : `Name speaker ${turn.speaker}${turn.speakerMappingUncertain ? " (this label is a guess after a reconnect)" : ""}`
-                }
-                onClick={() => setEditing(turn.speaker)}
-              >
-                {speakerText(turn.speaker, speakers)}
-                {/* A label from a later ASR session is a guess, not a fact
-                    (`fixtures/events/NOTES.md`), so it is marked as one. */}
-                {turn.speakerMappingUncertain && <span className="turn__guess">?</span>}
-              </button>{" "}
-              <span className="turn__text">{turn.text.trim()}</span>
-              {/* The room heard this much and no more: the rest was cut off. */}
-              {turn.interrupted === true && (
-                <span className="turn__interrupted" data-testid="turn-interrupted">
-                  {" "}
-                  (interrupted)
-                </span>
-              )}
-            </p>
+          mergeRuns(turns).map((run) => (
+            <TranscriptRow
+              key={run.id}
+              run={run}
+              speakers={speakers}
+              citedTurnId={highlight?.turnId ?? null}
+              onName={setEditing}
+            />
           ))
         )}
       </div>
@@ -215,6 +179,87 @@ export function TranscriptPanel({
         </button>
       )}
     </section>
+  );
+}
+
+interface TranscriptRowProps {
+  run: TranscriptRun;
+  speakers: SpeakerNames;
+  citedTurnId: string | null;
+  onName: (label: string | null) => void;
+}
+
+/** One paragraph: the chip once, then every turn of the run as a segment. */
+function TranscriptRow({ run, speakers, citedTurnId, onName }: TranscriptRowProps) {
+  const cited = citedTurnId !== null && run.segments.some((turn) => turn.turnId === citedTurnId);
+  // A row is a partial only while nothing in it is final yet.
+  const final = run.segments.some((turn) => turn.final);
+  const last = run.segments[run.segments.length - 1];
+  return (
+    <p
+      className={`turn ${final ? "turn--final" : "turn--partial"}${run.sotto ? " turn--sotto" : ""}${
+        cited ? " turn--cited" : ""
+      }`}
+      data-testid="turn"
+      data-turn-id={run.id}
+      data-turn-ids={run.segments.map((turn) => turn.turnId).join(" ")}
+      data-cited={cited ? true : undefined}
+      data-final={final}
+      data-speaker={run.speaker ?? ""}
+      data-sotto={run.sotto ? true : undefined}
+      data-interrupted={last?.interrupted === true ? true : undefined}
+    >
+      <button
+        type="button"
+        className="turn__chip"
+        data-testid="speaker-chip"
+        // Sotto's chip is the accent, which needs light ink on it; the
+        // room's colours are all pale.
+        style={{
+          background: speakerColor(run.speaker),
+          color: run.sotto ? "#fdfbf7" : "#11100e",
+        }}
+        // Sotto is not one of the room's labels, so there is no name
+        // to give it (V2-008a).
+        disabled={run.speaker === null || run.sotto}
+        title={
+          run.sotto
+            ? "Sotto said this out loud"
+            : run.speaker === null
+              ? "waiting for the speaker label"
+              : `Name speaker ${run.speaker}${run.speakerMappingUncertain ? " (this label is a guess after a reconnect)" : ""}`
+        }
+        onClick={() => onName(run.speaker)}
+      >
+        {speakerText(run.speaker, speakers)}
+        {/* A label from a later ASR session is a guess, not a fact
+            (`fixtures/events/NOTES.md`), so it is marked as one. */}
+        {run.speakerMappingUncertain && <span className="turn__guess">?</span>}
+      </button>{" "}
+      <span className="turn__text">
+        {run.segments.map((turn, index) => (
+          <span
+            key={turn.turnId}
+            className={`turn__segment${turn.final ? "" : " turn__segment--partial"}${
+              turn.turnId === citedTurnId ? " turn__segment--cited" : ""
+            }`}
+            data-testid="turn-segment"
+            data-turn-id={turn.turnId}
+            data-final={turn.final}
+          >
+            {index > 0 ? " " : ""}
+            {turn.text.trim()}
+          </span>
+        ))}
+      </span>
+      {/* The room heard this much and no more: the rest was cut off. */}
+      {last?.interrupted === true && (
+        <span className="turn__interrupted" data-testid="turn-interrupted">
+          {" "}
+          (interrupted)
+        </span>
+      )}
+    </p>
   );
 }
 
