@@ -90,3 +90,68 @@ against its own allowance, and the first full run came to $2.3409 of $4.20.
 **Where it lives:** `FIXTURE_BUDGET_USD` and `budgetFor` in
 `server/e2e/report.ts`, with `DEFAULT_FIXTURE_BUDGET_USD` for a conversation
 nobody has measured.
+
+---
+
+## 2026-11-01 — The v3 PRD is revised before any v3 story is built
+
+**What changed:** [`prd-sotto-v3.md`](prd-sotto-v3.md) and `ralph/prd.json`, which
+now carries 16 stories in a new build order. No code. The review that produced
+it asked one question of every unprompted thing Sotto would say: what gives it
+the right to the floor, and what makes it give the floor back?
+
+**Why, and what moved:**
+
+- **Open questions are noticed per turn, not by the observer (V3-002).** The
+  observer only looks after a board update, a median 12.6 s after the turn that
+  matters (US-009, four final turns). With a 2–3 s gate and a 16–21 s search
+  behind that, the original 25 s question-to-packet target was unreachable by
+  any prompt. A question-shaped final turn now goes through a lexical filter
+  and one Spark call, the shape V2-008 settled on for addresses. The research
+  gate is skipped for it too: the classifier already judged it answerable.
+- **Nothing runs in the pause (V3-004).** The still-open check was a ~2 s
+  Spark call at a 1.5 s pause, so Sotto would start speaking after the pause
+  ended. It is now a cached verdict, refreshed on each final turn after the
+  packet is ready, and renamed **still-current**: a group that changed topic
+  has not closed the question, but re-raising it 40 s later into the new topic
+  is the interruption the story exists to avoid.
+- **Unprompted speech yields to any voice (V3-004, FR-V3-2).** The draft only
+  cancelled before the first audio chunk; after that the wake word was needed.
+  A reservation, answer, read-back or offer now stops on the first human
+  partial the echo filter passes, at any point. Sotto was not asked, so it has
+  the lowest floor rights in the room. Answers to direct questions keep the
+  wake-word rule. Two yields in ten minutes lower the frequency (V3-006).
+- **Sotto claims the question out loud (new V3-015).** "I'll check the drive
+  time" at the first 700 ms gap, written locally from the classifier's topic,
+  is V2-008c's holding line applied to unprompted speech. It turns a 30 s wait
+  into an expected delivery, keeps phones in pockets, and the card that
+  appears with it shows a demo audience that something is happening.
+- **Decisions get a read-back, and the probe rides on it (V3-013).** The draft
+  spoke "Before six gardens: what if only one signs up?" at the moment someone
+  had just said "let's go with six", which is a challenge to that person. The
+  scribe's read-back ("Got it: six gardens") is the one unprompted line every
+  meeting already licenses, and the only thing attached to it out loud is the
+  **group's own** dropped or unanswered question, quoted back. Sotto's own
+  contradictions and untested assumptions go beside it on screen, and are
+  spoken only at boldness `bold` (FR-V3-9).
+- **No names, no obligating questions (FR-V3-8).** Diarization labels are
+  remapped on every reconnect, so "EJ, on the drive time" risks naming the
+  wrong person. Offers became statements ("There's a rundown on screen if you
+  want it") because a question from the agent makes the room owe it a reply.
+- **The off switch is built before the test that uses it.** The draft's
+  checkpoint script said "tell Sotto 'not now' once" while V3-006 and V3-012
+  were scheduled after the checkpoint. Both moved before it. V3-014
+  (follow-ups without the wake word) moved after it: answering a question
+  meant for a person is the worst failure in the plan, and the checkpoint
+  should measure the unprompted forms first.
+- **A shadow run before the live run (new V3-016).** `npm run shadow` replays
+  a real past `mic` session through the v3 pipeline on the null voice sink and
+  writes what Sotto would have said and when. The first look at its judgment
+  on a real conversation should not also be the first time anyone hears it.
+  The stage gains an "almost said" tray from the same records.
+- **`SPEAK_PAUSE_MS` is measured, not 1,500.** Real quiet inside planted
+  windows measured 930–1,610 ms (US-023), so 1,500 would exclude most of it.
+  V3-004 picks it off `npm run eval:ceiling` and records the margins here.
+
+**Where it lives:** the PRD's "Why open questions bypass the observer" section,
+V3-002, V3-004, V3-006, V3-013, V3-015, V3-016, FR-V3-8/9 and the build order.

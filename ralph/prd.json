@@ -1,16 +1,16 @@
 {
   "project": "Sotto",
   "branchName": "ralph/sotto-v3",
-  "description": "Sotto v3: speaking up when the room needs it. Sotto answers what the room wonders aloud (open questions it can look up) with a short sourced spoken answer at a real pause, keeps a conversation open for follow-ups without the wake word, asks one probing question at decision points, offers longer contributions ask-first, moves corrections to screen, and lets the room steer it by voice. Spark gates interjections; Glimmer gates research ideas. Full spec: tasks/prd-sotto-v3.md (wins over tasks/prd-sotto-v2.md and tasks/prd-sotto-core.md).",
+  "description": "Sotto v3: speaking up when the room needs it. Sotto notices what the room wonders aloud per turn, says 'I'll check' at the first gap, answers with a short sourced spoken line at a real pause, yields to any human voice, reads back closing decisions and attaches the group's own unsettled question, offers longer contributions as statements, keeps its own corrections on screen, lets the room steer it by voice, and opens a follow-up window without the wake word. Spark makes the time-critical judgments; Glimmer gates research ideas. Full spec: tasks/prd-sotto-v3.md (revised 2026-11-01; wins over tasks/prd-sotto-v2.md and tasks/prd-sotto-core.md).",
   "userStories": [
     {
       "id": "V3-001",
-      "title": "Gate per path: Spark for interjections, Glimmer for research",
+      "title": "Gate per path (Spark for interjections, Glimmer for research)",
       "description": "As the system, I want each judgment made by the model that can make it in time.",
       "acceptanceCriteria": [
-        "Interjection candidates (CandidateGate) are gated by Muse Spark by default; research ideas (ResearchGate) stay on Glimmer, falling back to Spark. --gate on the eval and e2e can still force either path for A/B runs",
-        "tasks/decisions.md records the split and its measured basis (Glimmer gate 24-34 s vs 12-29 s windows; V2-021 e2e delivered planted moments 31.9 s and 50.1 s late; Spark 9/9 vs 7/9 moment recall)",
-        "npm run e2e: the planted moments in moment-contradiction and research-business-idea are delivered inside their windows (report delivery time vs deadline for each)",
+        "Interjection candidates (CandidateGate) are gated by Muse Spark by default; research ideas (ResearchGate) stay on Glimmer, falling back to Spark. --gate on the eval and e2e can still force either path, for A/B runs",
+        "tasks/decisions.md records the split and the measured basis above",
+        "npm run e2e: the planted moments in moment-contradiction and research-business-idea that were late overnight are delivered inside their windows (report the delivery time vs. the deadline for each)",
         "The eval report shows median gate latency per path",
         "Tests pass",
         "Typecheck passes"
@@ -21,15 +21,16 @@
     },
     {
       "id": "V3-002",
-      "title": "Noticing what the room is wondering (open_question)",
-      "description": "As the system, I need to tell a real open question Sotto can answer from a rhetorical one, an already-answered one, and one only the group can answer.",
+      "title": "Noticing what the room is wondering",
+      "description": "As the system, I need to tell a real open question that Sotto can answer from a rhetorical one, from one that's been answered, and from one only the group can answer, within seconds of it being said.",
       "acceptanceCriteria": [
-        "New candidate type open_question: asked or wondered aloud to the room (not to Sotto), not answered in the turns since, and answerable by lookup (web, later the knowledge folder). Not: questions only the group can answer, rhetorical questions, decisions",
-        "unanswered_question keeps questions only the group can answer (screen only); research_hook keeps 'we should look into X' requests (research gate as today)",
-        "The candidate carries question (cleaned), askedBy and sourceTurnId",
-        "Observer prompt defines open_question with positive and negative examples, including rhetorical and decision questions",
-        "New fixture rhetorical-questions (2-3 min, Craig and EJ): at least four rhetorical/decision questions, one question asked and answered by a person within two turns, one genuine open question (positive control); rendered, captured, added to the eval set",
-        "Integration test (events replay): offsite-plan's drive-time question yields an open_question; rhetorical-questions yields exactly one (the positive control)",
+        "A question classifier on final turns, built like the V2-008 address classifier and not through the observer: a lexical pre-filter (wh-words, \"wonder\", \"does anyone know\", \"we'd need to check\", \"how long/much/far/many\", \"what does/do \u2026 charge/cost\", a trailing \"?\") decides whether a turn is question-shaped, and only those go to one Spark call (reasoning_effort: \"low\", about 2 s) with the previous four final turns and speaker names. The pre-filter must pass every open question in the fixtures and must not send more than about a quarter of brainstorm's turns to the model",
+        "The classifier returns kind: open_question (asked or wondered aloud to the room, not to Sotto, and answerable by lookup: the web, or later the knowledge folder in V3-009. Examples: drive time, prices, opening hours, market size, a definition, a date), to_group (only the group knows: \"who's handling food?\"), rhetorical (\"who even uses fax anymore?\"), decision (\"should we do it?\"), answered (a person answered it in the same or the previous turn) or none; plus question (cleaned, the thing to look up), topic (three to five words, for \"I'll check the drive time\") and askedBy",
+        "open_question is not a candidate type and never reaches the observer, the candidate gate or the policy. It is a record of its own (origin: \"open_question\" on the research idea, V3-003). unanswered_question keeps the questions only the group can answer (on screen only). research_hook keeps \"we should look into X\" requests, which go to the research gate as today; the observer prompt is told that a question somebody just wondered aloud is already handled and is not a hook",
+        "A question with the wake word, or inside the V3-014 follow-up window, is the address path's, never this one. A turn that is a decision is handed to V3-013's decision_closing detection so the pair share one call",
+        "The prompt is server/prompts/question.md, with positive and negative examples, including rhetorical and decision questions. Every classification is logged in timing.jsonl as stage: \"question\" with turnId, kind, latencyMs; a Spark failure or timeout (6 s, wall clock) is none and logged fallback: true",
+        "A new fixture, rhetorical-questions (2\u20133 min, Craig and EJ): at least four rhetorical or decision questions, one question asked and answered by a person within two turns, and one genuine open question (positive control). Rendered, captured and added to the eval set",
+        "Integration test (events replay, real Spark): offsite-plan's drive-time question yields an open_question within 4 s of its final turn (session clock plus the call's wall time); rhetorical-questions yields exactly one, the positive control; brainstorm and no-wake yield none",
         "Tests pass",
         "Typecheck passes"
       ],
@@ -42,11 +43,11 @@
       "title": "Fast path from question to answer",
       "description": "As the system, when the room wonders something Sotto can look up, I want the answer ready while it still matters.",
       "acceptanceCriteria": [
-        "An open_question skips the 2-minute planner and starts research immediately, gated by Spark (answerable by search, useful now?), counted against the research budget (V2-012), deduplicated against earlier ideas and packets",
-        "The research runner adds packet.spokenAnswer: one or two sentences answering the question directly, written to be heard (sensible rounding, no URLs), grounded in the sources; zero sources means no spokenAnswer",
-        "The integration test checks with the judge that spokenAnswer answers the question asked (an overnight packet answered about AGM software for a question about meeting assistants)",
-        "Target: median <= 25 s from question turn final to packet ready, recorded as questionToPacketMs in research.jsonl on the e2e fixtures",
-        "Unit tests: fast path vs planner path, shared budget, dedupe",
+        "An open_question becomes a research idea at once: it skips the 2-minute planner and the research gate (the classifier already judged it answerable and asked by the room, so a second call on the same question is only latency) and starts the search immediately. It counts against the research budget (V2-012). Duplicates of earlier ideas and packets are dropped, as today; a duplicate of an idea whose packet already exists re-uses that packet and is answered from it",
+        "The research runner produces a packet with a new field, spokenAnswer: one or two sentences that answer the question directly, written to be heard (numbers rounded sensibly, no URLs), grounded in the sources. Packets with zero sources produce no spokenAnswer",
+        "A research card appears on the stage as soon as the question is accepted, carrying the question and a thinking indicator (the thinking state answers already use), and fills in when the packet is ready. The room, and a demo audience, can see Sotto working during the wait",
+        "Target: median \u2264 25 s from the question turn going final to the packet being ready, measured in research.jsonl (questionToPacketMs) on the e2e fixtures",
+        "Unit tests: fast path vs planner path, budget shared, dedupe, re-use of an existing packet",
         "Tests pass",
         "Typecheck passes"
       ],
@@ -55,139 +56,57 @@
       "notes": ""
     },
     {
-      "id": "V3-004",
-      "title": "Speaking the answer to the room",
-      "description": "As a user, when we wondered something aloud and Sotto found the answer, I want it to tell us briefly, at a natural moment, without talking over anyone.",
+      "id": "V3-015",
+      "title": "Claiming the question out loud",
+      "description": "As a user, when I wonder something aloud and Sotto is going to look it up, I want it to say so right away, the way a colleague says \"I'll check\", so I know not to reach for my phone.",
       "acceptanceCriteria": [
-        "When a spokenAnswer is ready, Sotto waits for a real pause (no open turn and >= SPEAK_PAUSE_MS, default 1500, since the last speechEnd), then speaks it attributed to the asker ('EJ, on the drive time: about two hours fifteen from the city.')",
-        "Still-open check right before speaking: one quick Spark call over the turns since the question (answered by a person, or clearly closed?); if closed, card only; result logged",
-        "Never over anyone: a speechStart after the decision to speak but before first audio cancels the utterance and retries at the next real pause; barge-in (V2-007) handles anyone who starts once it is speaking",
-        "Expiry: not spoken within 90 s of ready or after 6 more final turns -> card only",
-        "The research card still appears with sources; the spoken line appears in the transcript as Sotto's (V2-008a)",
-        "Counts against the frequency budget and cooldown (V2-017); muted or boldness cautious -> card only",
-        "timing.jsonl records spoken_contribution with kind answer, questionToSpeechMs, pauseWaitMs, stillOpen, cancelledForSpeech and barged-in",
-        "Offline simulated-clock tests: waits for a real pause, cancels when speech starts before audio, still-open closed -> card, expiry, budget, muted, cautious",
-        "Typecheck passes",
-        "Verify in browser using webapp-testing skill (replay offsite-plan with the null audio sink: the spoken line appears in the transcript and the card shows sources)"
+        "When an open_question starts research, Sotto speaks a reservation line at the first gap of PAUSE_MS (the policy's 700 ms, on corrected silence) that arrives within RESERVE_WINDOW_MS (default 5,000) of the classifier's verdict. The text is written locally from the classifier's topic, no model call: \"I'll check the drive time.\" If no gap arrives in the window, nothing is said; the card from V3-003 is the only sign, and the answer still follows under V3-004",
+        "A reservation yields to any human voice (V3-004's rule) and is never retried",
+        "A reservation is the contribution for budget purposes (V2-017 frequency cooldown and budget); the answer that follows is its completion, not a second contribution. Muted voice or boldness cautious means no reservation",
+        "If the search then fails or comes back unsourced after a reservation was spoken, Sotto closes the loop at the next real pause with one short line (\"Nothing solid on the drive time, sorry.\"), only if the question is still current (V3-004); otherwise the card says so",
+        "timing.jsonl records spoken_contribution with kind: \"reserve\", questionToReserveMs, whether it yielded, and (for the closing line) kind: \"no_answer\"",
+        "Offline tests on the simulated clock: spoken at the first gap; not spoken when no gap arrives in the window; yields; budget; muted; cautious; the no-answer line",
+        "Typecheck passes"
       ],
       "priority": 4,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "V3-014",
-      "title": "Follow-ups without the wake word",
-      "description": "As a user, once I've asked Sotto something and it has answered, I want to keep talking to it without saying 'Sotto' each time, and I want it to notice when we've gone back to talking among ourselves.",
+      "id": "V3-004",
+      "title": "Speaking the answer to the room",
+      "description": "As a user, when we wondered something aloud and Sotto found the answer, I want it to tell us briefly, at a natural moment, and to stop the instant one of us starts talking.",
       "acceptanceCriteria": [
-        "After Sotto finishes speaking an answer (addressed, unprompted, or an accepted offer) a follow-up window opens; 'Sotto is listening' stays visible in a distinct 'in conversation' style",
-        "Each final turn in the window is classified by Spark with Sotto's last answer and recent turns as context: to_sotto (a follow-up), to_room (humans resumed), or closing ('great, thanks'); may share code with the V2-008 address and V2-007 command classifiers",
-        "to_sotto -> answered like a wake question and the window stays open from the end of that answer; to_room or closing -> the window closes silently",
-        "When unsure, close: an ambiguous turn is treated as to_room",
-        "The window also closes after 20 s with no final turn or after 2 consecutive human-to-human turns; any person may follow up",
-        "Barge-in during an answer works as today; a barge-in new_question counts as to_sotto",
-        "timing.jsonl logs followup_window opened/closed with reason, and each classification with kind and latencyMs",
-        "Offline simulated-clock tests: follow-up answered, humans resuming closes, 'thanks' closes, timeout, two human turns, ambiguous -> closed",
-        "New fixture followups (2-3 min, Craig and EJ): a wake question, two follow-ups without the name, then the pair resume with a question addressed to each other by name (must NOT be answered), then a fresh wake question; rendered, captured, in the eval set; answered-when-not-addressed counts as a false answer, gate 0",
+        "When a spokenAnswer is ready, Sotto waits for a real pause: no open turn and at least SPEAK_PAUSE_MS of corrected silence (silentForMs, V2's endpointer correction). The default is measured, not guessed: run npm run eval:ceiling with the speak threshold over the open-question fixtures and choose the largest value that leaves every planted open question a pause inside its window with \u2265 500 ms of margin; record the number and the margins in decisions.md. Expect it near 1,000 ms: the real quiet measured inside planted windows is 930\u20131,610 ms, so 1,500 would exclude most of it",
+        "Still-current check, never in the critical path. Right when the packet is ready and again after every later final turn, one quick Spark call over the turns since the question returns current (the group is still on, or adjacent to, the topic), answered (a person answered it, and whether the sourced answer agrees) or moved_on. The verdict is cached, so between \"pause detected\" and first audio there is no model call. No final turn since the question means current with no call. moved_on means card only: a pause 40 s later is a pause in the new topic, and re-raising the old one is the interruption this story exists to avoid. answered and the answer agrees means a card marked confirmed and nothing spoken; disagrees means a card only, with the correction on screen",
+        "The spoken line is addressed to the room, never by name: \"On the drive time: about two hours fifteen from the city.\" Diarization labels are remapped on every reconnect (speakerMappingUncertain), and naming the wrong person is a worse failure than naming nobody",
+        "Yield to any voice. Unprompted speech (a reservation, an answer, a read-back, a probe, an offer) is cancelled by the first human partial the self-echo filter lets through, at any point in the utterance, no wake word and no classification. (Not on a bare speechStart: the echo filter decides on text, and Sotto must not cancel itself on its own echo. The cost is one partial's lag, about 300 ms.) Barge-in (V2-007) still applies on top. A yielded answer is retried once at the next real pause if still current; yielded twice, it becomes a card only. Answers to direct questions keep the wake-word rule: the room asked for those",
+        "Expiry: an answer not spoken within 90 s of being ready, or after 6 more final turns, becomes a card only",
+        "The research card still appears, with sources. The spoken line appears in the transcript as Sotto's (V2-008a)",
+        "Counts against the frequency budget and cooldown (V2-017), unless a reservation already did. Muted voice means card only. Boldness cautious means card only",
+        "timing.jsonl records spoken_contribution with kind: \"answer\", questionToSpeechMs, pauseWaitMs, stillCurrent (verdict and the latency of the call that produced it), yielded (count) and whether it was barged-in",
+        "Offline tests on the simulated clock: waits for a real pause; no model call between pause and speech; yields to a human partial mid-utterance and retries once; still-current moved_on \u2192 card only; answered agreeing \u2192 confirmed card; expiry; budget; muted; cautious",
         "Typecheck passes",
-        "Verify in browser using webapp-testing skill (replay followups: the in-conversation indicator appears after the answer and clears when the humans resume)"
+        "Verify in browser using webapp-testing skill (replay offsite-plan with the null audio sink: the reservation and the answer appear in the transcript as Sotto's lines, and the card shows sources)"
       ],
       "priority": 5,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "V3-013",
-      "title": "Probing questions at decision points",
-      "description": "As a user, when we're about to lock in a decision with an unexamined risk, I want Sotto to ask one specific question instead of telling us we're wrong.",
+      "id": "V3-006",
+      "title": "The room can turn Sotto down, or up",
+      "description": "As a user, I want to steer how forward Sotto is just by talking to it, and I want it to take the hint when we keep talking over it.",
       "acceptanceCriteria": [
-        "Corrections become questions everywhere: card text for contradiction, untested_assumption and dropped_thread is a specific question tied to what was said; the observer prompt names generic coach-speak ('Have you considered your audience?') as a bad example",
-        "New signal decision_closing: the group is settling something ('OK, let's go with six gardens', 'so we're agreed on Saturday'); the observer flags it on the final turn",
-        "Spoken only at a decision point: if a decision_closing turn relates to an open contradiction or untested_assumption candidate that passed the gate, Sotto speaks one probing question at the next real pause under the V3-004 rules (real pause, never over anyone, still-open check, expiry 20 s); no relevant candidate -> nothing spoken",
-        "At most one spoken probing question per 10 minutes; counts against the frequency budget; cautious or muted -> card only; the room's quieter (V3-006) applies once built",
-        "Logged as spoken_contribution with kind probe, the decision turn and the candidate",
-        "Fixtures: planted decision moments, some with a real unexamined risk (expectedLevel speak) and some without; integration test (events replay): the risky decision gets a question, the safe decision and brainstorm get none",
-        "Tests pass",
+        "During, or within 15 s after, an unprompted contribution, an addressed \"stop\", \"not now\", \"too much\" or similar (V2-007 command classification gains quieter) stops speech and lowers frequency one step for the rest of the session. \"Sotto, you can jump in more\" (louder) raises it one step",
+        "Being talked over is a hint. Two yields (V3-004) inside 10 minutes lower frequency one step, silently, with the on-screen note below. Yields during an answer to a direct question don't count",
+        "The header controls reflect the change, and it's saved in session settings. A short on-screen note says what changed (\"Sotto will speak up less\")",
+        "A barge-in \"stop\" during an unprompted contribution counts as quieter; during an answer to a question it doesn't",
+        "Logged in timing.jsonl",
+        "Offline tests, including the two-yields rule",
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "V3-008",
-      "title": "Corrections go on screen",
-      "description": "As a user, I want Sotto's corrections available but never forced on the room.",
-      "acceptanceCriteria": [
-        "contradiction, factual_error, untested_assumption, dropped_thread and unanswered_question are cards only in every mode, except a probing question at a decision point (V3-013) and a verified factual_error at boldness bold (one sentence under the V3-004 rules)",
-        "The interjection eval gates are unchanged (they measure deliveries, not speech)",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 7,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "V3-010",
-      "title": "Eval for unprompted speech",
-      "description": "As the developer, I need to measure unprompted speech the way the interjection eval measures cards.",
-      "acceptanceCriteria": [
-        "Fixture moments gain expectedLevel speak for open questions and risky decisions Sotto should speak to (offsite-plan drive time, the rhetorical-questions positive control, V3-013's planted risky decisions)",
-        "Scoring: a speak moment is caught if Sotto speaks something the judge matches to it, at a real pause, before any human answered it, within its window; false speech is any unprompted utterance on brainstorm, no-wake or rhetorical-questions that matches no moment; answered-when-not-addressed on followups is a false answer",
-        "Gates: speak recall >= 0.6; zero false speech; zero false answers on followups; 100% of spoken contributions at a real pause; existing gates unchanged",
-        "Report adds a spoken-contributions table: moment, text, questionToSpeechMs, pause wait, still-open result",
-        "The e2e (real time) applies the same scoring to its fixtures, since only real time shows real latency",
-        "Typecheck passes"
-      ],
-      "priority": 8,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "V3-011",
-      "title": "HUMAN CHECKPOINT: live test of speaking up",
-      "description": "As the team, we need to hear whether Sotto speaking up unprompted is welcome before tuning further.",
-      "checkpoint": "tasks/checkpoint-speaking.md",
-      "acceptanceCriteria": [
-        "The loop does not start this story until tasks/checkpoint-speaking.md exists (ralph.sh enforces this)",
-        "A human runs a ~10-minute live session (two people if possible, a phone voice as stand-in otherwise): wonder aloud about lookup-able things, ask rhetorical questions, answer one yourselves before Sotto does, settle a risky and a safe decision, ask Sotto something and follow up twice without its name then return to each other, and say 'not now' once; plus the deferred V2-008 checks (side talk during speech, crosstalk)",
-        "tasks/checkpoint-speaking.md records each unprompted contribution (what, welcome?, timing, false or late) and 'Would you leave it on?', ending RESULT: PASS or RESULT: FAIL with notes",
-        "If RESULT: PASS: set passes true and summarize the findings in notes",
-        "If RESULT: FAIL: fix the listed problems in this iteration, commit, rename the file to tasks/checkpoint-speaking-fail-<n>.md (so the loop stops again for a retest), and leave passes false with notes"
-      ],
-      "priority": 9,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "V3-005",
-      "title": "Asking first for anything longer",
-      "description": "As a user, I want Sotto to offer longer contributions and let us decide.",
-      "acceptanceCriteria": [
-        "A packet from the planner or a research_hook (not an open question with a short answer) is offered aloud at a real pause in one sentence ('I've got a quick rundown on competitors if you want it'); the card appears at the same time",
-        "For 10 s after the offer, the next final turn from anyone is classified by Spark as yes / no / unrelated with no wake word needed; yes -> the V2-015 spoken briefing from that packet; no or unrelated -> nothing more, the card stays",
-        "At most one open offer at a time; offers count against the frequency budget",
-        "Logged as spoken_contribution with kind offer and its outcome",
-        "Offline tests: yes, no, unrelated, timeout, a second offer while one is open",
-        "Typecheck passes"
-      ],
-      "priority": 10,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "V3-006",
-      "title": "The room can turn Sotto down, or up",
-      "description": "As a user, I want to steer how forward Sotto is just by talking to it.",
-      "acceptanceCriteria": [
-        "During or within 15 s after an unprompted contribution, an addressed 'stop' / 'not now' / 'too much' (command classification gains quieter) stops speech and lowers frequency one step for the session; 'Sotto, you can jump in more' (louder) raises it one step",
-        "Header controls reflect the change and it is saved in session settings; a short on-screen note says what changed",
-        "A barge-in 'stop' during an unprompted contribution counts as quieter; during an answer to a question it does not",
-        "Logged in timing.jsonl",
-        "Offline tests",
-        "Typecheck passes"
-      ],
-      "priority": 11,
       "passes": false,
       "notes": ""
     },
@@ -196,11 +115,127 @@
       "title": "The hello sets expectations",
       "description": "As a user, I want Sotto to tell us up front that it may chime in, and how to stop it.",
       "acceptanceCriteria": [
-        "server/prompts/hello.md adds one sentence: Sotto may chime in when the group wonders something it can look up, and 'Sotto, not now' quiets it",
+        "server/prompts/hello.md adds, in one sentence, that Sotto may chime in when the group wonders something it can look up, that it will stop if anyone starts talking, and that \"Sotto, not now\" quiets it for the rest of the meeting",
         "The hello stays under about 20 s spoken (measured from a real render)",
         "Typecheck passes"
       ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "V3-008",
+      "title": "Sotto's own corrections go on screen",
+      "description": "As a user, I want Sotto's corrections available but never forced on the room.",
+      "acceptanceCriteria": [
+        "contradiction, factual_error, untested_assumption, dropped_thread and unanswered_question are delivered as cards only, in every mode, with two exceptions: the group's own unsettled question attached to a read-back (V3-013), and a verified factual_error at boldness bold, which may be spoken in one sentence under the V3-004 pause, still-current, yield and expiry rules",
+        "Corrections become questions everywhere. Card text for contradiction, untested_assumption and dropped_thread is phrased as a specific question tied to what was said (\"Before six gardens: what if only one signs up?\"), not an assertion. The observer prompt gives good and bad examples; generic coach-speak (\"Have you considered your audience?\") is a named bad example",
+        "The interjection eval gates are unchanged (they measure deliveries, not speech)",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "V3-013",
+      "title": "Read-backs and probing questions at decision points",
+      "description": "As a user, when we're about to lock in a decision, I want Sotto to read it back the way a good note-taker does, and if one of us raised a risk against it that never got settled, to remind us in our own words, not to tell us we're wrong.",
+      "acceptanceCriteria": [
+        "A new signal, decision_closing: the group is settling something (\"OK, let's go with six gardens\", \"so we're agreed on Saturday\", \"let's lock that in\"). Detected on the final turn by the V3-002 question classifier's call (its decision kind grows a closing: true with the decision in a few words), so it costs no extra call and is not late by a board update. The board's add_decision is the backstop",
+        "The read-back. At the next real pause after a decision_closing, Sotto speaks one line in the scribe's voice: \"Got it: six gardens, Saturday.\" Yield, still-current and expiry (20 s) rules from V3-004 apply. A read-back with nothing attached is spoken only at frequency often; otherwise the decision just lands on the board as today",
+        "The attached question. If an open dropped_thread or unanswered_question candidate that passed the gate relates to the decision, the read-back carries it, quoted from the group: \"Got it: six gardens. EJ's question about only one signing up, did that get settled?\" This is spoken at every frequency except where the budget says no. A contradiction or untested_assumption of Sotto's own that relates to the decision is attached on screen as a prominent card beside the read-back, and spoken only at boldness bold; the PRD's earlier \"Before you lock in six gardens: what if only one signs up?\" is that card's text, never Sotto's unprompted voice at default settings",
+        "At most one spoken read-back per 5 minutes and one attached question per 10 minutes. Counts against the frequency budget. Boldness cautious or muted means card only. quieter from the room (V3-006) applies",
+        "Logged as spoken_contribution with kind: \"readback\" (and attached: \"group\" | \"own\" | null), the decision turn and the candidate",
+        "Fixture work: add planted decision moments to existing or new fixtures, some where the group itself raised and dropped a risk (a read-back with the group's question expected, expectedLevel: \"speak\"), some where only Sotto would see a risk (a card expected, nothing spoken at default settings) and some with no risk (nothing or a bare read-back). Integration test (events replay): the first gets the question, the second gets the card and no speech, the third and brainstorm get nothing attached",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "V3-010",
+      "title": "Eval for unprompted speech",
+      "description": "As the developer, I need to measure unprompted speech the way the interjection eval measures cards.",
+      "acceptanceCriteria": [
+        "Fixture moments gain expectedLevel: \"speak\" for open questions Sotto should answer aloud (offsite-plan drive time; others where natural; the positive control in rhetorical-questions) and for the V3-013 read-backs with a group question attached",
+        "The eval scores spoken contributions: a moment is caught if Sotto speaks an answer the judge matches to it, at a real pause, before any human answered it, and within its window. A reservation (V3-015) is scored separately as reserved with its questionToReserveMs. False speech is any unprompted utterance on brainstorm, no-wake or rhetorical-questions that matches no moment, reservations included",
+        "Gates: speak recall \u2265 0.6; zero false speech on those three fixtures; 100% of spoken contributions at a real pause; zero unprompted utterances that continued over a human turn (read off the transcript: a Sotto line overlapping a human line that started after it, with no yield logged). Existing gates unchanged",
+        "The report adds a spoken-contributions table: moment, kind, text, questionToReserveMs, questionToSpeechMs, pause wait, still-current result, yields",
+        "The e2e (real time) runs the same scoring on its fixtures, since only real time shows real latency",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "V3-016",
+      "title": "Shadow run on a real conversation",
+      "description": "As the team, before anyone hears Sotto speak up unprompted, I want to read what it would have said during a real meeting we already had, so the first live test isn't also the first look at its judgment.",
+      "acceptanceCriteria": [
+        "npm run shadow -- <session folder> replays a past mic session's events.jsonl through the full v3 pipeline at max speed with the voice on the null sink (V2-021's nullSinkVoice) and the hello suppressed, and writes tasks/shadow-<session>.md: every unprompted contribution it would have made (reservation, answer, read-back, attached question, offer) with the trigger turn quoted, the text, its timing from the trigger, the still-current verdict and whether a pause was found; and every open question the classifier saw, with its kind, so false negatives are visible too. The policy's silent decisions go in a final \"almost said\" section",
+        "The stage gets an \"almost said\" tray: a collapsed list, below the cards, of what the policy held back this session (candidate headline, reason), built from the same records the digest's \"What Sotto almost said\" uses. Restraint made visible, and the cheapest demo of judgment there is",
+        "Run it on at least one real session from sessions/ and commit the report. A human reads it before V3-011 and writes verdicts (welcome / not / wrong) beside each line; the checkpoint script refers to it",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "V3-011",
+      "title": "HUMAN CHECKPOINT, live test of speaking up",
+      "description": "As the team, we need to hear whether Sotto speaking up unprompted is welcome before tuning it further.",
+      "acceptanceCriteria": [
+        "The loop does not start this story until tasks/checkpoint-speaking.md exists (ralph.sh enforces this)",
+        "Before the session, a human has read the V3-016 shadow report and written verdicts in it",
+        "A human runs a live session of about 10 minutes, with two people if possible (a phone voice as a stand-in otherwise): wonder aloud about things that can be looked up, ask rhetorical questions, answer a question yourselves before Sotto does, start talking while Sotto is mid-sentence and confirm it stops, settle a decision after one of you raised a risk and dropped it, settle one with no risk, tell Sotto \"not now\" once, and talk over it twice to see the frequency drop. Also cover the deferred V2-008 checks (side talk during Sotto's speech, two people talking at once). Follow-ups without the wake word (V3-014) and offers (V3-005) are built after this checkpoint and aren't tested here",
+        "tasks/checkpoint-speaking.md records, for each unprompted contribution: what was said, whether it was welcome, its timing, whether it yielded cleanly, and any false or late ones, then \"Would you leave it on?\" and RESULT: PASS or RESULT: FAIL with notes",
+        "On FAIL: fix the listed problems in this iteration, commit, rename the file to tasks/checkpoint-speaking-fail-<n>.md (so the loop stops again for a retest), and leave passes false with notes. On PASS: set passes true and summarize"
+      ],
       "priority": 12,
+      "passes": false,
+      "notes": "",
+      "checkpoint": "tasks/checkpoint-speaking.md"
+    },
+    {
+      "id": "V3-014",
+      "title": "Follow-ups without the wake word",
+      "description": "As a user, once I've asked Sotto something and it has answered, I want to keep talking to it (\"why's that?\", \"and on Sunday?\") without saying \"Sotto\" each time, and I want it to notice when we've gone back to talking among ourselves.",
+      "acceptanceCriteria": [
+        "After Sotto finishes speaking an answer (addressed, unprompted, or an accepted offer), a follow-up window opens. While it's open, \"Sotto is listening\" stays visible, in a distinct \"in conversation\" style",
+        "Every final turn in the window is classified by Spark, with Sotto's last answer and the recent turns as context: to_sotto (a follow-up: \"why's that?\", \"how much would that cost?\", \"and on Sunday?\", \"where did you get that?\"), to_room (the humans have resumed: \"OK EJ, what do you think?\", a new topic among themselves), or closing (\"great, thanks\", \"got it\"). This shares the V3-002 question classifier's call where a turn is question-shaped, and the V2-008 address classifier's otherwise",
+        "to_sotto \u2192 answered like a wake question (acknowledgment, spoken answer, card), and the window stays open from the end of that answer. to_room or closing \u2192 the window closes; nothing is said",
+        "When unsure, close. An ambiguous turn is treated as to_room. A turn that names another person is to_room without a call. Answering a question meant for a person is worse than making the user say \"Sotto\" again",
+        "The window also closes after 20 s with no final turn, or after 2 consecutive turns between humans. Any person may follow up, not only the original asker",
+        "Barge-in during an answer works as today. A barge-in new_question counts as to_sotto",
+        "Logged in timing.jsonl: followup_window opened/closed with the reason, and each classification with kind and latencyMs",
+        "Offline tests on the simulated clock: a follow-up answered, humans resuming closes it, \"thanks\" closes it, timeout, two human turns, ambiguous \u2192 closed, a named person \u2192 closed with no call",
+        "A new fixture, followups (2\u20133 min, Craig and EJ): a wake question, two natural follow-ups without the name, then the pair resume among themselves with a question addressed to each other by name (which must not be answered), then later a fresh wake question. Rendered, captured, and in the eval set. The eval counts answered-when-not-addressed as a false answer, gate 0",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (replay followups: the in-conversation indicator appears after the answer and clears when the humans resume)"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "V3-005",
+      "title": "Offering anything longer",
+      "description": "As a user, I want Sotto to tell us when it has something longer and let us decide, without putting us on the spot.",
+      "acceptanceCriteria": [
+        "A packet from the planner or a research_hook (not an open question with a short answer) is offered aloud at a real pause, as a statement, not a question: \"There's a quick rundown on competitors on screen if you want it.\" Nobody owes it a reply. The card appears at the same time. Yield and still-current rules from V3-004 apply; an offer about a topic the room has moved on from is the card alone",
+        "For 10 s after the offer, the next final turn from anyone is classified by Spark as yes (\"sure\", \"go ahead\", \"yeah let's hear it\"), no (\"not now\", \"later\") or unrelated, with no wake word needed. yes \u2192 the V2-015 spoken briefing from that packet. no or unrelated \u2192 nothing more; the card stays",
+        "At most one open offer at a time; offers count against the frequency budget",
+        "Logged as spoken_contribution with kind: \"offer\" and its outcome",
+        "Offline tests: yes, no, unrelated, timeout, a second offer while one is open, moved-on \u2192 card only",
+        "Typecheck passes"
+      ],
+      "priority": 14,
       "passes": false,
       "notes": ""
     },
@@ -209,14 +244,14 @@
       "title": "Offering ideas when the group is stuck",
       "description": "As a user, when we're going around in circles, I want Sotto to offer a few ideas, only if we want them.",
       "acceptanceCriteria": [
-        "New candidate type stall: the same question or problem revisited across >= 3 turns without progress, or explicit 'I don't know'/'we're stuck' with no new idea following; defined with negative examples (a normal pause, thinking aloud once)",
-        "A stall is offered, never volunteered ('Want a few ideas on the name?') using the V3-005 ask-first flow; yes -> up to three short ideas spoken in ~20 s plus a card",
+        "A new candidate type, stall: the same question or problem revisited across at least 3 turns without progress, or explicit \"I don't know\"/\"we're stuck\" with no new idea following. Defined in the observer prompt with negative examples (a normal pause, someone thinking aloud once, a disagreement being worked through: a group circling because two people disagree is not stuck, and an outsider's ideas there land as taking a side)",
+        "A stall is offered, never volunteered, as a statement in the V3-005 shape: \"I've got a few ideas on the name if they'd help.\" yes \u2192 up to three short ideas, spoken in about 20 s, plus a card",
         "At most one stall offer per 10 minutes",
-        "Integration test (events replay) on a fixture with a planted stall: detected and offered; brainstorm produces no stall offer",
+        "Integration test (events replay) on a fixture with a planted stall (add one to rhetorical-questions or a new fixture): the stall is detected and offered. brainstorm produces no stall offer",
         "Tests pass",
         "Typecheck passes"
       ],
-      "priority": 13,
+      "priority": 15,
       "passes": false,
       "notes": ""
     },
@@ -225,13 +260,13 @@
       "title": "The knowledge folder (stretch)",
       "description": "As a user, I want Sotto to answer from our own files, not just the web.",
       "acceptanceCriteria": [
-        "A folder (KNOWLEDGE_DIR, default knowledge/, git-ignored) of .md, .txt and .csv files is indexed at session start (plain-text search is fine)",
-        "The research runner gets a search_knowledge tool next to web_search and cites files as sources ('file: customers.csv')",
-        "fixtures/knowledge-demo/ holds a small, clearly labelled fictional company (customer list with renewal dates, price sheet, notes) for the demo and tests",
+        "A folder (KNOWLEDGE_DIR, default knowledge/, git-ignored) of .md, .txt and .csv files is indexed at session start (plain-text search is fine; no embeddings required)",
+        "The research runner gets a search_knowledge tool next to web_search, and cites files as sources (file: customers.csv)",
+        "fixtures/knowledge-demo/ holds a small fictional company (a customer list with renewal dates, a price sheet, notes), clearly labelled fictional, for the demo and tests",
         "Integration test: an open question about a customer's renewal date is answered from the folder with a file citation",
         "Typecheck passes"
       ],
-      "priority": 14,
+      "priority": 16,
       "passes": false,
       "notes": ""
     }
