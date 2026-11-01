@@ -1257,3 +1257,27 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   a spurious diff — `git checkout` the file afterwards. Scoring stays backwards compatible: a
   pre-V2-019 record has no `research`, which reads as "nothing was looked up" and skips the new
   gate with `no research moments in this run`.
+
+- **The eval cannot charge a gate for the time it takes, so a passing report is not a
+  passing room.** V2-020 ran the whole nine-fixture set twice with byte-identical prompts:
+  `--gate glimmer` passes all five gates (recall 7/9, research recall 2/3, 9/9 deliveries
+  in a pause, $3.71, 36 min) and `--gate spark` fails research recall at 1/3 while beating
+  it on recall (9/9) and precision (5/6). So `DEFAULT_GATE_MODE` stays `glimmer` — the
+  gateless run is the one whose committed report fails — and the local gate's **23.7 s
+  median** (12/12 calls local, 20.5–28.5) is written down instead. That latency is *free*
+  in the report because simulated time does not move inside `clock.track`, and the planted
+  windows are 11.8–28.7 s wide (median ~21): a candidate held 23.7 s for a verdict misses
+  seven of twelve. `npm run e2e` is the only check that runs a gate against real wall
+  clock. When a judgment model's cost is time rather than money, the replay is the wrong
+  instrument — reach for the live run before concluding the gate is affordable.
+- **A research hook split in two costs a search slot, and on a short conversation that is
+  a moment.** The research budget is 3 searches per 10 minutes and the v2 fixtures are
+  under three minutes, so a conversation gets three slots for the whole run and *which
+  three ideas take them* is the whole of research recall. Measured: the Glimmer run's
+  observer asked "how large is the market **and** who has raised in this niche?" as one
+  hook and caught `competitor-gaps`; the Spark run's split the same request into two hooks
+  at the same instant, spent a third slot on a near-duplicate, and the ideal question —
+  user complaints, approved by the research gate at 0.90, arriving *inside* the window —
+  was never searched. Neither outcome is the candidate gate's doing: a `research_hook`
+  never reaches it (V2-011). Read `research.jsonl`'s idea/gate/start lines before blaming
+  a prompt, and remember the research-recall gate moves in steps of 0.33 on three moments.
