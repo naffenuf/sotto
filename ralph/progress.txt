@@ -219,3 +219,32 @@ and closes the loop when nothing comes back.
   question's answer leaves the window open, so a `stop` during that answer would read as
   `quieter`. A card *is* an unprompted contribution, so this is the PRD's rule applied literally;
   if it bites, the fix is to open the window only for *spoken* contributions.
+
+[2026-11-01 08:45] V3-012 — completed — the hello now says Sotto may chime in, that it stops when anyone talks, and that anyone can quiet it; 18.4 s measured on a real render.
+
+- **One sentence, three facts.** `server/prompts/hello.md`'s new middle sentence covers the
+  criterion exactly — "If you wonder something out loud I can look up, I may chime in; I'll stop
+  the moment anyone talks, and any of you can say 'Sotto, not now' to keep me quiet for the rest
+  of the meeting." — while V2-009's four required elements (who it is, that it is listening, how
+  to address it, the invitation to introduce themselves) all stay. The rest of the text was
+  trimmed to pay for it ("I'm listening in and keeping notes" → "I'm listening and keeping
+  notes", "I think it's worth it" → "it's worth it", "If you want me, just say 'Sotto' and ask."
+  → no "and ask", "Before you get going, would you each…" → "Would you each…").
+- **The budget is measured, not predicted.** `npm run hello:measure`
+  (`scripts/measure-hello.ts`) renders hello.md once through the real ElevenLabs REST endpoint in
+  Sotto's own voice on `eleven_flash_v2_5` and reads the duration off the PCM byte count
+  (24 kHz mono, so bytes/2/24000 s), exiting 1 over 20 s. It writes nothing — the live hello is
+  synthesized fresh every session. Costs one request (~0.03 USD at 361 characters).
+- **Measured.** Old hello 44 words / 10.5 s / 4.17 w/s. First draft 83 words / 21.5 s / 3.87 w/s
+  — FAIL, so a word count is not a prediction: the long sentence's em dash and quotes cost a
+  third of a word per second. Shipped text 74 words / 361 characters / **18.4 s** / 4.01 w/s,
+  1.6 s under the budget. Typecheck clean, `npm test` 1,335 pass.
+- **Nothing asserted on the old words.** Every reader goes through `loadPrompt(PROMPTS.hello)` or
+  reads the file (`scripts/verify-hello.mjs`), including `selfEcho.test.ts`'s
+  `not.toContain("just say")`, which the new text still satisfies. No browser check was run: it
+  is not a criterion for this story and `verify:hello` would re-prove V2-009 at the cost of a
+  transcription session.
+- **Worth knowing for V3-011.** The hello is now ~8 s longer, so more of a live conversation's
+  opening lines overlap Sotto's playback and carry V2-006's `suppressTriggers`. The four wake
+  lines in the fixtures all land far later, and `npm run e2e` pays ~0.015 USD more per fixture in
+  TTS characters.

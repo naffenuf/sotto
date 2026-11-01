@@ -120,8 +120,8 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "server/prompts/hello.md gained one sentence covering all three facts the criterion names (may chime in when the room wonders something it can look up; stops the moment anyone talks; anyone can say \"Sotto, not now\" for the rest of the meeting), while keeping V2-009's four elements. Measured with the new `npm run hello:measure` (scripts/measure-hello.ts: one real ElevenLabs REST render in Sotto's own voice on eleven_flash_v2_5, duration read off the PCM byte count, exit 1 over 20 s): 74 words, 361 characters, 18.4 s, 4.01 words/second. The first draft was 83 words / 21.5 s and had to be trimmed - the River voice reads the old hello at 4.17 w/s but a sentence with an em dash and quotes drops to 3.87, so predict from a render, not from a word count. Typecheck clean, npm test 1,335 pass (every reader of the hello loads it through loadPrompt or reads the file, so nothing asserted on the old words). No browser check: not a criterion for this story, and verify:hello reads hello.md dynamically."
     },
     {
       "id": "V3-008",

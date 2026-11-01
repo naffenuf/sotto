@@ -1503,3 +1503,17 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   live path is V3-011's checkpoint. Same family as the `instantWallClock` and
   "tracked work always beats a pause timer" lessons: the fake clock decides which branch a test is
   really on.
+
+- **The hello's length is measured, not predicted.** V3-012 added one sentence to
+  `server/prompts/hello.md` (Sotto may chime in when the room wonders something it can look up, it
+  stops the moment anyone talks, and any of them can say "Sotto, not now" for the rest of the
+  meeting) against a 20-second budget, and the word count lied: the old hello reads at **4.17
+  words/second** in the River voice but a long sentence with an em dash and quoted speech drops to
+  **3.87**, so the 83-word first draft came back at 21.5 s. `npm run hello:measure`
+  (`scripts/measure-hello.ts`) renders the file once through the real ElevenLabs REST endpoint in
+  Sotto's own voice and reads the duration off the PCM byte count (24 kHz mono: bytes/2/24000 s),
+  exiting 1 over budget; the shipped text is 74 words / 361 characters / **18.4 s**. Whatever is
+  added here has to be paid for by trimming the rest, because V2-009's four elements — who it is,
+  that it is listening, how to address it, the invitation to introduce themselves — all have to
+  survive, and every reader loads the words through `loadPrompt(PROMPTS.hello)` or reads the file,
+  so none of them needs changing.
