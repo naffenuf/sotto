@@ -66,3 +66,38 @@ their own Spark classifier, not by the observer.
   gate. `questions.flush()` already runs before `research.flush()` in `drainLoops`.
   `QuestionWatcherOptions.inFollowUpWindow` is the seam V3-014 wires; the `decision` kind is
   classified and logged but has nowhere to go until V3-013 adds `closing` to it.
+
+[2026-11-01 07:30] V3-003 — completed — a question the room wondered aloud becomes a search at
+once, with a card on the stage saying so.
+- `ResearchManager.acceptQuestion` is the whole path: dedupe, then **straight into the run
+  queue**, unshifted ahead of the planner's and the hooks' ideas, with **no gate call at all**
+  (`--gate` is irrelevant here; the classifier made that judgment). The budget is shared
+  unchanged. It returns `accepted | reused | duplicate`, and `SessionManager.noticeQuestion`
+  — still the one call site — is what acts on it.
+- `ResearchIdea.askedAtMs` is the one piece of history an idea carries, because the thing being
+  measured spans the path: `ResearchPacketRecord.questionToPacketMs` is stamped on **every**
+  outcome, so V3-015's "nothing came back" has a latency too.
+- `ResearchPacket.spokenAnswer` is in the same reply as the rest (no second call): required in
+  the strict JSON schema, **optional in zod**, so a model that omits it loses the line rather
+  than the packet. `research-packet.md` asks for it as something heard once.
+- `ResearchCards` grew three methods and no new rules: `pending()` (thinking card now, id
+  `research-<ideaId>`, outside `CARD_ID_PREFIX` like every research card), `accept()` filling
+  that same card in with no pause and no budget — `filledIn: true` — and `failed()`, because a
+  spinner that never stops is worse than a short no. `reuse()` brings an earlier packet's card
+  forward. `ResearchCardRecord.cardId` is now written down rather than derived, since a
+  question's card id is not `researchCardId(packetId)`; `server/eval/runner.ts` reads it.
+- **Measured** (`npm run e2e -- --fixtures offsite-plan`, the new `QUESTION_FIXTURE`, 7/7
+  checks, $0.6954 of a $1.00 allowance, 167 s of audio in 179 s): drive time final at 57.7 s ->
+  idea at 60.6 s (classifier 2.8 s) -> packet at 70.9 s = **13.1 s**; Thursday availability
+  **28.2 s** (its search alone was 23.6 s). Median **20.7 s** against the PRD's 25 s. The e2e
+  report prints `question N looked up; question -> packet median …` per fixture.
+- Next (V3-015/V3-004) should know: `ResearchCards.pending` already returns the card id, and
+  `OpenQuestion.topic` is what the reservation line is written from — the two packets from
+  this run are "the drive time" and "farmhouse Thursday availability". Both of
+  `offsite-plan`'s questions name **no venue**, so the honest `spokenAnswer` is "I couldn't
+  find a straight answer on the drive time — there's no farmhouse or starting point named";
+  that is the fast path working, not failing, and it is also the V3-015 no-answer case a
+  real room would hear. A packet still counts as `ready` there, because it had sources.
+- The `max` replay cannot see any of this timing (simulated time stands still inside
+  `clock.track`), so `questionToPacketMs` reads near zero in `npm run eval` and in
+  `fastPath.integration.test.ts`. Only the e2e charges for a search.

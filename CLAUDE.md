@@ -1370,3 +1370,39 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   only the group can answer). And `question.md` has to rule out the *reply* — "No idea at all, I
   haven't looked at their pricing since last year" is an answer to the question before it, and
   without that rule it comes back as a second `open_question` about the same thing.
+
+- **The fast path is fast by subtraction, and the only thing it adds is a card.** V3-003's
+  `ResearchManager.acceptQuestion` keeps stage 1 (dedupe) and stage 3 (budget) of V2-012 and
+  drops stage 2: a `research_hook` is gated because nobody asked for it, while an
+  `open_question` has already been judged answerable-by-lookup and asked-of-the-room by the
+  V3-002 classifier, so a second verdict (16–30 s) would cost the only thing the answer has.
+  The idea is **unshifted** onto `toRun`, ahead of whatever the planner left there. Measured
+  live on `offsite-plan` (`npm run e2e --fixtures offsite-plan`, 7/7, $0.70): question final →
+  idea 2.8 s (the classifier), → packet 13.1 s and 28.2 s, median **20.7 s** against the PRD's
+  25 s — and the second one's *search* was 23.6 s, so the variance is the web, not the pipeline.
+  `questionToPacketMs` is on **every** packet line, outcome included, because "we wondered and
+  nothing came back" is a latency V3-015 has to close out loud.
+- **A `max` replay cannot measure the fast path at all.** Simulated time does not move inside
+  `clock.track`, so `questionToPacketMs` reads near zero in `npm run eval` and in
+  `fastPath.integration.test.ts`; `shared/e2e.ts`'s `QUESTION_FIXTURE` (`offsite-plan`) is the
+  clock that charges for a search, exactly as `RESEARCH_FIXTURE` is for V2-013. Adding a
+  fixture to `E2E_FIXTURES` is four edits: the list, `MIN_TRANSCRIPT_LINES`,
+  `EXPECTED_WAKE_TRIGGERS` (offsite-plan addresses Sotto once, at line 34) and
+  `FIXTURE_BUDGET_USD`.
+- **A card id outlives the thing it was derived from.** A question's card goes up before its
+  packet exists, so it is `researchQuestionCardId(ideaId)` and the packet *fills that card in*
+  rather than pushing `researchCardId(packetId)` beside it — which is why
+  `ResearchCardRecord.cardId` is now written down instead of derived by the readers
+  (`server/eval/runner.ts` was deriving it). The two card rules do not apply to it, for
+  `bringForward`'s reason: the room asked, so there is no pause to wait for and no
+  unsolicited budget to spend. A search that fails or comes back unsourced must still stop the
+  spinner — `ResearchCards.failed` — and `Card.tsx`'s collapsed line falls back to `message`,
+  because an `error` card with an empty headline was rendering a blank button.
+- **`spokenAnswer` rides the packet's own reply, and zod is deliberately laxer than the
+  schema.** Strict structured output requires every property, so the model always returns it;
+  the zod field is `.optional()` anyway, because a search that came back with a title, a
+  teaser and five findings is a good packet whether or not the spoken line survived, and
+  losing the search over it is the worse trade. Written to be heard: ≤ 40 words, no URL, no
+  list, numbers rounded — and on `offsite-plan` the honest answer to both planted questions is
+  "I couldn't find a straight answer … there's no farmhouse or starting point named", which is
+  the model doing the right thing with an underspecified question, not a regression.
