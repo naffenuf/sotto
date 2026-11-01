@@ -70,10 +70,14 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
   app.get("/api/fixtures", async (): Promise<FixtureListResponse> => listFixtures());
 
-  app.get("/api/history", async () => listHistory());
+  // Replayed sessions are browsable in a dev build only (V2-018): a `wav` or
+  // `events` folder is a recording being played back rather than a
+  // conversation a group had, and there are dozens of them in a checkout.
+  const history = { replays: process.env.SOTTO_DEV === "1" };
+  app.get("/api/history", async () => listHistory(undefined, history));
   app.get<{ Params: { folder: string } }>("/api/history/:folder", async (request, reply) => {
-    const history = await readHistory(request.params.folder);
-    return history ?? reply.code(404).send({ error: "Discussion not found" });
+    const discussion = await readHistory(request.params.folder, undefined, history);
+    return discussion ?? reply.code(404).send({ error: "Discussion not found" });
   });
 
   app.post("/api/session/start", async (request, reply) => {

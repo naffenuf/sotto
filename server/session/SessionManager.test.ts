@@ -40,6 +40,8 @@ import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import type { VoiceOut, VoiceUtterance } from "../voice/voiceOut.js";
 import type { GlimmerClient } from "../model/GlimmerClient.js";
+import { DIGEST_SECTIONS } from "./digest.js";
+import { WRAP_UP_HEADLINE } from "./WrapUp.js";
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
 
@@ -362,6 +364,7 @@ describe("SessionManager, board and observer", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -505,6 +508,7 @@ describe("SessionManager, board and observer", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -638,6 +642,7 @@ describe("SessionManager, board and observer", () => {
       appendResearch: (record: unknown) => research.push(record as ResearchLogLine),
       writePacket: (id: string, _packet: unknown, markdown: string) =>
         packetFiles.push({ id, markdown }),
+      writeDigest: () => {},
       appendTiming: (event: Record<string, unknown>) => timing.push(event),
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
@@ -818,6 +823,7 @@ describe("SessionManager, delivery and feedback", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1004,6 +1010,7 @@ describe("SessionManager, answers", () => {
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       appendTiming: (record: Record<string, unknown>) => timing.push(record),
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
@@ -1158,6 +1165,7 @@ describe("SessionManager, Sotto's speech in the transcript (V2-008a)", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1251,6 +1259,7 @@ describe("SessionManager, typed questions", () => {
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1443,6 +1452,7 @@ describe("SessionManager, frequency and boldness", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1672,6 +1682,7 @@ describe("SessionManager, speaker names", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1785,6 +1796,7 @@ describe("SessionManager and generated artifacts (US-020)", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string, html: string) => {
         written.push([fileName, html]);
         return options.fail === true ? null : `artifacts/${fileName}`;
@@ -1953,6 +1965,7 @@ describe("SessionManager, the opening hello (V2-009)", () => {
       appendAnswer: () => {},
       appendResearch: () => {},
       writePacket: () => {},
+      writeDigest: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -2109,5 +2122,215 @@ describe("SessionManager, judgment (V2-010)", () => {
     await sessions.stop();
 
     expect(dots(events)).toEqual(["connecting", "active:cloud", "idle"]);
+  });
+});
+
+describe("SessionManager, the digest (V2-018)", () => {
+  /**
+   * A voice that remembers rather than speaks, like the V2-008a block's:
+   * `npm test` never synthesizes anything.
+   */
+  class RecordingVoice implements VoiceOut {
+    private count = 0;
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const id = `v${(this.count += 1)}`;
+      const spoken = (): string => parts.join(" ");
+      return Promise.resolve({
+        id,
+        append: (text) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      });
+    }
+  }
+
+  /**
+   * Notices one thing, keeps a board, and classifies whatever is said to
+   * Sotto as `request` with `question`. The question is the test's lever:
+   * `ask-search`'s wake line becomes whatever this returns.
+   */
+  class DigestModel implements ModelClient {
+    readonly labels: string[] = [];
+    private addressCalls = 0;
+
+    constructor(private readonly question: string) {}
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "address") {
+        // The early check (V2-008b) says the name is all it has heard, so the
+        // final turn is classified again rather than reusing the verdict —
+        // which is also the one path where the model's own wording of the
+        // request is what reaches the wake watcher, and this test is about
+        // the wording.
+        this.addressCalls += 1;
+        return this.addressCalls === 1
+          ? { kind: "name_only", question: "" }
+          : { kind: "request", question: this.question };
+      }
+      if (call.label === "board") {
+        return {
+          operations: [
+            { op: "set_summary", text: "Pricing a note app." },
+            { op: "add_decision", text: "Charge per seat", sourceTurnIds: [] },
+            { op: "add_question", text: "Who owns onboarding?", sourceTurnIds: [] },
+          ],
+        };
+      }
+      if (call.label === "gate") {
+        return { true: 0.9, new: 0.9, worthSaying: 0.2, stillRelevant: 0.9 };
+      }
+      if (call.label === "observer") {
+        return {
+          candidates: [
+            {
+              type: "untested_assumption",
+              headline: "Nobody has checked what rivals charge",
+              detail: "The plan rests on a price nobody has looked up.",
+              whyNow: "The price is being set",
+              evidenceTurnIds: [],
+              relatedBoardItemIds: [],
+              scores: { relevance: 0.9, novelty: 0.9, importance: 0.2, confidence: 0.9 },
+            },
+          ],
+        };
+      }
+      return { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("not used here");
+    }
+
+    async prose(call: ProseCall): Promise<ProseReply> {
+      this.labels.push(call.label);
+      const text =
+        "Say this:\nThey charge five to twenty-five dollars a seat.\n\n" +
+        "Show this:\nRivals charge $5-$25 a seat\n\n- Notion $12 a seat";
+      call.onText?.({ itemId: "msg_1", text });
+      return { text, citations: [], searchedUrls: [], searched: true, functionCalls: 0 };
+    }
+  }
+
+  function replay(question: string): {
+    model: DigestModel;
+    voice: RecordingVoice;
+    digests: string[];
+    cards: StageCard[];
+    done: Promise<void>;
+  } {
+    const bus = new EventBus(quiet);
+    const model = new DigestModel(question);
+    const voice = new RecordingVoice();
+    const digests: string[] = [];
+    const cards: StageCard[] = [];
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: (markdown: string) => digests.push(markdown),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => model,
+      createVoice: () => voice,
+      replaySpeed: "max",
+      // Real time: the address check's deadline is on the wall clock.
+      wallClock: systemClock,
+    });
+    const done = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    return { model, voice, digests, cards, done };
+  }
+
+  it("writes digest.md once, with all seven sections filled in from the session", async () => {
+    const run = replay("what do the main competitors charge per month?");
+    await run.done;
+
+    expect(run.digests).toHaveLength(1);
+    const digest = run.digests[0] ?? "";
+    for (const section of DIGEST_SECTIONS) expect(digest).toContain(`## ${section}`);
+    // The board's own three sections.
+    expect(digest).toContain("Pricing a note app.");
+    expect(digest).toContain("- Charge per seat");
+    expect(digest).toContain("- Who owns onboarding?");
+    // What Sotto said, and what it decided not to.
+    expect(digest).toContain("They charge five to twenty-five dollars a seat.");
+    expect(digest).toContain("**Nobody has checked what rivals charge** — below threshold");
+  });
+
+  it("wraps up from the digest instead of asking the model, when asked to", async () => {
+    const run = replay("wrap us up");
+    await run.done;
+
+    // No answer call at all: the summary was already in hand.
+    expect(run.model.labels).not.toContain("answer");
+    const said = run.voice.utterances.join("\n");
+    expect(said).toContain("Here's where we got to.");
+    expect(said).toContain("Charge per seat");
+    expect(said).toContain("Who owns onboarding?");
+    // And it is in the digest's account of what Sotto said.
+    expect(run.digests[0]).toContain("“wrap us up” —");
+    expect(run.digests[0]).toContain(WRAP_UP_HEADLINE);
+  });
+
+  it("wraps up for a question typed into the box, while the session is running", async () => {
+    const bus = new EventBus(quiet);
+    const model = new DigestModel("never asked");
+    const voice = new RecordingVoice();
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => null,
+      createModel: () => model,
+      createVoice: () => voice,
+      // 1x, because a `max` replay finishes inside `start()` and a wrap-up is
+      // addressed to a conversation that is still going on.
+      replaySpeed: "1x",
+      wallClock: systemClock,
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    expect(sessions.askQuestion("wrap us up")).toBe("asked");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await sessions.stop();
+
+    expect(model.labels).not.toContain("answer");
+    expect(voice.utterances.join("\n")).toContain("wrap up yet");
   });
 });

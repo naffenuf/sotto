@@ -213,7 +213,7 @@ export function App() {
               {discussion && <button aria-pressed={view === "backstage"} onClick={() => setView("backstage")}>Backstage</button>}
             </div>
           </div>
-          {view === "backstage" && discussion ? <Backstage log={discussion.candidateLog ?? []} /> : view === "transcript" ? discussion ? (
+          {view === "backstage" && discussion ? <Backstage log={discussion.candidateLog ?? []} digest={discussion.digest ?? ""} /> : view === "transcript" ? discussion ? (
             <section className="history-transcript"><h2 className="panel__title">Transcript</h2><pre>{historyTranscript(discussion.transcript) || "No transcript saved."}</pre></section>
           ) : <TranscriptPanel turns={events.turns} speakers={events.speakers} onRename={onRenameSpeaker} highlight={cited} /> : <BoardPanel
             board={discussion ? discussion.board ?? emptyBoard() : events.board}

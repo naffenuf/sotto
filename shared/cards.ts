@@ -22,8 +22,8 @@
  *   opens into the key points, the sources and any visual. Never spoken, and
  *   never a decision the policy took, so it carries no feedback buttons.
  * - `notice`: Sotto talking about itself rather than about the conversation —
- *   the opening hello when the voice is muted, and the one nudge for names
- *   (V2-009). Plain, unaccented, and carrying no feedback buttons: there is no
+ *   the opening hello when the voice is muted, the one nudge for names
+ *   (V2-009), and a wrap-up nothing could say out loud (V2-018). Plain, unaccented, and carrying no feedback buttons: there is no
  *   decision to speak here for the group to have an opinion about, which is
  *   also why the eval harness and the end-to-end checks never count one as a
  *   delivery.
@@ -43,6 +43,11 @@ export const NOTICE_CARD_IDS = {
   hello: "notice-hello",
   /** "I'd love to know who's here", once, at a pause. */
   names: "notice-names",
+  /**
+   * A wrap-up that could not be said out loud (V2-018), numbered: unlike the
+   * other two, a group can ask for one more than once in a conversation.
+   */
+  wrapUp: "notice-wrapup",
 } as const;
 
 /**

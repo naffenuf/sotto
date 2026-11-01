@@ -2,9 +2,22 @@ import type { CandidateLogLine, DecisionLogRecord, VerificationLogRecord } from 
 
 function label(value: string): string { return value.replaceAll("_", " "); }
 
-export function Backstage({ log }: { log: CandidateLogLine[] }) {
+/** The digest without its `# Digest` line: this panel has a title of its own. */
+function withoutTitle(digest: string): string {
+  return digest.replace(/^#\s+Digest\s*\n+/, "").trim();
+}
+
+export function Backstage({ log, digest }: { log: CandidateLogLine[]; digest: string }) {
   const candidates = log.filter((entry) => entry.kind === "candidate");
-  return <section className="backstage" aria-label="Backstage candidates">
+  return <>
+    {/* `digest.md` as the session wrote it (V2-018). Shown as the text it is:
+        it is seven sections of markdown, which the card renderer — built for
+        a sentence and a list — has no headings for. */}
+    {digest.trim() !== "" && <section className="backstage__digest" aria-label="Session digest">
+      <h2 className="panel__title">Digest</h2>
+      <pre data-testid="digest">{withoutTitle(digest)}</pre>
+    </section>}
+    <section className="backstage" aria-label="Backstage candidates">
     <h2 className="panel__title">What Sotto considered</h2>
     <p className="backstage__intro">Candidates Sotto generated, including those it held back. An empty list means none were recorded.</p>
     {candidates.length === 0 && <p className="backstage__empty">No candidates recorded for this discussion.</p>}
@@ -24,5 +37,6 @@ export function Backstage({ log }: { log: CandidateLogLine[] }) {
         {decisions.length > 0 && <details><summary>Decision history</summary><ol>{decisions.map((decision, index) => <li key={index}>{label(decision.decision)} · {label(decision.reason)} · score {decision.score.toFixed(2)}{decision.heldForMs > 0 ? ` · waited ${(decision.heldForMs / 1000).toFixed(1)}s` : ""}</li>)}</ol></details>}
       </article>;
     })}
-  </section>;
+    </section>
+  </>;
 }

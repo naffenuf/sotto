@@ -34,7 +34,7 @@ import {
 } from "../../shared/artifacts.js";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { StageCard } from "../../shared/cards.js";
-import type { CandidateType } from "../../shared/candidates.js";
+import type { CandidateLogLine, CandidateType } from "../../shared/candidates.js";
 import type { StatusState } from "../../shared/events.js";
 import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
 import {
@@ -80,6 +80,8 @@ import { BargeIn } from "../answer/BargeIn.js";
 import { Greeting } from "./Greeting.js";
 import { introducedName } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
+import { SessionDigest, asksForWrapUp } from "./digest.js";
+import { WrapUp } from "./WrapUp.js";
 import { SessionTranscription } from "./SessionTranscription.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
@@ -214,6 +216,15 @@ export interface SessionManagerOptions {
  */
 interface StoreSlot {
   writer: SessionWriter | null;
+  /**
+   * What the session ends with (V2-018), collected from the same records the
+   * folder is written from.
+   *
+   * It lives beside the writer rather than inside it because it is wanted
+   * even when there is no folder: a laptop that could not open one still
+   * answers "Sotto, wrap us up".
+   */
+  digest: SessionDigest;
   /**
    * How many artifacts this folder holds, so the next one is numbered after
    * them (US-020). It counts attempts rather than successes: `02` following a
@@ -354,6 +365,8 @@ interface RunningSession {
   research: ResearchManager | null;
   /** The quiet cards the packets become (V2-014). */
   researchCards: ResearchCards | null;
+  /** "Sotto, wrap us up" (V2-018). It needs no model, so it is never null. */
+  wrapUp: WrapUp;
   /** The session's clock: simulated for a replay, live otherwise. */
   clock: Clock;
   /** What the transcription dot shows once the session is published. */
@@ -527,7 +540,7 @@ export class SessionManager {
       startedAtMs: source.kind === "events" ? 0 : this.liveClock.now(),
     };
 
-    const store: StoreSlot = { writer: null, artifacts: 0 };
+    const store: StoreSlot = { writer: null, artifacts: 0, digest: new SessionDigest() };
     const running =
       source.kind === "events"
         ? this.startReplay(info, source.fixture, store)
@@ -578,6 +591,7 @@ export class SessionManager {
     running.stopRequested = true;
     running.address?.stop();
     running.greeting?.stop();
+    running.wrapUp.stop();
     running.research?.stop();
     running.researchCards?.stop();
     running.judgment.stop();
@@ -611,7 +625,8 @@ export class SessionManager {
       () => assembler.streamNow(),
       voice,
     );
-    const assembler = this.assembler(info, clock, store, loops, voice, null);
+    const wrapUp = this.wrapUp(info, clock, store, voice, () => assembler.streamNow());
+    const assembler = this.assembler(info, clock, store, loops, voice, null, wrapUp);
     let source: EventReplaySource;
     try {
       source = EventReplaySource.forFixture(fixture, {
@@ -633,6 +648,7 @@ export class SessionManager {
       mic: undefined,
       ...loops,
       greeting: null,
+      wrapUp,
       clock,
       transcription: ["active", `replaying ${fixture} events at ${this.replaySpeed}`],
       model: modelStatus(loops.board),
@@ -652,7 +668,7 @@ export class SessionManager {
         // after the last word, so the silence the conversation really ended
         // in is handed to the policy before it accounts for what is left.
         .finally(() => assembler.finish())
-        .then(() => drainLoops(loops, () => clock.advanceBy(REPLAY_TRAILING_SILENCE_MS))),
+        .then(() => drainLoops(loops, () => clock.advanceBy(REPLAY_TRAILING_SILENCE_MS), null, wrapUp)),
       stopRequested: false,
     };
   }
@@ -709,7 +725,14 @@ export class SessionManager {
       () => assembler.pauseState(),
       () => assembler.streamNow(),
     );
-    const assembler = this.assembler(info, this.liveClock, store, loops, voice, greeting);
+    const wrapUp = this.wrapUp(
+      info,
+      this.liveClock,
+      store,
+      voice,
+      () => assembler.streamNow(),
+    );
+    const assembler = this.assembler(info, this.liveClock, store, loops, voice, greeting, wrapUp);
     const client = this.createAsrClient({
       apiKey,
       clock: this.liveClock,
@@ -738,6 +761,7 @@ export class SessionManager {
       mic,
       ...loops,
       greeting,
+      wrapUp,
       clock: this.liveClock,
       transcription: [
         "connecting",
@@ -749,7 +773,7 @@ export class SessionManager {
       stop: () => client.stop(),
       done: client.run(audio)
         .finally(() => assembler.finish())
-        .then(() => drainLoops(loops, undefined, greeting)),
+        .then(() => drainLoops(loops, undefined, greeting, wrapUp)),
       stopRequested: false,
     };
   }
@@ -761,8 +785,9 @@ export class SessionManager {
     loops: ModelLoops,
     voice: VoiceOut | null,
     greeting: Greeting | null,
+    wrapUp: WrapUp,
   ): SessionTranscription {
-    const wake = this.wakeWatcher(info, loops, clock, store);
+    const wake = this.wakeWatcher(info, loops, clock, store, wrapUp);
     const barge = new BargeIn({
       clock,
       speaking: () => voice?.playback?.().playing === true || this.bus.voiceState().speaking,
@@ -873,6 +898,38 @@ export class SessionManager {
   }
 
   /**
+   * Builds the thing that answers "Sotto, wrap us up" (V2-018).
+   *
+   * Like the greeting, it says words no model wrote, so it exists whether or
+   * not there is a model client — and unlike the greeting it exists for a
+   * replay too: a wrap-up is a reply to somebody asking for one, not
+   * something Sotto does to a room on its own.
+   */
+  private wrapUp(
+    info: SessionInfo,
+    clock: Clock,
+    store: StoreSlot,
+    voice: VoiceOut | null,
+    streamNow: () => number,
+  ): WrapUp {
+    return new WrapUp({
+      clock,
+      voice,
+      streamNow,
+      summary: () => store.digest.spokenSummary(),
+      logger: this.logger,
+      onCard: (card) => {
+        if (this.current?.info.id === info.id) this.bus.publishCard(card);
+      },
+      // Not to the board: a summary of the notes has nothing to tell them,
+      // and reading one back in would be the one loop with no way out.
+      onSpoken: (turn) => this.recordSottoSpeech(info, store, null, turn),
+      onSaid: (said) => store.digest.spoke(said),
+      onTiming: (record) => store.writer?.appendTiming?.(record),
+    });
+  }
+
+  /**
    * Watches the turns for somebody addressing Sotto by name (US-017).
    *
    * It exists whether or not there is a model client, because the indicator
@@ -886,6 +943,7 @@ export class SessionManager {
     loops: ModelLoops,
     clock: Clock,
     store: StoreSlot,
+    wrapUp: WrapUp,
   ): WakeWatcher | AddressWatcher {
     const current = (): boolean => this.current?.info.id === info.id;
     const effects: WakeWatcherOptions = {
@@ -909,6 +967,23 @@ export class SessionManager {
         this.logger.log(
           `[wake] ${info.id} ${trigger.turnId} asked: ${trigger.question}`,
         );
+        // "Sotto, wrap us up" (V2-018) is answered from the digest rather
+        // than by a model: the material is already in hand, and this is
+        // asked for when everybody is standing up. It needs no model client,
+        // so it is also the one request a session with no key can answer.
+        if (asksForWrapUp(trigger.question)) {
+          wrapUp.ask({
+            question: trigger.question,
+            // The name the group gave the label, as a card and the transcript
+            // show it (US-007), not the bare `A`.
+            askedBy:
+              trigger.speaker === null
+                ? null
+                : (this.bus.speakerNames()[trigger.speaker] ?? trigger.speaker),
+            turnId: trigger.turnId,
+          });
+          return;
+        }
         loops.answers?.ask({
           question: trigger.question,
           askedBy: trigger.speaker,
@@ -994,6 +1069,13 @@ export class SessionManager {
     };
     const deliveries = new Map<string, Delivered>();
     const onTiming = (event: Record<string, unknown>): void => store.writer?.appendTiming?.(event);
+    // Every candidate line goes two places: `candidates.jsonl`, and the
+    // digest the session ends with (V2-018), which is where "what Sotto
+    // almost said" gets its score and its reason.
+    const recordCandidate = (record: CandidateLogLine): void => {
+      store.writer?.appendCandidate(record);
+      store.digest.candidate(record);
+    };
     const policy = new InterjectionPolicy({
       clock,
       pauseState,
@@ -1003,7 +1085,7 @@ export class SessionManager {
         boldness: this.currentSettings.boldness,
       },
       logger: this.logger,
-      onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "policy_decision", ...record }); },
+      onRecord: (record) => { recordCandidate(record); onTiming({ stage: "policy_decision", ...record }); },
       // The stage (US-015). The level the policy chose becomes the card's
       // variant, and the card is kept so a 👍 can find its way back to it.
       onDeliver: (interjection) => { this.deliver(info, deliveries, interjection); onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id }); },
@@ -1020,14 +1102,14 @@ export class SessionManager {
       turns: transcript,
       wallClock: this.wallClock,
       logger: this.logger,
-      onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "candidate_gate", ...record }); },
+      onRecord: (record) => { recordCandidate(record); onTiming({ stage: "candidate_gate", ...record }); },
       onScored: (candidate) => policy.accept(candidate),
     });
     const verifier = new Verifier({
       clock,
       model,
       logger: this.logger,
-      onRecord: (record) => { store.writer?.appendCandidate(record); onTiming({ stage: "verification_complete", ...record }); },
+      onRecord: (record) => { recordCandidate(record); onTiming({ stage: "verification_complete", ...record }); },
       // A claim that really is wrong has the correction in its detail by now,
       // and goes to the policy like any other candidate — through the gate,
       // which is where "any other candidate" is now defined (V2-016).
@@ -1038,7 +1120,7 @@ export class SessionManager {
       clock,
       model,
       logger: this.logger,
-      onRecord: (record) => store.writer?.appendCandidate(record),
+      onRecord: (record) => recordCandidate(record),
       // Three destinations. A claim that looks wrong is checked against the
       // web before it can be said to anyone (US-013); a research hook leaves
       // the interjection path altogether for the research gate (V2-012) and
@@ -1059,6 +1141,7 @@ export class SessionManager {
       onTiming,
       onUpdate: (update) => {
         store.writer?.writeBoard(update.board, update.markdown);
+        store.digest.board(update.board);
         this.bus.publish({
           type: "board",
           board: update.board,
@@ -1073,6 +1156,7 @@ export class SessionManager {
     // `research.jsonl` and in `research/<id>.md`.
     const onResearch = (record: ResearchLogLine): void => {
       store.writer?.appendResearch(record);
+      store.digest.research(record);
       const detail =
         record.kind === "packet"
           ? { ...record, packet: undefined, packetId: record.packet?.id, sources: record.packet?.sources.length ?? 0 }
@@ -1166,7 +1250,10 @@ export class SessionManager {
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
         onTiming({ stage: "answer_card", atMs: clock.now(), answerId: answer.id, status: answer.status, hasHeadline: answer.headline !== "", latencyMs: answer.latencyMs, published: this.last?.sessionId === info.id });
       },
-      onRecord: (record) => store.writer?.appendAnswer(record),
+      onRecord: (record) => {
+        store.writer?.appendAnswer(record);
+        store.digest.answer(record);
+      },
       // Generated HTML goes into this session's folder and is served back
       // from it (US-020), so the numbering is per session and so is the URL.
       onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
@@ -1306,6 +1393,16 @@ export class SessionManager {
   askQuestion(question: string): AskOutcome {
     const target = this.last;
     if (target === undefined) return "no-session";
+    // "Wrap us up" typed into the box is the same request as the spoken one
+    // (V2-018), answered the same way: from the digest, with no model call.
+    // Only while the conversation is running, though — once it has ended the
+    // wrap-up has stopped talking, and the answer agent can still read the
+    // board for whoever asks.
+    const running = this.current;
+    if (running !== undefined && asksForWrapUp(question)) {
+      running.wrapUp.ask({ question: question.trim(), askedBy: TYPED_ASKER, turnId: null });
+      return "asked";
+    }
     if (target.answers === null) return "no-model";
     target.answers.ask({ question, askedBy: TYPED_ASKER, turnId: null });
     return "asked";
@@ -1406,10 +1503,14 @@ export class SessionManager {
     running.address?.stop();
     running.greeting?.stop();
     running.research?.stop();
+    running.wrapUp.stop();
     running.judgment.stop();
     // Not `running.answers`: a question typed after Stop is answered against
     // the conversation that just ended (US-019), so the agent is only
     // retired when the next session supersedes it.
+    // The digest is the last thing written (V2-018): every section of it is
+    // about the whole conversation, and by here every loop has drained.
+    running.store.writer?.writeDigest(running.store.digest.render());
     // Whether it ended, was stopped or failed, the folder gets its `endedAt`.
     running.store.writer?.end();
 
@@ -1466,10 +1567,14 @@ async function drainLoops(
   loops: ModelLoops,
   beforePolicy?: () => void,
   greeting?: Greeting | null,
+  wrapUp?: WrapUp,
 ): Promise<void> {
   // The hello is usually long finished; a session stopped two seconds in is
   // the case this covers, so its line still reaches the transcript.
   await greeting?.flush();
+  // A wrap-up asked for in the last seconds is still being said, and its
+  // line belongs in the transcript it is about.
+  await wrapUp?.flush();
   await loops.address?.flush();
   await loops.board?.flush();
   await loops.observer?.flush();

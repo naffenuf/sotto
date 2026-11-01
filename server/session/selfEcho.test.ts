@@ -36,6 +36,7 @@ function setup(withModel = true) {
     appendAnswer: (answer) => answers.push(answer),
     appendResearch: () => {},
     writePacket: () => {},
+    writeDigest: () => {},
     renameSpeaker: () => {},
     setSettings: () => {},
     writeBoard: () => {},

@@ -10,6 +10,8 @@ export interface HistoryEntry {
 export interface HistoryDetail extends HistoryEntry {
   board: Board | null;
   transcript: string;
+  /** `digest.md` as it was written (V2-018), or `""` for a session with none. */
+  digest: string;
   contributions: { kind: string; headline: string; detail: string }[];
   candidateLog: CandidateLogLine[];
 }

@@ -11,6 +11,7 @@
  *       answers.jsonl      one record per answer (US-018)
  *       research.jsonl     ideas, gate verdicts, job starts and packets (V2-012, V2-013)
  *       research/          one finished research packet each, as JSON and markdown (V2-013)
+ *       digest.md          what Sotto said, almost said and found (V2-018)
  *       artifacts/         generated HTML (US-020)
  *
  * The folder is the build's audit trail: a session can be checked, and the
@@ -53,6 +54,7 @@ export const SESSION_FILES = {
   feedback: "feedback.jsonl",
   answers: "answers.jsonl",
   research: "research.jsonl",
+  digest: "digest.md",
   timing: "timing.jsonl",
 } as const;
 
@@ -96,6 +98,14 @@ export interface SessionWriter {
   appendAnswer(answer: unknown): void;
   /** Appends one research idea, gate verdict, job start or packet (V2-012). */
   appendResearch(record: unknown): void;
+  /**
+   * Writes the end-of-session digest (V2-018): what Sotto said, what it
+   * almost said and why, and what the searches found.
+   *
+   * Written once, just before {@link SessionWriter.end}, because every
+   * section of it is about the whole conversation.
+   */
+  writeDigest(markdown: string): void;
   /**
    * Writes one finished research packet as `research/<id>.json` and
    * `research/<id>.md` (V2-013).
@@ -279,6 +289,10 @@ export class SessionStore implements SessionWriter {
 
   appendResearch(record: unknown): void {
     this.appendLine(SESSION_FILES.research, JSON.stringify(record));
+  }
+
+  writeDigest(markdown: string): void {
+    this.writeAtomic(SESSION_FILES.digest, endWithNewline(markdown));
   }
 
   writePacket(id: string, packet: unknown, markdown: string): void {

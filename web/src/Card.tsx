@@ -8,10 +8,12 @@
  * (US-014) picks the level, not the content.
  *
  * A `notice` (V2-009) is Sotto talking about itself rather than about the
- * conversation — the hello, and the nudge for names. Same card, read at
- * speaking size rather than across-the-table size, with no label above it and
- * no feedback buttons under it: there was no decision to speak to have an
- * opinion about.
+ * conversation — the hello, the nudge for names, and a wrap-up nothing could
+ * say out loud (V2-018). Same card, read at speaking size rather than
+ * across-the-table size, with no label above it and no feedback buttons under
+ * it: there was no decision to speak to have an opinion about. The wrap-up is
+ * the one whose summary is shown rather than hidden behind "details ▾": the
+ * summary is what was asked for.
  *
  * A `research` card (V2-014) is a finished background search. Closed, it is
  * "Research ready: …" and the teaser; open, it is the key points, the visual
@@ -29,6 +31,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Block, Inline } from "./markdown.js";
 import { parseMarkdown } from "./markdown.js";
 import {
+  NOTICE_CARD_IDS,
   feedbackVerdicts,
   type CardArtifact,
   type FeedbackVerdict,
@@ -40,6 +43,20 @@ const NOTICED = "Sotto noticed…";
 
 /** The label above an opened research card (V2-014). */
 const RESEARCHED = "Sotto looked this up…";
+
+/**
+ * Whether this card's markdown *is* the card rather than an aside behind
+ * "details ▾".
+ *
+ * A research card's key points (V2-014) and a wrap-up's summary (V2-018) are
+ * both the thing somebody wanted to see: "Where we got to" with the summary
+ * hidden is a card that says nothing. The hello and the name nudge are the
+ * other way round — a headline, with the how-to tucked away.
+ */
+function detailIsTheCard(card: StageCard): boolean {
+  if (card.variant === "research") return true;
+  return card.id.startsWith(NOTICE_CARD_IDS.wrapUp);
+}
 
 /** The variants that are one line until somebody opens them. */
 function isCollapsible(variant: StageCard["variant"]): boolean {
@@ -137,7 +154,7 @@ export function Card({
         <>
           <Evidence card={card} onQuoteClick={onQuoteClick} />
           <Artifacts card={card} />
-          <Details card={card} inline={card.variant === "research"} />
+          <Details card={card} inline={detailIsTheCard(card)} />
           <Spoken card={card} />
           <Sources card={card} />
         </>
