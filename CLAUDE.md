@@ -1040,3 +1040,35 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   out — the same shape as the policy's pause re-check. Dedupe is against every idea the session ever
   had, which is also the dedupe against earlier packets the PRD asks for, since a packet's idea is
   still in that list.
+
+- **`grounded` is the same tool loop `prose` is, and all three tools go in one request.** Probed
+  before V2-013 was written: a strict `json_schema` reply, `web_search` and a `function` tool are
+  accepted together by the Responses API, and a round that ends in a `function_call` carries **no
+  JSON at all** — narration, the searches, the call, nothing else — exactly the shape US-020
+  measured for prose. So `MuseClient.grounded` loops (`TOOL_MAX_ROUNDS`, renamed from
+  `PROSE_MAX_ROUNDS` now that two callers share it) and `GroundedReply` carries `functionCalls`.
+  Two consequences worth knowing before offering a tool on a searching call: `store: false` means
+  round two is resent only the user message and the call/result pair, so it **searches again from
+  scratch** — 56k input tokens a round, which is why a packet with a visual costs about twice one
+  without (~$0.17 against ~$0.08) and why `research-packet.md` tells the model a visual costs it a
+  round. And the citations still do not come from the annotations: a JSON reply has no prose for an
+  annotation to point into, so the model's own `sources` are the supply and every one is resolved
+  against `include: ["web_search_call.action.sources"]`, as US-013 does.
+- **A research packet is sources or nothing.** `server/research/ResearchRunner.ts` is one grounded
+  call per approved idea (V2-012's gate decided *whether*; this is the search), and the only thing
+  that can stop a finished reply reaching the screen is its sources: every URL goes through
+  `resolveCitation`/`searchedIndex`, and a packet left with none is **discarded** and written to
+  `research.jsonl` as `unsourced` — a research card is a claim about the world, and a group that
+  cannot follow it back is worse off than one that never saw it. `failed` is the same kind of
+  decision for a call that did not come back. The request is deliberately **just the question and
+  why it came up**: a model handed six turns of brainstorm starts answering the brainstorm.
+  Measured on a real `research-business-idea` replay: three packets at 67/90/110 s of a 175 s
+  conversation, 12.9–20.7 s each, 2–4 sources, 5 key points, no visual drawn in any of them.
+- **A research job has to be tracked on the clock, and that is what makes a replay honest.**
+  `ResearchManager.start` registers each job with `clock.track`, like the gate queue and the
+  verifier's checks; without it a `max` replay races past a 15-second search and every packet's
+  `createdAtMs` lands after the conversation ended — which is also how V2-019's "a research card
+  inside the window" would silently fail. The price: `SimulatedClock.settle()` now waits for a
+  running job, so a test that *holds* one must drain microtasks (`tick()`) instead of settling, and
+  `drainLoops` awaiting `research.flush()` means **Stop waits for a search in flight** (up to ~20 s)
+  — deliberate, because V2-018's digest lists the research produced.

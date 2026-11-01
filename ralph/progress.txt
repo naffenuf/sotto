@@ -477,3 +477,45 @@
   server/e2e/live.ts still do not pass createGlimmer, so their gates run on Spark and are billed.
   V2-019's cost gate and V2-021's $0.50 e2e budget are the two places that will notice first.
   NEXT: V2-013 (research runner and packets) — supply `run` to ResearchManagerOptions. 9 stories left.
+
+[2026-11-01 01:52] V2-013 — completed — Research runner: one grounded call per approved idea, sourced
+  packets written to research/<id>.json and .md, unsourced ones discarded.
+  WHAT IS WHERE:
+  - server/research/ResearchRunner.ts: the search. One `model.grounded` call with web_search, the
+    packet schema and `show_html` on the table; sources resolved against `searchedUrls` with
+    US-013's `resolveCitation`/`searchedIndex` (a page the search never returned is dropped, a bare
+    host resolves to the page it returned). It never throws: `unsourced` and `failed` are decisions
+    written to research.jsonl. `packets()` is what V2-014's cards and V2-015's briefings read.
+  - shared/research.ts: `ResearchPacket`, `PacketReplySchema` + `researchPacketJsonSchema` (held in
+    agreement by shared/research.test.ts), `ResearchPacketRecord` (the fourth kind of line in
+    research.jsonl), `PACKET_ID_PATTERN`, `packetFileName`, `renderPacketMarkdown`.
+  - server/prompts/research-packet.md: facts not advice, sources mandatory, and "a visual costs you
+    a round, so skip it when unsure".
+  - SessionWriter.writePacket writes both files under research/; a visual goes through the same
+    `saveArtifact` seam as an answer's, so it lands in artifacts/ and shares the numbering.
+  - MuseClient.grounded is now the same tool loop as prose. PROSE_MAX_ROUNDS -> TOOL_MAX_ROUNDS,
+    GroundedReply gained `functionCalls`, and its `input` is an array now (one test assertion moved).
+  - ResearchManager.start registers each job with `clock.track`. Without it a `max` replay races
+    past the search and every packet lands after the conversation ended — which would also fail
+    V2-019's "research card inside the window". Consequence: `clock.settle()` now waits for a
+    running job, so a test holding one must use the microtask `tick()` helper instead.
+  PROBE FIRST, THEN BUILD: strict `json_schema` + `web_search` + a `function` tool in one Responses
+  request was unprobed, so it was probed before anything was written (throwaway script, deleted).
+  All three are accepted; a round ending in a `function_call` carries **no JSON at all**, exactly
+  like the prose shape, and round two re-searches from scratch because `store: false`. Written up in
+  fixtures/events/NOTES.md.
+  MEASURED (real replay of research-business-idea, local Glimmer gate, npm run test:integration on
+  server/research/packet.integration.test.ts): 5 ideas — 3 observer hooks, 2 planner — gate queued
+  0.82/0.85/0.83 and rejected 0.54/0.53 (18-29 s a call on local Glimmer); three sourced packets
+  ready at 67 s, 90 s and 110 s of the conversation, taking 12.9/20.7/16.6 s with 2-4 sources and 5
+  key points each; the wake question is at 168 s, so all three were waiting. The budget's three-per-
+  ten-minutes cap was hit exactly. ~56k input tokens a packet (~$0.08; ~$0.17 if it draws).
+  NOT SEEN IN THE REPLAY: no visual was drawn in any of the three packets. The capability is unit
+  tested and was probed against the real API, but if V2-014 wants a visual on screen to look at,
+  drive it with the probe's kind of question (three products, four numbers each) rather than
+  assuming a replay will produce one.
+  WATCH OUT: `drainLoops` awaits `research.flush()`, so Stop now waits for a search in flight (up to
+  ~20 s). Deliberate — V2-018's digest lists the research produced — but a Playwright check that
+  clicks Stop must wait for Start to be enabled again, as the answer-queue note already says.
+  NEXT: V2-014 (research-ready cards) — `ModelLoops.researchRunner.packets()` is the supply, and the
+  card has to go out in a pause like an interjection but with its own budget. 8 stories left.
