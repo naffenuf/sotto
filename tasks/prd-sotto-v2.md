@@ -151,6 +151,19 @@ Ordered by dependency. Each should fit in one loop iteration.
 
 **Setup:** keep exactly one Sotto tab open, and start the mic in it. The first tab to connect owns playback, so with two tabs the voice can play from a page that is not capturing the mic, and echo cancellation will not remove it. Click the page once before the first answer: Chrome blocks audio until it has had a click or key press.
 
+### V2-008a: Sotto's speech in the transcript
+**Description:** As a user, I want what Sotto said aloud to appear in the transcript as Sotto's own lines, so the record shows both sides of the conversation.
+
+**Acceptance Criteria:**
+- [ ] Every utterance Sotto speaks aloud appears as a final transcript entry labeled **Sotto**: answers, briefings, and later the hello. Short acknowledgments ("Mm-hm.", "Let me check.") don't.
+- [ ] The text is Sotto's own source text, not the microphone's transcription. If the utterance was interrupted, the entry holds only `spokenSoFar` (what was actually played), marked as interrupted. Muted (screen-only) answers add no entry.
+- [ ] The entry is placed when playback started, **on the turn timeline** (the transcription stream's clock, the same one human turns use), not the server clock. Add a test with a live clock offset from the stream timeline (see the V2-008 answer-context bug).
+- [ ] Shown in the live transcript with a distinct Sotto style, written to `transcript.md`, and shown in the discussion-history view
+- [ ] Never fed back into listening: wake/address classification, barge-in, the self-echo matcher's human side, speaker introductions and the eval's turn matching all ignore Sotto entries
+- [ ] The board update sees Sotto entries, labeled as Sotto, so facts it established can land in the notes. The observer does **not** see them, so it never proposes interjections that argue with Sotto's own answers. Answer context may include them.
+- [ ] Typecheck passes
+- [ ] Verify in browser using webapp-testing skill (dev voice route or a replayed answer: the Sotto line appears with its style; a stopped utterance shows only the heard part)
+
 ### V2-009: Opening hello and introductions
 **Description:** As a group, we want Sotto to introduce itself and learn who's here, so it feels like a participant and not a hidden recorder.
 

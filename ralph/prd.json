@@ -142,6 +142,24 @@
       "notes": "Codex fixed checkpoint attempt 1: Spark address classification (15/15 real cases), instant lexical listening/barge-in, speaker-specific 8-second name-only arming, 6-second abortable fallback and timing logs; live answer context and pause-clock timeline fixes; unrestricted spoken-answer depth; 'This is Craig' introductions. Typecheck, 825 unit tests, build, 30 relevant integration checks plus 2 latency probes, and Playwright listening verification pass. First sentence measured at 11.938 s with search (2.460 s union of observed search intervals) and 3.161 s for conversation-only; early speech is a later story. Archived tasks/checkpoint-voice-fail-1.md. Still awaiting the human 10-minute, two-person room retest recorded in tasks/checkpoint-voice.md with RESULT: PASS/FAIL; do not proceed to V2-009."
     },
     {
+      "id": "V2-008a",
+      "title": "Sotto's speech in the transcript",
+      "description": "As a user, I want what Sotto said aloud to appear in the transcript as Sotto's own lines, so the record shows both sides of the conversation.",
+      "acceptanceCriteria": [
+        "Every utterance Sotto speaks aloud (answers, briefings, later the hello; not short acknowledgments) appears as a final transcript entry labeled Sotto",
+        "Text is Sotto's own source text, not the mic transcription; an interrupted utterance shows only spokenSoFar, marked interrupted; muted answers add no entry",
+        "Placed at playback start on the turn timeline (stream clock, same as human turns), not the server clock; test with a live clock offset from the stream timeline",
+        "Shown in the live transcript with a distinct Sotto style, written to transcript.md, and shown in the discussion-history view",
+        "Ignored by wake/address classification, barge-in, the self-echo matcher's human side, speaker introductions and eval turn matching",
+        "Board update sees Sotto entries (labeled Sotto); the observer does not; answer context may",
+        "Typecheck passes",
+        "Verify in browser using webapp-testing skill (Sotto line appears with its style; a stopped utterance shows only the heard part)"
+      ],
+      "priority": 8.5,
+      "passes": false,
+      "notes": ""
+    },
+    {
       "id": "V2-009",
       "title": "Opening hello and introductions",
       "description": "As a group, we want Sotto to introduce itself and learn who's here, so it feels like a participant and not a hidden recorder.",
