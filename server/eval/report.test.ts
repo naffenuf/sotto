@@ -324,3 +324,184 @@ describe("the totals row", () => {
     expect(text).toMatch(/all\s+66\s+2\s+2\s+2\/2\s+1\s+0\s+0\s+1\s+1\/0/);
   });
 });
+
+/**
+ * The research half of the report (V2-019): the recall it is gated on, the
+ * packets per conversation, the unsourced count and the gate type.
+ */
+describe("the research sections", () => {
+  const researchRun: FixtureRunRecord = {
+    fixture: "research-business-idea",
+    settings: { frequency: "normal", boldness: "normal" },
+    sessionDir: "/tmp/research",
+    durationMs: 175_000,
+    finalTurns: 38,
+    candidates: 2,
+    decisions: 3,
+    gateCalls: [],
+    deliveries: [],
+    research: {
+      ideas: 5,
+      queued: 3,
+      rejected: 2,
+      gateFailed: 0,
+      localGateCalls: 5,
+      packets: 2,
+      unsourced: 1,
+      failed: 0,
+      cards: [
+        {
+          cardId: "research-packet-1",
+          packetId: "packet-1",
+          ideaId: "idea-1",
+          title: "Market size | and funding",
+          question: "how big is the market?",
+          teaser: "About $2bn.",
+          detail: "- two vendors hold most of it",
+          sources: 3,
+          deliveredAtMs: 70_000,
+          inPause: true,
+          pause: { speaking: false, silentForMs: 1_900 },
+          atSessionEnd: false,
+        },
+        {
+          cardId: "research-packet-2",
+          packetId: "packet-2",
+          ideaId: "idea-2",
+          title: "Competitor gaps",
+          question: "who are the competitors?",
+          teaser: "Four of them.",
+          detail: "",
+          sources: 2,
+          deliveredAtMs: 180_000,
+          inPause: false,
+          pause: { speaking: true, silentForMs: 0 },
+          atSessionEnd: true,
+        },
+      ],
+    },
+    moments: [
+      {
+        id: "market-size-research-hook",
+        type: "research_hook",
+        expectedLevel: "research",
+        description: "nobody knows the market size",
+        triggerLine: 12,
+        deadlineLine: 17,
+        triggerEndMs: 66_200,
+        deadlineEndMs: 86_400,
+        setupTurnIds: ["0:11"],
+        triggerTurnIds: ["0:12"],
+        triggerTurnEndMs: 67_000,
+        deadlineTurnEndMs: 87_000,
+      },
+      {
+        id: "competitor-gaps-research-hook",
+        type: "research_hook",
+        expectedLevel: "research",
+        description: "nobody knows the competitors",
+        triggerLine: 22,
+        deadlineLine: 27,
+        triggerEndMs: 107_700,
+        deadlineEndMs: 127_200,
+        setupTurnIds: ["0:19"],
+        triggerTurnIds: ["0:22"],
+        triggerTurnEndMs: 108_000,
+        deadlineTurnEndMs: 128_000,
+      },
+    ],
+    matches: [
+      {
+        cardId: "research-packet-1",
+        momentId: "market-size-research-hook",
+        matches: true,
+        reason: "the packet answers exactly that",
+        cached: false,
+      },
+      {
+        cardId: "research-packet-2",
+        momentId: "competitor-gaps-research-hook",
+        matches: true,
+        reason: "the packet lists the competitors",
+        cached: false,
+      },
+    ],
+    elapsedMs: 120_000,
+  };
+  const withResearch: EvalRunRecord = {
+    ...record,
+    fixtures: ["research-business-idea"],
+    runs: [researchRun],
+  };
+  const score = scoreRun(withResearch);
+
+  it("states research recall apart from the policy's recall", () => {
+    const group = score.groups[0];
+    if (group === undefined) throw new Error("no group");
+    const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
+    // One card inside its window, one after it.
+    expect(metrics.get("research recall")).toContain("1/2 (50%)");
+    expect(metrics.get("research recall")).toContain("caught 1, late 1, missed 0");
+    expect(metrics.get("moment recall")).toContain("0/0");
+  });
+
+  it("states the packets, where they came from and how many were unsourced", () => {
+    const group = score.groups[0];
+    if (group === undefined) throw new Error("no group");
+    const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
+    const packets = metrics.get("research packets");
+    expect(packets).toContain("2 packet(s) from 5 idea(s)");
+    expect(packets).toContain("3 queued, 2 rejected");
+    expect(packets).toContain("1 unsourced");
+    expect(packets).toContain("2 card(s), 1 in a pause");
+    expect(packets).toContain("1 after the conversation ended");
+  });
+
+  it("gates research recall and names the threshold", () => {
+    const text = renderTerminalReport(withResearch, score);
+    // Exactly at the threshold, which passes.
+    expect(text).toContain("[PASS] research recall >= 0.5 — 0.50 (1/2)");
+    const markdown = renderReportMarkdown({
+      record: withResearch,
+      score,
+      promptHashes: [],
+      usage: { calls: 1, inputTokens: 1_000, outputTokens: 100, reasoningTokens: 50 },
+    });
+    expect(markdown).toContain("| research recall gate | >= 0.5 |");
+  });
+
+  it("has a per-fixture research table and a per-card table", () => {
+    const markdown = renderReportMarkdown({
+      record: withResearch,
+      score,
+      promptHashes: [],
+      usage: { calls: 1, inputTokens: 1_000, outputTokens: 100, reasoningTokens: 50 },
+    });
+    expect(markdown).toContain("### Research");
+    expect(markdown).toContain("| research-business-idea | 5 | 3 | 2 | 1 | 0 | 2 | 1/2 |");
+    expect(markdown).toContain("| research-packet-1 | 70.0s | yes | no |");
+    // A pipe in a packet title must not break the table either.
+    expect(markdown).toContain("Market size \\| and funding");
+  });
+
+  it("counts the calls that ran on Glimmer and prices them at nothing", () => {
+    const markdown = renderReportMarkdown({
+      record: withResearch,
+      score,
+      promptHashes: [],
+      usage: { calls: 1, inputTokens: 1_000, outputTokens: 100, reasoningTokens: 50 },
+    });
+    expect(markdown).toContain("| local calls (Glimmer, $0) | 5 |");
+    expect(markdown).toContain("research runner's web");
+  });
+
+  it("says nothing was looked up rather than printing an empty table", () => {
+    const markdown = renderReportMarkdown({
+      record,
+      score: scoreRun(record),
+      promptHashes: [],
+      usage: { calls: 0, inputTokens: 0, outputTokens: 0, reasoningTokens: 0 },
+    });
+    expect(markdown).toContain("_Nothing was looked up._");
+  });
+});

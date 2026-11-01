@@ -68,6 +68,17 @@ export const judgeMatchJsonSchema = {
   additionalProperties: false,
 } as const;
 
+/**
+ * The level a card the harness scored went out at.
+ *
+ * A policy delivery is a `glow` or an `interject` (V2-017's {@link
+ * DeliveredLevel}); a research-ready card (V2-014) is neither — nothing about
+ * it is a decision to take the floor — so it has its own level here, which is
+ * also the level a `research_hook` moment expects. One type so a moment's
+ * outcome can name what caught it, whichever half of the stage it came from.
+ */
+export type ScoredLevel = DeliveredLevel | "research";
+
 /** One card Sotto put on the stage during a replay. */
 export interface DeliveryRecord {
   /** The stage card's id, `card-<candidateId>`. */
@@ -95,6 +106,74 @@ export interface DeliveryRecord {
   reason: DecisionReason | null;
   /** The score the decision was made on, or `null` if the log was unreadable. */
   score: number | null;
+}
+
+/**
+ * One research-ready card a replay put on the stage (V2-019).
+ *
+ * Deliberately not a {@link DeliveryRecord}: a research card is not a
+ * decision the policy took, so it has no candidate behind it, no level the
+ * budget could have turned down and no reason — and it must not be counted
+ * among the deliveries the precision and pause gates are about. What it does
+ * have is a planted `research_hook` moment it may or may not be an answer to,
+ * which is what the judge is asked.
+ *
+ * It is read off the session folder's `research.jsonl` rather than off the
+ * stage, because a packet brought forward when somebody asks for it (V2-015)
+ * replaces its own card — same id, later `createdAtMs` — and the time that
+ * matters here is when the group first saw it.
+ */
+export interface ResearchDeliveryRecord {
+  /** The stage card's id, `research-<packetId>`. */
+  cardId: string;
+  packetId: string;
+  ideaId: string;
+  title: string;
+  /** The question the packet answers, from the `packet` line of the log. */
+  question: string;
+  /** The card's one line, which is what a reader sees closed. */
+  teaser: string;
+  /** The key points, as the card's markdown. */
+  detail: string;
+  /** How many sources the packet carried. A packet with none is discarded. */
+  sources: number;
+  /** When the card went up, on the session (simulated) clock. */
+  deliveredAtMs: number;
+  /** Whether nobody was talking then, reconstructed from the turns. */
+  inPause: boolean;
+  /** The reconstructed pause state at {@link deliveredAtMs}. */
+  pause: PauseState;
+  /** True when it went up in the drain, after the conversation had ended. */
+  atSessionEnd: boolean;
+}
+
+/**
+ * What the research pipeline did in one replay (V2-019), off `research.jsonl`.
+ *
+ * The PRD asks the report for packets per conversation and the unsourced
+ * count, and both are decisions the pipeline logged rather than anything the
+ * stage shows: an unsourced packet is thrown away without a card ever
+ * existing (V2-013).
+ */
+export interface ResearchRunRecord {
+  /** Ideas the session thought of, duplicates included. */
+  ideas: number;
+  /** Ideas the gate let through. */
+  queued: number;
+  /** Ideas the gate turned down. */
+  rejected: number;
+  /** Gate calls that did not come back; the idea stopped there too. */
+  gateFailed: number;
+  /** Gate verdicts that ran on the local model, which is billed at nothing. */
+  localGateCalls: number;
+  /** Sourced packets: the searches that produced something showable. */
+  packets: number;
+  /** Packets discarded for having no source the search really returned. */
+  unsourced: number;
+  /** Searches that did not come back at all. */
+  failed: number;
+  /** The cards those packets became, oldest first. */
+  cards: ResearchDeliveryRecord[];
 }
 
 /**
@@ -197,6 +276,11 @@ export interface FixtureRunRecord {
    */
   gateCalls?: GateCallRecord[];
   deliveries: DeliveryRecord[];
+  /**
+   * What the research pipeline did (V2-019). Absent on runs recorded before
+   * it, and on a replay whose session folder could not be read back.
+   */
+  research?: ResearchRunRecord;
   moments: MomentRecord[];
   /** Every (delivery, moment) pair the judge looked at. */
   matches: JudgeMatchRecord[];

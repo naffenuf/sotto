@@ -20,9 +20,15 @@ import type {
   GateScore,
   MomentScore,
   RunScore,
+  ScoreTotals,
   SettingsScore,
 } from "./score.js";
-import { MIN_MOMENT_RECALL, settingsAsked, settingsOf } from "./score.js";
+import {
+  MIN_MOMENT_RECALL,
+  MIN_RESEARCH_RECALL,
+  settingsAsked,
+  settingsOf,
+} from "./score.js";
 
 /** A moment's outcome as a reader sees it. */
 const OUTCOME_LABEL = {
@@ -165,8 +171,19 @@ export function headlines(group: SettingsScore): Headline[] {
         ` — caught ${totals.caught}, low ${totals.caughtLow}, late ${totals.late}, missed ${totals.missed}`,
     },
     {
+      label: "research recall",
+      value:
+        `${fraction(totals.researchCaught, totals.researchMoments)}` +
+        ` — caught ${totals.researchCaught}, late ${totals.researchLate},` +
+        ` missed ${totals.researchMissed}`,
+    },
+    {
       label: "interject precision",
       value: fraction(totals.trueInterjects, totals.interjects),
+    },
+    {
+      label: "research packets",
+      value: describeResearch(totals),
     },
     {
       label: "false interjects on brainstorm + no-wake",
@@ -203,6 +220,76 @@ function describeGate(gate: GateScore): string {
   );
 }
 
+/**
+ * `3 packet(s) from 7 idea(s), 1 unsourced, 0 failed; 3 card(s), 3 in a pause`.
+ *
+ * The unsourced count is in the headline on purpose (v2 PRD V2-019): a
+ * discarded packet is a search that was paid for and showed nobody anything,
+ * which is the number to watch when the research prompts are tuned.
+ */
+function describeResearch(totals: ScoreTotals): string {
+  if (totals.researchIdeas === 0 && totals.researchCards === 0) {
+    return "nothing was looked up";
+  }
+  return (
+    `${totals.researchPackets} packet(s) from ${totals.researchIdeas} idea(s)` +
+    ` (${totals.researchQueued} queued, ${totals.researchRejected} rejected)` +
+    `, ${totals.unsourcedPackets} unsourced, ${totals.failedPackets} failed` +
+    `; ${totals.researchCards} card(s), ` +
+    `${totals.researchCardsInPause} in a pause` +
+    (totals.researchCardsAtSessionEnd > 0
+      ? `, ${totals.researchCardsAtSessionEnd} after the conversation ended`
+      : "")
+  );
+}
+
+/** One row per fixture: what the research pipeline did in each conversation. */
+function researchRows(group: SettingsScore): string[][] {
+  const rows: string[][] = [
+    ["fixture", "ideas", "queued", "packets", "unsourced", "failed", "cards", "in pause"],
+  ];
+  for (const fixture of group.fixtures) {
+    const research = fixture.research;
+    rows.push([
+      fixture.fixture,
+      String(research?.ideas ?? 0),
+      String(research?.queued ?? 0),
+      String(research?.packets ?? 0),
+      String(research?.unsourced ?? 0),
+      String(research?.failed ?? 0),
+      String(fixture.researchCards.length),
+      `${fixture.researchCards.filter((one) => one.inPause).length}/${fixture.researchCards.length}`,
+    ]);
+  }
+  const { totals } = group;
+  rows.push([
+    "all",
+    String(totals.researchIdeas),
+    String(totals.researchQueued),
+    String(totals.researchPackets),
+    String(totals.unsourcedPackets),
+    String(totals.failedPackets),
+    String(totals.researchCards),
+    `${totals.researchCardsInPause}/${totals.researchCards}`,
+  ]);
+  return rows;
+}
+
+/**
+ * Calls that ran on the local model, over the whole run: the candidate gate's
+ * (V2-016) and the research gate's (V2-012).
+ *
+ * They are counted rather than priced because Muse Glimmer runs on this Mac —
+ * it bills nothing, and a report that said `$0.00` with no count would read
+ * as though no judgment had happened at all.
+ */
+function localCalls(score: RunScore): number {
+  return score.groups.reduce(
+    (total, group) => total + group.gate.local + group.totals.localResearchGateCalls,
+    0,
+  );
+}
+
 function gateLines(gates: readonly GateResult[]): string[] {
   return gates.map((gate) => `[${GATE_MARK[gate.status]}] ${gate.name} — ${gate.detail}`);
 }
@@ -216,6 +303,10 @@ export function renderTerminalReport(record: EvalRunRecord, score: RunScore): st
     if (group.totals.moments > 0) {
       parts.push("");
       parts.push(renderTable(momentRows(group)));
+    }
+    if (group.totals.researchIdeas > 0 || group.totals.researchCards > 0) {
+      parts.push("");
+      parts.push(renderTable(researchRows(group)));
     }
     parts.push("");
     parts.push(
@@ -285,6 +376,7 @@ export function renderReportMarkdown(context: ReportContext): string {
     ["judge prompt", record.judge.promptHash === "" ? "(judging skipped)" : record.judge.promptHash],
     ["judge calls", `${record.judge.calls} (${record.judge.cacheHits} cached)`],
     ["recall gate", `>= ${MIN_MOMENT_RECALL}`],
+    ["research recall gate", `>= ${MIN_RESEARCH_RECALL}`],
   ]));
   out.push("");
   out.push("## Prompts");
@@ -307,6 +399,7 @@ export function renderReportMarkdown(context: ReportContext): string {
       ["input tokens", usage.inputTokens.toLocaleString("en-US")],
       ["output tokens", usage.outputTokens.toLocaleString("en-US")],
       ["of which reasoning", usage.reasoningTokens.toLocaleString("en-US")],
+      ["local calls (Glimmer, $0)", String(localCalls(score))],
       ["estimate", formatUsd(estimateCostUsd(usage))],
     ]),
   );
@@ -314,7 +407,12 @@ export function renderReportMarkdown(context: ReportContext): string {
   out.push(
     "Replays cost no transcription: the conversations are captured events. " +
       "The estimate prices input and output tokens at the published Muse Spark 1.3 " +
-      "rates and does not include the verifier's web searches.",
+      "rates and does not include the verifier's or the research runner's web " +
+      "searches. Every call the research pipeline made at Muse Spark — the " +
+      "planner, a gate verdict that fell back to the cloud, and each search — is " +
+      "in the tokens above, because they all go through the one metered client; " +
+      "the calls that ran on Muse Glimmer are counted and priced at nothing, " +
+      "since it runs on this Mac.",
   );
 
   for (const group of score.groups) {
@@ -362,6 +460,33 @@ export function renderReportMarkdown(context: ReportContext): string {
             ),
           ]),
     );
+    out.push("");
+    out.push("### Research");
+    out.push("");
+    out.push(
+      group.totals.researchIdeas === 0 && group.totals.researchCards === 0
+        ? "_Nothing was looked up._"
+        : markdownTable(researchRows(group)),
+    );
+    if (group.totals.researchCards > 0) {
+      out.push("");
+      out.push(
+        markdownTable([
+          ["fixture", "card", "at", "pause", "at end", "matched", "title"],
+          ...group.fixtures.flatMap((fixture) =>
+            fixture.researchCards.map((card) => [
+              fixture.fixture,
+              card.cardId,
+              seconds(card.deliveredAtMs),
+              card.inPause ? "yes" : "no",
+              card.atSessionEnd ? "yes" : "no",
+              card.matchedMomentIds.join(", ") || "_none_",
+              card.title.replace(/\|/g, "\\|"),
+            ]),
+          ),
+        ]),
+      );
+    }
     const judged = group.fixtures
       .flatMap((fixture) => fixture.moments)
       .filter((moment) => moment.judgeReason !== null);

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DecisionLogRecord } from "../../shared/candidates.js";
+import type { ResearchLogLine, ResearchPacket } from "../../shared/research.js";
 import type { StageCard } from "../../shared/cards.js";
 import { FREQUENCY_LIMITS } from "../../shared/policy.js";
 import type { TurnUpdate } from "../../shared/turns.js";
@@ -10,10 +11,13 @@ import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { PAUSE_MS } from "../interject/policy.js";
 import { SESSION_FILES } from "../session/SessionStore.js";
 import {
+  asJudgeCard,
   deliveredDecisions,
   deliveriesFrom,
   readCandidateLog,
+  readResearchLog,
   replayFixture,
+  researchFrom,
   runFixture,
   type ReplayResult,
 } from "./runner.js";
@@ -186,6 +190,7 @@ describe("deliveriesFrom", () => {
       candidates: 0,
       decisions: 0,
       gateCalls: [],
+      researchLog: [],
       delivered: new Map(),
       ...partial,
     };
@@ -254,5 +259,227 @@ describe("deliveriesFrom", () => {
     );
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0]).toMatchObject({ cardId: "card-cand-2", level: "glow", type: null });
+  });
+});
+
+/**
+ * What the research pipeline did, read back off `research.jsonl` (V2-019).
+ *
+ * The counts come off the log rather than off the stage because two of the
+ * three outcomes never reach the stage at all: an unsourced packet is thrown
+ * away (V2-013) and a rejected idea never becomes one (V2-012).
+ */
+describe("readResearchLog and researchFrom", () => {
+  function turn(turnId: string, startMs: number, endMs: number): TurnUpdate {
+    return {
+      turnId,
+      speaker: "A",
+      text: "words",
+      final: true,
+      startMs,
+      endMs,
+      speakerMappingUncertain: false,
+    };
+  }
+
+  function packet(overrides: Partial<ResearchPacket> = {}): ResearchPacket {
+    return {
+      id: "packet-1",
+      ideaId: "idea-1",
+      title: "Meeting-tool market size",
+      teaser: "About $2bn in 2025.",
+      keyPoints: ["two vendors hold most of it", "clinics are a small slice"],
+      sources: [
+        { title: "A report", url: "https://example.com/report" },
+        { title: "Another", url: "https://example.com/other" },
+      ],
+      createdAtMs: 60_000,
+      latencyMs: 15_000,
+      ...overrides,
+    };
+  }
+
+  const log: ResearchLogLine[] = [
+    { kind: "idea", atMs: 10_000, origin: "hook", idea: idea("idea-1") },
+    { kind: "idea", atMs: 11_000, origin: "planner", idea: idea("idea-2") },
+    { kind: "idea", atMs: 12_000, origin: "planner", idea: idea("idea-3") },
+    gateLine("idea-1", "queued", "local"),
+    gateLine("idea-2", "rejected", "local"),
+    gateLine("idea-3", "failed", null),
+    { kind: "start", atMs: 20_000, ideaId: "idea-1", question: "how big?", running: 1, startedInWindow: 1 },
+    {
+      kind: "packet",
+      atMs: 60_000,
+      ideaId: "idea-1",
+      question: "how big is the market?",
+      outcome: "ready",
+      packet: packet(),
+      latencyMs: 15_000,
+      searched: true,
+    },
+    {
+      kind: "card",
+      atMs: 12_000,
+      packetId: "packet-1",
+      ideaId: "idea-1",
+      title: "Meeting-tool market size",
+      heldForMs: 500,
+      waiting: 0,
+      shownInWindow: 1,
+    },
+  ];
+
+  function idea(id: string) {
+    return {
+      id,
+      topic: "market size",
+      question: "how big is the market?",
+      why: "they are guessing",
+      sourceTurnIds: ["0:4"],
+      origin: "hook" as const,
+      createdAtMs: 10_000,
+    };
+  }
+
+  function gateLine(
+    ideaId: string,
+    decision: "queued" | "rejected" | "failed",
+    where: "local" | "cloud" | null,
+  ): ResearchLogLine {
+    return {
+      kind: "gate",
+      atMs: 15_000,
+      ideaId,
+      question: "how big is the market?",
+      decision,
+      where,
+      score: decision === "queued" ? 0.8 : 0.2,
+      threshold: 0.6,
+      latencyMs: 20_000,
+    };
+  }
+
+  function replay(lines: ResearchLogLine[]): ReplayResult {
+    return {
+      turns: [turn("0:0", 1_000, 4_000), turn("0:1", 6_000, 9_000)],
+      cards: [],
+      sessionDir: null,
+      durationMs: 9_000,
+      candidates: 0,
+      decisions: 0,
+      gateCalls: [],
+      researchLog: lines,
+      delivered: new Map(),
+    };
+  }
+
+  it("is empty for a session that never looked anything up", () => {
+    expect(readResearchLog(null)).toEqual([]);
+    expect(readResearchLog(root)).toEqual([]);
+  });
+
+  it("reads the lines a session wrote, skipping a half-written last one", () => {
+    const dir = join(root, "session");
+    mkdirSync(dir);
+    const lines = [JSON.stringify(log[0]), JSON.stringify(log[3]), '{"kind":"gate",'];
+    writeFileSync(join(dir, SESSION_FILES.research), `${lines.join("\n")}\n`);
+    expect(readResearchLog(dir)).toHaveLength(2);
+  });
+
+  it("counts the ideas, the verdicts and the packets, and places each card", () => {
+    const research = researchFrom(replay(log));
+    expect(research).toMatchObject({
+      ideas: 3,
+      queued: 1,
+      rejected: 1,
+      gateFailed: 1,
+      localGateCalls: 2,
+      packets: 1,
+      unsourced: 0,
+      failed: 0,
+    });
+    expect(research.cards).toHaveLength(1);
+    expect(research.cards[0]).toMatchObject({
+      cardId: "research-packet-1",
+      packetId: "packet-1",
+      ideaId: "idea-1",
+      question: "how big is the market?",
+      teaser: "About $2bn in 2025.",
+      sources: 2,
+      deliveredAtMs: 12_000,
+      // The room had been quiet since the last turn closed at 9 s.
+      inPause: true,
+      atSessionEnd: false,
+    });
+  });
+
+  it("counts an unsourced packet, which never became a card at all", () => {
+    const research = researchFrom(
+      replay([
+        {
+          kind: "packet",
+          atMs: 60_000,
+          ideaId: "idea-1",
+          question: "how big?",
+          outcome: "unsourced",
+          title: "Market size",
+          latencyMs: 12_000,
+          searched: true,
+        },
+        {
+          kind: "packet",
+          atMs: 70_000,
+          ideaId: "idea-2",
+          question: "and who funds it?",
+          outcome: "failed",
+          latencyMs: 9_000,
+          searched: false,
+          error: "the call did not come back",
+        },
+      ]),
+    );
+    expect(research).toMatchObject({ packets: 0, unsourced: 1, failed: 1 });
+    expect(research.cards).toEqual([]);
+  });
+
+  it("keeps a packet's first appearance, not the moment it was asked for", () => {
+    const broughtForward = [
+      ...log,
+      {
+        kind: "card" as const,
+        atMs: 150_000,
+        packetId: "packet-1",
+        ideaId: "idea-1",
+        title: "Meeting-tool market size",
+        heldForMs: 0,
+        waiting: 0,
+        shownInWindow: 1,
+        broughtForward: true as const,
+      },
+    ];
+    const research = researchFrom(replay(broughtForward));
+    expect(research.cards).toHaveLength(1);
+    expect(research.cards[0]?.deliveredAtMs).toBe(12_000);
+  });
+
+  it("measures the card's pause itself, as a delivery's is measured", () => {
+    const midTurn = log.map((line) =>
+      line.kind === "card" ? { ...line, atMs: 7_000 } : line,
+    );
+    const research = researchFrom(replay(midTurn));
+    expect(research.cards[0]?.inPause).toBe(false);
+    expect(research.cards[0]?.pause.speaking).toBe(true);
+  });
+
+  it("gives the judge the card's own words, with the question as the reason", () => {
+    const [card] = researchFrom(replay(log)).cards;
+    expect(card).toBeDefined();
+    expect(asJudgeCard(card!)).toEqual({
+      cardId: "research-packet-1",
+      headline: "Research ready: Meeting-tool market size",
+      detail:
+        "About $2bn in 2025.\n\n- two vendors hold most of it\n- clinics are a small slice",
+      whyNow: "how big is the market?",
+    });
   });
 });

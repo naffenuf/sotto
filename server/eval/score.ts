@@ -27,6 +27,9 @@ import type {
   FixtureRunRecord,
   JudgeMatchRecord,
   MomentRecord,
+  ResearchDeliveryRecord,
+  ResearchRunRecord,
+  ScoredLevel,
 } from "../../shared/eval.js";
 import type { ExpectedLevel } from "../../shared/fixtures.js";
 import { DEFAULT_GATE_MODE, type GateMode } from "../../shared/candidates.js";
@@ -40,6 +43,15 @@ import {
 
 /** The gate: below this, `npm run eval` exits non-zero. */
 export const MIN_MOMENT_RECALL = 0.7;
+
+/**
+ * The same gate for the research moments (V2-019), which are scored apart.
+ *
+ * Lower on purpose, and the v2 PRD sets it there: catching a `research_hook`
+ * takes a gate verdict, a web search and a pause to show the card in, so a
+ * window that an interjection can reach comfortably is tight for a packet.
+ */
+export const MIN_RESEARCH_RECALL = 0.5;
 
 /**
  * The conversations with nothing planted in them. Sotto interjecting here is
@@ -63,12 +75,13 @@ function outcomeRank(outcome: MomentOutcome): number {
  * `glow` < `interject` < `research`: "the expected level or higher" in one
  * number.
  *
- * `research` is a level a *moment* can expect and a policy delivery can never
- * have: a `research_hook` is caught by a research-ready card (v2 PRD V2-014),
- * so an interjection the judge matches to one scores `caught_low` until
- * V2-019 teaches the harness to match research cards.
+ * `research` is a level a policy delivery can never have and a research-ready
+ * card always has (V2-014). Since V2-019 the two halves of the stage are
+ * judged against the two kinds of moment they can catch and no further, so in
+ * practice a research moment's outcome is `caught`, `late` or `missed`: the
+ * rank is still here because the comparison is what *says* so.
  */
-function levelRank(level: DeliveredLevel | ExpectedLevel): number {
+function levelRank(level: ScoredLevel | ExpectedLevel): number {
   return level === "research" ? 2 : level === "interject" ? 1 : 0;
 }
 
@@ -81,7 +94,7 @@ export interface MomentScore {
   outcome: MomentOutcome;
   /** The card the outcome came from, or `null` when the moment was missed. */
   cardId: string | null;
-  deliveredLevel: DeliveredLevel | null;
+  deliveredLevel: ScoredLevel | null;
   /** The window, on the session clock. A delivery is compared to these. */
   windowStartMs: number;
   windowEndMs: number;
@@ -107,16 +120,54 @@ export interface DeliveryScore {
   unmatched: boolean;
 }
 
-/** One fixture at one setting, scored. */
+/**
+ * One research-ready card, scored (V2-019).
+ *
+ * Not a {@link DeliveryScore}, and that is the whole point: a research card
+ * is not a decision to take the floor, so it is outside the precision gate
+ * and outside the pause gate — the two gates about interrupting people. It
+ * is still *measured* on both, because a card appearing mid-sentence is worth
+ * knowing about even when nothing fails over it.
+ */
+export interface ResearchCardScore {
+  cardId: string;
+  packetId: string;
+  title: string;
+  deliveredAtMs: number;
+  inPause: boolean;
+  /** It went up in the drain, after the conversation had ended (V2-014). */
+  atSessionEnd: boolean;
+  /** The research moments the judge matched it to. */
+  matchedMomentIds: string[];
+  /** A card about nothing anybody planted. Counted, never gated. */
+  unmatched: boolean;
+}
+
+/**
+ * One fixture at one setting, scored.
+ *
+ * The moment counts are over the **non-research** moments, which is what the
+ * recall gate is about; a `research_hook` is counted separately under
+ * `research*`, because the two are caught by different halves of the stage
+ * and have different targets (v2 PRD V2-019).
+ */
 export interface FixtureScore {
   fixture: string;
   settings: PolicySettings;
   moments: MomentScore[];
   deliveries: DeliveryScore[];
+  /** The research-ready cards this replay showed (V2-019). */
+  researchCards: ResearchCardScore[];
+  /** What the research pipeline did, or `null` for a run recorded before V2-019. */
+  research: ResearchRunRecord | null;
   caught: number;
   caughtLow: number;
   late: number;
   missed: number;
+  /** Research moments caught inside their window. */
+  researchCaught: number;
+  researchLate: number;
+  researchMissed: number;
   /** `interject` cards matching no moment. On a quiet fixture, a gate failure. */
   falseInterjects: number;
   /** `glow` cards matching no moment. Counted, not gated. */
@@ -128,6 +179,7 @@ export interface FixtureScore {
 
 /** The totals the headline metrics are computed from. */
 export interface ScoreTotals {
+  /** Planted moments the policy is meant to catch: everything but a hook. */
   moments: number;
   caught: number;
   caughtLow: number;
@@ -143,6 +195,28 @@ export interface ScoreTotals {
   falseGlows: number;
   /** False interjects on `brainstorm` and `no-wake` only. Gated. */
   quietFalseInterjects: number;
+  /** Planted `research_hook` moments, which a research card catches (V2-019). */
+  researchMoments: number;
+  researchCaught: number;
+  researchLate: number;
+  researchMissed: number;
+  /** Research-ready cards shown, and how many of them in a pause. */
+  researchCards: number;
+  researchCardsInPause: number;
+  /** Cards the drain put up after the conversation ended, pause or not. */
+  researchCardsAtSessionEnd: number;
+  /** Research cards matching no planted hook. Counted, never gated. */
+  unmatchedResearchCards: number;
+  /** Ideas thought of, and what the gate did with them (V2-012). */
+  researchIdeas: number;
+  researchQueued: number;
+  researchRejected: number;
+  /** Gate verdicts that ran on the local model, which costs nothing. */
+  localResearchGateCalls: number;
+  /** Sourced packets, and the two ways a search produced none (V2-013). */
+  researchPackets: number;
+  unsourcedPackets: number;
+  failedPackets: number;
   replayErrors: number;
 }
 
@@ -178,6 +252,8 @@ export interface SettingsScore {
   totals: ScoreTotals;
   /** (caught + caught_low) / moments. A `late` catch does not count. */
   recall: number;
+  /** researchCaught / researchMoments; 1 when none were planted (V2-019). */
+  researchRecall: number;
   /** trueInterjects / interjects; 1 when Sotto interjected not at all. */
   interjectPrecision: number;
   /** deliveriesInPause / deliveries; 1 when there were none. */
@@ -252,13 +328,28 @@ export function windowFor(moment: MomentRecord): { startMs: number; endMs: numbe
  * had moved on did not catch the moment, however well it was pitched.
  */
 export function outcomeFor(
-  moment: MomentRecord,
-  delivery: DeliveryRecord,
+  moment: Pick<MomentRecord, "expectedLevel">,
+  delivery: { level: ScoredLevel; deliveredAtMs: number },
   window: { startMs: number; endMs: number },
 ): Exclude<MomentOutcome, "missed"> {
   if (delivery.deliveredAtMs > window.endMs) return "late";
   if (levelRank(delivery.level) < levelRank(moment.expectedLevel)) return "caught_low";
   return "caught";
+}
+
+/**
+ * A card as the moment scoring compares it: when it went out, and at what
+ * level. Both halves of the stage reduce to this.
+ */
+interface ScoredCard {
+  cardId: string;
+  level: ScoredLevel;
+  deliveredAtMs: number;
+}
+
+/** A research moment expects a research card; everything else expects the policy. */
+function expectsResearch(moment: Pick<MomentRecord, "expectedLevel">): boolean {
+  return moment.expectedLevel === "research";
 }
 
 /** One fixture's run, scored against the moments its script planted. */
@@ -279,31 +370,59 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
       unmatched: matched.length === 0,
     };
   });
+  const research = run.research ?? null;
+  const researchCards: ResearchCardScore[] = (research?.cards ?? []).map((card) => {
+    const matched = byCard.get(card.cardId) ?? [];
+    return {
+      cardId: card.cardId,
+      packetId: card.packetId,
+      title: card.title,
+      deliveredAtMs: card.deliveredAtMs,
+      inPause: card.inPause,
+      atSessionEnd: card.atSessionEnd,
+      matchedMomentIds: matched.map((match) => match.momentId),
+      unmatched: matched.length === 0,
+    };
+  });
+
+  // The pool a moment can be caught by: a research hook by a research card
+  // (V2-014), everything else by the policy. The judge is only asked about
+  // these pairs either, so nothing is lost by not looking at the other.
+  const policyPool: ScoredCard[] = run.deliveries.map((delivery) => ({
+    cardId: delivery.cardId,
+    level: delivery.level,
+    deliveredAtMs: delivery.deliveredAtMs,
+  }));
+  const researchPool: ScoredCard[] = (research?.cards ?? []).map((card) => ({
+    cardId: card.cardId,
+    level: "research",
+    deliveredAtMs: card.deliveredAtMs,
+  }));
 
   const moments: MomentScore[] = run.moments.map((moment) => {
     const window = windowFor(moment);
-    let best: { outcome: Exclude<MomentOutcome, "missed">; delivery: DeliveryRecord } | null = null;
-    for (const delivery of run.deliveries) {
-      const matched = (byCard.get(delivery.cardId) ?? []).some(
+    let best: { outcome: Exclude<MomentOutcome, "missed">; card: ScoredCard } | null = null;
+    for (const card of expectsResearch(moment) ? researchPool : policyPool) {
+      const matched = (byCard.get(card.cardId) ?? []).some(
         (match) => match.momentId === moment.id,
       );
       if (!matched) continue;
-      const outcome = outcomeFor(moment, delivery, window);
+      const outcome = outcomeFor(moment, card, window);
       // Best outcome wins; between two of the same, the earlier card.
       if (
         best === null ||
         outcomeRank(outcome) < outcomeRank(best.outcome) ||
         (outcomeRank(outcome) === outcomeRank(best.outcome) &&
-          delivery.deliveredAtMs < best.delivery.deliveredAtMs)
+          card.deliveredAtMs < best.card.deliveredAtMs)
       ) {
-        best = { outcome, delivery };
+        best = { outcome, card };
       }
     }
     const reason =
       best === null
         ? null
         : (run.matches.find(
-            (match) => match.cardId === best?.delivery.cardId && match.momentId === moment.id,
+            (match) => match.cardId === best?.card.cardId && match.momentId === moment.id,
           )?.reason ?? null);
     return {
       momentId: moment.id,
@@ -311,17 +430,17 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
       expectedLevel: moment.expectedLevel,
       description: moment.description,
       outcome: best?.outcome ?? "missed",
-      cardId: best?.delivery.cardId ?? null,
-      deliveredLevel: best?.delivery.level ?? null,
+      cardId: best?.card.cardId ?? null,
+      deliveredLevel: best?.card.level ?? null,
       windowStartMs: window.startMs,
       windowEndMs: window.endMs,
-      delayMs: best === null ? null : best.delivery.deliveredAtMs - window.startMs,
+      delayMs: best === null ? null : best.card.deliveredAtMs - window.startMs,
       judgeReason: reason,
     };
   });
 
-  const count = (outcome: MomentOutcome): number =>
-    moments.filter((one) => one.outcome === outcome).length;
+  const count = (outcome: MomentOutcome, research: boolean): number =>
+    moments.filter((one) => expectsResearch(one) === research && one.outcome === outcome).length;
   const unmatchedAt = (level: DeliveredLevel): number =>
     deliveries.filter((one) => one.unmatched && one.level === level).length;
 
@@ -330,10 +449,17 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
     settings: settingsOf(run),
     moments,
     deliveries,
-    caught: count("caught"),
-    caughtLow: count("caught_low"),
-    late: count("late"),
-    missed: count("missed"),
+    researchCards,
+    research,
+    caught: count("caught", false),
+    caughtLow: count("caught_low", false),
+    late: count("late", false),
+    missed: count("missed", false),
+    // A research moment can only be caught at the level it expects, so
+    // `caught_low` is counted with the catches rather than losing one.
+    researchCaught: count("caught", true) + count("caught_low", true),
+    researchLate: count("late", true),
+    researchMissed: count("missed", true),
     falseInterjects: unmatchedAt("interject"),
     falseGlows: unmatchedAt("glow"),
     deliveriesInPause: deliveries.filter((one) => one.inPause).length,
@@ -356,18 +482,53 @@ function totalsOf(fixtures: readonly FixtureScore[]): ScoreTotals {
     falseInterjects: 0,
     falseGlows: 0,
     quietFalseInterjects: 0,
+    researchMoments: 0,
+    researchCaught: 0,
+    researchLate: 0,
+    researchMissed: 0,
+    researchCards: 0,
+    researchCardsInPause: 0,
+    researchCardsAtSessionEnd: 0,
+    unmatchedResearchCards: 0,
+    researchIdeas: 0,
+    researchQueued: 0,
+    researchRejected: 0,
+    localResearchGateCalls: 0,
+    researchPackets: 0,
+    unsourcedPackets: 0,
+    failedPackets: 0,
     replayErrors: 0,
   };
   for (const fixture of fixtures) {
-    totals.moments += fixture.moments.length;
+    totals.moments += fixture.caught + fixture.caughtLow + fixture.late + fixture.missed;
     totals.caught += fixture.caught;
     totals.caughtLow += fixture.caughtLow;
     totals.late += fixture.late;
     totals.missed += fixture.missed;
+    totals.researchMoments +=
+      fixture.researchCaught + fixture.researchLate + fixture.researchMissed;
+    totals.researchCaught += fixture.researchCaught;
+    totals.researchLate += fixture.researchLate;
+    totals.researchMissed += fixture.researchMissed;
     totals.deliveries += fixture.deliveries.length;
     totals.deliveriesInPause += fixture.deliveriesInPause;
     totals.falseInterjects += fixture.falseInterjects;
     totals.falseGlows += fixture.falseGlows;
+    totals.researchCards += fixture.researchCards.length;
+    totals.researchCardsInPause += fixture.researchCards.filter((one) => one.inPause).length;
+    totals.researchCardsAtSessionEnd += fixture.researchCards.filter(
+      (one) => one.atSessionEnd,
+    ).length;
+    totals.unmatchedResearchCards += fixture.researchCards.filter((one) => one.unmatched).length;
+    if (fixture.research !== null) {
+      totals.researchIdeas += fixture.research.ideas;
+      totals.researchQueued += fixture.research.queued;
+      totals.researchRejected += fixture.research.rejected;
+      totals.localResearchGateCalls += fixture.research.localGateCalls;
+      totals.researchPackets += fixture.research.packets;
+      totals.unsourcedPackets += fixture.research.unsourced;
+      totals.failedPackets += fixture.research.failed;
+    }
     if (isQuietFixture(fixture.fixture)) totals.quietFalseInterjects += fixture.falseInterjects;
     if (fixture.error !== undefined) totals.replayErrors += 1;
     for (const delivery of fixture.deliveries) {
@@ -392,8 +553,14 @@ export function median(values: readonly number[]): number | null {
 }
 
 /**
- * The three gates of US-016, plus the one that is not a judgement: a replay
- * that threw produced no numbers, so the run failed whatever the rest says.
+ * The three gates of US-016, V2-019's research recall beside them, plus the
+ * one that is not a judgement: a replay that threw produced no numbers, so
+ * the run failed whatever the rest says.
+ *
+ * Research cards are deliberately outside the two gates about interrupting
+ * people — the precision gate and the pause gate. A research card is not a
+ * decision to take the floor, and the one it would break is by design: a
+ * packet still waiting when the conversation ends goes up anyway (V2-014).
  *
  * Unjudged runs (`--no-judge`) skip the two that need matches. A skipped gate
  * is not a passed one, and the report says so.
@@ -401,6 +568,7 @@ export function median(values: readonly number[]): number | null {
 function gatesFor(
   totals: ScoreTotals,
   recall: number,
+  researchRecall: number,
   pauseRate: number,
   judged: boolean,
 ): GateResult[] {
@@ -414,6 +582,13 @@ function gatesFor(
       `moment recall >= ${MIN_MOMENT_RECALL}`,
       totals.moments === 0 || recall >= MIN_MOMENT_RECALL,
       totals.moments === 0 ? "no moments in this run" : formatRatio(recall),
+    ),
+    gate(
+      `research recall >= ${MIN_RESEARCH_RECALL}`,
+      totals.researchMoments === 0 || researchRecall >= MIN_RESEARCH_RECALL,
+      totals.researchMoments === 0
+        ? "no research moments in this run"
+        : `${formatRatio(researchRecall)} (${totals.researchCaught}/${totals.researchMoments})`,
     ),
     gate(
       `no false interject on ${QUIET_FIXTURES.join(" or ")}`,
@@ -454,18 +629,21 @@ export function scoreSettings(
   const recall = totals.moments === 0 ? 1 : (totals.caught + totals.caughtLow) / totals.moments;
   const interjectPrecision =
     totals.interjects === 0 ? 1 : totals.trueInterjects / totals.interjects;
+  const researchRecall =
+    totals.researchMoments === 0 ? 1 : totals.researchCaught / totals.researchMoments;
   const pauseRate =
     totals.deliveries === 0 ? 1 : totals.deliveriesInPause / totals.deliveries;
   const delays = fixtures
     .flatMap((fixture) => fixture.moments)
     .map((moment) => moment.delayMs)
     .filter((delay): delay is number => delay !== null);
-  const gates = gatesFor(totals, recall, pauseRate, judged);
+  const gates = gatesFor(totals, recall, researchRecall, pauseRate, judged);
   return {
     settings,
     fixtures,
     totals,
     recall,
+    researchRecall,
     interjectPrecision,
     pauseRate,
     medianDelayMs: median(delays),

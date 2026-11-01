@@ -27,8 +27,17 @@ import type {
   FixtureRunRecord,
   GateCallRecord,
   JudgeMatchRecord,
+  MomentRecord,
+  ResearchDeliveryRecord,
+  ResearchRunRecord,
 } from "../../shared/eval.js";
 import type { DeliveredLevel, PolicySettings } from "../../shared/policy.js";
+import {
+  researchCardHeadline,
+  researchCardId,
+  type ResearchLogLine,
+  type ResearchPacketRecord,
+} from "../../shared/research.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { EventBus } from "../events/bus.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
@@ -38,7 +47,7 @@ import { SessionManager } from "../session/SessionManager.js";
 import { SESSION_FILES, SessionStore } from "../session/SessionStore.js";
 import { loadScript, resolveMoments } from "./moments.js";
 import { pauseAt, turnIntervals } from "./pause.js";
-import type { Judge } from "./judge.js";
+import type { Judge, JudgeCard } from "./judge.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
 
@@ -75,6 +84,8 @@ export interface ReplayResult {
   decisions: number;
   /** Every gate call the replay made, in the order they came back (V2-016). */
   gateCalls: GateCallRecord[];
+  /** `research.jsonl`, parsed: the ideas, the verdicts, the packets, the cards. */
+  researchLog: ResearchLogLine[];
   /** The policy's own decision, by candidate id, for the ones it delivered. */
   delivered: Map<string, DecisionLogRecord>;
 }
@@ -139,6 +150,7 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     candidates: log.filter((line) => line.kind === "candidate").length,
     decisions: log.filter((line) => line.kind === "decision").length,
     gateCalls: gateCallsFrom(log),
+    researchLog: readResearchLog(sessionDir),
     delivered: deliveredDecisions(log),
   };
 }
@@ -177,8 +189,9 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
 
   const finals = replay.turns.filter((turn) => turn.final);
   const deliveries = deliveriesFrom(replay);
+  const research = researchFrom(replay);
   const moments = resolveMoments(options.fixture, finals);
-  const matches = await judgeAll(options, deliveries, moments.length > 0);
+  const matches = await judgeAll(options, deliveries, research.cards, moments);
 
   return {
     fixture: options.fixture,
@@ -190,30 +203,63 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
     decisions: replay.decisions,
     gateCalls: replay.gateCalls,
     deliveries,
+    research,
     moments,
     matches,
     elapsedMs: Date.now() - startedAt,
   };
 }
 
-/** Every (card, moment) pair, judged. Nothing to judge when either is empty. */
+/**
+ * Every (card, moment) pair worth judging. Nothing when either side is empty.
+ *
+ * The two halves of the stage are judged against the two kinds of moment they
+ * can catch, and no further (V2-019): a `research_hook` is caught by a
+ * research-ready card and nothing else — that is what `expectedLevel:
+ * "research"` *means* in the schema — and a contradiction or an unanswered
+ * question is caught by the policy. Crossing them over would cost a judge
+ * call per pair for a verdict the scoring could never use.
+ */
 async function judgeAll(
   options: RunFixtureOptions,
   deliveries: readonly DeliveryRecord[],
-  hasMoments: boolean,
+  researchCards: readonly ResearchDeliveryRecord[],
+  moments: readonly MomentRecord[],
 ): Promise<JudgeMatchRecord[]> {
   const judge = options.judge;
-  if (judge === undefined || !hasMoments || deliveries.length === 0) return [];
+  if (judge === undefined || moments.length === 0) return [];
+  if (deliveries.length === 0 && researchCards.length === 0) return [];
   const script = loadScript(options.fixture);
   const matches: JudgeMatchRecord[] = [];
-  for (const delivery of deliveries) {
-    for (const moment of script.moments) {
+  for (const moment of script.moments) {
+    const cards =
+      moment.expectedLevel === "research"
+        ? researchCards.map(asJudgeCard)
+        : deliveries;
+    for (const delivery of cards) {
       matches.push(
         await judge.judge({ fixture: options.fixture, moment, script, delivery }),
       );
     }
   }
   return matches;
+}
+
+/**
+ * One research card as the judge reads it.
+ *
+ * The same three fields an interjection offers — what it said, what it said
+ * about it, and why now — so the judge prompt needs no second shape. "Why
+ * now" is the question the search was answering, which is the nearest thing a
+ * packet has to a reason for existing.
+ */
+export function asJudgeCard(card: ResearchDeliveryRecord): JudgeCard {
+  return {
+    cardId: card.cardId,
+    headline: researchCardHeadline(card.title),
+    detail: [card.teaser, card.detail].filter((part) => part.trim() !== "").join("\n\n"),
+    whyNow: card.question,
+  };
 }
 
 /** The cards a replay delivered, with the moment each went out in. */
@@ -258,24 +304,96 @@ function deliveredLevel(variant: StageCard["variant"]): DeliveredLevel | null {
 
 /** `candidates.jsonl`, parsed. An unreadable or absent log is an empty one. */
 export function readCandidateLog(sessionDir: string | null): CandidateLogLine[] {
+  return readJsonlLog<CandidateLogLine>(sessionDir, SESSION_FILES.candidates);
+}
+
+/** `research.jsonl`, parsed (V2-019). Empty for a session that searched nothing. */
+export function readResearchLog(sessionDir: string | null): ResearchLogLine[] {
+  return readJsonlLog<ResearchLogLine>(sessionDir, SESSION_FILES.research);
+}
+
+/**
+ * One of the session folder's `.jsonl` logs, parsed.
+ *
+ * A missing file is the normal case rather than an error: `SessionStore` only
+ * opens a log on its first append, so a conversation where the observer found
+ * nothing has no `candidates.jsonl` and one where nothing was worth looking
+ * up has no `research.jsonl`.
+ */
+function readJsonlLog<T>(sessionDir: string | null, file: string): T[] {
   if (sessionDir === null) return [];
   let text: string;
   try {
-    text = readFileSync(join(sessionDir, SESSION_FILES.candidates), "utf8");
+    text = readFileSync(join(sessionDir, file), "utf8");
   } catch {
-    // A conversation where the observer found nothing never opens the file.
     return [];
   }
-  const lines: CandidateLogLine[] = [];
+  const lines: T[] = [];
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     try {
-      lines.push(JSON.parse(line) as CandidateLogLine);
+      lines.push(JSON.parse(line) as T);
     } catch {
       // A half-written last line is the only way this happens.
     }
   }
   return lines;
+}
+
+/**
+ * What the research pipeline did in this replay (V2-019), off its own log.
+ *
+ * The counts are decisions rather than cards: an `unsourced` packet never
+ * becomes one (V2-013) and a `rejected` idea never becomes a packet, and both
+ * are numbers the report is asked for. The cards are taken from the log for
+ * the one reason the stage cannot be trusted here — a packet brought forward
+ * because somebody asked for it (V2-015) writes a second `card` line and
+ * *replaces* its own stage card, so the stage remembers only the later time,
+ * while the moment it may have caught is about the first.
+ */
+export function researchFrom(replay: ReplayResult): ResearchRunRecord {
+  const intervals = turnIntervals(replay.turns);
+  const packets = new Map<string, ResearchPacketRecord>();
+  for (const line of replay.researchLog) {
+    if (line.kind === "packet") packets.set(line.ideaId, line);
+  }
+  const counted = (predicate: (line: ResearchLogLine) => boolean): number =>
+    replay.researchLog.filter(predicate).length;
+  const cards: ResearchDeliveryRecord[] = [];
+  const seen = new Set<string>();
+  for (const line of replay.researchLog) {
+    if (line.kind !== "card" || seen.has(line.packetId)) continue;
+    seen.add(line.packetId);
+    const packet = packets.get(line.ideaId);
+    const pause = pauseAt(intervals, line.atMs);
+    cards.push({
+      cardId: researchCardId(line.packetId),
+      packetId: line.packetId,
+      ideaId: line.ideaId,
+      title: line.title,
+      question: packet?.question ?? "",
+      teaser: packet?.packet?.teaser ?? "",
+      detail: (packet?.packet?.keyPoints ?? []).map((point) => `- ${point}`).join("\n"),
+      sources: packet?.packet?.sources.length ?? 0,
+      deliveredAtMs: line.atMs,
+      // The policy's own definition of a pause, measured against the
+      // conversation rather than taken on trust — exactly as a delivery's is.
+      inPause: inPause(pause),
+      pause,
+      atSessionEnd: line.atSessionEnd === true,
+    });
+  }
+  return {
+    ideas: counted((line) => line.kind === "idea"),
+    queued: counted((line) => line.kind === "gate" && line.decision === "queued"),
+    rejected: counted((line) => line.kind === "gate" && line.decision === "rejected"),
+    gateFailed: counted((line) => line.kind === "gate" && line.decision === "failed"),
+    localGateCalls: counted((line) => line.kind === "gate" && line.where === "local"),
+    packets: counted((line) => line.kind === "packet" && line.outcome === "ready"),
+    unsourced: counted((line) => line.kind === "packet" && line.outcome === "unsourced"),
+    failed: counted((line) => line.kind === "packet" && line.outcome === "failed"),
+    cards,
+  };
 }
 
 /**

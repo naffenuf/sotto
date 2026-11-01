@@ -22,6 +22,19 @@ describe("evalFixtures", () => {
     ]);
   });
 
+  it("takes the two v2 conversations too, last and in the PRD's order (V2-019)", () => {
+    expect(isEvalFixture("research-business-idea")).toBe(true);
+    expect(isEvalFixture("offsite-plan")).toBe(true);
+    expect(evalFixtures([...captured, "offsite-plan", "research-business-idea"])).toEqual([
+      "brainstorm",
+      "no-wake",
+      "moment-contradiction",
+      "moment-mixed",
+      "offsite-plan",
+      "research-business-idea",
+    ]);
+  });
+
   it("leaves out the wake-phrase fixtures, which US-017 measures instead", () => {
     expect(isEvalFixture("ask-search")).toBe(false);
     expect(isEvalFixture("ask-diagram")).toBe(false);

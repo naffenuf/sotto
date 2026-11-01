@@ -15,19 +15,42 @@ import {
   type PolicySettings,
 } from "../../shared/policy.js";
 
-/** The conversations the harness measures: the two quiet ones, then the moments. */
+/**
+ * The conversations with planted moments but no quiet gate: the two longer v2
+ * conversations (V2-002), which carry the research hooks the research recall
+ * gate is measured on (V2-019).
+ */
+export const V2_EVAL_FIXTURES = ["research-business-idea", "offsite-plan"] as const;
+
+/**
+ * The conversations the harness measures: the two quiet ones, the moments,
+ * and the two v2 conversations.
+ */
 export function isEvalFixture(name: string): boolean {
-  return name === "brainstorm" || name === "no-wake" || name.startsWith("moment-");
+  return (
+    name === "brainstorm" ||
+    name === "no-wake" ||
+    name.startsWith("moment-") ||
+    (V2_EVAL_FIXTURES as readonly string[]).includes(name)
+  );
 }
 
 /**
  * The eval set, in the order it is run: `brainstorm` and `no-wake` first —
  * they are the ones a false interjection is a gate failure on — then every
- * `moment-*` fixture alphabetically.
+ * `moment-*` fixture alphabetically, then the two v2 conversations, which are
+ * the longest and the most expensive.
  */
 export function evalFixtures(available: readonly string[]): string[] {
   const chosen = available.filter(isEvalFixture);
-  const rank = (name: string): number => (name === "brainstorm" ? 0 : name === "no-wake" ? 1 : 2);
+  const rank = (name: string): number =>
+    name === "brainstorm"
+      ? 0
+      : name === "no-wake"
+        ? 1
+        : (V2_EVAL_FIXTURES as readonly string[]).includes(name)
+          ? 3
+          : 2;
   return [...chosen].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 

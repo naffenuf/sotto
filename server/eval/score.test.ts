@@ -5,10 +5,13 @@ import type {
   FixtureRunRecord,
   JudgeMatchRecord,
   MomentRecord,
+  ResearchDeliveryRecord,
+  ResearchRunRecord,
 } from "../../shared/eval.js";
 import { policySettingsLabel, type PolicySettings } from "../../shared/policy.js";
 import {
   MIN_MOMENT_RECALL,
+  MIN_RESEARCH_RECALL,
   boldnessFromChattiness,
   isQuietFixture,
   median,
@@ -68,6 +71,52 @@ function match(overrides: Partial<JudgeMatchRecord> = {}): JudgeMatchRecord {
     matches: true,
     reason: "the card names both figures",
     cached: false,
+    ...overrides,
+  };
+}
+
+/** A planted `research_hook`, which only a research card can catch (V2-019). */
+function hook(overrides: Partial<MomentRecord> = {}): MomentRecord {
+  return moment({
+    id: "h1",
+    type: "research_hook",
+    expectedLevel: "research",
+    description: "nobody knows what the market is worth",
+    ...overrides,
+  });
+}
+
+function researchCard(
+  overrides: Partial<ResearchDeliveryRecord> = {},
+): ResearchDeliveryRecord {
+  return {
+    cardId: "research-packet-1",
+    packetId: "packet-1",
+    ideaId: "idea-1",
+    title: "Meeting-tool market size",
+    question: "How big is the meeting-assistant market?",
+    teaser: "About $2bn in 2025, growing fast.",
+    detail: "- two vendors hold most of it",
+    sources: 3,
+    deliveredAtMs: 110_000,
+    inPause: true,
+    pause: { speaking: false, silentForMs: 2_000 },
+    atSessionEnd: false,
+    ...overrides,
+  };
+}
+
+function research(overrides: Partial<ResearchRunRecord> = {}): ResearchRunRecord {
+  return {
+    ideas: 3,
+    queued: 1,
+    rejected: 2,
+    gateFailed: 0,
+    localGateCalls: 3,
+    packets: 1,
+    unsourced: 0,
+    failed: 0,
+    cards: [researchCard()],
     ...overrides,
   };
 }
@@ -479,5 +528,203 @@ describe("isQuietFixture", () => {
     expect(isQuietFixture("brainstorm")).toBe(true);
     expect(isQuietFixture("no-wake")).toBe(true);
     expect(isQuietFixture("moment-fact")).toBe(false);
+  });
+});
+
+/**
+ * The research half of the score (V2-019).
+ *
+ * A `research_hook` is caught by a research-ready card and by nothing else,
+ * and it is kept out of the recall the policy is gated on — the two are
+ * different halves of the stage with different targets, so mixing them would
+ * let a good search cover for a missed contradiction, or the reverse.
+ */
+describe("scoreFixture with research", () => {
+  const matched = match({ cardId: "research-packet-1", momentId: "h1" });
+
+  it("counts a research card inside the window as catching its hook", () => {
+    const scored = scoreFixture(
+      run({ moments: [hook()], research: research(), matches: [matched] }),
+    );
+    expect(scored.researchCaught).toBe(1);
+    expect(scored.researchMissed).toBe(0);
+    expect(scored.moments[0]).toMatchObject({
+      momentId: "h1",
+      outcome: "caught",
+      cardId: "research-packet-1",
+      deliveredLevel: "research",
+      delayMs: 8_000,
+    });
+    expect(scored.researchCards[0]).toMatchObject({
+      cardId: "research-packet-1",
+      packetId: "packet-1",
+      inPause: true,
+      matchedMomentIds: ["h1"],
+      unmatched: false,
+    });
+    // It is not one of the policy's deliveries, so it is in neither the
+    // precision count nor the pause gate's denominator.
+    expect(scored.deliveries).toEqual([]);
+    expect(scored.caught).toBe(0);
+  });
+
+  it("counts a research card after the deadline as late, not as a catch", () => {
+    const scored = scoreFixture(
+      run({
+        moments: [hook()],
+        research: research({ cards: [researchCard({ deliveredAtMs: 130_000 })] }),
+        matches: [matched],
+      }),
+    );
+    expect(scored.researchLate).toBe(1);
+    expect(scored.researchCaught).toBe(0);
+    expect(scored.moments[0]?.outcome).toBe("late");
+  });
+
+  it("misses a hook no card matched, and counts the card as raising nothing", () => {
+    const scored = scoreFixture(
+      run({
+        moments: [hook()],
+        research: research(),
+        matches: [match({ cardId: "research-packet-1", momentId: "h1", matches: false })],
+      }),
+    );
+    expect(scored.researchMissed).toBe(1);
+    expect(scored.researchCards[0]?.unmatched).toBe(true);
+  });
+
+  it("never lets an interjection catch a hook, however the judge matched it", () => {
+    const scored = scoreFixture(
+      run({
+        moments: [hook()],
+        deliveries: [delivery()],
+        research: research({ cards: [] }),
+        matches: [match({ cardId: "card-cand-1", momentId: "h1" })],
+      }),
+    );
+    expect(scored.researchMissed).toBe(1);
+    expect(scored.moments[0]?.outcome).toBe("missed");
+  });
+
+  it("keeps the two kinds of moment in their own counts", () => {
+    const scored = scoreFixture(
+      run({
+        moments: [moment(), hook()],
+        deliveries: [delivery()],
+        research: research(),
+        matches: [match(), matched],
+      }),
+    );
+    expect(scored.caught).toBe(1);
+    expect(scored.researchCaught).toBe(1);
+    expect(scored.moments).toHaveLength(2);
+  });
+
+  it("is empty-but-not-null-counted for a run recorded before V2-019", () => {
+    const scored = scoreFixture(run({ moments: [hook()] }));
+    expect(scored.research).toBeNull();
+    expect(scored.researchCards).toEqual([]);
+    expect(scored.researchMissed).toBe(1);
+  });
+});
+
+describe("scoreSettings with research", () => {
+  const hookRun = (overrides: Partial<FixtureRunRecord> = {}): FixtureRunRecord =>
+    run({
+      fixture: "research-business-idea",
+      moments: [hook()],
+      research: research(),
+      matches: [match({ cardId: "research-packet-1", momentId: "h1" })],
+      ...overrides,
+    });
+
+  it("gates research recall on its own threshold", () => {
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [hookRun()], true);
+    expect(group.researchRecall).toBe(1);
+    expect(group.researchRecall).toBeGreaterThanOrEqual(MIN_RESEARCH_RECALL);
+    expect(gate(group, "research recall").status).toBe("pass");
+    // The policy caught nothing because nothing was asked of it.
+    expect(group.recall).toBe(1);
+    expect(gate(group, "moment recall").detail).toContain("no moments");
+    expect(group.passed).toBe(true);
+  });
+
+  it("fails below half the hooks and passes at half", () => {
+    const missed = hookRun({ matches: [] });
+    const half = scoreSettings(
+      { frequency: "normal", boldness: "normal" },
+      [hookRun(), missed],
+      true,
+    );
+    expect(half.researchRecall).toBe(0.5);
+    expect(gate(half, "research recall").status).toBe("pass");
+    const none = scoreSettings({ frequency: "normal", boldness: "normal" }, [missed], true);
+    expect(none.researchRecall).toBe(0);
+    expect(gate(none, "research recall").status).toBe("fail");
+    expect(none.passed).toBe(false);
+  });
+
+  it("skips the research gate when judging was skipped", () => {
+    const group = scoreSettings(
+      { frequency: "normal", boldness: "normal" },
+      [hookRun({ matches: [] })],
+      false,
+    );
+    expect(gate(group, "research recall").status).toBe("skipped");
+    expect(group.passed).toBe(true);
+  });
+
+  it("totals the packets, the unsourced ones and the local gate calls", () => {
+    const group = scoreSettings(
+      { frequency: "normal", boldness: "normal" },
+      [
+        hookRun(),
+        hookRun({
+          fixture: "offsite-plan",
+          moments: [hook({ id: "h2" })],
+          matches: [],
+          research: research({
+            ideas: 2,
+            queued: 2,
+            rejected: 0,
+            packets: 0,
+            unsourced: 1,
+            failed: 1,
+            localGateCalls: 2,
+            cards: [],
+          }),
+        }),
+      ],
+      true,
+    );
+    expect(group.totals).toMatchObject({
+      researchMoments: 2,
+      researchCaught: 1,
+      researchMissed: 1,
+      researchIdeas: 5,
+      researchQueued: 3,
+      researchRejected: 2,
+      researchPackets: 1,
+      unsourcedPackets: 1,
+      failedPackets: 1,
+      localResearchGateCalls: 5,
+      researchCards: 1,
+      researchCardsInPause: 1,
+      researchCardsAtSessionEnd: 0,
+    });
+  });
+
+  it("keeps a research card out of the pause gate, flushed after the end or not", () => {
+    const flushed = hookRun({
+      research: research({
+        cards: [researchCard({ inPause: false, atSessionEnd: true, deliveredAtMs: 180_000 })],
+      }),
+      matches: [],
+    });
+    const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [flushed], true);
+    expect(group.totals.researchCardsInPause).toBe(0);
+    expect(group.totals.researchCardsAtSessionEnd).toBe(1);
+    expect(group.pauseRate).toBe(1);
+    expect(gate(group, "pause").status).toBe("pass");
   });
 });

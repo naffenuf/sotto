@@ -36,12 +36,22 @@ export const JUDGE_LABEL = "judge";
 /** Where cached verdicts live, relative to the repo root. */
 export const JUDGE_CACHE_DIR = "eval/cache";
 
+/**
+ * One card as the judge reads it: what it said, and why it said it then.
+ *
+ * Narrower than a {@link DeliveryRecord} on purpose, so that a research-ready
+ * card — which has no candidate, no level and no policy reason behind it
+ * (V2-019) — can be judged by the same prompt without pretending to be a
+ * decision the policy took.
+ */
+export type JudgeCard = Pick<DeliveryRecord, "cardId" | "headline" | "detail" | "whyNow">;
+
 /** One thing to judge: a card Sotto showed, against a moment that was planted. */
 export interface JudgePair {
   fixture: string;
   moment: PlantedMoment;
   script: FixtureScript;
-  delivery: DeliveryRecord;
+  delivery: JudgeCard;
 }
 
 /** A verdict as it is stored, with everything needed to read the file later. */

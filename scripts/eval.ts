@@ -18,9 +18,11 @@
  *
  * This calls the real API. A replay costs the model calls the conversation
  * would really have made — six or seven board updates, a look after each, a
- * web check for each claim — so the seven-fixture set is tens of calls and
- * takes as long as those calls take. Judge verdicts are cached in
- * `eval/cache/`, so a rerun after tuning only pays for the cards that changed.
+ * web check for each claim, and since V2-019 the research planner, its gate
+ * and a web search per approved idea — so the nine-fixture set is a hundred
+ * or so calls and takes as long as those calls take. Judge verdicts are
+ * cached in `eval/cache/`, so a rerun after tuning only pays for the cards
+ * that changed.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -76,10 +78,20 @@ function report(run: FixtureRunRecord): void {
   const matched = new Set(run.matches.filter((match) => match.matches).map((m) => m.momentId));
   const outside = run.deliveries.filter((delivery) => !delivery.inPause).length;
   const levels = run.deliveries.map((delivery) => delivery.level[0]).join("") || "-";
+  // V2-019: the research pipeline is the other half of what a replay produced,
+  // and an unsourced packet is a search that was paid for and shown to nobody.
+  const research = run.research;
+  const researched =
+    research === undefined || (research.ideas === 0 && research.cards.length === 0)
+      ? ""
+      : `, ${research.ideas} idea(s) -> ${research.packets} packet(s)` +
+        (research.unsourced > 0 ? ` (${research.unsourced} unsourced)` : "") +
+        `, ${research.cards.length} research card(s)`;
   console.log(
     `  ${run.fixture} [${label(run)}]: ${run.finalTurns} turns, ` +
       `${run.candidates} candidate(s), ${run.deliveries.length} delivered (${levels}), ` +
       `${matched.size}/${run.moments.length} moment(s) matched` +
+      researched +
       (outside > 0 ? `, ${outside} OUTSIDE A PAUSE` : "") +
       `, ${(run.elapsedMs / 1000).toFixed(0)}s`,
   );
