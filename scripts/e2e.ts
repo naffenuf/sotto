@@ -34,6 +34,7 @@ import {
   checkFixture,
   finalCards,
   researchFrom,
+  spokenFrom,
   type E2eCheckInput,
 } from "../server/e2e/checks.js";
 import { fixtureLatency } from "../server/e2e/latency.js";
@@ -140,6 +141,7 @@ async function main(): Promise<void> {
       latency: fixtureLatency(input),
       moments: input.moments,
       research: researchFrom(input),
+      spoken: spokenFrom(input),
       voice: observed.voice,
       usage: meter.total(),
       ...(observed.error === undefined ? {} : { error: observed.error }),

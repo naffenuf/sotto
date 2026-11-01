@@ -6,6 +6,7 @@
  * produce the numbers.
  */
 import type { E2eFixtureReport, E2eRunReport } from "../../shared/e2e.js";
+import { isUnpromptedSpeech } from "../eval/spoken.js";
 import { QUESTION_FIXTURE, RESEARCH_FIXTURE } from "../../shared/e2e.js";
 import {
   estimateAsrCostUsd,
@@ -130,6 +131,52 @@ function detailLines(report: E2eFixtureReport): string[] {
       `  question ${research.questionToPacketMs.length} looked up; ` +
         `question -> packet median ${seconds(median(research.questionToPacketMs))} ` +
         `(${research.questionToPacketMs.map((ms) => seconds(ms)).join(", ")})`,
+    );
+  }
+  // V3-010: what Sotto said unasked, in the only run that charges it for the
+  // seconds it waited. One line per utterance, and one per planted moment it
+  // was meant to speak about — `card only` there is a result, not a failure.
+  for (const one of report.spoken.filter(isUnpromptedSpeech)) {
+    lines.push(
+      `  spoke    ${one.record.kind} at ${seconds(one.atStreamMs)}: ` +
+        `${JSON.stringify(one.record.text)}` +
+        `; pause ${one.inPause === null ? "—" : one.inPause ? "yes" : "NO"}` +
+        (one.record.pauseWaitMs === undefined
+          ? ""
+          : `, waited ${seconds(one.record.pauseWaitMs)}`) +
+        (one.record.questionToReserveMs === undefined
+          ? ""
+          : `, claimed after ${seconds(one.record.questionToReserveMs)}`) +
+        (one.record.questionToSpeechMs === undefined
+          ? ""
+          : `, question -> speech ${seconds(one.record.questionToSpeechMs)}`) +
+        (one.record.stillCurrent === undefined
+          ? ""
+          : `, ${one.record.stillCurrent.verdict}`) +
+        (one.record.yields === undefined ? "" : `, ${one.record.yields} yield(s)`) +
+        (one.overTurnId === null ? "" : `, OVER ${one.overTurnId}`),
+    );
+  }
+  const unsaid = report.spoken.filter((one) => !one.record.spoken);
+  if (unsaid.length > 0) {
+    lines.push(
+      `  unsaid   ${unsaid
+        .map((one) => `${one.record.kind} (${one.record.reason ?? "—"})`)
+        .join(", ")}`,
+    );
+  }
+  for (const moment of report.latency.spokenMoments) {
+    lines.push(
+      `  speak    ${moment.momentId}: ` +
+        (moment.spokenId === null
+          ? "nothing said about it"
+          : `${moment.kind} ${seconds(moment.afterTriggerMs)} after the trigger` +
+            (moment.beforeDeadline === null
+              ? ""
+              : moment.beforeDeadline ? " (before the deadline)" : " (after the deadline)")) +
+        (moment.reservedAfterMs === null
+          ? ""
+          : `; claimed ${seconds(moment.reservedAfterMs)} after the trigger`),
     );
   }
   lines.push(

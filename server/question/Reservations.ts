@@ -60,6 +60,12 @@ import { isSottoTurn, sottoTurn, type PauseState, type TurnUpdate } from "../../
 // in what words.
 import { RESEARCH_NO_ANSWER, type ResearchIdea, type ResearchPacket } from "../../shared/research.js";
 import type { PolicySettings } from "../../shared/policy.js";
+import {
+  spokenUtteranceId as utteranceIdFor,
+  type ReserveSkipReason,
+  type SpokenContributionKind,
+  type SpokenContributionRecord,
+} from "../../shared/spoken.js";
 import type { Clock } from "../clock.js";
 import { PAUSE_MS, SPEAK_PAUSE_MS, inPause } from "../interject/policy.js";
 import type { SpendVerdict } from "../interject/policy.js";
@@ -121,146 +127,29 @@ export const CALLED_ON_RECHECK_MS = 500;
 export const MAX_ANSWER_YIELDS = 2;
 
 /**
- * The kinds of unprompted line this module says.
+ * The kinds of unprompted line this module says, and why one went unsaid.
  *
- * The first three are the fast path's, about one of the room's own questions
- * (V3-015, V3-004). `correction` is V3-008's one exception: a verified
- * factual error at boldness `bold`, which is said under the same rules an
- * answer is — a real pause, the cached still-current verdict, yielding to any
- * voice with one retry, ninety seconds or six turns of expiry — and differs
- * only in that it spends nothing, because the card it was delivered as
- * already spent one interject. `readback` is V3-013's: the decision the group
- * has just settled, said back in the scribe's voice, with the group's own
- * unsettled question on it when one fits. It is the one kind with a shorter
- * fuse — twenty seconds, because a read-back is about the instant a decision
- * lands — and the one the frequency setting can silence outright when it
- * carries nothing.
+ * Both unions, and the record they describe, live in `shared/spoken.ts`: the
+ * eval scores unprompted speech off that record (V3-010) and `npm run e2e`
+ * runs the same scoring, so the shape belongs where both can read it. Which
+ * kind means what is documented there; what each one *does* here is below.
  *
- * `called_on` is V3-017's and it is the odd one out: the room *asked*. So it
- * is the only kind that waits for no gap, is not held back by the boldness or
- * the frequency, charges nothing, and is not cancelled by a voice in the room
- * — a question Sotto has been asked is answered under the wake-word rules,
- * where only the barge-in (V2-007) stops it.
+ * `called_on` is the odd one out: the room asked. So it is the only kind that
+ * waits for no gap, is not held back by the boldness or the frequency,
+ * charges nothing, and is not cancelled by a voice in the room — a question
+ * Sotto has been asked is answered under the wake-word rules, where only the
+ * barge-in (V2-007) stops it.
  */
-export const spokenContributionKinds = [
-  "reserve",
-  "no_answer",
-  "answer",
-  "correction",
-  "readback",
-  "called_on",
-] as const;
-export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
-
-/**
- * Why a reservation was not said, for `timing.jsonl`.
- *
- * - `boldness`: a `cautious` session, which contributes on screen only. A
- *   `correction` (V3-008) is only ever queued by a `bold` one, so the room
- *   turning Sotto down mid-wait is the way it reads this.
- * - `cooldown` / `budget`: the frequency setting's, spent on something else.
- * - `no_gap`: nobody stopped talking inside {@link RESERVE_WINDOW_MS}.
- * - `frequency`: a bare read-back (V3-013), which only a session set to
- *   contribute `often` says out loud; the decision lands on the board either
- *   way.
- * - `unheard`: muted, or no page attached to play it — the card is the sign.
- * - `moved_on`: the room is somewhere else now, so the card is the only sign.
- * - `answered`: somebody present answered the question and the search agrees,
- *   so the card says `confirmed` and nothing is said (V3-004).
- * - `disagrees`: somebody present answered it and the search does not agree.
- *   The correction belongs on the screen, where it can be read twice.
- * - `expired`: ninety seconds or six final turns went by without a pause —
- *   or, for a read-back, twenty.
- * - `yielded`: cut off by a voice in the room twice (V3-004).
- * - `overtaken`: the search came back with nothing before the claim could be
- *   made, so there is nothing left to claim.
- * - `session_ended`: still waiting for a gap when the conversation stopped.
- */
-export const reserveSkipReasons = [
-  "boldness",
-  "cooldown",
-  "budget",
-  "no_gap",
-  "frequency",
-  "unheard",
-  "moved_on",
-  "answered",
-  "disagrees",
-  "expired",
-  "yielded",
-  "overtaken",
-  "session_ended",
-] as const;
-export type ReserveSkipReason = (typeof reserveSkipReasons)[number];
-
-/** One `spoken_contribution` line of `timing.jsonl` (V3-015). */
-export interface SpokenContributionRecord {
-  stage: "spoken_contribution";
-  kind: SpokenContributionKind;
-  /** When it was said, or when it was given up on, on the session clock. */
-  atMs: number;
-  /**
-   * What is being spoken about: the research idea behind the question, or —
-   * for a `correction` (V3-008) — the candidate, which is the only thing that
-   * identifies it.
-   */
-  ideaId: string;
-  /**
-   * The same id again on a `correction`, under the name a reader expects —
-   * and, on a `readback`, the candidate whose question is attached to it
-   * (V3-013), or absent when nothing is.
-   */
-  candidateId?: string;
-  /**
-   * What a `readback` carries (V3-013): the room's own unsettled question,
-   * one of Sotto's own corrections, or `null` for the bare decision.
-   *
-   * Read at the pause rather than when it was queued, so a session turned
-   * down from `bold` mid-wait records the line it really said.
-   */
-  attached?: ReadBackAttachment | null;
-  /** What was settled, on a `readback`: "six gardens, Saturday". */
-  decision?: string;
-  /**
-   * The card being read out, on a `called_on` (V3-017), or absent when there
-   * was nothing raised to read.
-   */
-  cardId?: string;
-  /** The turn the question was heard in, or the one a correction rests on. */
-  turnId: string;
-  /** Three to five words naming it; a correction's is its headline. */
-  topic: string;
-  /**
-   * Whether it was said at all: an utterance was opened and the words handed
-   * to the voice. What the room got of it is {@link heard}.
-   */
-  spoken: boolean;
-  /** The words, whether or not they were said. */
-  text: string;
-  /**
-   * The question turn going final to the first audio of this line, on the
-   * session clock. Only on a claim or a closing line that was really said.
-   */
-  questionToReserveMs?: number;
-  /** The same for an answer (V3-004): wondering aloud to hearing it back. */
-  questionToSpeechMs?: number;
-  /** How long this line waited for a pause to be said in (V3-004). */
-  pauseWaitMs?: number;
-  /** The cached verdict the decision to speak was made on (V3-004). */
-  stillCurrent?: StillCurrentState;
-  /** True when a human voice cut it off (V3-004's rule). */
-  yielded?: boolean;
-  /** How many times a voice in the room has cut this line off (V3-004). */
-  yields?: number;
-  /** True when it was the barge-in that cancelled it (V2-007 on top). */
-  bargedIn?: boolean;
-  /** True on an answer that was cut off and will be tried again (V3-004). */
-  retrying?: boolean;
-  /** What the room actually heard, when that is less than {@link text}. */
-  heard?: string;
-  /** Why nothing was said, when nothing was. */
-  reason?: ReserveSkipReason;
-}
+export {
+  spokenContributionKinds,
+  reserveSkipReasons,
+  spokenUtteranceId,
+} from "../../shared/spoken.js";
+export type {
+  SpokenContributionKind,
+  ReserveSkipReason,
+  SpokenContributionRecord,
+} from "../../shared/spoken.js";
 
 export interface ReservationsOptions {
   /** The session's clock — simulated for a replay, real for a live session. */
@@ -1144,7 +1033,7 @@ export function reserveUtteranceId(
   ideaId: string,
   attempt = 0,
 ): string {
-  return attempt === 0 ? `${kind}-${ideaId}` : `${kind}-${ideaId}-${attempt + 1}`;
+  return utteranceIdFor(kind, ideaId, attempt);
 }
 
 /**

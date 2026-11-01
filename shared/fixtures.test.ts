@@ -81,8 +81,24 @@ describe("FixtureScriptSchema", () => {
       moments: [{ ...moment, type: "research_hook" }],
     });
     expect(messages(result)).toContainEqual(
-      expect.stringContaining('expectedLevel must be "research"'),
+      expect.stringContaining('expectedLevel must be "research" or "speak"'),
     );
+  });
+
+  it("accepts a research_hook the room wondered aloud expecting speech", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, type: "research_hook", expectedLevel: "speak" }],
+    });
+    expect(messages(result)).toEqual([]);
+  });
+
+  it("accepts a read-back moment expecting speech (V3-013)", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      moments: [{ ...moment, type: "unanswered_question", expectedLevel: "speak" }],
+    });
+    expect(messages(result)).toEqual([]);
   });
 
   it("rejects a research expectation on a moment the policy delivers", () => {

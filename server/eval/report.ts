@@ -23,10 +23,12 @@ import type {
   RunScore,
   ScoreTotals,
   SettingsScore,
+  SpokenScore,
 } from "./score.js";
 import {
   MIN_MOMENT_RECALL,
   MIN_RESEARCH_RECALL,
+  MIN_SPEAK_RECALL,
   settingsAsked,
   settingsOf,
 } from "./score.js";
@@ -76,7 +78,9 @@ export function renderTable(rows: readonly string[][]): string {
 
 /** One row per planted moment, in the order the fixtures ran. */
 function momentRows(group: SettingsScore): string[][] {
-  const rows: string[][] = [["fixture", "moment", "type", "want", "got", "outcome", "delay"]];
+  const rows: string[][] = [
+    ["fixture", "moment", "type", "want", "got", "outcome", "delay", "claimed"],
+  ];
   for (const fixture of group.fixtures) {
     for (const moment of fixture.moments) {
       rows.push(momentRow(fixture, moment));
@@ -94,6 +98,62 @@ function momentRow(fixture: FixtureScore, moment: MomentScore): string[] {
     moment.deliveredLevel ?? "—",
     OUTCOME_LABEL[moment.outcome],
     seconds(moment.delayMs),
+    // V3-015, scored apart from the catch: Sotto said it would look this up.
+    moment.reserved === null ? "—" : seconds(moment.reserved.questionToReserveMs),
+  ];
+}
+
+/**
+ * One row per unprompted line (V3-010), in the order they were said.
+ *
+ * The columns the story asks for, in its own order: which moment it was about,
+ * what kind of line it was, what it said, the two latencies a claim and an
+ * answer have, how long it waited for a pause, what the still-current check
+ * thought and how many times the room talked over it. `pause` and `over` are
+ * here too because they are what two of the gates read.
+ */
+function spokenRows(group: SettingsScore, escape = false): string[][] {
+  const rows: string[][] = [
+    [
+      "fixture",
+      "moment",
+      "kind",
+      "said",
+      "at",
+      "pause",
+      "claim",
+      "speech",
+      "waited",
+      "current",
+      "yields",
+      "over",
+      "text",
+    ],
+  ];
+  for (const fixture of group.fixtures) {
+    for (const line of fixture.spoken) rows.push(spokenRow(fixture, line, escape));
+  }
+  return rows;
+}
+
+function spokenRow(fixture: FixtureScore, line: SpokenScore, escape: boolean): string[] {
+  return [
+    fixture.fixture,
+    line.matchedMomentIds.join(", ") ||
+      (line.falseSpeech ? "**FALSE SPEECH**" : line.unprompted ? "_none_" : "(asked for)"),
+    line.kind,
+    line.spoken ? "yes" : `no (${line.reason ?? "—"})`,
+    seconds(line.atMs),
+    line.inPause === null ? "—" : line.inPause ? "yes" : "**NO**",
+    seconds(line.questionToReserveMs),
+    seconds(line.questionToSpeechMs),
+    seconds(line.pauseWaitMs),
+    line.stillCurrent ?? "—",
+    String(line.yields),
+    // `?` rather than `—` for a line this run could not tell about: a `max`
+    // replay spends no time speaking, so it never knows (V3-010).
+    !line.spoken ? "—" : !line.overrunMeasured ? "?" : line.overTurnId ?? "—",
+    escape ? line.text.replace(/\|/g, "\\|") : line.text,
   ];
 }
 
@@ -155,6 +215,17 @@ function withReplayCounts(rows: string[][], record: EvalRunRecord, group: Settin
   });
 }
 
+/**
+ * How many moments the run planted, in every bucket.
+ *
+ * `totals.moments` is the policy's bucket alone (V2-019, V3-010), so a run
+ * whose only moments are research hooks or spoken questions would otherwise
+ * have its per-moment table hidden.
+ */
+function plantedMoments(group: SettingsScore): number {
+  return group.fixtures.reduce((total, fixture) => total + fixture.moments.length, 0);
+}
+
 /** One headline metric, so the terminal and the markdown can lay it out their own way. */
 export interface Headline {
   label: string;
@@ -177,6 +248,17 @@ export function headlines(group: SettingsScore): Headline[] {
         `${fraction(totals.researchCaught, totals.researchMoments)}` +
         ` — caught ${totals.researchCaught}, late ${totals.researchLate},` +
         ` missed ${totals.researchMissed}`,
+    },
+    {
+      label: "speak recall",
+      value:
+        `${fraction(totals.speakCaught, totals.speakMoments)}` +
+        ` — caught ${totals.speakCaught}, card only ${totals.speakCaughtLow},` +
+        ` late ${totals.speakLate}, missed ${totals.speakMissed}`,
+    },
+    {
+      label: "unprompted speech",
+      value: describeSpeech(totals),
     },
     {
       label: "interject precision",
@@ -205,6 +287,32 @@ export function headlines(group: SettingsScore): Headline[] {
         `, median delay from the trigger line ${seconds(group.medianDelayMs)}`,
     },
   ];
+}
+
+/**
+ * `4 line(s) heard, 4 in a pause, 0 false, 0 over a human turn; 2 claim(s)`.
+ *
+ * The lines Sotto *decided against* are the other half of the story and are
+ * counted separately, because at the default settings most of what the fast
+ * path produces is a card and no sentence — and the reasons are in the table
+ * below, which is where a tuning run looks next.
+ */
+function describeSpeech(totals: ScoreTotals): string {
+  if (totals.spokenLines === 0 && totals.spokenSkipped === 0 && totals.calledOn === 0) {
+    return "Sotto said nothing unprompted";
+  }
+  return (
+    `${totals.spokenLines} line(s) heard, ` +
+    `${totals.spokenInPause}/${totals.spokenPlaced} in a pause, ` +
+    `${totals.falseSpeech} false, ` +
+    (totals.spokenOverrunMeasured === 0
+      ? "overruns not measurable here"
+      : `${totals.spokenOverHuman} over a human turn`) +
+    "; " +
+    `${totals.reservations} claim(s)` +
+    (totals.calledOn === 0 ? "" : `, ${totals.calledOn} called for`) +
+    `, ${totals.spokenSkipped} decided against`
+  );
 }
 
 /**
@@ -325,13 +433,17 @@ export function renderTerminalReport(record: EvalRunRecord, score: RunScore): st
   for (const group of score.groups) {
     parts.push(`\n=== frequency/boldness: ${policySettingsLabel(group.settings)} ===`);
     parts.push(renderTable(withReplayCounts(fixtureRows(group), record, group)));
-    if (group.totals.moments > 0) {
+    if (plantedMoments(group) > 0) {
       parts.push("");
       parts.push(renderTable(momentRows(group)));
     }
     if (group.totals.researchIdeas > 0 || group.totals.researchCards > 0) {
       parts.push("");
       parts.push(renderTable(researchRows(group)));
+    }
+    if (group.fixtures.some((fixture) => fixture.spoken.length > 0)) {
+      parts.push("");
+      parts.push(renderTable(spokenRows(group)));
     }
     parts.push("");
     parts.push(
@@ -402,6 +514,7 @@ export function renderReportMarkdown(context: ReportContext): string {
     ["judge calls", `${record.judge.calls} (${record.judge.cacheHits} cached)`],
     ["recall gate", `>= ${MIN_MOMENT_RECALL}`],
     ["research recall gate", `>= ${MIN_RESEARCH_RECALL}`],
+    ["speak recall gate", `>= ${MIN_SPEAK_RECALL}`],
   ]));
   out.push("");
   out.push("## Prompts");
@@ -437,7 +550,10 @@ export function renderReportMarkdown(context: ReportContext): string {
       "planner, a gate verdict that fell back to the cloud, and each search — is " +
       "in the tokens above, because they all go through the one metered client; " +
       "the calls that ran on Muse Glimmer are counted and priced at nothing, " +
-      "since it runs on this Mac.",
+      "since it runs on this Mac. Nothing is synthesized either: a replay " +
+      "speaks through `transcriptOnlyVoice`, so the unprompted lines below " +
+      "are real decisions with no ElevenLabs bill and no audio latencies — " +
+      "`npm run e2e` is the clock that charges for those.",
   );
 
   for (const group of score.groups) {
@@ -457,7 +573,7 @@ export function renderReportMarkdown(context: ReportContext): string {
     out.push("### Per moment");
     out.push("");
     out.push(
-      group.totals.moments === 0
+      plantedMoments(group) === 0
         ? "_No planted moments in this run._"
         : markdownTable(momentRows(group)),
     );
@@ -512,6 +628,14 @@ export function renderReportMarkdown(context: ReportContext): string {
         ]),
       );
     }
+    out.push("");
+    out.push("### Unprompted speech");
+    out.push("");
+    out.push(
+      group.fixtures.every((fixture) => fixture.spoken.length === 0)
+        ? "_Sotto said nothing unprompted._"
+        : markdownTable(spokenRows(group, true)),
+    );
     const judged = group.fixtures
       .flatMap((fixture) => fixture.moments)
       .filter((moment) => moment.judgeReason !== null);

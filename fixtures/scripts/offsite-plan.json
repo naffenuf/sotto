@@ -202,8 +202,8 @@
       ],
       "triggerLine": 12,
       "deadlineLine": 18,
-      "expectedLevel": "research",
-      "description": "The farmhouse venue is \"about an hour and a half out\", which EJ points out is three hours of the day in a car (lines 10 and 11). At line 12 Craig doubts his own figure, at line 13 nobody knows whether the place has a Thursday free, and at line 14 they agree somebody should check both the drive and the availability."
+      "expectedLevel": "speak",
+      "description": "The farmhouse venue is \"about an hour and a half out\", which EJ points out is three hours of the day in a car (lines 10 and 11). At line 12 Craig doubts his own figure, at line 13 nobody knows whether the place has a Thursday free, and at line 14 they agree somebody should check both the drive and the availability. The room wonders the drive time aloud, so the fast path (V3-003) looks it up and V3-004 is meant to say it back at a real pause inside the window, not only put a card up."
     },
     {
       "id": "food-unanswered",

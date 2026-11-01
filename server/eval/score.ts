@@ -20,6 +20,13 @@
  *     one card — a glow, then an interjection. The PRD lists the outcomes in
  *     order of quality, so the *best* of them is the moment's outcome, and
  *     the card that earned it is the one the report names.
+ *
+ * Since V3-010 there are three kinds of moment and they are counted apart:
+ * one the policy catches with a card, one a research card catches (V2-019),
+ * and one only Sotto saying something catches. Each has its own recall gate,
+ * and a moment is in exactly one bucket — so nothing is held to two
+ * thresholds at once, and a `speak` moment that got a card is `caught_low`
+ * rather than a catch.
  */
 import type {
   DeliveryRecord,
@@ -30,9 +37,17 @@ import type {
   ResearchDeliveryRecord,
   ResearchRunRecord,
   ScoredLevel,
+  SpokenRecord,
 } from "../../shared/eval.js";
+import type {
+  ReserveSkipReason,
+  SpokenContributionKind,
+  StillCurrentVerdict,
+} from "../../shared/spoken.js";
+import { isUnpromptedKind } from "../../shared/spoken.js";
 import type { ExpectedLevel } from "../../shared/fixtures.js";
 import { DEFAULT_GATE_MODE, type GateMode } from "../../shared/candidates.js";
+import { isUnpromptedSpeech } from "./spoken.js";
 import {
   DEFAULT_FREQUENCY,
   policySettingsLabel,
@@ -54,6 +69,16 @@ export const MIN_MOMENT_RECALL = 0.7;
 export const MIN_RESEARCH_RECALL = 0.5;
 
 /**
+ * The gate for the moments Sotto is meant to *say* something about (V3-010).
+ *
+ * Lower than {@link MIN_MOMENT_RECALL}, and deliberately so: speech has to
+ * clear everything a card does and then three more things — a pause of its
+ * own, the still-current check, and nobody in the room having answered the
+ * question first — any of which can honestly stop it.
+ */
+export const MIN_SPEAK_RECALL = 0.6;
+
+/**
  * The conversations with nothing planted in them. Sotto interjecting here is
  * a false positive with no judgement call about it, so it is its own gate.
  */
@@ -61,6 +86,25 @@ export const QUIET_FIXTURES = ["brainstorm", "no-wake"] as const;
 
 export function isQuietFixture(fixture: string): boolean {
   return (QUIET_FIXTURES as readonly string[]).includes(fixture);
+}
+
+/**
+ * The conversations Sotto must not *speak* unprompted in (V3-010).
+ *
+ * The two quiet ones, plus `rhetorical-questions`: twenty-nine lines of
+ * questions the group is asking itself rhetorically, with exactly one real
+ * lookup in the middle of them (the Loom price). Saying anything about the
+ * other twenty-eight is the failure that story exists to catch, so a planted
+ * moment there does not make it a conversation where speech is free.
+ */
+export const SPEECH_QUIET_FIXTURES = [
+  "brainstorm",
+  "no-wake",
+  "rhetorical-questions",
+] as const;
+
+export function isSpeechQuietFixture(fixture: string): boolean {
+  return (SPEECH_QUIET_FIXTURES as readonly string[]).includes(fixture);
 }
 
 /** What became of one planted moment. Best first; {@link outcomeRank} agrees. */
@@ -81,9 +125,9 @@ function outcomeRank(outcome: MomentOutcome): number {
  * practice a research moment's outcome is `caught`, `late` or `missed`: the
  * rank is still here because the comparison is what *says* so.
  *
- * `speak` is a level no *card* has (V3-013): a moment that expected Sotto to
- * say something and got a card instead is `caught_low`, which is the truthful
- * answer until V3-010 scores spoken contributions in their own right.
+ * `speak` is a level no *card* has (V3-013), and the one V3-010 scores
+ * unprompted speech at: a moment that expected Sotto to say something and got
+ * a card instead is `caught_low`, which is exactly the comparison below.
  */
 function levelRank(level: ScoredLevel | ExpectedLevel): number {
   return level === "speak" ? 3 : level === "research" ? 2 : level === "interject" ? 1 : 0;
@@ -106,6 +150,63 @@ export interface MomentScore {
   delayMs: number | null;
   /** The judge's sentence, for the report's notes column. */
   judgeReason: string | null;
+  /**
+   * Sotto claiming this question out loud (V3-015), scored *separately* from
+   * the catch, which is what the story asks for: "I'll check the drive time"
+   * is not an answer and must not be counted as one, but it is the half of
+   * the fast path a person in the room hears first.
+   */
+  reserved: MomentReservation | null;
+}
+
+/** A claim Sotto made about one planted moment (V3-015). */
+export interface MomentReservation {
+  /** The spoken line's id, so the report can point at the row. */
+  spokenId: string;
+  /** Where the claim was said, on the conversation's own timeline. */
+  atMs: number | null;
+  /** The question going final to the claim's first words. */
+  questionToReserveMs: number | null;
+}
+
+/**
+ * One unprompted line, scored (V3-010).
+ *
+ * Not a {@link DeliveryScore} and not a {@link ResearchCardScore}: speech has
+ * no card id, no level the budget could have turned down, and two failure
+ * modes neither of those has — it can be said over somebody, and it can be
+ * said after the room has answered the question itself. Both are gated here
+ * and nowhere else.
+ */
+export interface SpokenScore {
+  id: string;
+  kind: SpokenContributionKind;
+  /** False for a line that was decided against; {@link reason} says why. */
+  spoken: boolean;
+  /** False only for a `called_on` line: the room asked for that one (V3-017). */
+  unprompted: boolean;
+  text: string;
+  topic: string;
+  /** Where it was said, on the conversation's timeline; `null` if unheard. */
+  atMs: number | null;
+  /** Whether the room was quiet enough for this kind of line; `null` if unheard. */
+  inPause: boolean | null;
+  /** A room turn Sotto talked over with no yield logged (V3-004's promise). */
+  overTurnId: string | null;
+  /** Whether this run spends real seconds speaking, so it could tell. */
+  overrunMeasured: boolean;
+  questionToReserveMs: number | null;
+  questionToSpeechMs: number | null;
+  pauseWaitMs: number | null;
+  stillCurrent: StillCurrentVerdict | null;
+  yields: number;
+  reason: ReserveSkipReason | null;
+  /** The planted moments the judge matched it to. */
+  matchedMomentIds: string[];
+  /** It raised nothing anybody planted. */
+  unmatched: boolean;
+  /** Unprompted, really said, matching nothing, in a conversation it must not. */
+  falseSpeech: boolean;
 }
 
 /** One card, scored. */
@@ -150,10 +251,12 @@ export interface ResearchCardScore {
 /**
  * One fixture at one setting, scored.
  *
- * The moment counts are over the **non-research** moments, which is what the
- * recall gate is about; a `research_hook` is counted separately under
- * `research*`, because the two are caught by different halves of the stage
- * and have different targets (v2 PRD V2-019).
+ * The moment counts are over the moments the **policy** is meant to catch: a
+ * `research_hook` is counted under `research*` and a moment that expects
+ * Sotto to speak under `speak*`, because the three are caught by three
+ * different things — a card, a research card and a sentence — with three
+ * different targets (v2 PRD V2-019, V3-010). The buckets do not overlap, so
+ * nothing is gated twice at two thresholds.
  */
 export interface FixtureScore {
   fixture: string;
@@ -172,6 +275,14 @@ export interface FixtureScore {
   researchCaught: number;
   researchLate: number;
   researchMissed: number;
+  /** Every unprompted line, said or not (V3-010). */
+  spoken: SpokenScore[];
+  /** Moments that expected Sotto to say something, and what happened. */
+  speakCaught: number;
+  /** Got a card instead of a sentence, which is the common near miss. */
+  speakCaughtLow: number;
+  speakLate: number;
+  speakMissed: number;
   /** `interject` cards matching no moment. On a quiet fixture, a gate failure. */
   falseInterjects: number;
   /** `glow` cards matching no moment. Counted, not gated. */
@@ -204,6 +315,37 @@ export interface ScoreTotals {
   researchCaught: number;
   researchLate: number;
   researchMissed: number;
+  /** Moments only Sotto speaking can catch (V3-010), and what happened. */
+  speakMoments: number;
+  speakCaught: number;
+  /** A card went up instead of a sentence. */
+  speakCaughtLow: number;
+  speakLate: number;
+  speakMissed: number;
+  /** Claims Sotto made out loud about a planted question (V3-015). */
+  reservations: number;
+  /** Unprompted lines the room really heard: everything the gates are about. */
+  spokenLines: number;
+  /** Of those, the ones that could be placed in the conversation at all. */
+  spokenPlaced: number;
+  /** Of those, the ones said in a pause of the kind their own rule asks for. */
+  spokenInPause: number;
+  /** Unprompted utterances raising nothing planted, in a conversation with
+   * nothing to raise. Gated at zero. */
+  falseSpeech: number;
+  /** Unprompted lines Sotto carried on over somebody with. Gated at zero. */
+  spokenOverHuman: number;
+  /**
+   * Of the lines heard, how many this run could tell that about at all.
+   *
+   * Zero for a `max` replay: speech takes no simulated time there, so the
+   * rule is only really checked by `npm run e2e` (V3-010).
+   */
+  spokenOverrunMeasured: number;
+  /** Lines the room asked for (V3-017): reported, never gated. */
+  calledOn: number;
+  /** Lines that were decided against, which is most of them. */
+  spokenSkipped: number;
   /** Research-ready cards shown, and how many of them in a pause. */
   researchCards: number;
   researchCardsInPause: number;
@@ -269,6 +411,14 @@ export interface SettingsScore {
   recall: number;
   /** researchCaught / researchMoments; 1 when none were planted (V2-019). */
   researchRecall: number;
+  /**
+   * speakCaught / speakMoments; 1 when none were planted (V3-010).
+   *
+   * `caught_low` is **not** in the numerator: the whole of the story is that
+   * a card is not a sentence, and a moment the room never heard about is not
+   * one Sotto spoke up in.
+   */
+  speakRecall: number;
   /** trueInterjects / interjects; 1 when Sotto interjected not at all. */
   interjectPrecision: number;
   /** deliveriesInPause / deliveries; 1 when there were none. */
@@ -369,6 +519,99 @@ function expectsResearch(moment: Pick<MomentRecord, "expectedLevel">): boolean {
   return moment.expectedLevel === "research";
 }
 
+/** A moment that is only really caught by Sotto saying something (V3-010). */
+function expectsSpeech(moment: Pick<MomentRecord, "expectedLevel">): boolean {
+  return moment.expectedLevel === "speak";
+}
+
+/** The bucket a moment is counted and gated in. The three do not overlap. */
+function bucketOf(moment: Pick<MomentRecord, "expectedLevel">): "policy" | "research" | "speak" {
+  return expectsSpeech(moment) ? "speak" : expectsResearch(moment) ? "research" : "policy";
+}
+
+/**
+ * One unprompted line, scored against what the judge made of it (V3-010).
+ *
+ * `falseSpeech` is the gate's own definition, applied here rather than in the
+ * totals so that the report can point at the row: an utterance Sotto chose to
+ * make, that the room really heard, raising nothing anybody planted, in one of
+ * the conversations where there was nothing to raise.
+ */
+export function scoreSpoken(
+  fixture: string,
+  one: SpokenRecord,
+  byCard: Map<string, JudgeMatchRecord[]>,
+): SpokenScore {
+  const matched = byCard.get(one.id) ?? [];
+  const said = isUnpromptedSpeech(one);
+  const unmatched = matched.length === 0;
+  return {
+    id: one.id,
+    kind: one.record.kind,
+    spoken: one.record.spoken,
+    unprompted: isUnpromptedKind(one.record.kind),
+    text: one.record.text,
+    topic: one.record.topic,
+    atMs: one.atStreamMs,
+    inPause: one.inPause,
+    overTurnId: one.overTurnId,
+    overrunMeasured: one.overrunMeasured,
+    questionToReserveMs: one.record.questionToReserveMs ?? null,
+    questionToSpeechMs: one.record.questionToSpeechMs ?? null,
+    pauseWaitMs: one.record.pauseWaitMs ?? null,
+    stillCurrent: one.record.stillCurrent?.verdict ?? null,
+    yields: one.record.yields ?? 0,
+    reason: one.record.reason ?? null,
+    matchedMomentIds: matched.map((match) => match.momentId),
+    unmatched,
+    falseSpeech: said && unmatched && isSpeechQuietFixture(fixture),
+  };
+}
+
+/**
+ * Whether a spoken line counts as catching a moment at all (V3-010).
+ *
+ * The PRD's four conditions, three of which are here and the fourth
+ * (inside the window) in {@link outcomeFor}: the room really heard it, it was
+ * said in a pause of the kind its own rule asks for, and nobody present had
+ * already answered the question — a sourced answer to something the room has
+ * settled itself is not a catch however right it is.
+ */
+export function speechCounts(one: SpokenRecord): boolean {
+  return (
+    isUnpromptedSpeech(one) &&
+    one.atStreamMs !== null &&
+    one.inPause === true &&
+    one.record.stillCurrent?.verdict !== "answered"
+  );
+}
+
+/**
+ * The claim Sotto made about this moment, if it made one (V3-015).
+ *
+ * Matched structurally rather than by the judge, and deliberately: "I'll
+ * check the drive time" is about the question rather than about the issue the
+ * script planted, so a judge asked whether it raises the moment would be
+ * right to say no. What ties it to the moment is the turn it was heard in —
+ * the same rule `server/e2e/checks.ts` uses for a delivered card.
+ */
+function reservationFor(
+  moment: MomentRecord,
+  spoken: readonly SpokenRecord[],
+): MomentReservation | null {
+  const cited = new Set([...moment.setupTurnIds, ...moment.triggerTurnIds]);
+  const claim = spoken.find(
+    (one) =>
+      one.record.kind === "reserve" && one.record.spoken && cited.has(one.record.turnId),
+  );
+  if (claim === undefined) return null;
+  return {
+    spokenId: claim.id,
+    atMs: claim.atStreamMs,
+    questionToReserveMs: claim.record.questionToReserveMs ?? null,
+  };
+}
+
 /** One fixture's run, scored against the moments its script planted. */
 export function scoreFixture(run: FixtureRunRecord): FixtureScore {
   const byCard = matchesByCard(run.matches);
@@ -415,11 +658,32 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
     level: "research",
     deliveredAtMs: card.deliveredAtMs,
   }));
+  // V3-010: and the third thing a moment can be caught by, which is not a
+  // card at all. Only lines that clear the PRD's conditions are in the pool —
+  // a sentence said over somebody, or after the room answered its own
+  // question, is reported but catches nothing.
+  const spokenRecords = run.spoken ?? [];
+  const spoken = spokenRecords.map((one) => scoreSpoken(run.fixture, one, byCard));
+  const speechPool: ScoredCard[] = spokenRecords
+    .filter(speechCounts)
+    .map((one) => ({
+      cardId: one.id,
+      level: "speak",
+      deliveredAtMs: one.atStreamMs as number,
+    }));
 
   const moments: MomentScore[] = run.moments.map((moment) => {
     const window = windowFor(moment);
     let best: { outcome: Exclude<MomentOutcome, "missed">; card: ScoredCard } | null = null;
-    for (const card of expectsResearch(moment) ? researchPool : policyPool) {
+    // A moment that expects speech can still be *caught low* by the card that
+    // went up instead, so its pool is both: the sentence, and whichever half
+    // of the stage its type belongs to.
+    const pool = expectsSpeech(moment)
+      ? [...speechPool, ...(moment.type === "research_hook" ? researchPool : policyPool)]
+      : expectsResearch(moment)
+        ? researchPool
+        : policyPool;
+    for (const card of pool) {
       const matched = (byCard.get(card.cardId) ?? []).some(
         (match) => match.momentId === moment.id,
       );
@@ -453,11 +717,15 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
       windowEndMs: window.endMs,
       delayMs: best === null ? null : best.card.deliveredAtMs - window.startMs,
       judgeReason: reason,
+      reserved: reservationFor(moment, spokenRecords),
     };
   });
 
-  const count = (outcome: MomentOutcome, research: boolean): number =>
-    moments.filter((one) => expectsResearch(one) === research && one.outcome === outcome).length;
+  const count = (
+    outcome: MomentOutcome,
+    bucket: "policy" | "research" | "speak",
+  ): number =>
+    moments.filter((one) => bucketOf(one) === bucket && one.outcome === outcome).length;
   const unmatchedAt = (level: DeliveredLevel): number =>
     deliveries.filter((one) => one.unmatched && one.level === level).length;
 
@@ -468,15 +736,23 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
     deliveries,
     researchCards,
     research,
-    caught: count("caught", false),
-    caughtLow: count("caught_low", false),
-    late: count("late", false),
-    missed: count("missed", false),
+    caught: count("caught", "policy"),
+    caughtLow: count("caught_low", "policy"),
+    late: count("late", "policy"),
+    missed: count("missed", "policy"),
     // A research moment can only be caught at the level it expects, so
     // `caught_low` is counted with the catches rather than losing one.
-    researchCaught: count("caught", true) + count("caught_low", true),
-    researchLate: count("late", true),
-    researchMissed: count("missed", true),
+    researchCaught: count("caught", "research") + count("caught_low", "research"),
+    researchLate: count("late", "research"),
+    researchMissed: count("missed", "research"),
+    spoken,
+    // A speak moment is the opposite case: `caught_low` is a real shortfall,
+    // because the thing that would have caught it is a sentence and what it
+    // got was a card nobody has to read.
+    speakCaught: count("caught", "speak"),
+    speakCaughtLow: count("caught_low", "speak"),
+    speakLate: count("late", "speak"),
+    speakMissed: count("missed", "speak"),
     falseInterjects: unmatchedAt("interject"),
     falseGlows: unmatchedAt("glow"),
     deliveriesInPause: deliveries.filter((one) => one.inPause).length,
@@ -503,6 +779,20 @@ function totalsOf(fixtures: readonly FixtureScore[]): ScoreTotals {
     researchCaught: 0,
     researchLate: 0,
     researchMissed: 0,
+    speakMoments: 0,
+    speakCaught: 0,
+    speakCaughtLow: 0,
+    speakLate: 0,
+    speakMissed: 0,
+    reservations: 0,
+    spokenLines: 0,
+    spokenPlaced: 0,
+    spokenInPause: 0,
+    falseSpeech: 0,
+    spokenOverHuman: 0,
+    spokenOverrunMeasured: 0,
+    calledOn: 0,
+    spokenSkipped: 0,
     researchCards: 0,
     researchCardsInPause: 0,
     researchCardsAtSessionEnd: 0,
@@ -527,6 +817,36 @@ function totalsOf(fixtures: readonly FixtureScore[]): ScoreTotals {
     totals.researchCaught += fixture.researchCaught;
     totals.researchLate += fixture.researchLate;
     totals.researchMissed += fixture.researchMissed;
+    totals.speakMoments +=
+      fixture.speakCaught + fixture.speakCaughtLow + fixture.speakLate + fixture.speakMissed;
+    totals.speakCaught += fixture.speakCaught;
+    totals.speakCaughtLow += fixture.speakCaughtLow;
+    totals.speakLate += fixture.speakLate;
+    totals.speakMissed += fixture.speakMissed;
+    totals.reservations += fixture.moments.filter((one) => one.reserved !== null).length;
+    for (const line of fixture.spoken) {
+      if (!line.spoken) {
+        totals.spokenSkipped += 1;
+        continue;
+      }
+      if (!line.unprompted) {
+        totals.calledOn += 1;
+        continue;
+      }
+      totals.spokenLines += 1;
+      // A line nobody heard cannot be placed in the conversation, so it is
+      // not in the pause gate's denominator — and `inPause` is `null`, not
+      // `false`, so it is not silently counted as a failure either.
+      if (line.inPause !== null) {
+        totals.spokenPlaced += 1;
+        if (line.inPause) totals.spokenInPause += 1;
+      }
+      if (line.falseSpeech) totals.falseSpeech += 1;
+      if (line.overrunMeasured) {
+        totals.spokenOverrunMeasured += 1;
+        if (line.overTurnId !== null) totals.spokenOverHuman += 1;
+      }
+    }
     totals.deliveries += fixture.deliveries.length;
     totals.deliveriesInPause += fixture.deliveriesInPause;
     totals.falseInterjects += fixture.falseInterjects;
@@ -570,9 +890,15 @@ export function median(values: readonly number[]): number | null {
 }
 
 /**
- * The three gates of US-016, V2-019's research recall beside them, plus the
- * one that is not a judgement: a replay that threw produced no numbers, so
- * the run failed whatever the rest says.
+ * The three gates of US-016, V2-019's research recall and V3-010's four about
+ * unprompted speech beside them, plus the one that is not a judgement: a
+ * replay that threw produced no numbers, so the run failed whatever the rest
+ * says.
+ *
+ * Speech is gated apart from cards for the reason V2-019 separated research:
+ * it is caught by a different thing, at a different target, and it can fail
+ * in two ways a card cannot — said over somebody, or said after the room
+ * answered its own question.
  *
  * Research cards are deliberately outside the two gates about interrupting
  * people — the precision gate and the pause gate. A research card is not a
@@ -586,6 +912,7 @@ function gatesFor(
   totals: ScoreTotals,
   recall: number,
   researchRecall: number,
+  speakRecall: number,
   pauseRate: number,
   judged: boolean,
 ): GateResult[] {
@@ -606,6 +933,38 @@ function gatesFor(
       totals.researchMoments === 0
         ? "no research moments in this run"
         : `${formatRatio(researchRecall)} (${totals.researchCaught}/${totals.researchMoments})`,
+    ),
+    gate(
+      `speak recall >= ${MIN_SPEAK_RECALL}`,
+      totals.speakMoments === 0 || speakRecall >= MIN_SPEAK_RECALL,
+      totals.speakMoments === 0
+        ? "no speak moments in this run"
+        : `${formatRatio(speakRecall)} (${totals.speakCaught}/${totals.speakMoments}` +
+          `, ${totals.speakCaughtLow} card only)`,
+    ),
+    gate(
+      `no false speech on ${SPEECH_QUIET_FIXTURES.join(", ")}`,
+      totals.falseSpeech === 0,
+      `${totals.falseSpeech} found of ${totals.spokenLines} unprompted line(s)`,
+    ),
+    gate(
+      "every unprompted line in a pause",
+      totals.spokenPlaced === totals.spokenInPause,
+      totals.spokenPlaced === 0
+        ? "nothing was said unprompted"
+        : `${totals.spokenInPause}/${totals.spokenPlaced}`,
+      false,
+    ),
+    // V3-004's promise, read off the transcript rather than off the policy:
+    // Sotto stops the moment anybody talks, so a line that overlapped a turn
+    // which started after it, with no yield logged, is the rule failing.
+    gate(
+      "nothing spoken over a human turn",
+      totals.spokenOverHuman === 0,
+      totals.spokenOverrunMeasured === 0
+        ? `not measurable: ${totals.spokenLines} line(s) heard, none in real time`
+        : `${totals.spokenOverHuman} of ${totals.spokenOverrunMeasured} measurable line(s)`,
+      false,
     ),
     gate(
       `no false interject on ${QUIET_FIXTURES.join(" or ")}`,
@@ -648,19 +1007,21 @@ export function scoreSettings(
     totals.interjects === 0 ? 1 : totals.trueInterjects / totals.interjects;
   const researchRecall =
     totals.researchMoments === 0 ? 1 : totals.researchCaught / totals.researchMoments;
+  const speakRecall = totals.speakMoments === 0 ? 1 : totals.speakCaught / totals.speakMoments;
   const pauseRate =
     totals.deliveries === 0 ? 1 : totals.deliveriesInPause / totals.deliveries;
   const delays = fixtures
     .flatMap((fixture) => fixture.moments)
     .map((moment) => moment.delayMs)
     .filter((delay): delay is number => delay !== null);
-  const gates = gatesFor(totals, recall, researchRecall, pauseRate, judged);
+  const gates = gatesFor(totals, recall, researchRecall, speakRecall, pauseRate, judged);
   return {
     settings,
     fixtures,
     totals,
     recall,
     researchRecall,
+    speakRecall,
     interjectPrecision,
     pauseRate,
     medianDelayMs: median(delays),

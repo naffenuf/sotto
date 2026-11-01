@@ -7,7 +7,10 @@ import type {
   MomentRecord,
   ResearchDeliveryRecord,
   ResearchRunRecord,
+  SpokenRecord,
 } from "../../shared/eval.js";
+import type { SpokenContributionRecord } from "../../shared/spoken.js";
+import { SPOKEN_CONTRIBUTION_STAGE } from "../../shared/spoken.js";
 import { policySettingsLabel, type PolicySettings } from "../../shared/policy.js";
 import {
   MIN_MOMENT_RECALL,
@@ -417,7 +420,7 @@ describe("scoreSettings", () => {
     });
     const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [rude], true);
     expect(group.pauseRate).toBe(0);
-    expect(gate(group, "pause").status).toBe("fail");
+    expect(gate(group, "every delivery in a pause").status).toBe("fail");
     expect(group.passed).toBe(false);
   });
 
@@ -431,7 +434,7 @@ describe("scoreSettings", () => {
     const group = scoreSettings({ frequency: "normal", boldness: "normal" }, [run({ moments: [moment()] })], false);
     expect(gate(group, "recall").status).toBe("skipped");
     expect(gate(group, "false interject").status).toBe("skipped");
-    expect(gate(group, "pause").status).toBe("pass");
+    expect(gate(group, "every delivery in a pause").status).toBe("pass");
     // A skipped gate is not a failed one: the run is not pronounced bad.
     expect(group.passed).toBe(true);
   });
@@ -725,6 +728,301 @@ describe("scoreSettings with research", () => {
     expect(group.totals.researchCardsInPause).toBe(0);
     expect(group.totals.researchCardsAtSessionEnd).toBe(1);
     expect(group.pauseRate).toBe(1);
-    expect(gate(group, "pause").status).toBe("pass");
+    expect(gate(group, "every delivery in a pause").status).toBe("pass");
+  });
+});
+
+/**
+ * Unprompted speech, scored (PRD V3-010).
+ *
+ * The run record carries the spoken lines already placed in the conversation
+ * (`server/eval/spoken.ts` does the placing, and has its own tests), so these
+ * build the placed shape by hand and check what the scoring makes of it: the
+ * four conditions a catch has to meet, the near miss where a card went up
+ * instead, and the two gates that are about harm rather than judgment.
+ */
+function spokenLine(
+  overrides: Partial<SpokenRecord> = {},
+  record: Partial<SpokenContributionRecord> = {},
+): SpokenRecord {
+  return {
+    id: "spoken-0",
+    record: {
+      stage: SPOKEN_CONTRIBUTION_STAGE,
+      kind: "answer",
+      atMs: 110_000,
+      ideaId: "idea-1",
+      turnId: "0:10",
+      topic: "the drive time",
+      spoken: true,
+      text: "On the drive time: about two hours fifteen.",
+      questionToSpeechMs: 21_000,
+      pauseWaitMs: 900,
+      ...record,
+    },
+    atStreamMs: 110_000,
+    endsAtStreamMs: 112_200,
+    inPause: true,
+    pause: { speaking: false, silentForMs: 1_200 },
+    overTurnId: null,
+    overrunMeasured: true,
+    ...overrides,
+  };
+}
+
+/** A planted question the room wondered aloud, which only speech catches. */
+function speakMoment(overrides: Partial<MomentRecord> = {}): MomentRecord {
+  return moment({
+    id: "s1",
+    type: "research_hook",
+    expectedLevel: "speak",
+    description: "nobody knows how long the drive is",
+    ...overrides,
+  });
+}
+
+function spokenMatch(overrides: Partial<JudgeMatchRecord> = {}): JudgeMatchRecord {
+  return match({ cardId: "spoken-0", momentId: "s1", ...overrides });
+}
+
+describe("scoreFixture, speech", () => {
+  it("counts a sentence in a pause inside the window as the catch", () => {
+    const score = scoreFixture(
+      run({
+        fixture: "offsite-plan",
+        moments: [speakMoment()],
+        spoken: [spokenLine()],
+        matches: [spokenMatch()],
+      }),
+    );
+    expect(score.moments[0]?.outcome).toBe("caught");
+    expect(score.moments[0]?.deliveredLevel).toBe("speak");
+    expect(score.speakCaught).toBe(1);
+    // A speak moment is in its own bucket, so it is not in the policy's
+    // recall and is not gated at two thresholds at once.
+    expect(score.caught + score.caughtLow + score.late + score.missed).toBe(0);
+    expect(score.spoken[0]?.matchedMomentIds).toEqual(["s1"]);
+    expect(score.spoken[0]?.falseSpeech).toBe(false);
+  });
+
+  it("calls a card instead of a sentence caught low, which is the near miss", () => {
+    const score = scoreFixture(
+      run({
+        fixture: "offsite-plan",
+        moments: [speakMoment()],
+        research: research(),
+        matches: [match({ cardId: "research-packet-1", momentId: "s1" })],
+      }),
+    );
+    expect(score.moments[0]?.outcome).toBe("caught_low");
+    expect(score.moments[0]?.deliveredLevel).toBe("research");
+    expect(score.speakCaught).toBe(0);
+    expect(score.speakCaughtLow).toBe(1);
+  });
+
+  it("does not count a sentence said over somebody as a catch", () => {
+    const score = scoreFixture(
+      run({
+        fixture: "offsite-plan",
+        moments: [speakMoment()],
+        spoken: [spokenLine({ inPause: false })],
+        matches: [spokenMatch()],
+      }),
+    );
+    expect(score.moments[0]?.outcome).toBe("missed");
+    expect(score.spoken[0]?.inPause).toBe(false);
+  });
+
+  it("does not count an answer the room had already given itself", () => {
+    const score = scoreFixture(
+      run({
+        fixture: "offsite-plan",
+        moments: [speakMoment()],
+        spoken: [
+          spokenLine(
+            {},
+            {
+              stillCurrent: {
+                verdict: "answered",
+                agrees: true,
+                latencyMs: 1_900,
+                fallback: false,
+                turns: 4,
+              },
+            },
+          ),
+        ],
+        matches: [spokenMatch()],
+      }),
+    );
+    expect(score.moments[0]?.outcome).toBe("missed");
+    expect(score.spoken[0]?.stillCurrent).toBe("answered");
+  });
+
+  it("calls a sentence after the deadline late, as it does a card", () => {
+    const score = scoreFixture(
+      run({
+        fixture: "offsite-plan",
+        moments: [speakMoment()],
+        spoken: [spokenLine({ atStreamMs: 130_000 })],
+        matches: [spokenMatch()],
+      }),
+    );
+    expect(score.moments[0]?.outcome).toBe("late");
+    expect(score.speakLate).toBe(1);
+  });
+
+  it("scores a claim separately from the catch, with its own latency", () => {
+    const score = scoreFixture(
+      run({
+        fixture: "offsite-plan",
+        moments: [speakMoment()],
+        spoken: [
+          spokenLine(
+            { id: "spoken-0", atStreamMs: 104_000 },
+            {
+              kind: "reserve",
+              text: "I'll check the drive time.",
+              questionToReserveMs: 2_400,
+            },
+          ),
+          spokenLine({ id: "spoken-1" }),
+        ],
+        matches: [spokenMatch({ cardId: "spoken-1" })],
+      }),
+    );
+    expect(score.moments[0]?.outcome).toBe("caught");
+    expect(score.moments[0]?.reserved).toEqual({
+      spokenId: "spoken-0",
+      atMs: 104_000,
+      questionToReserveMs: 2_400,
+    });
+  });
+});
+
+describe("scoreSettings, speech", () => {
+  function gated(runs: FixtureRunRecord[]) {
+    return scoreSettings({ frequency: "normal", boldness: "normal" }, runs, true);
+  }
+
+  it("gates speak recall on sentences, not on cards", () => {
+    const group = gated([
+      run({
+        fixture: "offsite-plan",
+        moments: [speakMoment(), speakMoment({ id: "s2" })],
+        research: research(),
+        matches: [match({ cardId: "research-packet-1", momentId: "s2" })],
+        spoken: [spokenLine()],
+      }),
+    ]);
+    expect(group.totals.speakMoments).toBe(2);
+    expect(group.speakRecall).toBe(0);
+    expect(gate(group, "speak recall").status).toBe("fail");
+  });
+
+  it("fails on an unprompted line that raised nothing, in a quiet conversation", () => {
+    const group = gated([
+      run({
+        fixture: "brainstorm",
+        moments: [],
+        spoken: [spokenLine({}, { kind: "reserve", text: "I'll check the greenhouse." })],
+      }),
+    ]);
+    expect(group.totals.falseSpeech).toBe(1);
+    expect(gate(group, "no false speech").status).toBe("fail");
+  });
+
+  it("does not call a line about a planted moment false speech", () => {
+    const group = gated([
+      run({
+        fixture: "rhetorical-questions",
+        moments: [speakMoment()],
+        spoken: [spokenLine()],
+        matches: [spokenMatch()],
+      }),
+    ]);
+    expect(group.totals.falseSpeech).toBe(0);
+    expect(gate(group, "no false speech").status).toBe("pass");
+  });
+
+  it("leaves an unmatched line on a conversation with moments uncounted", () => {
+    const group = gated([
+      run({ fixture: "offsite-plan", moments: [speakMoment()], spoken: [spokenLine()] }),
+    ]);
+    expect(group.totals.spokenLines).toBe(1);
+    expect(group.totals.falseSpeech).toBe(0);
+    expect(group.fixtures[0]?.spoken[0]?.unmatched).toBe(true);
+  });
+
+  it("fails on a line said while somebody was talking", () => {
+    const group = gated([
+      run({ fixture: "offsite-plan", spoken: [spokenLine({ inPause: false })] }),
+    ]);
+    expect(group.totals.spokenInPause).toBe(0);
+    expect(group.totals.spokenPlaced).toBe(1);
+    expect(gate(group, "every unprompted line in a pause").status).toBe("fail");
+  });
+
+  it("fails on a line Sotto carried on over somebody with", () => {
+    const group = gated([
+      run({ fixture: "offsite-plan", spoken: [spokenLine({ overTurnId: "0:11" })] }),
+    ]);
+    expect(group.totals.spokenOverHuman).toBe(1);
+    expect(gate(group, "nothing spoken over a human turn").status).toBe("fail");
+  });
+
+  it("passes the overrun gate as unmeasurable when the clock said nothing", () => {
+    const group = gated([
+      run({
+        fixture: "offsite-plan",
+        spoken: [spokenLine({ overTurnId: null, overrunMeasured: false })],
+      }),
+    ]);
+    expect(group.totals.spokenOverrunMeasured).toBe(0);
+    const over = gate(group, "nothing spoken over a human turn");
+    expect(over.status).toBe("pass");
+    expect(over.detail).toContain("not measurable");
+  });
+
+  it("counts a line nobody heard as neither in a pause nor out of one", () => {
+    const group = gated([
+      run({
+        fixture: "offsite-plan",
+        spoken: [
+          spokenLine(
+            { atStreamMs: null, inPause: null, pause: null },
+            { spoken: false, reason: "no_gap" },
+          ),
+        ],
+      }),
+    ]);
+    expect(group.totals.spokenLines).toBe(0);
+    expect(group.totals.spokenSkipped).toBe(1);
+    expect(gate(group, "every unprompted line in a pause").status).toBe("pass");
+  });
+
+  it("leaves a card the room called for out of every gate about speaking up", () => {
+    const group = gated([
+      run({
+        fixture: "brainstorm",
+        spoken: [
+          spokenLine(
+            { inPause: false, overTurnId: "0:11" },
+            { kind: "called_on", ideaId: "card-cand-1", text: "Sotto noticed the budget." },
+          ),
+        ],
+      }),
+    ]);
+    expect(group.totals.calledOn).toBe(1);
+    expect(group.totals.spokenLines).toBe(0);
+    expect(group.totals.falseSpeech).toBe(0);
+    expect(group.totals.spokenOverHuman).toBe(0);
+    expect(group.passed).toBe(true);
+  });
+
+  it("passes the speak gate when nothing was planted to speak about", () => {
+    const group = gated([run({ fixture: "brainstorm" })]);
+    expect(group.speakRecall).toBe(1);
+    expect(gate(group, "speak recall").detail).toContain("no speak moments");
   });
 });

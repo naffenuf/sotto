@@ -529,3 +529,170 @@ describe("the research sections", () => {
     expect(markdown).toContain("_Nothing was looked up._");
   });
 });
+
+/**
+ * The spoken-contributions table (PRD V3-010).
+ *
+ * The columns the story names, plus the two the gates read: whether the room
+ * was quiet, and whether Sotto was still talking when somebody started.
+ */
+describe("the unprompted speech sections", () => {
+  const spokenRun: FixtureRunRecord = {
+    fixture: "offsite-plan",
+    settings: { frequency: "normal", boldness: "normal" },
+    sessionDir: "/tmp/offsite",
+    durationMs: 175_000,
+    finalTurns: 37,
+    candidates: 2,
+    decisions: 3,
+    gateCalls: [],
+    deliveries: [],
+    spoken: [
+      {
+        id: "spoken-0",
+        record: {
+          stage: "spoken_contribution",
+          kind: "reserve",
+          atMs: 60_000,
+          ideaId: "idea-1",
+          turnId: "s1:12",
+          topic: "the drive time",
+          spoken: true,
+          text: "I'll check the drive time.",
+          questionToReserveMs: 2_400,
+        },
+        atStreamMs: 60_000,
+        endsAtStreamMs: 61_300,
+        inPause: true,
+        pause: { speaking: false, silentForMs: 1_100 },
+        overTurnId: null,
+        overrunMeasured: true,
+      },
+      {
+        id: "spoken-1",
+        record: {
+          stage: "spoken_contribution",
+          kind: "answer",
+          atMs: 81_000,
+          ideaId: "idea-1",
+          turnId: "s1:12",
+          topic: "the drive time",
+          spoken: true,
+          text: "On the drive time: about two hours fifteen | each way.",
+          questionToSpeechMs: 23_400,
+          pauseWaitMs: 900,
+          stillCurrent: {
+            verdict: "current",
+            agrees: false,
+            latencyMs: 1_700,
+            fallback: false,
+            turns: 4,
+          },
+        },
+        atStreamMs: 81_000,
+        endsAtStreamMs: 83_700,
+        inPause: true,
+        pause: { speaking: false, silentForMs: 1_300 },
+        overTurnId: null,
+        overrunMeasured: true,
+      },
+      {
+        id: "spoken-2",
+        record: {
+          stage: "spoken_contribution",
+          kind: "readback",
+          atMs: 120_000,
+          ideaId: "decision-1",
+          turnId: "s1:30",
+          topic: "Thursday afternoon",
+          spoken: false,
+          text: "Got it: Thursday afternoon.",
+          pauseWaitMs: 20_000,
+          reason: "expired",
+        },
+        atStreamMs: null,
+        endsAtStreamMs: null,
+        inPause: null,
+        pause: null,
+        overTurnId: null,
+        overrunMeasured: false,
+      },
+    ],
+    moments: [
+      {
+        id: "venue-logistics",
+        type: "research_hook",
+        expectedLevel: "speak",
+        description: "nobody knows how long the drive is",
+        triggerLine: 12,
+        deadlineLine: 18,
+        triggerEndMs: 56_000,
+        deadlineEndMs: 82_000,
+        setupTurnIds: ["s1:10"],
+        triggerTurnIds: ["s1:12"],
+        triggerTurnEndMs: 57_000,
+        deadlineTurnEndMs: 83_000,
+      },
+    ],
+    matches: [
+      {
+        cardId: "spoken-1",
+        momentId: "venue-logistics",
+        matches: true,
+        reason: "it answers the drive-time question",
+        cached: false,
+      },
+    ],
+    elapsedMs: 300_000,
+  };
+
+  const spokenRecord: EvalRunRecord = {
+    ...record,
+    fixtures: ["offsite-plan"],
+    runs: [spokenRun],
+  };
+
+  it("puts speak recall and the speech summary in the headlines", () => {
+    const group = scoreRun(spokenRecord).groups[0];
+    const labels = headlines(group as never).map((one) => `${one.label}: ${one.value}`);
+    expect(labels).toContainEqual(expect.stringContaining("speak recall: 1/1 (100%)"));
+    expect(labels).toContainEqual(
+      expect.stringContaining("unprompted speech: 2 line(s) heard, 2/2 in a pause, 0 false"),
+    );
+  });
+
+  it("prints one row per line, with the latencies the story asks for", () => {
+    const text = renderTerminalReport(spokenRecord, scoreRun(spokenRecord));
+    expect(text).toContain("venue-logistics  answer");
+    expect(text).toMatch(/reserve\s+yes\s+60\.0s\s+yes\s+2\.4s/);
+    expect(text).toMatch(/answer\s+yes\s+81\.0s\s+yes\s+—\s+23\.4s\s+0\.9s\s+current/);
+    // A line that was never said says so, and why, instead of a time.
+    expect(text).toMatch(/readback\s+no \(expired\)/);
+  });
+
+  it("names the claim beside the catch in the moment table", () => {
+    const text = renderTerminalReport(spokenRecord, scoreRun(spokenRecord));
+    expect(text).toMatch(/venue-logistics\s+research_hook\s+speak\s+speak\s+caught\s+24\.0s\s+2\.4s/);
+  });
+
+  it("renders the markdown section, escaping a pipe in what was said", () => {
+    const markdown = renderReportMarkdown({
+      record: spokenRecord,
+      score: scoreRun(spokenRecord),
+      promptHashes: [],
+      usage: { calls: 0, inputTokens: 0, outputTokens: 0, reasoningTokens: 0 },
+    });
+    expect(markdown).toContain("### Unprompted speech");
+    expect(markdown).toContain("two hours fifteen \\| each way");
+  });
+
+  it("says so when nothing was said unprompted", () => {
+    const markdown = renderReportMarkdown({
+      record,
+      score: scoreRun(record),
+      promptHashes: [],
+      usage: { calls: 0, inputTokens: 0, outputTokens: 0, reasoningTokens: 0 },
+    });
+    expect(markdown).toContain("_Sotto said nothing unprompted._");
+  });
+});

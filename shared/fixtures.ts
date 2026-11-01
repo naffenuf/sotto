@@ -25,13 +25,16 @@ export const momentTypes = [
  *
  * `research` is not a level the interjection policy can choose: it means a
  * research-ready card has to appear inside the window (v2 PRD V2-014), which
- * is the only thing a `research_hook` can be caught by.
+ * is one of the two things a `research_hook` can be caught by.
  *
  * `speak` is the one above everything (V3-013, V3-010): the moment is only
  * really caught if Sotto said something out loud inside the window — an
  * answer to what the room wondered (V3-004), or a decision read back with the
  * room's own unsettled question on it. A card for one of those is `caught_low`
- * rather than a catch, which is exactly what the rank below says.
+ * rather than a catch, which is exactly what the rank in
+ * `server/eval/score.ts` says. A `research_hook` may expect either: `research`
+ * when a card inside the window is the whole ask, `speak` when the room
+ * wondered it aloud and the point of the fast path is that Sotto answers it.
  */
 export const expectedLevels = ["glow", "interject", "research", "speak"] as const;
 
@@ -135,15 +138,26 @@ export const FixtureScriptSchema = z
         });
       }
 
-      const expectsResearch = moment.expectedLevel === "research";
+      // A research card is the only thing that can catch a hook, so
+      // `research` is a hook's level and nobody else's (V2-019) — but a hook
+      // the room wondered *aloud* may expect Sotto to say the answer instead
+      // (V3-004, V3-010), which is a level above the card rather than a
+      // different kind of catch.
       const isResearchHook = moment.type === "research_hook";
-      if (expectsResearch !== isResearchHook) {
+      if (moment.expectedLevel === "research" && !isResearchHook) {
         ctx.addIssue({
           code: "custom",
           path: at("expectedLevel"),
-          message: isResearchHook
-            ? 'a research_hook is caught by a research card, so expectedLevel must be "research"'
-            : `expectedLevel "research" only applies to a research_hook, not a ${moment.type}`,
+          message: `expectedLevel "research" only applies to a research_hook, not a ${moment.type}`,
+        });
+      }
+      if (isResearchHook && moment.expectedLevel !== "research" && moment.expectedLevel !== "speak") {
+        ctx.addIssue({
+          code: "custom",
+          path: at("expectedLevel"),
+          message:
+            "a research_hook is caught by a research card, or by Sotto saying the " +
+            'answer out loud, so expectedLevel must be "research" or "speak"',
         });
       }
 

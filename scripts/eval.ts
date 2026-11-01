@@ -88,11 +88,17 @@ function report(run: FixtureRunRecord): void {
       : `, ${research.ideas} idea(s) -> ${research.packets} packet(s)` +
         (research.unsourced > 0 ? ` (${research.unsourced} unsourced)` : "") +
         `, ${research.cards.length} research card(s)`;
+  // V3-010: what Sotto said out loud unasked, which at the default settings
+  // is the thing most likely to be zero when something upstream broke.
+  const said = (run.spoken ?? []).filter((one) => one.record.spoken);
+  const spoken =
+    said.length === 0 ? "" : `, ${said.length} spoken (${said.map((one) => one.record.kind).join(", ")})`;
   console.log(
     `  ${run.fixture} [${label(run)}]: ${run.finalTurns} turns, ` +
       `${run.candidates} candidate(s), ${run.deliveries.length} delivered (${levels}), ` +
       `${matched.size}/${run.moments.length} moment(s) matched` +
       researched +
+      spoken +
       (outside > 0 ? `, ${outside} OUTSIDE A PAUSE` : "") +
       `, ${(run.elapsedMs / 1000).toFixed(0)}s`,
   );

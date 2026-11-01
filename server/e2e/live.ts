@@ -35,7 +35,7 @@ import { fixtureAudioPath } from "../audio/WavReplaySource.js";
 import { readWavFile } from "../audio/wav.js";
 import { AUDIO_SAMPLE_RATE } from "../../shared/audio.js";
 import { EventBus } from "../events/bus.js";
-import { deliveredDecisions, readCandidateLog } from "../eval/runner.js";
+import { deliveredDecisions, readCandidateLog, readSpokenLog } from "../eval/runner.js";
 import type {
   GlimmerClientFactory,
   ModelClientFactory,
@@ -185,6 +185,7 @@ export function readSessionFiles(dir: string | null): E2eFiles {
     artifacts: [],
     artifactHtml: {},
     research: [],
+    spoken: [],
     researchFiles: [],
   };
   if (dir === null) return files;
@@ -203,6 +204,8 @@ export function readSessionFiles(dir: string | null): E2eFiles {
   );
 
   files.research = readJsonLines<ResearchLogLine>(join(dir, SESSION_FILES.research));
+  // V3-010: what Sotto said unasked, and what it decided against saying.
+  files.spoken = readSpokenLog(dir);
   try {
     files.artifacts = readdirSync(join(dir, ARTIFACTS_DIR));
   } catch {

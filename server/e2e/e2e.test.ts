@@ -17,7 +17,11 @@ import type { MomentRecord } from "../../shared/eval.js";
 import type { ResearchLogLine, ResearchPacket } from "../../shared/research.js";
 import { DEFAULT_BOLDNESS, defaultPolicySettings, limitsFor, thresholdsFor } from "../../shared/policy.js";
 import type { SessionRecord } from "../../shared/session.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import {
+  SPOKEN_CONTRIBUTION_STAGE,
+  type SpokenContributionRecord,
+} from "../../shared/spoken.js";
+import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { defaultSettings } from "../../shared/session.js";
 import { describe, expect, it } from "vitest";
 import {
@@ -193,6 +197,7 @@ function files(overrides: Partial<E2eFiles> = {}): E2eFiles {
     candidates: 0,
     artifacts: [],
     artifactHtml: {},
+    spoken: [],
     research: [],
     researchFiles: [],
     ...overrides,
@@ -464,6 +469,148 @@ describe("brainstorm's silence", () => {
   it("allows a glow, which is not an interjection", () => {
     const quiet = [{ value: card({ variant: "glow" }), atMs: 60_000 }];
     expect(failures(checkFixture(input("brainstorm", { cards: quiet })))).toEqual([]);
+  });
+});
+
+/**
+ * The same scoring as `npm run eval`, against a real clock (PRD V3-010).
+ *
+ * Only two things are *checked* — a line said in a pause, and a line nobody
+ * was talked over by — because those are the harm. Whether a particular
+ * planted question got its sentence is reported, like moment latency, since a
+ * search coming back and the room leaving a gap are not things an assertion
+ * can insist on without making a $2 run flaky.
+ */
+describe("unprompted speech", () => {
+  function said(
+    overrides: Partial<SpokenContributionRecord> = {},
+  ): SpokenContributionRecord {
+    return {
+      stage: SPOKEN_CONTRIBUTION_STAGE,
+      kind: "answer",
+      atMs: 24_000,
+      ideaId: "idea-1",
+      turnId: "s1:9",
+      topic: "the drive time",
+      spoken: true,
+      text: "On the drive time: about two hours fifteen.",
+      pauseWaitMs: 900,
+      questionToSpeechMs: 21_000,
+      ...overrides,
+    };
+  }
+
+  /** The transcript row V2-008a wrote for it, at `startMs` on the stream. */
+  function heard(one: SpokenContributionRecord, startMs: number): Stamped<TurnUpdate> {
+    return {
+      value: sottoTurn({
+        utteranceId: `${one.kind}-${one.ideaId}`,
+        text: one.text,
+        startMs,
+        interrupted: false,
+      }),
+      atMs: startMs + 700,
+    };
+  }
+
+  it("passes a line said after the room stopped talking", () => {
+    const line = said();
+    const checks = checkFixture(
+      input("moment-contradiction", { sottoTurns: [heard(line, 24_000)] }, { spoken: [line] }),
+    );
+    expect(failures(checks)).toEqual([]);
+  });
+
+  it("fails a line said into somebody's sentence", () => {
+    const line = said();
+    // The eleventh scripted turn runs from 20.0s to 21.5s.
+    const checks = checkFixture(
+      input("moment-contradiction", { sottoTurns: [heard(line, 20_500)] }, { spoken: [line] }),
+    );
+    // And, having started mid-sentence, it also runs into the next turn.
+    expect(failures(checks)).toContain("unprompted speech in a pause");
+  });
+
+  it("fails a line Sotto carried on over somebody with", () => {
+    const line = said();
+    const checks = checkFixture(
+      input(
+        "offsite-plan",
+        {
+          turns: [{ value: turn({ turnId: "s1:20", startMs: 24_400, endMs: 28_000 }), atMs: 28_700 }],
+          sottoTurns: [heard(line, 24_000)],
+        },
+        { spoken: [line] },
+      ),
+    );
+    expect(failures(checks)).toContain("nothing spoken over a human turn");
+  });
+
+  it("says nothing about a line that was never said", () => {
+    const line = said({ spoken: false, reason: "no_gap" });
+    const checks = checkFixture(input("moment-contradiction", {}, { spoken: [line] }));
+    expect(failures(checks)).toEqual([]);
+  });
+
+  it("calls any unprompted line on brainstorm false speech", () => {
+    const line = said({ kind: "reserve", text: "I'll check the greenhouse." });
+    const checks = checkFixture(
+      input("brainstorm", { sottoTurns: [heard(line, 24_000)] }, { spoken: [line] }),
+    );
+    expect(failures(checks)).toEqual(["no false speech"]);
+  });
+
+  it("leaves a card the room called for out of all three checks", () => {
+    const line = said({ kind: "called_on", ideaId: "card-cand-1" });
+    const checks = checkFixture(
+      input("brainstorm", { sottoTurns: [heard(line, 20_500)] }, { spoken: [line] }),
+    );
+    expect(failures(checks)).toEqual([]);
+  });
+
+  it("reports what was said about a planted speak moment, and the claim first", () => {
+    const claim = said({
+      kind: "reserve",
+      text: "I'll check the drive time.",
+      questionToReserveMs: 2_300,
+    });
+    const answer = said();
+    const planted = moment({
+      id: "venue-logistics",
+      type: "research_hook",
+      expectedLevel: "speak",
+    });
+    const latency = fixtureLatency(
+      input(
+        "offsite-plan",
+        { sottoTurns: [heard(claim, 20_000), heard(answer, 24_000)] },
+        { spoken: [claim, answer] },
+        [planted],
+      ),
+    );
+    expect(latency.spokenMoments).toEqual([
+      {
+        momentId: "venue-logistics",
+        spokenId: "spoken-1",
+        kind: "answer",
+        afterTriggerMs: 24_000 - 18_500,
+        beforeDeadline: false,
+        reservedAfterMs: 20_000 - 18_500,
+      },
+    ]);
+    // A hook is caught by a research card or by speech, never by a policy
+    // card citing turns, so it stays out of the card latencies.
+    expect(latency.moments).toEqual([]);
+  });
+
+  it("reports nothing said about a speak moment as exactly that", () => {
+    const latency = fixtureLatency(
+      input("moment-contradiction", {}, {}, [
+        moment({ id: "venue-logistics", type: "research_hook", expectedLevel: "speak" }),
+      ]),
+    );
+    expect(latency.spokenMoments[0]?.spokenId).toBeNull();
+    expect(latency.spokenMoments[0]?.afterTriggerMs).toBeNull();
   });
 });
 
@@ -1021,9 +1168,11 @@ describe("the report", () => {
             ackMs: 420,
             firstAudioMs: 2_100,
             moments: [],
+            spokenMoments: [],
           },
           moments: [],
           research: noResearch(),
+          spoken: [],
           voice: { utterances: 2, characters: 310 },
           usage: { calls: 6, inputTokens: 12_000, outputTokens: 9_000, reasoningTokens: 7_000 },
         },
@@ -1045,6 +1194,92 @@ describe("the report", () => {
     expect(text).toContain("ok    one answer");
     expect(text).toContain("wake -> headline 18.4s, wake -> done 19.2s");
     expect(text).toContain("/tmp/e2e/wav-ask-search-1");
+  });
+
+  it("prints what Sotto said unasked, what it held back, and the speak moments", () => {
+    const run = passing();
+    const fixture = run.fixtures[0] as (typeof run.fixtures)[number];
+    const text = renderFixture({
+      ...fixture,
+      spoken: [
+        {
+          id: "spoken-0",
+          record: {
+            stage: SPOKEN_CONTRIBUTION_STAGE,
+            kind: "answer",
+            atMs: 81_000,
+            ideaId: "idea-1",
+            turnId: "s1:12",
+            topic: "the drive time",
+            spoken: true,
+            text: "On the drive time: about two hours fifteen.",
+            questionToSpeechMs: 23_400,
+            pauseWaitMs: 900,
+            stillCurrent: {
+              verdict: "current",
+              agrees: false,
+              latencyMs: 1_700,
+              fallback: false,
+              turns: 4,
+            },
+          },
+          atStreamMs: 81_000,
+          endsAtStreamMs: 83_200,
+          inPause: true,
+          pause: { speaking: false, silentForMs: 1_300 },
+          overTurnId: null,
+          overrunMeasured: true,
+        },
+        {
+          id: "spoken-1",
+          record: {
+            stage: SPOKEN_CONTRIBUTION_STAGE,
+            kind: "readback",
+            atMs: 120_000,
+            ideaId: "decision-1",
+            turnId: "s1:30",
+            topic: "Thursday afternoon",
+            spoken: false,
+            text: "Got it: Thursday afternoon.",
+            reason: "expired",
+          },
+          atStreamMs: null,
+          endsAtStreamMs: null,
+          inPause: null,
+          pause: null,
+          overTurnId: null,
+          overrunMeasured: false,
+        },
+      ],
+      latency: {
+        ...fixture.latency,
+        spokenMoments: [
+          {
+            momentId: "venue-logistics",
+            spokenId: "spoken-0",
+            kind: "answer",
+            afterTriggerMs: 24_000,
+            beforeDeadline: true,
+            reservedAfterMs: 2_400,
+          },
+          {
+            momentId: "food-unanswered",
+            spokenId: null,
+            kind: null,
+            afterTriggerMs: null,
+            beforeDeadline: null,
+            reservedAfterMs: null,
+          },
+        ],
+      },
+    });
+    expect(text).toContain("spoke    answer at 81.0s");
+    expect(text).toContain("pause yes, waited 0.9s, question -> speech 23.4s, current");
+    expect(text).toContain("unsaid   readback (expired)");
+    expect(text).toContain(
+      "speak    venue-logistics: answer 24.0s after the trigger (before the deadline)",
+    );
+    expect(text).toContain("speak    food-unanswered: nothing said about it");
   });
 
   it("prints what this one conversation cost, against its own allowance", () => {

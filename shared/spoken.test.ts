@@ -1,0 +1,89 @@
+/**
+ * The record an unprompted line leaves, read back (PRD V3-010).
+ *
+ * `timing.jsonl` is written as `unknown` and carries two dozen other stages,
+ * so the narrowing is the load-bearing part: a line from a future version of
+ * the pipeline has to be dropped rather than guessed at.
+ */
+import { describe, expect, it } from "vitest";
+import {
+  SPOKEN_CHARS_PER_SECOND,
+  SPOKEN_CONTRIBUTION_STAGE,
+  asSpokenContribution,
+  estimateSpokenMs,
+  isUnpromptedKind,
+  spokenContributionKinds,
+  spokenTurnId,
+  spokenUtteranceId,
+  type SpokenContributionRecord,
+} from "./spoken.js";
+import { sottoTurnId } from "./turns.js";
+
+const line: SpokenContributionRecord = {
+  stage: SPOKEN_CONTRIBUTION_STAGE,
+  kind: "answer",
+  atMs: 90_000,
+  ideaId: "idea-1",
+  turnId: "0:7",
+  topic: "the drive time",
+  spoken: true,
+  text: "On the drive time: about two hours fifteen.",
+};
+
+describe("asSpokenContribution", () => {
+  it("narrows a spoken_contribution line", () => {
+    expect(asSpokenContribution({ ...line })).toEqual(line);
+  });
+
+  it("ignores every other stage in the file", () => {
+    expect(asSpokenContribution({ stage: "turn_final", atMs: 1 })).toBeNull();
+    expect(asSpokenContribution({ stage: "board_complete", atMs: 1 })).toBeNull();
+  });
+
+  it("drops a kind this version does not know rather than guessing", () => {
+    expect(asSpokenContribution({ ...line, kind: "serenade" })).toBeNull();
+  });
+
+  it("drops a line missing what the scoring reads", () => {
+    const { atMs, ...noTime } = line;
+    expect(atMs).toBe(90_000);
+    expect(asSpokenContribution(noTime)).toBeNull();
+    expect(asSpokenContribution({ ...line, spoken: "yes" })).toBeNull();
+    expect(asSpokenContribution(null)).toBeNull();
+    expect(asSpokenContribution("spoken_contribution")).toBeNull();
+  });
+});
+
+describe("isUnpromptedKind", () => {
+  it("is every kind but the one the room asked for", () => {
+    const unprompted = spokenContributionKinds.filter(isUnpromptedKind);
+    expect(unprompted).not.toContain("called_on");
+    expect(unprompted).toHaveLength(spokenContributionKinds.length - 1);
+  });
+});
+
+describe("spokenTurnId", () => {
+  it("is the transcript row of a first attempt", () => {
+    expect(spokenTurnId(line)).toBe(sottoTurnId(spokenUtteranceId("answer", "idea-1")));
+  });
+
+  it("stays on the first attempt's row for the yield that ended it", () => {
+    expect(spokenTurnId({ ...line, yielded: true, yields: 1 })).toBe(spokenTurnId(line));
+  });
+
+  it("moves to the retry's own row, which is numbered from two", () => {
+    expect(spokenTurnId({ ...line, yields: 1 })).toBe(sottoTurnId("answer-idea-1-2"));
+  });
+});
+
+describe("estimateSpokenMs", () => {
+  it("reads at the rate the hello was measured at", () => {
+    // 361 characters of hello took 18.4 s in Sotto's own voice (V3-012).
+    expect(estimateSpokenMs("x".repeat(361)) / 1000).toBeCloseTo(18.4, 1);
+    expect(estimateSpokenMs("x".repeat(Math.round(SPOKEN_CHARS_PER_SECOND * 5)))).toBe(5_000);
+  });
+
+  it("is zero for nothing", () => {
+    expect(estimateSpokenMs("   ")).toBe(0);
+  });
+});

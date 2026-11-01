@@ -27,10 +27,12 @@ import type {
   E2eLatency,
   E2eObserved,
   MomentLatency,
+  SpokenMomentOutcome,
   Stamped,
 } from "../../shared/e2e.js";
-import type { MomentRecord } from "../../shared/eval.js";
-import { deliveredForMoment, type E2eCheckInput } from "./checks.js";
+import type { MomentRecord, SpokenRecord } from "../../shared/eval.js";
+import { isUnpromptedSpeech } from "../eval/spoken.js";
+import { deliveredForMoment, spokenFrom, type E2eCheckInput } from "./checks.js";
 
 /**
  * How far ahead of the audio timeline the wall clock ran, in ms.
@@ -128,6 +130,41 @@ export function voiceLatency(files: E2eFiles): Pick<E2eLatency, "ackMs" | "first
 }
 
 /**
+ * What Sotto said about one planted moment, and when (V3-010).
+ *
+ * Structural, like {@link momentLatency}: the line about this moment is the
+ * one whose question turn is one of the moment's own turns, which is what ties
+ * a spoken answer to the thing the room wondered. Both ends are on the
+ * transcription stream's timeline — Sotto's transcript row carries stream time
+ * and the window came from the turns the scripted lines produced — so nothing
+ * is mapped onto the wall here, and the number is directly comparable to the
+ * eval's.
+ */
+export function spokenMomentOutcome(
+  moment: MomentRecord,
+  spoken: readonly SpokenRecord[],
+): SpokenMomentOutcome {
+  const cited = new Set([...moment.setupTurnIds, ...moment.triggerTurnIds]);
+  const about = spoken.filter(
+    (one) => isUnpromptedSpeech(one) && cited.has(one.record.turnId),
+  );
+  const claim = about.find((one) => one.record.kind === "reserve");
+  const said = about.find((one) => one.record.kind !== "reserve");
+  const from = moment.triggerTurnEndMs;
+  return {
+    momentId: moment.id,
+    spokenId: said?.id ?? null,
+    kind: said?.record.kind ?? null,
+    afterTriggerMs: gap(from, said?.atStreamMs ?? null),
+    beforeDeadline:
+      said?.atStreamMs === undefined || said.atStreamMs === null || moment.deadlineTurnEndMs === null
+        ? null
+        : said.atStreamMs <= moment.deadlineTurnEndMs,
+    reservedAfterMs: gap(from, claim?.atStreamMs ?? null),
+  };
+}
+
+/**
  * Every latency one fixture's run can be asked for.
  *
  * A `research_hook` moment is left out of the moment latencies: it is caught
@@ -137,11 +174,19 @@ export function voiceLatency(files: E2eFiles): Pick<E2eLatency, "ackMs" | "first
  * every run. The research card times are reported on their own line instead.
  */
 export function fixtureLatency(input: E2eCheckInput): E2eLatency {
+  const spoken = spokenFrom(input);
   return {
     ...answerLatency(input.observed),
     ...voiceLatency(input.files),
     moments: input.moments
-      .filter((moment) => moment.expectedLevel !== "research")
+      // A `research_hook` is caught by a research card or by Sotto saying the
+      // answer (V3-010), never by a policy card citing turns, so there is
+      // nothing structural here to match it to a moment by. Its times are on
+      // the research line and in `spokenMoments`.
+      .filter((moment) => moment.type !== "research_hook")
       .map((moment) => momentLatency(input, moment)),
+    spokenMoments: input.moments
+      .filter((moment) => moment.expectedLevel === "speak")
+      .map((moment) => spokenMomentOutcome(moment, spoken)),
   };
 }

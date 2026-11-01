@@ -24,6 +24,7 @@
  * in.
  */
 import type { Candidate, CandidateType } from "../../shared/candidates.js";
+import type { ReadBackAttachment } from "../../shared/spoken.js";
 
 /**
  * How long a read-back is still worth saying (PRD V3-013): twenty seconds.
@@ -42,8 +43,8 @@ export const READBACK_COOLDOWN_MS = 5 * 60_000;
 export const ATTACHED_COOLDOWN_MS = 10 * 60_000;
 
 /** What a read-back carries besides the decision, when it carries anything. */
-export const readBackAttachments = ["group", "own"] as const;
-export type ReadBackAttachment = (typeof readBackAttachments)[number];
+export { readBackAttachments } from "../../shared/spoken.js";
+export type { ReadBackAttachment } from "../../shared/spoken.js";
 
 /**
  * The room's own unsettled business, which Sotto may quote back out loud.

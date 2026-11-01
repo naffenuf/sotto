@@ -147,5 +147,18 @@
     }
   ],
   "wakeQuestions": [],
-  "moments": []
+  "moments": [
+    {
+      "id": "loom-pricing-open-question",
+      "type": "research_hook",
+      "setupLines": [
+        12,
+        13
+      ],
+      "triggerLine": 17,
+      "deadlineLine": 20,
+      "expectedLevel": "speak",
+      "description": "The positive control in a conversation of rhetorical questions (V3-002): having agreed to replace the status meeting with a written update (lines 12 and 13), Craig asks at line 17 what Loom actually charges per seat. It is a real question with a looked-up answer — EJ says at line 18 that he has no idea — and at line 19 the group writes video off as \"a maybe, not a plan\" for want of the number, confirming the written-first decision at line 20. Sotto should say the price out loud inside that window; every other question in this script is one it must say nothing about."
+    }
+  ]
 }

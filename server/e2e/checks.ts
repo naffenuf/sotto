@@ -24,8 +24,9 @@ import type {
   Stamped,
 } from "../../shared/e2e.js";
 import { QUESTION_FIXTURE, RESEARCH_FIXTURE } from "../../shared/e2e.js";
-import type { MomentRecord } from "../../shared/eval.js";
+import type { MomentRecord, SpokenRecord } from "../../shared/eval.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
+import { isUnpromptedSpeech, spokenRecords } from "../eval/spoken.js";
 
 /** Everything one fixture's checks are decided from. */
 export interface E2eCheckInput {
@@ -279,11 +280,21 @@ export function candidateIdOf(cardId: string): string {
 /** `brainstorm`: nothing worth raising a hand for, so no hand is raised. */
 function quietChecks(input: E2eCheckInput): E2eCheck[] {
   const loud = interjections(input.observed).filter((card) => card.variant === "interject");
+  // V3-010: and nothing worth *saying*, which on a conversation with no
+  // planted moment is false speech by definition — there is nothing here for
+  // a sentence to be about.
+  const said = spokenFrom(input).filter(isUnpromptedSpeech);
   return [
     check(
       "no interjections",
       loud.length === 0,
       loud.map((card) => JSON.stringify(card.headline)).join(", ") || "none",
+    ),
+    check(
+      "no false speech",
+      said.length === 0,
+      said.map((one) => `${one.record.kind}: ${JSON.stringify(one.record.text)}`).join(", ") ||
+        "nothing said unprompted",
     ),
   ];
 }
@@ -486,9 +497,61 @@ function researchChecks(input: E2eCheckInput): E2eCheck[] {
   ];
 }
 
+/**
+ * Every unprompted line, placed in the conversation (V3-010).
+ *
+ * The same module `npm run eval` scores with, which is the point of the
+ * criterion: the rules are one implementation and only the clock differs.
+ * Everything is placed on the transcription stream's timeline, off Sotto's own
+ * transcript rows, so nothing here needs {@link onWall}.
+ */
+export function spokenFrom(input: E2eCheckInput): SpokenRecord[] {
+  return spokenRecords({
+    records: input.files.spoken,
+    turns: input.observed.turns.map((stamped) => stamped.value),
+    sottoTurns: input.observed.sottoTurns.map((stamped) => stamped.value),
+  });
+}
+
+/**
+ * The two rules about unprompted speech that must hold in every conversation
+ * (V3-010), measured in real time rather than in a replay.
+ *
+ * Recall is *reported* rather than checked, as moment latency already is
+ * (V2-021): whether a particular planted question got its sentence depends on
+ * a search coming back and the room leaving a gap, and a run that reports
+ * "card only" is telling the truth rather than failing. What is gated is the
+ * harm — Sotto talking into a sentence, or over one.
+ */
+function speechChecks(input: E2eCheckInput): E2eCheck[] {
+  const heard = spokenFrom(input).filter(isUnpromptedSpeech);
+  const placed = heard.filter((one) => one.inPause !== null);
+  const outside = placed.filter((one) => one.inPause === false);
+  const over = heard.filter((one) => one.overTurnId !== null);
+  return [
+    check(
+      "unprompted speech in a pause",
+      outside.length === 0,
+      heard.length === 0
+        ? "nothing was said unprompted"
+        : `${placed.length - outside.length}/${placed.length} in a pause` +
+          (outside.length === 0
+            ? ""
+            : `; ${outside.map((one) => JSON.stringify(one.record.text)).join(", ")}`),
+    ),
+    check(
+      "nothing spoken over a human turn",
+      over.length === 0,
+      over.length === 0
+        ? `${heard.length} unprompted line(s), none talked over`
+        : over.map((one) => `${one.record.kind} over ${one.overTurnId}`).join(", "),
+    ),
+  ];
+}
+
 /** Every check for one fixture, in the order a reader wants them. */
 export function checkFixture(input: E2eCheckInput): E2eCheck[] {
-  const checks = [...commonChecks(input), ...boardChecks(input)];
+  const checks = [...commonChecks(input), ...speechChecks(input), ...boardChecks(input)];
   switch (input.observed.fixture) {
     case "brainstorm":
       return [...checks, ...quietChecks(input)];

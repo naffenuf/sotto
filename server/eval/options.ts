@@ -26,11 +26,14 @@ export const V2_EVAL_FIXTURES = ["research-business-idea", "offsite-plan"] as co
  * The conversations the harness measures: the quiet ones, the moments, and the
  * two v2 conversations.
  *
- * `rhetorical-questions` (V3-002) is a quiet one in the same sense
- * `brainstorm` is: it plants no moment, and its job is to be a conversation
- * full of questions Sotto must say nothing about. `decision-closings`
- * (V3-013) is the opposite: three decisions settled out loud, two of them
- * with something unsettled hanging off them.
+ * `rhetorical-questions` (V3-002) is a quiet one in the sense that matters:
+ * its job is to be a conversation full of questions Sotto must say nothing
+ * about, and it is one of the three the false-speech gate is measured on
+ * (V3-010). The one real lookup in the middle of it is a planted `speak`
+ * moment — the positive control, so that "said nothing" and "noticed nothing"
+ * are different results. `decision-closings` (V3-013) is the opposite: three
+ * decisions settled out loud, two of them with something unsettled hanging
+ * off them.
  */
 export function isEvalFixture(name: string): boolean {
   return (

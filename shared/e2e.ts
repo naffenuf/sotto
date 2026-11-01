@@ -18,8 +18,9 @@ import type { AnswerLogRecord } from "./answers.js";
 import type { Board } from "./board.js";
 import type { DecisionLogRecord } from "./candidates.js";
 import type { StageCard } from "./cards.js";
-import type { MomentRecord, RunTokenUsage } from "./eval.js";
+import type { MomentRecord, RunTokenUsage, SpokenRecord } from "./eval.js";
 import type { ResearchLogLine } from "./research.js";
+import type { SpokenContributionKind, SpokenContributionRecord } from "./spoken.js";
 import type { SessionRecord } from "./session.js";
 import type { TurnUpdate } from "./turns.js";
 
@@ -131,6 +132,14 @@ export interface E2eFiles {
   artifactHtml: Record<string, string>;
   /** `research.jsonl`, parsed: the ideas, the verdicts and the packets (V2-021). */
   research: ResearchLogLine[];
+  /**
+   * The `spoken_contribution` lines of `timing.jsonl` (V3-010).
+   *
+   * The only record of what Sotto said unasked and of what it decided against
+   * saying, which is why the end-to-end check reads it: this is the one clock
+   * that charges a spoken line for the seconds it waited.
+   */
+  spoken: SpokenContributionRecord[];
   /** File names in `research/`: one `.json` and one `.md` per packet (FR-V9). */
   researchFiles: string[];
 }
@@ -171,6 +180,32 @@ export interface E2eLatency {
   /** The question arriving → the first audio of the answer itself, in real ms. */
   firstAudioMs: number | null;
   moments: MomentLatency[];
+  /** What became of each moment Sotto was meant to speak about (V3-010). */
+  spokenMoments: SpokenMomentOutcome[];
+}
+
+/**
+ * One planted `speak` moment, as a live run scored it (V3-010).
+ *
+ * Structural rather than judged, like every other end-to-end assertion: the
+ * line Sotto said about this moment is the one whose question turn is one of
+ * the moment's own, which is the same rule {@link MomentLatency} uses for a
+ * card. Everything here is on the transcription stream's timeline, because
+ * that is the only clock a spoken line and a scripted line share — Sotto's
+ * transcript row carries stream time and a planted window is resolved from
+ * the turns the script's lines produced.
+ */
+export interface SpokenMomentOutcome {
+  momentId: string;
+  /** The spoken line that caught it, or `null` if nothing was said about it. */
+  spokenId: string | null;
+  kind: SpokenContributionKind | null;
+  /** The trigger turn's end to Sotto's first word. */
+  afterTriggerMs: number | null;
+  /** Whether it landed before the deadline line finished. */
+  beforeDeadline: boolean | null;
+  /** The same for the claim Sotto made first, if it made one (V3-015). */
+  reservedAfterMs: number | null;
 }
 
 /**
@@ -238,6 +273,8 @@ export interface E2eFixtureReport {
   moments: MomentRecord[];
   /** What the research pipeline did (V2-021). All zeros for most fixtures. */
   research: E2eResearch;
+  /** Every unprompted line, placed in the conversation (V3-010). */
+  spoken: SpokenRecord[];
   /** What was spoken, and what it is billed as (V2-021). */
   voice: VoiceSpend;
   /**

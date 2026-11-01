@@ -6,7 +6,11 @@ import type { DecisionLogRecord } from "../../shared/candidates.js";
 import type { ResearchLogLine, ResearchPacket } from "../../shared/research.js";
 import type { StageCard } from "../../shared/cards.js";
 import { FREQUENCY_LIMITS } from "../../shared/policy.js";
-import type { TurnUpdate } from "../../shared/turns.js";
+import {
+  SPOKEN_CONTRIBUTION_STAGE,
+  type SpokenContributionRecord,
+} from "../../shared/spoken.js";
+import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { PAUSE_MS } from "../interject/policy.js";
 import { SESSION_FILES } from "../session/SessionStore.js";
@@ -16,9 +20,11 @@ import {
   deliveriesFrom,
   readCandidateLog,
   readResearchLog,
+  readSpokenLog,
   replayFixture,
   researchFrom,
   runFixture,
+  spokenFrom,
   type ReplayResult,
 } from "./runner.js";
 
@@ -184,6 +190,7 @@ describe("deliveriesFrom", () => {
   function result(partial: Partial<ReplayResult>): ReplayResult {
     return {
       turns,
+      sottoTurns: [],
       cards: [],
       sessionDir: null,
       durationMs: 9_000,
@@ -191,6 +198,7 @@ describe("deliveriesFrom", () => {
       decisions: 0,
       gateCalls: [],
       researchLog: [],
+      spokenLog: [],
       delivered: new Map(),
       ...partial,
     };
@@ -362,6 +370,7 @@ describe("readResearchLog and researchFrom", () => {
   function replay(lines: ResearchLogLine[]): ReplayResult {
     return {
       turns: [turn("0:0", 1_000, 4_000), turn("0:1", 6_000, 9_000)],
+      sottoTurns: [],
       cards: [],
       sessionDir: null,
       durationMs: 9_000,
@@ -369,6 +378,7 @@ describe("readResearchLog and researchFrom", () => {
       decisions: 0,
       gateCalls: [],
       researchLog: lines,
+      spokenLog: [],
       delivered: new Map(),
     };
   }
@@ -481,5 +491,102 @@ describe("readResearchLog and researchFrom", () => {
         "About $2bn in 2025.\n\n- two vendors hold most of it\n- clinics are a small slice",
       whyNow: "how big is the market?",
     });
+  });
+});
+
+/**
+ * Reading unprompted speech back off the session folder (PRD V3-010).
+ *
+ * `timing.jsonl` is the pipeline's whole diary — two dozen stages, written as
+ * `unknown` — so what is checked here is that the reader takes exactly the
+ * `spoken_contribution` lines out of it, in order, and places each against
+ * the turns the replay produced.
+ */
+describe("readSpokenLog", () => {
+  function spokenLine(
+    overrides: Partial<SpokenContributionRecord> = {},
+  ): SpokenContributionRecord {
+    return {
+      stage: SPOKEN_CONTRIBUTION_STAGE,
+      kind: "reserve",
+      atMs: 60_000,
+      ideaId: "idea-1",
+      turnId: "0:7",
+      topic: "the drive time",
+      spoken: true,
+      text: "I'll check the drive time.",
+      questionToReserveMs: 2_400,
+      ...overrides,
+    };
+  }
+
+  function write(lines: unknown[]): string {
+    const dir = join(root, "session");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, SESSION_FILES.timing),
+      `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`,
+    );
+    return dir;
+  }
+
+  it("takes the spoken lines out of the diary and leaves the rest", () => {
+    const dir = write([
+      { stage: "turn_final", atMs: 59_000, turnId: "0:7" },
+      spokenLine(),
+      { stage: "board_complete", atMs: 61_000 },
+      spokenLine({ kind: "answer", atMs: 81_000, text: "About two hours fifteen." }),
+    ]);
+    const log = readSpokenLog(dir);
+    expect(log.map((one) => one.kind)).toEqual(["reserve", "answer"]);
+  });
+
+  it("is empty for a session with no folder and for one that said nothing", () => {
+    expect(readSpokenLog(null)).toEqual([]);
+    expect(readSpokenLog(root)).toEqual([]);
+  });
+
+  it("drops a line from a version of the pipeline this one does not know", () => {
+    const dir = write([spokenLine({ kind: "serenade" as never }), spokenLine()]);
+    expect(readSpokenLog(dir)).toHaveLength(1);
+  });
+
+  it("places each line against the turns, in log order", () => {
+    const claim = spokenLine();
+    const replay: ReplayResult = {
+      turns: [
+        {
+          turnId: "0:7",
+          speaker: "A",
+          text: "and I have no idea how long the drive is",
+          final: true,
+          startMs: 4_000,
+          endMs: 9_000,
+          speakerMappingUncertain: false,
+        },
+      ],
+      sottoTurns: [
+        sottoTurn({
+          utteranceId: "reserve-idea-1",
+          text: claim.text,
+          startMs: 7_000,
+          interrupted: false,
+        }),
+      ],
+      cards: [],
+      sessionDir: null,
+      durationMs: 9_000,
+      candidates: 0,
+      decisions: 0,
+      gateCalls: [],
+      researchLog: [],
+      spokenLog: [claim],
+      delivered: new Map(),
+    };
+    const [one] = spokenFrom(replay);
+    expect(one?.id).toBe("spoken-0");
+    expect(one?.atStreamMs).toBe(7_000);
+    // The room was still mid-turn at 7s, so Sotto spoke into it.
+    expect(one?.inPause).toBe(false);
   });
 });

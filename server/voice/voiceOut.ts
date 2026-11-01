@@ -14,6 +14,9 @@
  * ElevenLabs socket with the audio thrown away, which is what an integration
  * test and the end-to-end check speak through — the timings and the
  * spoken-so-far tracking are real, only the speakers are missing.
+ * {@link transcriptOnlyVoice} is one step further out, for the `max`-speed
+ * eval (V3-010): nothing is synthesized at all, so the decisions are real and
+ * there is no audio and no bill.
  */
 import type { VoiceSpend } from "../../shared/e2e.js";
 import type { SpeechEndReason, Speaker } from "./Speaker.js";
@@ -118,6 +121,54 @@ export function nullSinkVoice(create: () => Speaker): VoiceOut {
               firstAudioMs: result.firstAudioMs,
             };
           }),
+      };
+    },
+  };
+}
+
+/**
+ * A voice that says nothing and reports the words as entirely heard (V3-010).
+ *
+ * The instrument the `max`-speed eval speaks through. It exists because a
+ * replay with *no* voice is not a quiet Sotto, it is a Sotto that cannot
+ * speak: `begin()` resolving `null` means "nobody would hear this", so every
+ * unprompted line would be written off as `unheard` and the whole of V3's main
+ * form would be unmeasurable. With this one the decisions are real — the gap
+ * was found, the frequency's allowance was spent, Sotto's line went into the
+ * transcript and onto the board — and nothing is synthesized.
+ *
+ * What it deliberately cannot measure is anything about sound: there is no
+ * first audio, no alignment and no playback to report, which is honest rather
+ * than lossy, because simulated time does not move inside a tracked call and
+ * a replay's synthesis latencies would be fiction. `npm run e2e` is the clock
+ * that charges for those, through {@link nullSinkVoice} against real
+ * ElevenLabs.
+ *
+ * A cancelled utterance reports nothing heard, as the null sink does: audio
+ * having been generated is not the same as anybody having heard it, and here
+ * none was.
+ */
+export function transcriptOnlyVoice(): VoiceOut {
+  let nextId = 0;
+  return {
+    async begin(): Promise<VoiceUtterance | null> {
+      let said = "";
+      let cancelled = false;
+      return {
+        id: `silent-${++nextId}`,
+        append: (text) => {
+          if (!cancelled) said += text;
+        },
+        cancel: () => {
+          cancelled = true;
+        },
+        firstAudioMs: () => null,
+        finish: async () => ({
+          reason: cancelled ? "cancelled" : "complete",
+          text: said,
+          spokenSoFar: cancelled ? "" : said,
+          firstAudioMs: null,
+        }),
       };
     },
   };

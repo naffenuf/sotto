@@ -23,13 +23,19 @@
 import { z } from "zod";
 import type { SpeakerNames } from "../../shared/events.js";
 import { clipWords } from "../../shared/candidates.js";
+import { stillCurrentVerdicts } from "../../shared/spoken.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import type { ModelClient } from "../model/client.js";
 import { loadPrompt, PROMPTS } from "../prompts/index.js";
 
-/** What the turns since the question say about saying the answer now. */
-export const stillCurrentVerdicts = ["current", "answered", "moved_on"] as const;
-export type StillCurrentVerdict = (typeof stillCurrentVerdicts)[number];
+/**
+ * What the turns since the question say about saying the answer now.
+ *
+ * In `shared/spoken.ts` because the record a spoken line writes carries the
+ * verdict it was decided on, and the eval reads that record back (V3-010).
+ */
+export { stillCurrentVerdicts } from "../../shared/spoken.js";
+export type { StillCurrentVerdict } from "../../shared/spoken.js";
 
 /** Words of the one-line reason, which is for the log rather than the room. */
 export const STILL_CURRENT_WHY_MAX_WORDS = 15;

@@ -30,7 +30,9 @@ import type {
   MomentRecord,
   ResearchDeliveryRecord,
   ResearchRunRecord,
+  SpokenRecord,
 } from "../../shared/eval.js";
+import { asSpokenContribution, type SpokenContributionRecord } from "../../shared/spoken.js";
 import type { DeliveredLevel, PolicySettings } from "../../shared/policy.js";
 import {
   researchCardHeadline,
@@ -42,10 +44,16 @@ import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { EventBus } from "../events/bus.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
 import { candidateScore, inPause } from "../interject/policy.js";
-import type { GlimmerClientFactory, ModelClientFactory } from "../session/SessionManager.js";
+import type {
+  GlimmerClientFactory,
+  ModelClientFactory,
+  VoiceFactory,
+} from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { SESSION_FILES, SessionStore } from "../session/SessionStore.js";
+import { transcriptOnlyVoice } from "../voice/voiceOut.js";
 import { loadScript, resolveMoments } from "./moments.js";
+import { isUnpromptedSpeech, spokenRecords } from "./spoken.js";
 import { pauseAt, turnIntervals } from "./pause.js";
 import type { Judge, JudgeCard } from "./judge.js";
 
@@ -70,12 +78,25 @@ export interface ReplayOptions {
    * `scripts/eval.ts` passes {@link glimmerFromEnv} in.
    */
   createGlimmer?: GlimmerClientFactory;
+  /**
+   * Sotto's voice (V3-010). Defaults to {@link transcriptOnlyVoice}: a replay
+   * with *no* voice is not a quiet Sotto but one that cannot speak, so every
+   * unprompted line would be `unheard` and V3's main form unmeasurable. It
+   * synthesizes nothing, which is why `npm run eval` still makes no ElevenLabs
+   * call; `npm run e2e` is where real speech is paid for.
+   */
+  createVoice?: VoiceFactory;
   logger?: Logger;
 }
 
 /** What one replay produced, before any judging. */
 export interface ReplayResult {
   turns: TurnUpdate[];
+  /**
+   * Sotto's own transcript rows (V2-008a), kept apart from the room's: they
+   * are what place an unprompted line on the conversation's timeline (V3-010).
+   */
+  sottoTurns: TurnUpdate[];
   cards: StageCard[];
   sessionDir: string | null;
   /** The conversation's length on the session clock. */
@@ -86,6 +107,8 @@ export interface ReplayResult {
   gateCalls: GateCallRecord[];
   /** `research.jsonl`, parsed: the ideas, the verdicts, the packets, the cards. */
   researchLog: ResearchLogLine[];
+  /** The `spoken_contribution` lines of `timing.jsonl` (V3-010), in log order. */
+  spokenLog: SpokenContributionRecord[];
   /** The policy's own decision, by candidate id, for the ones it delivered. */
   delivered: Map<string, DecisionLogRecord>;
 }
@@ -106,6 +129,7 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     ...(options.apiKey === undefined ? {} : { apiKey: options.apiKey }),
     ...(options.createModel === undefined ? {} : { createModel: options.createModel }),
     ...(options.createGlimmer === undefined ? {} : { createGlimmer: options.createGlimmer }),
+    createVoice: options.createVoice ?? (() => transcriptOnlyVoice()),
     logger,
     replaySpeed: "max",
     settings: options.settings,
@@ -118,13 +142,16 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
   });
 
   const turns: TurnUpdate[] = [];
+  const sottoTurns: TurnUpdate[] = [];
   const cards: StageCard[] = [];
   const ended = new Promise<void>((resolve) => {
     const off = bus.subscribe((event) => {
       // V2-008a: Sotto's own lines are in the transcript, not the conversation
       // a moment was planted in; scoring and the pause reconstruction read
       // only what the room said.
-      if (event.type === "turn" && !isSottoTurn(event.turn)) turns.push(event.turn);
+      if (event.type === "turn") {
+        (isSottoTurn(event.turn) ? sottoTurns : turns).push(event.turn);
+      }
       // A card with an id already on the stage replaces it: an interjection
       // is delivered once, but the rule is the stage's, so follow it here too.
       if (event.type === "card") {
@@ -144,6 +171,7 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
   const log = readCandidateLog(sessionDir);
   return {
     turns,
+    sottoTurns,
     cards,
     sessionDir,
     durationMs: Math.max(0, ...turns.map((turn) => turn.endMs ?? turn.startMs)),
@@ -151,6 +179,7 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     decisions: log.filter((line) => line.kind === "decision").length,
     gateCalls: gateCallsFrom(log),
     researchLog: readResearchLog(sessionDir),
+    spokenLog: readSpokenLog(sessionDir),
     delivered: deliveredDecisions(log),
   };
 }
@@ -174,6 +203,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
     decisions: 0,
     gateCalls: [],
     deliveries: [],
+    spoken: [],
     moments: [],
     matches: [],
   } satisfies Omit<FixtureRunRecord, "elapsedMs">;
@@ -190,8 +220,9 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
   const finals = replay.turns.filter((turn) => turn.final);
   const deliveries = deliveriesFrom(replay);
   const research = researchFrom(replay);
+  const spoken = spokenFrom(replay);
   const moments = resolveMoments(options.fixture, finals);
-  const matches = await judgeAll(options, deliveries, research.cards, moments);
+  const matches = await judgeAll(options, deliveries, research.cards, spoken, moments);
 
   return {
     fixture: options.fixture,
@@ -204,6 +235,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
     gateCalls: replay.gateCalls,
     deliveries,
     research,
+    spoken,
     moments,
     matches,
     elapsedMs: Date.now() - startedAt,
@@ -224,25 +256,65 @@ async function judgeAll(
   options: RunFixtureOptions,
   deliveries: readonly DeliveryRecord[],
   researchCards: readonly ResearchDeliveryRecord[],
+  spoken: readonly SpokenRecord[],
   moments: readonly MomentRecord[],
 ): Promise<JudgeMatchRecord[]> {
   const judge = options.judge;
   if (judge === undefined || moments.length === 0) return [];
-  if (deliveries.length === 0 && researchCards.length === 0) return [];
+  // V3-010: speech is judged against every moment of the fixture, not only
+  // the ones that expect it, because "an unprompted utterance that matches no
+  // moment" is what the false-speech gate is defined on — a sentence that
+  // raised the planted contradiction is not false speech even where a card
+  // was what the script asked for.
+  const said = spoken.filter(isUnpromptedSpeech).map(asSpokenJudgeCard);
+  if (deliveries.length === 0 && researchCards.length === 0 && said.length === 0) return [];
   const script = loadScript(options.fixture);
   const matches: JudgeMatchRecord[] = [];
   for (const moment of script.moments) {
     const cards =
-      moment.expectedLevel === "research"
-        ? researchCards.map(asJudgeCard)
-        : deliveries;
-    for (const delivery of cards) {
+      moment.type === "research_hook" ? researchCards.map(asJudgeCard) : deliveries;
+    for (const delivery of [...said, ...cards]) {
       matches.push(
         await judge.judge({ fixture: options.fixture, moment, script, delivery }),
       );
     }
   }
   return matches;
+}
+
+/**
+ * One spoken line as the judge reads it.
+ *
+ * The sentence Sotto said is the headline, because that is all a person in
+ * the room got: there is no detail behind it and no card to open. "Why now" is
+ * the topic the classifier named (V3-002), which is the nearest thing a
+ * spoken line has to a reason for existing.
+ */
+export function asSpokenJudgeCard(one: SpokenRecord): JudgeCard {
+  return {
+    cardId: one.id,
+    headline: one.record.text,
+    detail: "",
+    whyNow: one.record.topic,
+  };
+}
+
+/**
+ * Every unprompted line, placed in the conversation (V3-010).
+ *
+ * Off `timing.jsonl` and Sotto's own transcript rows, never off the stage:
+ * speech leaves no card, and the row is the only record that something
+ * reported playing it.
+ */
+export function spokenFrom(replay: ReplayResult): SpokenRecord[] {
+  return spokenRecords({
+    records: replay.spokenLog,
+    turns: replay.turns,
+    sottoTurns: replay.sottoTurns,
+    // A `max` replay spends no simulated time speaking, so whether Sotto
+    // carried on over somebody is not a thing this clock can tell (V3-010).
+    speechTakesTime: false,
+  });
 }
 
 /**
@@ -305,6 +377,20 @@ function deliveredLevel(variant: StageCard["variant"]): DeliveredLevel | null {
 /** `candidates.jsonl`, parsed. An unreadable or absent log is an empty one. */
 export function readCandidateLog(sessionDir: string | null): CandidateLogLine[] {
   return readJsonlLog<CandidateLogLine>(sessionDir, SESSION_FILES.candidates);
+}
+
+/**
+ * The `spoken_contribution` lines of `timing.jsonl` (V3-010), in log order.
+ *
+ * `timing.jsonl` is written as `unknown` and carries two dozen other stages,
+ * so every line goes through {@link asSpokenContribution} — a line whose
+ * `kind` is not one this version knows is dropped rather than guessed at.
+ */
+export function readSpokenLog(sessionDir: string | null): SpokenContributionRecord[] {
+  return readJsonlLog<unknown>(sessionDir, SESSION_FILES.timing).flatMap((line) => {
+    const record = asSpokenContribution(line);
+    return record === null ? [] : [record];
+  });
 }
 
 /** `research.jsonl`, parsed (V2-019). Empty for a session that searched nothing. */

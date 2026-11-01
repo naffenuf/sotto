@@ -25,6 +25,7 @@
  * cost judgment rather than speech.
  */
 import type { SpeakerNames } from "../../shared/events.js";
+import type { StillCurrentState } from "../../shared/spoken.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { systemClock, type Clock } from "../clock.js";
 import {
@@ -41,18 +42,13 @@ export const STILL_CURRENT_TIMEOUT_MS = 8_000;
 /** Turns the check is given. Enough to see the subject change, and no more. */
 export const STILL_CURRENT_CONTEXT_TURNS = 8;
 
-/** The cached answer about one waiting answer. */
-export interface StillCurrentState {
-  verdict: StillCurrentVerdict;
-  /** Whether a person's own answer agrees; only an `answered` verdict has one. */
-  agrees: boolean;
-  /** Real milliseconds the call that produced it took; 0 when no call was made. */
-  latencyMs: number;
-  /** True when the verdict is the default rather than a model's. */
-  fallback: boolean;
-  /** How many turns the verdict was made over. */
-  turns: number;
-}
+/**
+ * The cached answer about one waiting answer.
+ *
+ * Shared (`shared/spoken.ts`) because a spoken line records the verdict it was
+ * decided on and the eval scores that record (V3-010).
+ */
+export type { StillCurrentState } from "../../shared/spoken.js";
 
 /** What is being watched: one question, and the answer Sotto found for it. */
 interface Watched {

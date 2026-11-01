@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { CandidateGateWhere, CandidateType, GateMode } from "./candidates.js";
 import type { ExpectedLevel, MomentType } from "./fixtures.js";
 import type { DecisionReason, DeliveredLevel, PolicySettings } from "./policy.js";
+import type { SpokenContributionRecord } from "./spoken.js";
 import type { PauseState } from "./turns.js";
 
 /** The `json_schema.name` a judge request sends. */
@@ -69,15 +70,17 @@ export const judgeMatchJsonSchema = {
 } as const;
 
 /**
- * The level a card the harness scored went out at.
+ * The level a thing the harness scored went out at.
  *
  * A policy delivery is a `glow` or an `interject` (V2-017's {@link
  * DeliveredLevel}); a research-ready card (V2-014) is neither — nothing about
  * it is a decision to take the floor — so it has its own level here, which is
- * also the level a `research_hook` moment expects. One type so a moment's
- * outcome can name what caught it, whichever half of the stage it came from.
+ * also the level a `research_hook` moment expects. `speak` is V3-010's: Sotto
+ * said it out loud, which is the level above every card. One type so a
+ * moment's outcome can name what caught it, whichever half of the stage — or
+ * of the room — it came from.
  */
-export type ScoredLevel = DeliveredLevel | "research";
+export type ScoredLevel = DeliveredLevel | "research" | "speak";
 
 /** One card Sotto put on the stage during a replay. */
 export interface DeliveryRecord {
@@ -186,6 +189,64 @@ export interface ResearchRunRecord {
 }
 
 /**
+ * One unprompted line Sotto said, or gave up on saying, placed in the
+ * conversation (V3-010).
+ *
+ * Read back off `timing.jsonl`'s `spoken_contribution` records rather than off
+ * the bus, because most of what the scoring needs is a decision nothing
+ * publishes: what was said, whether anybody heard it, what the still-current
+ * check thought, how long it waited for a pause and how many times the room
+ * talked over it.
+ *
+ * Everything placed in time here is on the **transcription stream's**
+ * timeline, off Sotto's own transcript row (V2-008a) — never off
+ * {@link SpokenContributionRecord.atMs}, which is the session clock and in a
+ * live session counts from the start of the process. That is what lets one
+ * scoring module serve both the `max`-speed eval and the real-time `npm run
+ * e2e`.
+ */
+export interface SpokenRecord {
+  /** What the judge and the report know it by: `spoken-<n>`, in log order. */
+  id: string;
+  /** The log line, exactly as the session folder carries it. */
+  record: SpokenContributionRecord;
+  /** Where the line started, on the stream clock; `null` if nothing was heard. */
+  atStreamMs: number | null;
+  /**
+   * Where it is estimated to have finished (`shared/spoken.ts`'s measured
+   * reading rate). Nothing records where speech stopped, and this exists only
+   * so "Sotto carried on over somebody" can be read off the transcript.
+   */
+  endsAtStreamMs: number | null;
+  /**
+   * Whether the room was quiet enough for this kind of line when it started,
+   * reconstructed from the turns rather than taken from Sotto's own word —
+   * the same rule a {@link DeliveryRecord}'s `inPause` follows. `null` when
+   * nothing was heard, so there is nothing to place.
+   */
+  inPause: boolean | null;
+  pause: PauseState | null;
+  /**
+   * A turn of the room's that started while Sotto was still talking, with no
+   * yield logged: the one thing V3-004 promises never happens. `null` is the
+   * good case — and also what a harness that cannot tell reports; see
+   * {@link overrunMeasured}.
+   */
+  overTurnId: string | null;
+  /**
+   * Whether this run could tell at all.
+   *
+   * False in a `max` replay, and not as a caveat: simulated time does not
+   * move while an utterance is being said, so every line lands at the instant
+   * the question did and the room's next scripted turn always appears to
+   * start mid-sentence. Only a real-time run (`npm run e2e`, a live session)
+   * spends the seconds Sotto spends talking, so only there does "it carried
+   * on over somebody" mean anything.
+   */
+  overrunMeasured: boolean;
+}
+
+/**
  * One planted moment, with its window resolved onto both timelines.
  *
  * The scripted times come from `<fixture>.timing.json` and are positions in
@@ -290,6 +351,11 @@ export interface FixtureRunRecord {
    * it, and on a replay whose session folder could not be read back.
    */
   research?: ResearchRunRecord;
+  /**
+   * Every unprompted line Sotto said or gave up on saying (V3-010), oldest
+   * first. Absent on runs recorded before it.
+   */
+  spoken?: SpokenRecord[];
   moments: MomentRecord[];
   /** Every (delivery, moment) pair the judge looked at. */
   matches: JudgeMatchRecord[];
