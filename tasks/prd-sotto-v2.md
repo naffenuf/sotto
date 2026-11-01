@@ -164,6 +164,35 @@ Ordered by dependency. Each should fit in one loop iteration.
 - [ ] Typecheck passes
 - [ ] Verify in browser using webapp-testing skill (dev voice route or a replayed answer: the Sotto line appears with its style; a stopped utterance shows only the heard part)
 
+### V2-008b: Faster response to being addressed
+**Description:** As a user, when I say "Sotto, …", I want the acknowledgment to come right after I stop talking, not 4 seconds later.
+
+Measured at the V2-008 retest: name to "Mm-hm" was about 4 s. End-of-speech detection is about 0.5 s, transcription lag about 0.65 s, the Spark address check 2.6–3.3 s (the biggest piece), and the acknowledgment 0.25–0.5 s.
+
+**Acceptance Criteria:**
+- [ ] When a partial turn contains the name (the existing word check) and its text has settled (for example, unchanged for about 300 ms, or a few words after the name), the Spark address check starts **on the partial** rather than waiting for the final turn. At most one early check is in flight per turn.
+- [ ] When the turn goes final: if the final text only extends the partial that was checked, the early result is reused; otherwise the final is checked again. Mentions never acknowledge. `name_only` arming works as before.
+- [ ] The acknowledgment plays as soon as the turn is final and the result is `request`. It **never** plays while the person is still talking.
+- [ ] Target: the turn's end-of-speech arrival to the first acknowledgment audio ≤ 1.5 s when the early check has finished. `timing.jsonl` records `address_early` (started, reused or rechecked) and `speechEndToAckMs`.
+- [ ] Barge-in during playback is unchanged
+- [ ] Offline tests with a fake classifier on the simulated clock: early start, reuse, recheck on a changed final, no acknowledgment while speaking, mention, `name_only`
+- [ ] Typecheck passes
+
+### V2-008c: First line while researching
+**Description:** As a user, when Sotto has to search before answering, I want it to start talking sensibly right away instead of leaving a long silence after "Let me check."
+
+Measured: acknowledgment to first real sentence was 8–13 s on searched answers, of which only about 2.5 s was the search itself.
+
+**Acceptance Criteria:**
+- [ ] For a question likely to need search, the answer pipeline starts a fast **conversation-only first line** in parallel with the searched answer: Muse Spark, no tools, low reasoning. It's grounded only in the conversation and Sotto's general knowledge, and makes **no specific factual claims that need the search** (no figures, dates or quotes). For example: "The 2019 Outback is mostly solid, but there are a couple of known weak spots worth checking. Let me pull the specifics."
+- [ ] Spoken after the acknowledgment. The searched answer continues from it without repeating it: it gets the first line as context.
+- [ ] If the searched answer's first sentence is ready before the first line, the first line is skipped
+- [ ] Both are one utterance for barge-in and `spokenSoFar`: an interruption cancels both and records what was heard across the two
+- [ ] The card is unchanged (headline, detail, sources from the searched answer). The spoken transcript of the answer includes both parts.
+- [ ] Target: acknowledgment to first real sentence ≤ 4 s on search questions. `answers.jsonl` records `firstLineMs` and the continuation's first audio.
+- [ ] Offline tests on the simulated clock (ordering, skip when the answer is first, cancellation across both). An integration probe measures the real timing on a search question.
+- [ ] Typecheck passes
+
 ### V2-009: Opening hello and introductions
 **Description:** As a group, we want Sotto to introduce itself and learn who's here, so it feels like a participant and not a hidden recorder.
 

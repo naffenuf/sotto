@@ -160,6 +160,41 @@
       "notes": ""
     },
     {
+      "id": "V2-008b",
+      "title": "Faster response to being addressed",
+      "description": "As a user, when I say \"Sotto, ...\", I want the acknowledgment right after I stop talking, not 4 seconds later.",
+      "acceptanceCriteria": [
+        "When a partial with the name (existing word check) has settled, start the Spark address check on the partial; at most one early check in flight per turn",
+        "On the final turn, reuse the early result if the final only extends the checked partial, else recheck; mentions never acknowledge; name_only arming unchanged",
+        "Acknowledgment plays as soon as the turn is final and the result is request, never while the person is still talking",
+        "Target: speechEnd arrival to first acknowledgment audio <= 1.5 s when the early check finished; timing.jsonl records address_early (started/reused/rechecked) and speechEndToAckMs",
+        "Barge-in during playback unchanged",
+        "Offline simulated-clock tests with a fake classifier: early start, reuse, recheck on changed final, no ack while speaking, mention, name_only",
+        "Typecheck passes"
+      ],
+      "priority": 8.6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "V2-008c",
+      "title": "First line while researching",
+      "description": "As a user, when Sotto has to search, I want it to start talking sensibly right away instead of a long silence after the acknowledgment.",
+      "acceptanceCriteria": [
+        "For a question likely to need search, start a fast conversation-only first line in parallel (Muse Spark, no tools, low reasoning), grounded in the conversation and general knowledge, with no specific claims that need the search (no figures, dates, quotes)",
+        "Spoken after the acknowledgment; the searched answer continues from it without repeating it (it gets the first line as context)",
+        "If the searched answer's first sentence is ready first, skip the first line",
+        "First line and continuation are one utterance for barge-in and spokenSoFar",
+        "Card unchanged (from the searched answer); the spoken transcript of the answer includes both parts",
+        "Target: acknowledgment to first real sentence <= 4 s on search questions; answers.jsonl records firstLineMs and the continuation's first audio",
+        "Offline simulated-clock tests (ordering, skip when the answer comes first, cancellation across both) plus an integration probe of real timing on a search question",
+        "Typecheck passes"
+      ],
+      "priority": 8.7,
+      "passes": false,
+      "notes": ""
+    },
+    {
       "id": "V2-009",
       "title": "Opening hello and introductions",
       "description": "As a group, we want Sotto to introduce itself and learn who's here, so it feels like a participant and not a hidden recorder.",
