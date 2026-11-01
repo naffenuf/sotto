@@ -8,7 +8,7 @@
 # Earlier logs are archived: ralph/archive/2026-10-31-sotto-core/ (US-001..US-028) and
 # ralph/archive/2026-11-01-sotto-v2/ (V2-001..V2-021, including V2-008a/b/c).
 # Build order follows priority, not story number (PRD revised 2026-11-01): V3-001, 002, 003, 015, 004,
-# 006, 012, 008, 013, 010, 016, then the V3-011 human checkpoint, then 014, 005, 007, 009.
+# 006, 012, 008, 013, 017, 010, 016, then the V3-011 human checkpoint, then 014, 005, 007, 009.
 
 
 [2026-11-01 06:36] V3-001 — completed — the judgment gate splits: Spark (i.e. the observer's

@@ -218,3 +218,27 @@ seconds.
 `server/interject/CandidateGate.ts`, `server/e2e/options.ts` (`--gate`),
 `server/eval/score.ts` (`scoreResearchGate`), `server/eval/report.ts`
 (the two headline rows), PRD V3-001.
+
+---
+
+## 2026-11-01 — Related work, and two ideas taken from it
+
+**What changed:** [`prd-sotto-v3.md`](prd-sotto-v3.md) gains a "Related work"
+section and V3-017 (a raised hand, and being called on); V3-009 and V3-012 are
+extended; `ralph/prd.json` is regenerated with V3-001's result preserved.
+
+**Why:** a survey of Meet Live Assist (Krystian Gwizdała's Chrome extension
+that hands Meet captions to your own Claude Code session and advises one
+person in a side panel), AWS Live Meeting Assistant, AgentCall, Hedy,
+Fireflies Live Assist, Otter's Meeting Agent, CoAgentor, Relly and the Sun
+voice API. None of them is in-room, and none publishes a theory of when to
+speak or measures it, which is Sotto's claim. Two of their ideas were worth
+having: CoAgentor's **hand-raise mode** is the safe route for every
+correction Sotto decides not to say (visible, callable, never forced), and
+Meet Live Assist's **corrections against your own records** ("that date is
+inside the freeze") land where corrections against general knowledge do not,
+so a file-backed `factual_error` is the one correction spoken at default
+settings. Relly's "any participant can silence it" is now in the hello.
+
+**Where it lives:** the PRD's "Related work", V3-017, V3-009, V3-012,
+FR-V3-9/10 and the build order.

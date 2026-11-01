@@ -82,6 +82,18 @@ answer is ready 31–37 s after the question, before any pause is waited for, an
 cannot be hit by any prompt. So an open question is noticed the way an address is (V2-008): a cheap
 lexical filter on the final turn, then one Spark call. The observer never sees `open_question`.
 
+## Related work (2026-11-01)
+
+Nothing here is first to "an AI that participates in meetings": Otter's Meeting Agent (voice, on "Hey
+Otter"), CoAgentor (persona agents with keyword triggers and Live / Hand-raise / Silent modes), Relly
+(a voice-first participant that researches and drafts unprompted) and the Sun voice API (multi-party
+rooms, a 20 s no-wake-word follow-up window) all ship or market it, and Meet Live Assist, Hedy and
+Fireflies Live Assist are private copilots that show one person what to say. What none of them
+publishes is a theory of **when** to speak and a measurement of it: recall, false speech, pause hits,
+yields, cost per conversation. That is Sotto's claim and the demo's story. Two of their ideas are
+taken here: CoAgentor's hand-raise mode (V3-017) and Meet Live Assist's corrections grounded in the
+group's own records (V3-009). The hello says anyone can quiet Sotto (V3-012), as Relly's does.
+
 ## Goals
 
 - Sotto speaks up unprompted, and is **welcome**: the live checkpoint asks "would you leave it on?"
@@ -190,7 +202,7 @@ lexical filter on the final turn, then one Spark call. The observer never sees `
 **Description:** As a user, I want Sotto to tell us up front that it may chime in, and how to stop it.
 
 **Acceptance Criteria:**
-- [ ] `server/prompts/hello.md` adds, in one sentence, that Sotto may chime in when the group wonders something it can look up, that it will stop if anyone starts talking, and that "Sotto, not now" quiets it for the rest of the meeting
+- [ ] `server/prompts/hello.md` adds, in one sentence, that Sotto may chime in when the group wonders something it can look up, that it will stop if anyone starts talking, and that **anyone** can say "Sotto, not now" to quiet it for the rest of the meeting
 - [ ] The hello stays under about 20 s spoken (measured from a real render)
 - [ ] Typecheck passes
 
@@ -200,6 +212,7 @@ lexical filter on the final turn, then one Spark call. The observer never sees `
 **Acceptance Criteria:**
 - [ ] `contradiction`, `factual_error`, `untested_assumption`, `dropped_thread` and `unanswered_question` are delivered as cards only, in every mode, with two exceptions: the group's own unsettled question attached to a read-back (V3-013), and a **verified** `factual_error` at boldness `bold`, which may be spoken in one sentence under the V3-004 pause, still-current, yield and expiry rules
 - [ ] **Corrections become questions everywhere.** Card text for `contradiction`, `untested_assumption` and `dropped_thread` is phrased as a specific question tied to what was said ("Before six gardens: what if only one signs up?"), not an assertion. The observer prompt gives good and bad examples; generic coach-speak ("Have you considered your audience?") is a named bad example
+- [ ] A correction card Sotto has not spoken raises its hand (V3-017): the stage shows that Sotto has something, and anyone can call on it
 - [ ] The interjection eval gates are unchanged (they measure deliveries, not speech)
 - [ ] Tests pass
 - [ ] Typecheck passes
@@ -216,6 +229,18 @@ lexical filter on the final turn, then one Spark call. The observer never sees `
 - [ ] Fixture work: add planted decision moments to existing or new fixtures, some where the group itself raised and dropped a risk (a read-back with the group's question expected, `expectedLevel: "speak"`), some where only Sotto would see a risk (a card expected, nothing spoken at default settings) and some with no risk (nothing or a bare read-back). Integration test (events replay): the first gets the question, the second gets the card and no speech, the third and `brainstorm` get nothing attached
 - [ ] Tests pass
 - [ ] Typecheck passes
+
+### V3-017: Raising a hand, and being called on
+**Description:** As a user, when Sotto has something it has decided not to say out loud, I want to see that it has something, and to be able to call on it, the way a host calls on a quiet participant, so that nothing Sotto holds back is lost and nothing is forced on us.
+
+**Acceptance Criteria:**
+- [ ] Whenever a card Sotto has not spoken is on the stage and still current (a glow or interject card, a research card, a correction attached to a read-back, an answer that became card-only under V3-004), the header shows a **raised hand** beside the status dots, with a count. It clears when every such card has been opened, spoken or has expired. No sound, no modal
+- [ ] **Calling on Sotto.** "Sotto, go ahead", "Sotto, what have you got?", "Sotto?" on its own while the hand is raised, and similar, are classified by the V2-008 address classifier as a new kind, `call_on`, and Sotto speaks the most recent raised card: an interjection's headline and detail, a research packet's `spokenAnswer` or a V2-015 briefing, a correction's question. Spoken as an answer to a direct question (wake-word barge-in, not yield), since the room asked. With nothing raised, `call_on` is answered with a short "Nothing right now."
+- [ ] A called-on card does not count against the frequency budget: the room asked for it. It is logged as `spoken_contribution` with `kind: "called_on"` and the card id
+- [ ] The raised hand is the route by which Sotto's own corrections (V3-008) reach the room's ears at default settings: never unprompted, always on request
+- [ ] Offline tests: hand up on a held card, down when opened/spoken/expired, `call_on` with one card, with several (most recent), with none
+- [ ] Typecheck passes
+- [ ] Verify in browser using webapp-testing skill (`/dev/cards` shows the raised hand with a count; a mocked `/ws/events` clears it)
 
 ### V3-010: Eval for unprompted speech
 **Description:** As the developer, I need to measure unprompted speech the way the interjection eval measures cards.
@@ -243,7 +268,7 @@ lexical filter on the final turn, then one Spark call. The observer never sees `
 **Acceptance Criteria:**
 - [ ] The loop does not start this or any later story until `tasks/checkpoint-speaking.md` exists
 - [ ] Before the session, a human has read the V3-016 shadow report and written verdicts in it
-- [ ] A human runs a live session of about 10 minutes, with two people if possible (a phone voice as a stand-in otherwise): wonder aloud about things that can be looked up, ask rhetorical questions, answer a question yourselves before Sotto does, start talking while Sotto is mid-sentence and confirm it stops, settle a decision after one of you raised a risk and dropped it, settle one with no risk, tell Sotto "not now" once, and talk over it twice to see the frequency drop. Also cover the deferred V2-008 checks (side talk during Sotto's speech, two people talking at once). Follow-ups without the wake word (V3-014) and offers (V3-005) are built after this checkpoint and aren't tested here
+- [ ] A human runs a live session of about 10 minutes, with two people if possible (a phone voice as a stand-in otherwise): wonder aloud about things that can be looked up, ask rhetorical questions, answer a question yourselves before Sotto does, start talking while Sotto is mid-sentence and confirm it stops, settle a decision after one of you raised a risk and dropped it, settle one with no risk, tell Sotto "not now" once, talk over it twice to see the frequency drop, and call on it once while its hand is raised. Also cover the deferred V2-008 checks (side talk during Sotto's speech, two people talking at once). Follow-ups without the wake word (V3-014) and offers (V3-005) are built after this checkpoint and aren't tested here
 - [ ] `tasks/checkpoint-speaking.md` records, for each unprompted contribution: what was said, whether it was welcome, its timing, whether it yielded cleanly, and any false or late ones, then **"Would you leave it on?"** and `RESULT: PASS` or `RESULT: FAIL` with notes
 - [ ] On FAIL: fix the listed problems in this iteration, commit, rename the file to `tasks/checkpoint-speaking-fail-<n>.md` (so the loop stops again for a retest), and leave `passes` false with notes. On PASS: set `passes` true and summarize
 
@@ -293,6 +318,8 @@ lexical filter on the final turn, then one Spark call. The observer never sees `
 - [ ] The research runner gets a `search_knowledge` tool next to `web_search`, and cites files as sources (`file: customers.csv`)
 - [ ] `fixtures/knowledge-demo/` holds a small fictional company (a customer list with renewal dates, a price sheet, notes), clearly labelled fictional, for the demo and tests
 - [ ] Integration test: an open question about a customer's renewal date is answered from the folder with a file citation
+- [ ] **A correction from the group's own files is the group's own words.** The verifier (US-013) checks a `factual_error` against the knowledge folder before the web, and a claim contradicted by one of the group's files ("the price sheet has that at $49") is spoken at boldness `normal` under the V3-004 rules, phrased as the file's and cited by name, because a group's own record quoted back is the same move as the read-back and lands the same way. A web-verified error still follows V3-008 (`bold` only)
+- [ ] The V3-016 shadow report and V3-011 checkpoint note any file-backed correction separately, since it is the one correction spoken at default settings
 - [ ] Typecheck passes
 
 ## Build order
@@ -310,10 +337,11 @@ is tested:
 7. V3-012 the hello
 8. V3-008 corrections on screen, phrased as questions
 9. V3-013 read-backs and attached questions
-10. V3-010 eval for unprompted speech
-11. V3-016 shadow run on a real conversation
-12. **V3-011 live checkpoint** (the loop stops here)
-13. V3-014 follow-ups without the wake word, V3-005 offers, V3-007 stall ideas,
+10. V3-017 raising a hand, and being called on
+11. V3-010 eval for unprompted speech
+12. V3-016 shadow run on a real conversation
+13. **V3-011 live checkpoint** (the loop stops here)
+14. V3-014 follow-ups without the wake word, V3-005 offers, V3-007 stall ideas,
     V3-009 knowledge folder (stretch)
 
 V3-014 moved from before the checkpoint to after it: it is the highest false-positive risk in the plan
@@ -329,7 +357,8 @@ V3-014 moved from before the checkpoint to after it: it is the highest false-pos
 - FR-V3-6: Spark makes time-critical judgments (question classification, interjections, still-current checks, offer replies); Glimmer judges research ideas
 - FR-V3-7: After Sotto answers, follow-ups need no wake word until the humans resume. When unsure whether it's being addressed, Sotto stays quiet
 - FR-V3-8: Unprompted speech never addresses a person by name, and never asks the room a question it has to answer, except the group's own question quoted back at a decision
-- FR-V3-9: Sotto's own judgments (contradictions, untested assumptions) are never spoken unprompted at default settings
+- FR-V3-9: Sotto's own judgments (contradictions, untested assumptions) are never spoken unprompted at default settings; they raise a hand, and the room calls on them
+- FR-V3-10: Anything Sotto holds back is visible as a raised hand and can be asked for by voice, outside the frequency budget
 
 ## Non-Goals
 
