@@ -880,3 +880,24 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   is not at the end (the same move `renameSpeaker` makes), and `withTurn` in
   `useSessionEvents.ts` inserts by `startMs` — a no-op for the room's turns, which arrive in order.
   Sotto is never added to `record.speakers`, so nothing offers to rename it.
+
+- **The complete question is known while the speaker is still talking, and that is where the address
+  check belongs.** V2-008b starts the Spark classification on a *partial*: four words after the name
+  (`ADDRESS_EARLY_WORDS`), or 600 ms of unchanged text (`ADDRESS_SETTLE_MS`) for turns that never
+  reach four. Both numbers are measured off the captures rather than guessed: mid-speech partials
+  arrive a median 310 ms apart (p75 482, p90 641), so the obvious 300 ms settle fires mid-sentence,
+  and the *last* partial of a turn — which carries the complete text in 270 of 273 turns — lands only
+  a median 882 ms before `speechEnd` arrives, so no settle rule can cover a 2.5 s check. Four words
+  after the name is reached 1.8–4.9 s ahead. Real Spark on the four wake captures: the final turn
+  waits **0.07–0.69 ms** for a verdict that took 1.9–3.0 s. A reuse keeps the **verdict**, never the
+  wording — an extended request re-derives its question from the final text through
+  `questionAfterName` (the loose reading `detect` refuses: any whole-word spelling anywhere, minus
+  possessives and `voce`) — and a `name_only` is rechecked on *any* extension, because the request is
+  the rest of the sentence and reusing it would arm the speaker and answer nothing.
+- **A fake clock where every wait is instant does not test what it looks like it tests.**
+  `instantWallClock` in `SessionManager.test.ts` fires a timer's callback in a microtask after adding
+  its delay to `now()`, so the address check's six-second deadline expired before the model could
+  answer and the `ask-search` answer test had been exercising the lexical fallback
+  (`latencyMs: 6000, fallback: true`) rather than the classifier. A `max` replay spends no wall time
+  pacing, so such a test can simply take `systemClock` and still run in 400 ms; only a `1x` replay
+  needs the instant one.

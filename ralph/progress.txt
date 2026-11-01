@@ -273,3 +273,43 @@
   NEXT: V2-008b (faster acknowledgment — start the Spark address check on the settled partial) is
   the lowest unfinished priority. V2-008c follows it. The checkpoint's deferred two-person checks
   are not a blocker for either.
+
+[2026-10-31 23:40] V2-008b — completed — the address check runs on a partial; the final reuses it.
+  AddressWatcher starts the Spark check while the person is still talking: ADDRESS_EARLY_WORDS (4)
+  words after the name, else ADDRESS_SETTLE_MS (600 ms) of unchanged text for turns that never reach
+  four. One check in flight per turn; the final turn reuses the verdict instead of calling again.
+  Measured first, off the captures (free, no API): mid-speech partials arrive a median 310 ms apart
+  (p75 482, p90 641), so the PRD's example 300 ms settle fires mid-sentence; and the last partial of
+  a turn — which carries the complete text in 270 of 273 turns — lands only a median 882 ms before
+  speechEnd arrives, so no settle rule can ever cover a 2.5 s check. Four words after the name is
+  reached 1,752–4,865 ms ahead on all six captured named turns, which is what makes the target
+  reachable. Real Spark, four wake captures: started 2.0–4.9 s early, took 1,895–2,986 ms, final
+  waited 0.07–0.69 ms. So speechEnd → first ack audio is now the acknowledgment synthesis alone
+  (461 ms measured in V2-005), well inside 1.5 s.
+  THE RULE THAT MATTERS: a reuse keeps the verdict, never the wording. An extended request re-derives
+  its question from the final text through the new wake.questionAfterName (loose — any whole-word
+  spelling anywhere, skipping possessives and "voce" — because detect() refuses a name mid-sentence),
+  which is why ask-diagram (+8 words) and offsite-plan (+11) are answered whole. name_only is
+  rechecked on ANY extension, because the request is the rest of the sentence and reusing it would
+  arm the speaker and answer nothing; a mention is rechecked past ADDRESS_EXTENSION_WORDS (3), since
+  nothing waits on a mention. A final that is not a prefix extension is rechecked.
+  timing.jsonl: address_early (started | reused | rechecked, with extraWords/earlyMs/waitedMs) and
+  answer_voice (ackMs, firstAudioMs, speechEndToAskMs, speechEndToAckMs, speechEndToAnswerMs).
+  speechEnd's real time is read off the closing partial (endMs set while final is still false) and
+  travels as WakeTrigger.heardAtMs → AskedQuestion.heardAtMs → AnswerAgent.recordVoiceLatency.
+  Checked: npm run typecheck, npm test (63 files, 862 tests), npm run build, and
+  npx vitest run --config vitest.integration.config.ts server/answer/address.integration.test.ts
+  (real Spark; 20/21 — see the flake below). No microphone, no speakers, no browser check (the story
+  has no UI criterion).
+  WATCH OUT: server/session/SessionManager.test.ts's instantWallClock fires a 6 s timeout in a
+  microtask, so the ask-search answer test had been timing every address classification out and
+  silently testing the lexical fallback (latencyMs 6000, fallback true). That one test now takes
+  systemClock as its wall clock — a max replay spends no wall time pacing, so it still runs in
+  ~400 ms. Any new test that cares about a wall-clock deadline needs the same.
+  PRE-EXISTING FLAKE, not from this story: the integration case previous "EJ: Soto" + "never mind"
+  came back request once (5,963 ms) and mention on a rerun (4,333 ms). Model non-determinism on the
+  hardest of the fifteen checkpoint cases; classifyAddress and address.md are untouched.
+  NEXT: V2-008c (first line while researching) is the lowest unfinished priority, then V2-009.
+  V2-008c should reuse the same promise chain SpokenAnswer already runs on, and note that
+  AnswerAgent.ask() now carries heardAtMs, so its "acknowledgment to first real sentence" target can
+  be logged off the same answer_voice record.
