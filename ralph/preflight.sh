@@ -18,14 +18,24 @@ echo "Repo:"
 check "git repo"            "git -C '$PROJECT_DIR' rev-parse HEAD"         "git init and make an initial commit"
 check ".env has MODEL_API_KEY" "grep -qE '^MODEL_API_KEY=.+' '$PROJECT_DIR/.env'" "cp .env.example .env and add the Meta Model API key"
 check ".env has ELEVENLABS_API_KEY" "grep -qE '^ELEVENLABS_API_KEY=.+' '$PROJECT_DIR/.env'" "add the ElevenLabs API key to .env"
-# Glimmer is a warning, not a failure: voice stories come first, and V2-010 marks itself blocked without it
+# Glimmer is a warning, not a failure: a session that cannot reach it judges
+# with Muse Spark instead (V2-010), it just does so in the cloud.
 GLIMMER_URL=$(grep -E '^GLIMMER_BASE_URL=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2- || true)
-if [[ -z "$GLIMMER_URL" ]]; then
-  echo "  WARN     GLIMMER_BASE_URL not set in .env (needed from V2-010; see tasks/prd-sotto-v2.md Prerequisites)"
-elif curl -sf --max-time 5 "$GLIMMER_URL/models" >/dev/null; then
-  echo "  ok       Glimmer endpoint $GLIMMER_URL"
+GLIMMER_MODEL=$(grep -E '^GLIMMER_MODEL=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2- || true)
+if [[ -z "$GLIMMER_URL" || -z "$GLIMMER_MODEL" ]]; then
+  echo "  WARN     GLIMMER_BASE_URL/GLIMMER_MODEL not set in .env (judgment calls fall back to Muse Spark; see tasks/prd-sotto-v2.md Prerequisites)"
 else
-  echo "  WARN     Glimmer endpoint $GLIMMER_URL not answering (needed from V2-010)"
+  # A trivial *structured* request, not just a models listing: the thing a
+  # judgment role needs is grammar-constrained JSON back. A cold load is ~44 s
+  # on this Mac, and paying it here leaves the model warm for the loop.
+  glimmer_started=$SECONDS
+  glimmer_out=$(curl -sf --max-time 90 "$GLIMMER_URL/chat/completions"     -H 'Content-Type: application/json'     -d "{\"model\":\"$GLIMMER_MODEL\",\"max_tokens\":512,\"reasoning_effort\":\"low\",\"keep_alive\":\"30m\",\"messages\":[{\"role\":\"system\",\"content\":\"Reply with the JSON object the schema describes.\"},{\"role\":\"user\",\"content\":\"Say that you are ready.\"}],\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"glimmer_preflight\",\"strict\":true,\"schema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"ready\"],\"properties\":{\"ready\":{\"type\":\"boolean\"}}}}}}"     2>/dev/null || true)
+  glimmer_ready=$(printf '%s' "$glimmer_out" | jq -r '.choices[0].message.content // ""' 2>/dev/null | jq -r '.ready // empty' 2>/dev/null || true)
+  if [[ "$glimmer_ready" == "true" || "$glimmer_ready" == "false" ]]; then
+    echo "  ok       Glimmer $GLIMMER_MODEL answered structured JSON in $((SECONDS - glimmer_started))s"
+  else
+    echo "  WARN     Glimmer at $GLIMMER_URL did not answer a structured request (judgment calls fall back to Muse Spark)"
+  fi
 fi
 if [[ -n "$(git -C "$PROJECT_DIR" status --porcelain)" ]]; then echo "  note     uncommitted changes present; the next iteration will salvage or discard them"; fi
 if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then echo "  WARN     ANTHROPIC_API_KEY is set in this shell; ralph.sh strips it before calling claude"; fi

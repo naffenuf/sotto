@@ -4,7 +4,7 @@
  * The server publishes to an in-process bus (`server/events/bus.ts`) and each
  * attached socket gets the events as JSON lines. A socket that attaches part
  * way through a session is caught up first with the bus's remembered state
- * (the three statuses, the running session, the speaker names, the board, the
+ * (the four statuses, the running session, the speaker names, the board, the
  * settings, whether somebody is addressing Sotto, and every card it has put
  * up), so the UI never has to poll.
  */
@@ -15,7 +15,7 @@ import type { StageCard } from "./cards.js";
 import type { VoiceState } from "./voice.js";
 
 /**
- * The three things the header shows a dot for.
+ * The four things the header shows a dot for.
  *
  * - `server`: this server is up and the events socket is attached.
  * - `transcription`: turns are arriving — from the realtime API for a `wav` or
@@ -23,8 +23,13 @@ import type { VoiceState } from "./voice.js";
  * - `model`: a model client is configured, so the board, observer and answers
  *   (US-009 onwards) can call Muse Spark. `connecting` means a call is in
  *   flight — a board update, say — not that the client is still starting up.
+ * - `judgment`: where the short, private judgment calls are running (V2-010).
+ *   `connecting` while the session is checking, then `active` with a `detail`
+ *   of `local` (Muse Glimmer on this Mac) or `cloud` (Muse Spark, because
+ *   Glimmer is not there). Both are working states, which is why the detail
+ *   rather than the state is what the dot reads out.
  */
-export const statusChannels = ["server", "transcription", "model"] as const;
+export const statusChannels = ["server", "transcription", "model", "judgment"] as const;
 export type StatusChannel = (typeof statusChannels)[number];
 
 /**

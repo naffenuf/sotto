@@ -59,6 +59,8 @@ import { InterjectionPolicy, type Interjection } from "../interject/Interjection
 import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
+import type { GlimmerClient } from "../model/GlimmerClient.js";
+import { JudgmentRouter } from "../model/judgment.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
@@ -131,6 +133,13 @@ export type VoiceFactory = () => VoiceOut | null;
  */
 export type ModelClientFactory = () => ModelClient | null;
 
+/**
+ * Builds the local judgment model (V2-010), or returns `null` when Glimmer is
+ * not configured. A `null` is not a failure: the session's judgment calls go
+ * to Muse Spark instead, which is what the header's judgment dot reports.
+ */
+export type GlimmerClientFactory = () => GlimmerClient | null;
+
 /** A start that can't happen, with the HTTP status the route should answer. */
 export class SessionStartError extends Error {
   constructor(
@@ -152,6 +161,13 @@ export interface SessionManagerOptions {
   createStore?: SessionStoreFactory;
   /** Makes the model client. Defaults to Muse Spark when there is an API key. */
   createModel?: ModelClientFactory;
+  /**
+   * Makes the local judgment model (V2-010). Defaults to none, so a
+   * SessionManager built without one judges with Muse Spark and `npm test`
+   * never dials the local server; `server/app.ts` passes
+   * {@link glimmerFromEnv}.
+   */
+  createGlimmer?: GlimmerClientFactory;
   /**
    * The voice answers are spoken with (V2-005). Defaults to none, so a
    * SessionManager built without one answers on screen only; `server/app.ts`
@@ -191,6 +207,11 @@ interface StoreSlot {
 interface ModelLoops {
   /** Shared Spark client for final-turn addressing (V2-008). */
   modelClient: ModelClient | null;
+  /**
+   * Which model the session's judgment calls go to (V2-010). Built even when
+   * there is no model client at all, so the dot tells the truth either way.
+   */
+  judgment: JudgmentRouter;
   /** Retired with the session so late classifications cannot restart speech. */
   address?: AddressWatcher;
   board: BoardUpdater | null;
@@ -251,6 +272,8 @@ export type AskOutcome = "asked" | "no-session" | "no-model";
 interface RunningSession {
   /** V2-008: final-turn addressing has its own bounded asynchronous work. */
   address?: AddressWatcher;
+  /** Where this session's judgment calls run: local Glimmer or Spark (V2-010). */
+  judgment: JudgmentRouter;
   info: SessionInfo;
   assembler: SessionTranscription;
   store: StoreSlot;
@@ -296,6 +319,7 @@ export class SessionManager {
   private readonly createAsrClient: AsrClientFactory;
   private readonly createStore: SessionStoreFactory;
   private readonly createModel: ModelClientFactory;
+  private readonly createGlimmer: GlimmerClientFactory;
   private readonly createVoice: VoiceFactory;
   private readonly liveClock: Clock;
   private readonly wallClock: Clock;
@@ -331,6 +355,11 @@ export class SessionManager {
         this.apiKey === undefined || this.apiKey === ""
           ? null
           : new MuseClient({ apiKey: this.apiKey, logger: this.logger }));
+    // Defaults to none, like `createVoice`: a SessionManager built without
+    // one judges in the cloud, which is what keeps `npm test` off the local
+    // server as surely as it is off the network. `server/app.ts` passes
+    // {@link glimmerFromEnv}.
+    this.createGlimmer = options.createGlimmer ?? ((): GlimmerClient | null => null);
     this.createVoice = options.createVoice ?? ((): VoiceOut | null => null);
     // V2-006: playback can end after generation, with no new ASR frame to
     // re-check held cards. The bus has already folded the voice state here.
@@ -450,6 +479,11 @@ export class SessionManager {
     this.bus.setSession(info);
     this.bus.setStatus("transcription", ...running.transcription);
     this.bus.setStatus("model", ...running.model);
+    // V2-010: which model judges is the answer to a health check, so the dot
+    // says "checking" until it comes back. Nothing waits for it — a judgment
+    // role awaits `judgment.client()` instead.
+    this.bus.setStatus("judgment", "connecting");
+    void running.judgment.check();
     this.watch(running);
     // After the `session` event, which is what clears the stage: a card
     // published before it would be swept away by its own session (V2-009).
@@ -469,12 +503,14 @@ export class SessionManager {
     running.stopRequested = true;
     running.address?.stop();
     running.greeting?.stop();
+    running.judgment.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
     running.stop();
     // The UI asked for idle, so say idle now; the drain below is cleanup.
     this.bus.setStatus("transcription", "idle");
     this.bus.setStatus("model", "idle");
+    this.bus.setStatus("judgment", "idle");
     this.bus.setSession(null);
     await this.drain(running);
     return true;
@@ -847,12 +883,16 @@ export class SessionManager {
     voice: VoiceOut | null,
   ): ModelLoops {
     const model = this.createModel();
+    // Built either way: judgment is its own model (V2-010), and a session
+    // with no Muse Spark key can still have Glimmer on this Mac.
+    const judgment = this.judgmentRouter(info, model);
     if (model === null) {
       this.logger.warn(
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
       );
       return {
         modelClient: null,
+        judgment,
         board: null,
         observer: null,
         verifier: null,
@@ -953,7 +993,28 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { modelClient: model, board, observer, verifier, policy, answers, deliveries };
+    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries };
+  }
+
+  /**
+   * Decides where this session's judgment calls run (V2-010).
+   *
+   * The check itself is started by {@link SessionManager.start}, after the
+   * session is published, so the dot can go from "checking" to `local` or
+   * `cloud` while nothing waits. A verdict that lands after this session has
+   * gone changes no dot — the same guard every per-callback bus write uses.
+   */
+  private judgmentRouter(info: SessionInfo, spark: ModelClient | null): JudgmentRouter {
+    return new JudgmentRouter({
+      glimmer: this.createGlimmer(),
+      spark,
+      logger: this.logger,
+      onWhere: (where) => {
+        if (this.current?.info.id !== info.id) return;
+        if (where === null) this.bus.setStatus("judgment", "error");
+        else this.bus.setStatus("judgment", "active", where);
+      },
+    });
   }
 
   /**
@@ -1162,6 +1223,7 @@ export class SessionManager {
     running.policy?.stop();
     running.address?.stop();
     running.greeting?.stop();
+    running.judgment.stop();
     // Not `running.answers`: a question typed after Stop is answered against
     // the conversation that just ended (US-019), so the agent is only
     // retired when the next session supersedes it.
@@ -1178,6 +1240,7 @@ export class SessionManager {
 
     if (wasCurrent) {
       this.bus.setStatus("model", "idle");
+      this.bus.setStatus("judgment", "idle");
       this.bus.setSession(null);
     }
   }

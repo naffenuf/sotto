@@ -91,7 +91,12 @@ function idle(channel: StatusChannel): StatusUpdate {
 const initial: SessionEventsState = {
   voice: silentVoice(),
   connected: false,
-  statuses: { server: idle("server"), transcription: idle("transcription"), model: idle("model") },
+  statuses: {
+    server: idle("server"),
+    transcription: idle("transcription"),
+    model: idle("model"),
+    judgment: idle("judgment"),
+  },
   session: null,
   turns: [],
   speakers: {},

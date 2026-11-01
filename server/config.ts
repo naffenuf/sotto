@@ -59,6 +59,28 @@ export function loadElevenLabsApiKey(env: NodeJS.ProcessEnv = process.env): stri
   return key;
 }
 
+/** Where Muse Glimmer is served, when it is (V2-010). */
+export interface GlimmerConfig {
+  /** `GLIMMER_BASE_URL`, e.g. `http://127.0.0.1:11434/v1`, without a trailing slash. */
+  baseUrl: string;
+  /** `GLIMMER_MODEL`, e.g. `muse-glimmer:30b-q4_K_M`. */
+  model: string;
+}
+
+/**
+ * Loads `.env` and returns where Glimmer is, or `null` when either variable
+ * is missing. Unlike the two API keys this is *optional*: Glimmer is a local
+ * server that may not be running, and a session without it judges with Muse
+ * Spark instead (see {@link JudgmentRouter}), so there is no error to throw.
+ */
+export function loadGlimmerConfig(env: NodeJS.ProcessEnv = process.env): GlimmerConfig | null {
+  loadDotenv({ quiet: true });
+  const baseUrl = (env.GLIMMER_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  const model = (env.GLIMMER_MODEL ?? "").trim();
+  if (baseUrl === "" || model === "") return null;
+  return { baseUrl, model };
+}
+
 /**
  * The ElevenLabs voice Sotto speaks with: `ELEVENLABS_VOICE_ID` when set,
  * otherwise {@link DEFAULT_SOTTO_VOICE_ID}. A voice id is configuration rather

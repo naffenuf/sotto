@@ -31,6 +31,7 @@ import { emptyModel } from "../test/emptyModel.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import type { VoiceOut, VoiceUtterance } from "../voice/voiceOut.js";
+import type { GlimmerClient } from "../model/GlimmerClient.js";
 
 const quiet = { log: () => {}, warn: () => {}, error: () => {} };
 
@@ -149,6 +150,26 @@ function harness(options: { apiKey?: string; client?: (c: FakeAsrClient) => void
         });
       }),
   };
+}
+
+/**
+ * Glimmer, down to the two methods a session touches (V2-010). `npm test`
+ * never dials the local server, so the health answer is canned.
+ */
+function fakeGlimmer(ok: boolean): GlimmerClient & { warmed: () => number } {
+  let warmed = 0;
+  return {
+    warmed: () => warmed,
+    health: async () => ({
+      ok,
+      latencyMs: 4,
+      detail: ok ? "muse-glimmer at 127.0.0.1" : "127.0.0.1 did not answer (ECONNREFUSED)",
+    }),
+    warm: () => {
+      warmed += 1;
+    },
+    structured: async () => ({}),
+  } as unknown as GlimmerClient & { warmed: () => number };
 }
 
 function turns(events: ServerEvent[]): TurnEvent["turn"][] {
@@ -1748,5 +1769,92 @@ describe("SessionManager, the opening hello (V2-009)", () => {
     await done;
     expect(events.filter((event) => event.type === "card")).toEqual([]);
     expect(turns(events).filter(isSottoTurn)).toEqual([]);
+  });
+});
+
+describe("SessionManager, judgment (V2-010)", () => {
+  /**
+   * Lets the health check's own microtasks run, and nothing else: a session
+   * that is stopped first never publishes where its judgment went, which is
+   * the point of {@link JudgmentRouter.stop}.
+   */
+  async function settled(): Promise<void> {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+
+  /** Just the judgment dot, in the order it changed. */
+  function dots(events: ServerEvent[]): string[] {
+    return events
+      .filter((event) => event.type === "status" && event.status.channel === "judgment")
+      .map((event) =>
+        event.type === "status"
+          ? `${event.status.state}${event.status.detail === undefined ? "" : `:${event.status.detail}`}`
+          : "",
+      );
+  }
+
+  function judged(glimmer: GlimmerClient | null): {
+    bus: EventBus;
+    sessions: SessionManager;
+    events: ServerEvent[];
+    warnings: string[];
+  } {
+    const bus = new EventBus(quiet);
+    const events: ServerEvent[] = [];
+    const warnings: string[] = [];
+    bus.subscribe((event) => events.push(event));
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: { ...quiet, warn: (line: string) => warnings.push(line) },
+      createStore: () => null,
+      createModel: () => emptyModel,
+      createGlimmer: () => glimmer,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    return { bus, sessions, events, warnings };
+  }
+
+  it("checks Glimmer at session start and judges locally when it answers", async () => {
+    const glimmer = fakeGlimmer(true);
+    const { sessions, events } = judged(glimmer);
+
+    sessions.start({ kind: "events", fixture: "moment-fact" });
+    // The dot cannot say where until the check comes back, so start() leaves
+    // it checking rather than waiting for an answer.
+    expect(dots(events)).toEqual(["connecting"]);
+    await settled();
+    await sessions.stop();
+
+    // Checking, then where it landed, then idle when the session has gone —
+    // a `max` replay of one fixture is over almost at once.
+    expect(dots(events)).toEqual(["connecting", "active:local", "idle"]);
+    // And the cold load is paid before any role needs a verdict.
+    expect(glimmer.warmed()).toBe(1);
+  });
+
+  it("warns and judges in the cloud when Glimmer is not there", async () => {
+    const glimmer = fakeGlimmer(false);
+    const { sessions, events, warnings } = judged(glimmer);
+
+    sessions.start({ kind: "events", fixture: "moment-fact" });
+    await settled();
+    await sessions.stop();
+
+    expect(dots(events)).toEqual(["connecting", "active:cloud", "idle"]);
+    expect(warnings.join("\n")).toMatch(/Glimmer is unavailable.*Muse Spark/s);
+    expect(glimmer.warmed()).toBe(0);
+  });
+
+  it("judges in the cloud when no Glimmer is configured", async () => {
+    const { sessions, events } = judged(null);
+
+    sessions.start({ kind: "events", fixture: "moment-fact" });
+    // Nothing to check, so the dot is already answered when start() returns.
+    expect(dots(events)).toEqual(["connecting", "active:cloud"]);
+    await sessions.stop();
+
+    expect(dots(events)).toEqual(["connecting", "active:cloud", "idle"]);
   });
 });

@@ -7,7 +7,7 @@
  * saves — every raw transcription frame, 78% of them `audioProgress` — is
  * exactly what the browser must not be sent.
  *
- * It remembers the state an event implies — the three status dots, the running
+ * It remembers the state an event implies — the four status dots, the running
  * session, the speaker names the user has given (US-007), the board (US-009),
  * the settings (US-014), whether somebody is addressing Sotto by name
  * (US-017) and the cards Sotto has put on the stage (US-015) —
@@ -53,6 +53,9 @@ function initialStatuses(): Record<StatusChannel, StatusUpdate> {
     server: { channel: "server", state: "active" },
     transcription: { channel: "transcription", state: "idle" },
     model: { channel: "model", state: "idle" },
+    // Nothing is judged until a session is running, and which model will do
+    // it is only known once that session has checked (V2-010).
+    judgment: { channel: "judgment", state: "idle" },
   };
 }
 

@@ -76,6 +76,9 @@ async function buildTestApp(
     // A live source (`mic`, `wav`) must not reach the real API from here.
     createAsrClient: () => audio,
     createModel: () => options.model ?? (options.apiKey === "" ? null : emptyModel),
+    // V2-010: `npm test` does not dial the local Glimmer server either, so
+    // judgment falls back to the (fake) cloud client above.
+    createGlimmer: () => null,
   });
   app = await buildApp({ bus, sessions });
   return { app, bus, audio, sessions };
@@ -638,7 +641,7 @@ describe("/ws/events", () => {
     const { app: server, bus } = await buildTestApp();
     bus.setStatus("transcription", "active", "replaying brainstorm events at max");
 
-    const { socket, events } = await open(server, (seen) => seen.length === 9);
+    const { socket, events } = await open(server, (seen) => seen.length === 10);
     const snapshot = await events;
     socket.close();
 
@@ -654,6 +657,8 @@ describe("/ws/events", () => {
       },
       // The model dot only claims to be ready while a session is running.
       { type: "status", status: { channel: "model", state: "idle" } },
+      // And nothing is judged until one is (V2-010).
+      { type: "status", status: { channel: "judgment", state: "idle" } },
       { type: "session", session: null },
       { type: "speakers", speakers: {} },
       // Nothing has been said, so the board is empty rather than absent.
@@ -668,10 +673,10 @@ describe("/ws/events", () => {
 
   it("pushes turns and status changes while a session runs", async () => {
     const { app: server } = await buildTestApp();
-    // The seven snapshot events, then the session's own, ending back at null.
+    // The ten snapshot events, then the session's own, ending back at null.
     const { socket, events } = await open(server, (seen) => {
       const last = seen.at(-1);
-      return seen.length > 7 && last?.type === "session" && last.session === null;
+      return seen.length > 10 && last?.type === "session" && last.session === null;
     });
 
     await server.inject({
@@ -690,7 +695,10 @@ describe("/ws/events", () => {
       .filter((event) => event.type === "status")
       .map((event) => `${event.status.channel}:${event.status.state}`);
     expect(dots).toContain("transcription:active");
-    expect(dots.at(-1)).toBe("model:idle");
+    // V2-010: with no Glimmer the judgment dot settles on the cloud, and
+    // every dot but the server's is idle again once the session has gone.
+    expect(dots).toContain("judgment:active");
+    expect(dots.slice(-2)).toEqual(["model:idle", "judgment:idle"]);
   });
 
   it("drops its subscription when the socket closes", async () => {

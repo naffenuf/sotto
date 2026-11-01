@@ -19,6 +19,7 @@ import {
 import { EventBus } from "./events/bus.js";
 import { listFixtures } from "./fixtures.js";
 import { SessionManager, SessionStartError } from "./session/SessionManager.js";
+import { glimmerFromEnv } from "./model/GlimmerClient.js";
 import { listHistory, readHistory } from "./session/history.js";
 import { VoiceTestRequestSchema, type VoiceActionResponse } from "../shared/voice.js";
 import { loadElevenLabsApiKey, loadSottoVoiceId } from "./config.js";
@@ -53,7 +54,15 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   // as the rest of the server does, rather than through Fastify's logger.
   const sessions =
     options.sessions ??
-    new SessionManager({ bus, apiKey: options.apiKey, createVoice: () => voice });
+    new SessionManager({
+      bus,
+      apiKey: options.apiKey,
+      createVoice: () => voice,
+      // V2-010: judgment calls prefer Muse Glimmer on this Mac. `.env` is
+      // read here rather than inside the session manager so a test that
+      // builds its own never reaches the local server.
+      createGlimmer: () => glimmerFromEnv(),
+    });
 
   await app.register(websocket);
 

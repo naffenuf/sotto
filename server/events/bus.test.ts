@@ -33,6 +33,8 @@ describe("EventBus", () => {
       { type: "status", status: { channel: "server", state: "active" } },
       { type: "status", status: { channel: "transcription", state: "idle" } },
       { type: "status", status: { channel: "model", state: "idle" } },
+      // V2-010: which model judges is only known once a session has checked.
+      { type: "status", status: { channel: "judgment", state: "idle" } },
       { type: "session", session: null },
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
@@ -125,6 +127,7 @@ describe("EventBus", () => {
         },
       },
       { type: "status", status: { channel: "model", state: "idle" } },
+      { type: "status", status: { channel: "judgment", state: "idle" } },
       { type: "session", session },
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
