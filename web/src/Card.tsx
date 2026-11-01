@@ -58,6 +58,20 @@ function detailIsTheCard(card: StageCard): boolean {
   return card.id.startsWith(NOTICE_CARD_IDS.wrapUp);
 }
 
+/**
+ * The one line a collapsed card shows.
+ *
+ * The headline where there is one; "thinking…" while one is on its way; and
+ * the message when there will not be one — a research card whose search came
+ * back with nothing (V3-003) is still a button somebody can click, and a
+ * blank one would say nothing at all.
+ */
+function collapsedLine(card: StageCard): string {
+  if (card.headline !== "") return card.headline;
+  if (card.state === "thinking") return "thinking…";
+  return card.message ?? "";
+}
+
 /** The variants that are one line until somebody opens them. */
 function isCollapsible(variant: StageCard["variant"]): boolean {
   return variant === "glow" || variant === "research";
@@ -121,7 +135,7 @@ export function Card({
         </span>
         <span className="card__collapsed-lines">
           <span className="card__glow-line" data-testid="card-headline">
-            {card.state === "thinking" && card.headline === "" ? "thinking…" : card.headline}
+            {collapsedLine(card)}
           </span>
           <Teaser card={card} />
         </span>

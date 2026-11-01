@@ -33,6 +33,17 @@ import type { TurnUpdate } from "./turns.js";
 export const RESEARCH_FIXTURE = "research-business-idea";
 
 /**
+ * The conversation V3-003 added: the one where the room wonders something
+ * aloud.
+ *
+ * Named for the same reason {@link RESEARCH_FIXTURE} is. The fast path's
+ * target — a question going final to a packet being ready — is a latency, and
+ * the max-speed eval cannot measure a latency: simulated time stands still
+ * inside a model call. This is the fixture that charges real seconds for it.
+ */
+export const QUESTION_FIXTURE = "offsite-plan";
+
+/**
  * The conversations the check drives, in the order it runs them.
  *
  * The two long ones first: `brainstorm` is where a false interjection shows
@@ -41,12 +52,14 @@ export const RESEARCH_FIXTURE = "research-business-idea";
  * {@link RESEARCH_FIXTURE} runs last for the same reason, from the other end:
  * it is three minutes of audio, three web searches and a spoken briefing, so
  * it is the one worth reaching with everything else already known good.
+ * {@link QUESTION_FIXTURE} is second to last on the same logic.
  */
 export const E2E_FIXTURES = [
   "brainstorm",
   "moment-contradiction",
   "ask-search",
   "ask-diagram",
+  QUESTION_FIXTURE,
   RESEARCH_FIXTURE,
 ] as const;
 
@@ -198,6 +211,16 @@ export interface E2eResearch {
   failed: number;
   /** Wall-clock arrival of each research-ready card's first push, oldest first. */
   cardAtMs: number[];
+  /**
+   * The fast path's end-to-end latency, one per finished job the room asked
+   * for out loud (V3-003), oldest first.
+   *
+   * Session-clock milliseconds from the question turn going final to the job
+   * finishing, read straight off `research.jsonl`. This is the only clock in
+   * the project that charges a search for the time it takes, which is why the
+   * PRD's 25-second target is measured here and not in `npm run eval`.
+   */
+  questionToPacketMs: number[];
 }
 
 /** Everything one fixture's run produced. */

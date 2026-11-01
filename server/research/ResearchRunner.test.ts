@@ -344,3 +344,49 @@ describe("renderPacketRequest", () => {
     expect(renderPacketRequest(idea({ why: "  " }))).toContain("_not recorded_");
   });
 });
+
+/**
+ * V3-003: the fast path's two additions, both read off one reply — the spoken
+ * sentence V3-004 says to the room, and how long the room waited for it.
+ */
+describe("a packet for a question the room wondered aloud (V3-003)", () => {
+  it("carries the spoken answer and the end-to-end latency", async () => {
+    const { runner, records, clock } = harness([
+      async () =>
+        reply({
+          value: packetReply({
+            spokenAnswer: "About two hours fifteen each way, so a bit over four hours in the car.",
+          }),
+        }),
+    ]);
+    clock.advanceTo(80_000);
+    const packet = await runner.run(idea({ askedAtMs: 60_000 }));
+
+    expect(packet?.spokenAnswer).toBe(
+      "About two hours fifteen each way, so a bit over four hours in the car.",
+    );
+    expect(records[0]?.questionToPacketMs).toBe(20_000);
+  });
+
+  it("leaves both off a packet nobody asked for out loud", async () => {
+    const { runner, records } = harness([async () => reply({ value: packetReply() })]);
+    const packet = await runner.run(idea());
+
+    expect(packet).not.toBeNull();
+    expect(packet?.spokenAnswer).toBeUndefined();
+    expect(records[0]?.questionToPacketMs).toBeUndefined();
+  });
+
+  // V3-015 closes the loop out loud on a question it already claimed, so the
+  // wait has to be recorded even when there is nothing to say at the end of it.
+  it("records the latency of a search that came back with nothing", async () => {
+    const { runner, records, clock } = harness([
+      async () => reply({ value: packetReply({ sources: [] }), searchedUrls: [] }),
+    ]);
+    clock.advanceTo(75_000);
+    expect(await runner.run(idea({ askedAtMs: 60_000 }))).toBeNull();
+
+    expect(records[0]?.outcome).toBe("unsourced");
+    expect(records[0]?.questionToPacketMs).toBe(15_000);
+  });
+});

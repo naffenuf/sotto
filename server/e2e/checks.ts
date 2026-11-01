@@ -23,7 +23,7 @@ import type {
   E2eResearch,
   Stamped,
 } from "../../shared/e2e.js";
-import { RESEARCH_FIXTURE } from "../../shared/e2e.js";
+import { QUESTION_FIXTURE, RESEARCH_FIXTURE } from "../../shared/e2e.js";
 import type { MomentRecord } from "../../shared/eval.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
 
@@ -48,6 +48,7 @@ export const MIN_TRANSCRIPT_LINES: Record<string, number> = {
   "moment-contradiction": 10,
   "ask-search": 5,
   "ask-diagram": 5,
+  [QUESTION_FIXTURE]: 10,
   [RESEARCH_FIXTURE]: 10,
 };
 
@@ -57,6 +58,8 @@ export const EXPECTED_WAKE_TRIGGERS: Record<string, number> = {
   "moment-contradiction": 0,
   "ask-search": 1,
   "ask-diagram": 1,
+  // `offsite-plan` ends by asking Sotto to lay the dependencies out (US-017).
+  [QUESTION_FIXTURE]: 1,
   [RESEARCH_FIXTURE]: 1,
 };
 
@@ -408,6 +411,13 @@ export function researchFrom(input: E2eCheckInput): E2eResearch {
     unsourced: counted((line) => line.kind === "packet" && line.outcome === "unsourced"),
     failed: counted((line) => line.kind === "packet" && line.outcome === "failed"),
     cardAtMs: researchCards(input.observed).map((stamped) => stamped.atMs),
+    // V3-003: only a question the room wondered aloud carries one, so this is
+    // empty for every fixture that never asked itself anything.
+    questionToPacketMs: log.flatMap((line) =>
+      line.kind === "packet" && line.questionToPacketMs !== undefined
+        ? [line.questionToPacketMs]
+        : [],
+    ),
   };
 }
 

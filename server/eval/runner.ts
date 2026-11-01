@@ -367,7 +367,10 @@ export function researchFrom(replay: ReplayResult): ResearchRunRecord {
     const packet = packets.get(line.ideaId);
     const pause = pauseAt(intervals, line.atMs);
     cards.push({
-      cardId: researchCardId(line.packetId),
+      // V3-003: a question's card went up as the *idea* before the packet
+      // existed, so the id is read off the line rather than derived from the
+      // packet it ended up carrying.
+      cardId: line.cardId ?? researchCardId(line.packetId),
       packetId: line.packetId,
       ideaId: line.ideaId,
       title: line.title,

@@ -6,7 +6,7 @@
  * produce the numbers.
  */
 import type { E2eFixtureReport, E2eRunReport } from "../../shared/e2e.js";
-import { RESEARCH_FIXTURE } from "../../shared/e2e.js";
+import { QUESTION_FIXTURE, RESEARCH_FIXTURE } from "../../shared/e2e.js";
 import {
   estimateAsrCostUsd,
   estimateCostUsd,
@@ -41,6 +41,10 @@ export const FIXTURE_BUDGET_USD: Record<string, number> = {
   "moment-contradiction": 0.7,
   "ask-search": 0.7,
   "ask-diagram": 0.7,
+  // V3-003: three minutes of offsite planning, one spoken answer, and at
+  // least one search of its own — the drive time, which the room wonders
+  // aloud and Sotto now looks up without being asked.
+  [QUESTION_FIXTURE]: 1.0,
   [RESEARCH_FIXTURE]: 1.6,
 };
 
@@ -67,6 +71,15 @@ export function runBudgetUsd(fixtures: readonly { fixture: string }[]): number {
 }
 
 const MARK = { pass: "ok  ", fail: "FAIL" } as const;
+
+/** The middle value, or the mean of the two middle ones. `null` when empty. */
+export function median(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle] ?? null;
+  return ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2;
+}
 
 /** `1.4s`, or `—` for a latency this run could not measure. */
 function seconds(ms: number | null): string {
@@ -107,6 +120,16 @@ function detailLines(report: E2eFixtureReport): string[] {
           ? ""
           : ` at ${research.cardAtMs.map((atMs) => seconds(atMs)).join(", ")}`) +
         `; ${research.localGateCalls} local gate call(s)`,
+    );
+  }
+  // V3-003's target, and the only clock that can state it: a question going
+  // final to its packet being ready. Reported as the median, because that is
+  // what the PRD asks for, with each one beside it.
+  if (research.questionToPacketMs.length > 0) {
+    lines.push(
+      `  question ${research.questionToPacketMs.length} looked up; ` +
+        `question -> packet median ${seconds(median(research.questionToPacketMs))} ` +
+        `(${research.questionToPacketMs.map((ms) => seconds(ms)).join(", ")})`,
     );
   }
   lines.push(

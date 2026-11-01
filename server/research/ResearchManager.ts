@@ -1,9 +1,9 @@
 /**
  * What Sotto decides to research, and how much of it (PRD V2-012).
  *
- * Ideas arrive from two places — a `research_hook` candidate the observer
- * noticed (V2-011) and the planner's own two-minute look — and go through the
- * same three stages here:
+ * Ideas arrive from three places — a `research_hook` candidate the observer
+ * noticed (V2-011), the planner's own two-minute look, and a question the room
+ * wondered aloud (V3-002) — and go through the same three stages here:
  *
  *   1. **Dedupe.** Every idea the session has ever had is remembered, so an
  *      idea that repeats one is written down and goes no further. Because a
@@ -17,6 +17,11 @@
  *      {@link MAX_CONCURRENT_JOBS} jobs run at once and at most
  *      {@link MAX_JOBS_PER_WINDOW} start in any {@link RESEARCH_WINDOW_MS},
  *      so a conversation full of hooks cannot turn into a search engine.
+ *
+ * A question the room asked itself takes stages 1 and 3 only
+ * ({@link ResearchManager.acceptQuestion}): the classifier that heard it has
+ * already made the judgment the gate would make, and the answer is worth
+ * nothing once the room has moved on (V3-003).
  *
  * Nothing here blocks the conversation. {@link ResearchManager.acceptHook}
  * and the planner's callback return immediately and the work registers itself
@@ -35,10 +40,12 @@ import {
   RESEARCH_WINDOW_MS,
   findDuplicateIdea,
   hookIdea,
+  questionIdea,
   type PlannerIdea,
   type ResearchIdea,
   type ResearchLogLine,
   type ResearchOrigin,
+  type ResearchPacket,
 } from "../../shared/research.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { isSottoTurn } from "../../shared/turns.js";
@@ -73,6 +80,13 @@ export interface ResearchManagerOptions {
    * waits in the queue, which is what the budget's tests count.
    */
   run?: (idea: ResearchIdea) => Promise<unknown>;
+  /**
+   * Every packet the session has produced — {@link ResearchRunner.packets}.
+   *
+   * Read only when a question repeats an earlier idea (V3-003): the answer is
+   * already in hand, so it is given back rather than searched for again.
+   */
+  packets?: () => readonly ResearchPacket[];
   /** The model status dot, shared with the board loop and the observer. */
   onModelState?: (state: "connecting" | "active" | "error", detail: string) => void;
   /** Real time, for the latency a gate verdict took. */
@@ -86,10 +100,25 @@ export interface ResearchManagerOptions {
   windowMs?: number;
 }
 
+/**
+ * What became of a question the room wondered aloud (V3-003).
+ *
+ * `accepted` is a search under way or queued behind the budget — either way a
+ * card goes up with a thinking indicator. `reused` is the same question asked
+ * twice with the answer already in hand. `duplicate` is the same question
+ * while the first search is still running, so there is nothing to do and
+ * nothing to show that is not already shown.
+ */
+export type QuestionResearch =
+  | { outcome: "accepted"; idea: ResearchIdea }
+  | { outcome: "reused"; idea: ResearchIdea; duplicateOf: string; packet: ResearchPacket }
+  | { outcome: "duplicate"; idea: ResearchIdea; duplicateOf: string };
+
 export class ResearchManager {
   private readonly clock: Clock;
   private readonly onRecord: (record: ResearchLogLine) => void;
   private readonly run: ResearchManagerOptions["run"];
+  private readonly packets: ResearchManagerOptions["packets"];
   private readonly logger: Logger;
   private readonly maxConcurrent: number;
   private readonly maxPerWindow: number;
@@ -119,6 +148,7 @@ export class ResearchManager {
     this.clock = options.clock;
     this.onRecord = options.onRecord;
     this.run = options.run;
+    this.packets = options.packets;
     this.logger = options.logger ?? console;
     this.maxConcurrent = options.maxConcurrent ?? MAX_CONCURRENT_JOBS;
     this.maxPerWindow = options.maxPerWindow ?? MAX_JOBS_PER_WINDOW;
@@ -187,7 +217,44 @@ export class ResearchManager {
    */
   acceptHook(candidate: Candidate): void {
     if (this.stopped) return;
-    this.submit("hook", hookIdea(candidate), candidate.id);
+    this.submit("hook", hookIdea(candidate), { candidateId: candidate.id });
+  }
+
+  /**
+   * Takes one question the room wondered aloud, and starts looking it up
+   * (V3-002, V3-003).
+   *
+   * The fast path, and it is fast by *subtraction*: the two-minute planner
+   * never saw this question and the gate is not asked about it, because the
+   * classifier has already decided it is answerable by a lookup and was asked
+   * of the room rather than of Sotto. A second judgment would cost fifteen to
+   * thirty seconds of the only thing the answer has.
+   *
+   * What it keeps is the dedupe and the budget. A question that repeats an
+   * earlier idea whose search already came back is answered from that packet
+   * — the room gets the answer it asked for and nobody pays for the same
+   * search twice — and one that repeats an idea still in flight simply stops
+   * here, because the packet it is waiting for is on its way.
+   *
+   * Returns what became of it so the caller can put a card on the stage;
+   * `null` only once the session has stopped.
+   */
+  acceptQuestion(asked: {
+    turnId: string;
+    question: string;
+    topic: string;
+    askedBy: string | null;
+    askedAtMs: number;
+  }): QuestionResearch | null {
+    if (this.stopped) return null;
+    const { idea, duplicateOf } = this.submit("open_question", questionIdea(asked), {
+      fast: true,
+    });
+    if (duplicateOf === undefined) return { outcome: "accepted", idea };
+    const packet = this.packets?.().find((one) => one.ideaId === duplicateOf);
+    return packet === undefined
+      ? { outcome: "duplicate", idea, duplicateOf }
+      : { outcome: "reused", idea, duplicateOf, packet };
   }
 
   /** Waits for the planner, the gate queue and every job in flight. */
@@ -210,12 +277,18 @@ export class ResearchManager {
     for (const idea of ideas) this.submit("planner", idea);
   }
 
-  /** Records one idea and, unless it repeats an earlier one, gates it. */
+  /**
+   * Records one idea and, unless it repeats an earlier one, sends it on.
+   *
+   * `fast` is V3-003's open question: it goes straight into the run queue,
+   * ahead of whatever the planner and the hooks left there, because the room
+   * is waiting for this one and they are not.
+   */
   private submit(
     origin: ResearchOrigin,
     proposed: Omit<ResearchIdea, "id">,
-    candidateId?: string,
-  ): void {
+    options: { candidateId?: string; fast?: boolean } = {},
+  ): { idea: ResearchIdea; duplicateOf: string | undefined } {
     const duplicateOf = findDuplicateIdea(proposed, this.allIdeas);
     this.ideaCount += 1;
     const idea: ResearchIdea = { ...proposed, id: `idea-${this.ideaCount}` };
@@ -225,16 +298,22 @@ export class ResearchManager {
       origin,
       idea,
       ...(duplicateOf === undefined ? {} : { duplicateOf }),
-      ...(candidateId === undefined ? {} : { candidateId }),
+      ...(options.candidateId === undefined ? {} : { candidateId: options.candidateId }),
     });
     if (duplicateOf !== undefined) {
       this.logger.log(`[research] ${idea.id} repeats ${duplicateOf}: ${idea.question}`);
-      return;
+      return { idea, duplicateOf };
     }
     this.logger.log(`[research] ${idea.id} (${origin}) ${idea.topic}: ${idea.question}`);
     this.allIdeas.push(idea);
-    this.toScore.push(idea);
-    this.pumpGate();
+    if (options.fast === true) {
+      this.toRun.unshift(idea);
+      this.pumpJobs();
+    } else {
+      this.toScore.push(idea);
+      this.pumpGate();
+    }
+    return { idea, duplicateOf };
   }
 
   /**

@@ -4,7 +4,10 @@ import {
   MAX_RESEARCH_CARDS_PER_WINDOW,
   RESEARCH_CARD_COOLDOWN_MS,
   RESEARCH_CARD_WINDOW_MS,
+  RESEARCH_NO_ANSWER,
   type ResearchCardRecord,
+  type ResearchIdea,
+  type ResearchPendingRecord,
   type ResearchPacket,
 } from "../../shared/research.js";
 import { FREQUENCY_LIMITS } from "../../shared/policy.js";
@@ -45,6 +48,8 @@ interface Harness {
   cards: ResearchCards;
   delivered: StageCard[];
   records: ResearchCardRecord[];
+  /** The `pending` lines a question's thinking card wrote (V3-003). */
+  pendings: ResearchPendingRecord[];
   /** Somebody starts talking. */
   speak: () => void;
   /** Everybody stops; the silence grows with the clock from here. */
@@ -60,6 +65,7 @@ function harness(options: Partial<ResearchCardsOptions> = {}): Harness {
   const clock = new SimulatedClock(0);
   const delivered: StageCard[] = [];
   const records: ResearchCardRecord[] = [];
+  const pendings: ResearchPendingRecord[] = [];
   const state = { speaking: true, quietSince: 0 };
   const pauseState = (): PauseState =>
     state.speaking
@@ -69,7 +75,10 @@ function harness(options: Partial<ResearchCardsOptions> = {}): Harness {
     clock,
     pauseState,
     onDeliver: (card) => delivered.push(card),
-    onRecord: (record) => records.push(record),
+    onRecord: (record) => {
+      if (record.kind === "pending") pendings.push(record);
+      else records.push(record);
+    },
     logger: quiet,
     ...options,
   });
@@ -78,6 +87,7 @@ function harness(options: Partial<ResearchCardsOptions> = {}): Harness {
     cards,
     delivered,
     records,
+    pendings,
     speak: () => {
       state.speaking = true;
       cards.acceptTurn(snapshot);
@@ -343,5 +353,119 @@ describe("ResearchCards", () => {
   it("keeps the shipped budget separate from the interjection one", () => {
     expect(RESEARCH_CARD_COOLDOWN_MS).toBeLessThan(RESEARCH_CARD_WINDOW_MS);
     expect(MAX_RESEARCH_CARDS_PER_WINDOW).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * V3-003: the card for a question the room wondered aloud, which goes up
+ * before the search has started and fills in when it comes back.
+ */
+describe("the card a question puts up (V3-003)", () => {
+  const idea: ResearchIdea = {
+    id: "idea-1",
+    topic: "the drive time",
+    question: "How long is the drive from the city to the farmhouse venue?",
+    why: "Craig wondered this aloud and nobody in the room knew.",
+    sourceTurnIds: ["0:12"],
+    askedAtMs: 4_000,
+  };
+
+  it("goes up at once, mid-sentence, with a thinking indicator", () => {
+    const h = harness();
+    // Deliberately while somebody is talking: the room asked, so there is
+    // nothing unsolicited here to wait for a pause with.
+    const cardId = h.cards.pending(idea);
+
+    expect(cardId).toBe("research-idea-1");
+    expect(h.delivered).toEqual([
+      {
+        id: "research-idea-1",
+        variant: "research",
+        state: "thinking",
+        createdAtMs: 0,
+        headline: "Looking up: How long is the drive from the city to the farmhouse venue?",
+      },
+    ]);
+    expect(h.pendings[0]).toEqual({
+      kind: "pending",
+      atMs: 0,
+      ideaId: "idea-1",
+      cardId: "research-idea-1",
+      question: idea.question,
+    });
+    // Nothing was spent: it is not an unsolicited card.
+    expect(h.cards.shown()).toEqual([]);
+  });
+
+  it("fills the same card in when the packet lands, without waiting for a pause", () => {
+    const h = harness();
+    h.cards.pending(idea);
+    h.clock.advanceBy(21_000);
+    h.cards.accept(packet());
+
+    expect(h.delivered).toHaveLength(2);
+    const filled = h.delivered[1] as StageCard;
+    expect(filled.id).toBe("research-idea-1");
+    expect(filled.state).toBe("ready");
+    expect(filled.headline).toBe("Research ready: Otter and Fireflies charge $8–19 a seat");
+    expect(h.cards.waitingCount()).toBe(0);
+    expect(h.records[0]).toMatchObject({
+      kind: "card",
+      packetId: "packet-1",
+      ideaId: "idea-1",
+      cardId: "research-idea-1",
+      // Measured from the question, which is the wait the room really had.
+      heldForMs: 21_000,
+      filledIn: true,
+    });
+    expect(h.cards.shown()).toEqual([]);
+  });
+
+  it("leaves a packet nobody asked for to the pause rule", () => {
+    const h = harness();
+    h.cards.pending(idea);
+    h.cards.accept(packet({ id: "packet-2", ideaId: "idea-9" }));
+    expect(h.delivered.map((card) => card.id)).toEqual(["research-idea-1"]);
+    expect(h.cards.waitingCount()).toBe(1);
+  });
+
+  it("stops the spinner when the search comes back with nothing", () => {
+    const h = harness();
+    h.cards.pending(idea);
+    h.cards.failed("idea-1");
+
+    const said = h.delivered[1] as StageCard;
+    expect(said.id).toBe("research-idea-1");
+    expect(said.state).toBe("error");
+    expect(said.message).toBe(RESEARCH_NO_ANSWER);
+    // And a packet arriving afterwards is an ordinary one again.
+    h.cards.failed("idea-1");
+    expect(h.delivered).toHaveLength(2);
+  });
+
+  it("answers a repeated question from the packet already on the stage", () => {
+    const h = harness();
+    const first = packet();
+    h.cards.reuse({ ...idea, id: "idea-2" }, first);
+
+    expect(h.pendings[0]).toMatchObject({
+      ideaId: "idea-2",
+      cardId: "research-packet-1",
+      reusedPacketId: "packet-1",
+    });
+    const shown = h.delivered[0] as StageCard;
+    expect(shown.id).toBe("research-packet-1");
+    expect(shown.state).toBe("ready");
+    expect(shown.forward).toBe(true);
+    expect(h.cards.shown()).toEqual([]);
+  });
+
+  it("says nothing once the session is over", () => {
+    const h = harness();
+    h.cards.stop();
+    h.cards.pending(idea);
+    h.cards.reuse(idea, packet());
+    h.cards.failed("idea-1");
+    expect(h.delivered).toHaveLength(0);
   });
 });

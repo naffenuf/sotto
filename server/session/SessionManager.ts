@@ -1204,7 +1204,7 @@ export class SessionManager {
       onRecord: (record) => onResearch(record),
       onDeliver: (card, packet) => {
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
-        onTiming({ stage: "research_publish", atMs: clock.now(), packetId: packet.id, cardId: card.id, published: this.last?.sessionId === info.id });
+        onTiming({ stage: "research_publish", atMs: clock.now(), packetId: packet?.id ?? null, cardId: card.id, state: card.state, published: this.last?.sessionId === info.id });
       },
     });
     // The search (V2-013): one grounded call per approved idea, writing
@@ -1217,7 +1217,13 @@ export class SessionManager {
       wallClock: this.wallClock,
       logger: this.logger,
       onModelState,
-      onRecord: onResearch,
+      onRecord: (record) => {
+        onResearch(record);
+        // V3-003: a question's thinking card has to stop spinning. A search
+        // that failed or came back unsourced says so on the card; V3-015 is
+        // what says it out loud, and only to a room that heard Sotto claim it.
+        if (record.outcome !== "ready") researchCards.failed(record.ideaId);
+      },
       onPacket: (packet, markdown) => {
         store.writer?.writePacket(packet.id, packet, markdown);
         // The one place a packet becomes something the room can see.
@@ -1240,6 +1246,9 @@ export class SessionManager {
       onModelState,
       onRecord: onResearch,
       run: (idea) => researchRunner.run(idea),
+      // V3-003: a question that repeats one already answered is answered from
+      // that packet rather than searched for again.
+      packets: () => researchRunner.packets(),
     });
     // Its own queue, on purpose: an answer must not wait behind a board
     // update, and the group must not wait for the board loop to let go of the
@@ -1287,9 +1296,9 @@ export class SessionManager {
       onModelState,
     });
     // V3-002: what the room wonders aloud, noticed per final turn rather than
-    // through the observer. Nothing acts on a verdict yet — V3-003 turns an
-    // open question into a search, V3-015 claims it out loud and V3-004
-    // answers it — so for now it is written down and logged.
+    // through the observer. V3-003 is what it starts: a search at once, with
+    // a card on the stage to say so. V3-015 claims it out loud and V3-004
+    // speaks the answer.
     const questions = new QuestionWatcher({
       clock,
       // Real time: the four seconds this story is measured against are
@@ -1299,24 +1308,41 @@ export class SessionManager {
       classify: (input, signal) => classifyQuestion(model, input, signal),
       speakers: () => this.bus.speakerNames(),
       onTiming,
-      onOpenQuestion: (question) => this.noticeQuestion(info, store, question),
+      onOpenQuestion: (question) =>
+        this.noticeQuestion(info, store, question, research, researchCards),
     });
     return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions };
   }
 
   /**
-   * What happens when the room wonders something aloud (V3-002).
+   * What happens when the room wonders something aloud (V3-002, V3-003).
    *
-   * For now: a line in the log and a line in `timing.jsonl`, which is what
-   * the integration test and the eval read. The question is a record of its
-   * own rather than a candidate — it never reaches the observer, the
-   * candidate gate or the policy — because it is not something to say, it is
-   * something to look up, and V3-003 is what looks it up.
+   * The question is a record of its own rather than a candidate — it never
+   * reaches the observer, the candidate gate or the policy — because it is
+   * not something to say, it is something to **look up**. So this is the fast
+   * path's one call site: a line in the log, a line in `timing.jsonl`, and
+   * the question handed to the research manager, which skips the planner and
+   * the gate and searches now.
+   *
+   * Three things can come back. An accepted question puts a thinking card on
+   * the stage at once, which the packet fills in twenty seconds later. The
+   * same question asked twice with the answer already in hand brings that
+   * packet's card forward instead of paying for the search again. And the
+   * same question while the first search is still running stops here: the
+   * card it would show is already up.
    */
-  private noticeQuestion(info: SessionInfo, store: StoreSlot, question: OpenQuestion): void {
+  private noticeQuestion(
+    info: SessionInfo,
+    store: StoreSlot,
+    question: OpenQuestion,
+    research: ResearchManager,
+    researchCards: ResearchCards,
+  ): void {
+    const started = research.acceptQuestion(question);
     this.logger.log(
       `[question] ${info.id} ${question.turnId} wondered: ${question.question}` +
-        ` (${question.topic})`,
+        ` (${question.topic})` +
+        (started === null ? " — the session had stopped" : ` -> ${started.outcome}`),
     );
     store.writer?.appendTiming?.({
       stage: "open_question",
@@ -1325,7 +1351,14 @@ export class SessionManager {
       topic: question.topic,
       question: question.question,
       askedBy: question.askedBy,
+      outcome: started?.outcome ?? "stopped",
+      ideaId: started?.idea.id ?? null,
     });
+    if (started === null) return;
+    if (started.outcome === "accepted") researchCards.pending(started.idea);
+    // The answer exists already: show it as though they had asked for it,
+    // which is what they did (V2-015's own rule, and no second search).
+    else if (started.outcome === "reused") researchCards.reuse(started.idea, started.packet);
   }
 
   /**

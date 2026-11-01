@@ -186,6 +186,34 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
       },
     },
     {
+      title: "research — looking it up",
+      note:
+        "The room wondered something aloud and Sotto is searching (V3-003):" +
+        " the question on the card, a thinking indicator, and the same card" +
+        " fills in when the packet is ready.",
+      card: {
+        id: "r-looking",
+        variant: "research",
+        state: "thinking",
+        createdAtMs: now,
+        headline: "Looking up: How long is the drive from the city to the farmhouse venue?",
+      },
+    },
+    {
+      title: "research — nothing found",
+      note:
+        "The search came back with nothing the group could follow up, so the" +
+        " spinner stops and says so rather than turning forever (V3-003).",
+      card: {
+        id: "r-nothing",
+        variant: "research",
+        state: "error",
+        createdAtMs: now,
+        headline: "",
+        message: "Nothing solid on the drive time.",
+      },
+    },
+    {
       title: "research — closed",
       note:
         "What a finished background search looks like before anybody opens it" +

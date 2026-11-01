@@ -8,6 +8,11 @@
  * list — and what comes back is written to `research/<id>.json` and
  * `research/<id>.md` in the session folder, with any visual in `artifacts/`.
  *
+ * What comes back also carries a **spoken** answer (V3-003): one or two
+ * sentences written to be heard, which is what Sotto says to a room that
+ * wondered the question aloud (V3-004). It is part of the same reply rather
+ * than a second call, because the search is already the slow thing.
+ *
  * Two rules decide what a packet is worth:
  *
  *   - **Sources or nothing.** Every URL the model lists is resolved against
@@ -143,7 +148,7 @@ export class ResearchRunner {
       const detail = error instanceof Error ? error.message : String(error);
       this.logger.warn(`[research] ${id} (${idea.id}) failed: ${detail}`);
       this.options.onModelState?.("error", detail);
-      this.record({
+      this.record(idea, {
         ideaId: idea.id,
         question: idea.question,
         outcome: "failed",
@@ -162,7 +167,7 @@ export class ResearchRunner {
       this.logger.warn(
         `[research] ${id} (${idea.id}) came back unsourced after ${latencyMs} ms: ${reply.title}`,
       );
-      this.record({
+      this.record(idea, {
         ideaId: idea.id,
         question: idea.question,
         outcome: "unsourced",
@@ -180,13 +185,16 @@ export class ResearchRunner {
       teaser: reply.teaser,
       keyPoints: reply.keyPoints,
       sources,
+      // V3-003: the one or two sentences V3-004 says out loud. Absent when the
+      // model left it blank, which a card and a briefing do not need.
+      ...(reply.spokenAnswer === "" ? {} : { spokenAnswer: reply.spokenAnswer }),
       ...(artifacts[0] === undefined ? {} : { visual: artifacts[0] }),
       createdAtMs: this.clock.now(),
       latencyMs,
     };
     this.ready.push(packet);
     this.options.onPacket?.(packet, renderPacketMarkdown(packet, idea.question));
-    this.record({
+    this.record(idea, {
       ideaId: idea.id,
       question: idea.question,
       outcome: "ready",
@@ -313,8 +321,27 @@ export class ResearchRunner {
     ];
   }
 
-  private record(record: Omit<ResearchPacketRecord, "kind" | "atMs">): void {
-    this.options.onRecord({ kind: "packet", atMs: this.clock.now(), ...record });
+  /**
+   * One `packet` line, with the fast path's end-to-end latency on it when the
+   * room is what asked (V3-003).
+   *
+   * Both ends of `questionToPacketMs` are read off the *session* clock: the
+   * classifier stamped the question with it and this is the same clock the
+   * packet's `createdAtMs` is on, so the two subtract. It is recorded on every
+   * outcome rather than only on a packet, because "the room wondered and
+   * nothing came back" is a latency somebody has to be told about too
+   * (V3-015).
+   */
+  private record(idea: ResearchIdea, record: Omit<ResearchPacketRecord, "kind" | "atMs">): void {
+    const atMs = this.clock.now();
+    this.options.onRecord({
+      kind: "packet",
+      atMs,
+      ...record,
+      ...(idea.askedAtMs === undefined
+        ? {}
+        : { questionToPacketMs: Math.max(0, Math.round(atMs - idea.askedAtMs)) }),
+    });
   }
 
   private sinceMs(startedAt: number): number {

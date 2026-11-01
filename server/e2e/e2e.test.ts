@@ -12,7 +12,7 @@ import { emptyBoard, type Board, type Item } from "../../shared/board.js";
 import { DEFAULT_GATE_MODE, type DecisionLogRecord } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { E2eFiles, E2eObserved, E2eResearch, Stamped } from "../../shared/e2e.js";
-import { RESEARCH_FIXTURE } from "../../shared/e2e.js";
+import { QUESTION_FIXTURE, RESEARCH_FIXTURE } from "../../shared/e2e.js";
 import type { MomentRecord } from "../../shared/eval.js";
 import type { ResearchLogLine, ResearchPacket } from "../../shared/research.js";
 import { DEFAULT_BOLDNESS, defaultPolicySettings, limitsFor, thresholdsFor } from "../../shared/policy.js";
@@ -38,6 +38,7 @@ import { E2E_USAGE, parseE2eArgs } from "./options.js";
 import {
   DEFAULT_FIXTURE_BUDGET_USD,
   FIXTURE_BUDGET_USD,
+  median,
   renderFixture,
   renderRun,
   runBudgetUsd,
@@ -282,6 +283,7 @@ function noResearch(): E2eResearch {
     unsourced: 0,
     failed: 0,
     cardAtMs: [],
+    questionToPacketMs: [],
   };
 }
 
@@ -385,6 +387,7 @@ describe("the checks common to every fixture", () => {
       "moment-contradiction": 0,
       "ask-search": 1,
       "ask-diagram": 1,
+      [QUESTION_FIXTURE]: 1,
       [RESEARCH_FIXTURE]: 1,
     });
     // A conversation nobody addressed Sotto in that answered anyway.
@@ -851,7 +854,21 @@ describe("the research conversation", () => {
       unsourced: 0,
       failed: 0,
       cardAtMs: [67_300],
+      // Nobody wondered this one aloud: it came from the planner.
+      questionToPacketMs: [],
     });
+  });
+
+  // V3-003: the fast path's end-to-end latency is on the packet line, so it
+  // is read off the log rather than off the stage.
+  it("reads the question-to-packet latency off the packet lines", () => {
+    const run = passingResearch();
+    const research: ResearchLogLine[] = run.files.research.map((line) =>
+      line.kind === "packet" ? { ...line, questionToPacketMs: 21_400 } : line,
+    );
+    expect(
+      researchFrom({ ...run, files: { ...run.files, research } }).questionToPacketMs,
+    ).toEqual([21_400]);
   });
 
   it("keeps only the first push of each research card", () => {
@@ -937,13 +954,14 @@ describe("the research conversation", () => {
 });
 
 describe("the arguments", () => {
-  it("runs all five conversations by default, the expensive one last", () => {
+  it("runs every conversation by default, the expensive ones last", () => {
     expect(parseE2eArgs([])).toEqual({
       fixtures: [
         "brainstorm",
         "moment-contradiction",
         "ask-search",
         "ask-diagram",
+        QUESTION_FIXTURE,
         RESEARCH_FIXTURE,
       ],
       gate: DEFAULT_GATE_MODE,
@@ -1065,6 +1083,7 @@ describe("the report", () => {
         unsourced: 1,
         failed: 0,
         cardAtMs: [67_300, 110_000],
+        questionToPacketMs: [],
       },
     });
     expect(text).toContain(
@@ -1072,6 +1091,25 @@ describe("the report", () => {
         "2 card(s) at 67.3s, 110.0s; 4 local gate call(s)",
     );
     expect(renderFixture(report)).not.toContain("research ");
+  });
+
+  // V3-003: the one latency the max-speed eval cannot measure, so the e2e
+  // report is where the PRD's 25-second target is read off.
+  it("prints the fast path's question-to-packet latency, median first", () => {
+    const report = passing().fixtures[0]!;
+    const text = renderFixture({
+      ...report,
+      research: { ...noResearch(), packets: 2, questionToPacketMs: [19_400, 23_900] },
+    });
+    expect(text).toContain("question 2 looked up; question -> packet median 21.6s (19.4s, 23.9s)");
+    expect(renderFixture(report)).not.toContain("question ");
+  });
+
+  it("medians an odd and an even list the conventional way", () => {
+    expect(median([])).toBeNull();
+    expect(median([3_000])).toBe(3_000);
+    expect(median([30_000, 10_000, 20_000])).toBe(20_000);
+    expect(median([28_199, 13_135])).toBe(20_667);
   });
 
   it("budgets each conversation, so one fixture is gated on its own cost", () => {

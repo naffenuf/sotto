@@ -9,11 +9,13 @@ import {
   packetRelevance,
   packetSourceUrls,
   packetsForBriefing,
+  questionIdea,
   renderPacketsForAnswer,
   MAX_KEY_POINTS,
   MAX_PACKET_SOURCES,
   MAX_PLANNER_IDEAS,
   PACKET_ID_PATTERN,
+  PACKET_SPOKEN_MAX_WORDS,
   PACKET_TEASER_MAX_WORDS,
   PACKET_TITLE_MAX_CHARS,
   PacketReplySchema,
@@ -307,6 +309,39 @@ describe("hookIdea", () => {
   });
 });
 
+describe("questionIdea (V3-003)", () => {
+  const asked = {
+    turnId: "0:12",
+    question: "How long is the drive from the city to the farmhouse venue?",
+    topic: "the drive time",
+    askedBy: "Craig",
+    askedAtMs: 12_000,
+  };
+
+  it("takes the classifier's own question and topic, and writes the why locally", () => {
+    expect(questionIdea(asked)).toEqual({
+      topic: "the drive time",
+      question: "How long is the drive from the city to the farmhouse venue?",
+      why: "Craig wondered this aloud and nobody in the room knew.",
+      sourceTurnIds: ["0:12"],
+      askedAtMs: 12_000,
+    });
+  });
+
+  it("says somebody when the speaker has no name yet", () => {
+    expect(questionIdea({ ...asked, askedBy: null }).why).toContain("Somebody wondered");
+  });
+
+  it("reads a topic off the question when the classifier left it blank", () => {
+    expect(questionIdea({ ...asked, topic: "  " }).topic).not.toBe("");
+  });
+
+  it("deduplicates against an earlier idea about the same thing", () => {
+    const earlier: ResearchIdea = { id: "idea-1", ...questionIdea(asked) };
+    expect(findDuplicateIdea(questionIdea({ ...asked, turnId: "0:20" }), [earlier])).toBe("idea-1");
+  });
+});
+
 describe("researchPacketJsonSchema", () => {
   it("is in the subset strict structured output accepts", () => {
     closedAndRequired(researchPacketJsonSchema);
@@ -325,6 +360,7 @@ describe("researchPacketJsonSchema", () => {
     expect(properties.keyPoints?.description).toContain(String(MAX_KEY_POINTS));
     expect(properties.keyPoints?.description).toContain(String(KEY_POINT_MAX_WORDS));
     expect(properties.sources?.description).toContain(String(MAX_PACKET_SOURCES));
+    expect(properties.spokenAnswer?.description).toContain(String(PACKET_SPOKEN_MAX_WORDS));
   });
 
   it("has a name the request can send", () => {
@@ -337,6 +373,7 @@ describe("PacketReplySchema", () => {
     title: "Otter and Fireflies charge $8-19 a seat",
     teaser: "Otter Pro is $16.99 a month, or $8.33 on annual billing; Fireflies Pro is $18 or $10.",
     keyPoints: ["Otter Pro: $16.99 monthly, $8.33 annual", "Fireflies Pro: $18 monthly, $10 annual"],
+    spokenAnswer: "Otter is about seventeen dollars a seat monthly, or eight on annual billing.",
     sources: [{ url: "https://otter.ai/pricing", title: "Pricing | Otter.ai" }],
   };
 
@@ -355,6 +392,21 @@ describe("PacketReplySchema", () => {
     expect(parsed.teaser.split(" ")).toHaveLength(PACKET_TEASER_MAX_WORDS);
     expect(parsed.teaser).not.toContain("\n");
     expect(parsed.keyPoints).toHaveLength(MAX_KEY_POINTS);
+  });
+
+  // V3-003: the spoken line is the one field a packet is still worth having
+  // without, so a reply that left it out keeps everything else.
+  it("keeps a packet whose spoken answer is missing, and clips one that runs long", () => {
+    const { spokenAnswer: _omitted, ...withoutSpoken } = valid;
+    expect(PacketReplySchema.parse(withoutSpoken).spokenAnswer).toBe("");
+    const long = PacketReplySchema.parse({
+      ...valid,
+      spokenAnswer: Array.from({ length: PACKET_SPOKEN_MAX_WORDS + 12 }, (_, i) => `w${i}`).join(
+        "\n",
+      ),
+    });
+    expect(long.spokenAnswer.split(" ")).toHaveLength(PACKET_SPOKEN_MAX_WORDS);
+    expect(long.spokenAnswer).not.toContain("\n");
   });
 
   it("drops blank and repeated key points rather than showing them", () => {

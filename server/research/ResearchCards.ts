@@ -32,10 +32,15 @@ import type { StageCard } from "../../shared/cards.js";
 import { DEFAULT_FREQUENCY, limitsFor, type FrequencyLimits } from "../../shared/policy.js";
 import {
   RESEARCH_CARD_WINDOW_MS,
+  RESEARCH_NO_ANSWER,
   researchCardHeadline,
   researchCardId,
+  researchLookingHeadline,
+  researchQuestionCardId,
   type ResearchCardRecord,
+  type ResearchIdea,
   type ResearchPacket,
+  type ResearchPendingRecord,
 } from "../../shared/research.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import type { Clock } from "../clock.js";
@@ -48,10 +53,16 @@ export interface ResearchCardsOptions {
   clock: Clock;
   /** Whether anybody is talking, including Sotto: the policy's own getter. */
   pauseState: () => PauseState;
-  /** Puts one card on the stage. */
-  onDeliver: (card: StageCard, packet: ResearchPacket) => void;
-  /** One `card` line in `research.jsonl`. */
-  onRecord: (record: ResearchCardRecord) => void;
+  /**
+   * Puts one card on the stage.
+   *
+   * `packet` is `null` for the thinking card a question puts up before its
+   * search has come back, and for the short no when it comes back with
+   * nothing (V3-003): the card is the whole of what there is to show.
+   */
+  onDeliver: (card: StageCard, packet: ResearchPacket | null) => void;
+  /** One `card` or `pending` line in `research.jsonl`. */
+  onRecord: (record: ResearchCardRecord | ResearchPendingRecord) => void;
   logger?: Logger;
   /**
    * What the session's frequency setting allows (V2-017). Defaults to the
@@ -80,6 +91,14 @@ export class ResearchCards {
 
   /** Packets waiting for a pause and a budget slot, oldest first. */
   private waiting: Waiting[] = [];
+  /**
+   * The card already on the stage for one idea, by idea id (V3-003).
+   *
+   * A question the room wondered aloud puts a thinking card up at once, so
+   * the packet that answers it fills in a card the group is already looking
+   * at: same id, no pause to wait for, no budget to spend.
+   */
+  private readonly questionCards = new Map<string, { cardId: string; askedAtMs: number }>();
   /** Packets whose card is on the stage, so a second one is not a surprise. */
   private readonly delivered = new Set<string>();
   /** When each card went up, oldest first: the cooldown and the window. */
@@ -129,11 +148,106 @@ export class ResearchCards {
   /**
    * Takes one sourced packet from the runner (V2-013) and shows it as soon as
    * the room is quiet and the budget allows — which, mid-sentence, is later.
+   *
+   * Unless the room asked for it out loud: a packet answering a question the
+   * group wondered aloud fills in the thinking card {@link pending} already
+   * put on the stage (V3-003), which is neither a new card nor a surprise, so
+   * it goes up now.
    */
   accept(packet: ResearchPacket): void {
     if (this.stopped) return;
+    const asked = this.questionCards.get(packet.ideaId);
+    if (asked !== undefined) {
+      this.fillIn(packet, asked);
+      return;
+    }
     this.waiting.push({ packet, seenAtMs: this.clock.now() });
     this.review();
+  }
+
+  /**
+   * The room wondered something aloud and Sotto is looking it up (V3-003).
+   *
+   * A card goes on the stage *now*, carrying the question and a thinking
+   * indicator — the same `thinking` state an answer uses — so that the group,
+   * and a demo audience, can see Sotto working through the twenty seconds the
+   * search takes. Neither of the two rules above applies, for
+   * {@link bringForward}'s reason: the room asked, so there is nothing
+   * unsolicited to ration and nothing to interrupt.
+   *
+   * The card's id is the *idea's* (there is no packet yet), and
+   * {@link accept} reuses it, so the packet fills this card in rather than
+   * stacking a second one beside it.
+   */
+  pending(idea: ResearchIdea): string {
+    const cardId = researchQuestionCardId(idea.id);
+    if (this.stopped) return cardId;
+    const nowMs = this.clock.now();
+    this.questionCards.set(idea.id, { cardId, askedAtMs: nowMs });
+    this.onRecord({ kind: "pending", atMs: nowMs, ideaId: idea.id, cardId, question: idea.question });
+    this.logger.log(`[research] ${cardId} looking up: ${idea.question}`);
+    this.onDeliver(
+      {
+        id: cardId,
+        variant: "research",
+        state: "thinking",
+        createdAtMs: nowMs,
+        headline: researchLookingHeadline(idea.question),
+      },
+      // There is no packet to hand over yet; the caller's only job here is to
+      // put the card on the stage, which needs none.
+      null,
+    );
+    return cardId;
+  }
+
+  /**
+   * The room wondered something Sotto has already looked up (V3-003).
+   *
+   * No thinking card and no second search: the packet's own card comes
+   * forward, open, which is what {@link bringForward} is for — they asked,
+   * even if they asked by wondering rather than by name. The `pending` line
+   * names the packet it was answered from, so the log says why no search
+   * started.
+   */
+  reuse(idea: ResearchIdea, packet: ResearchPacket): void {
+    if (this.stopped) return;
+    this.onRecord({
+      kind: "pending",
+      atMs: this.clock.now(),
+      ideaId: idea.id,
+      cardId: researchCardId(packet.id),
+      question: idea.question,
+      reusedPacketId: packet.id,
+    });
+    this.logger.log(`[research] ${idea.id} answered from ${packet.id}: ${idea.question}`);
+    this.bringForward([packet]);
+  }
+
+  /**
+   * The search behind a thinking card came back with nothing showable
+   * (V3-003).
+   *
+   * A spinner that never stops is worse than a short no: the card says so and
+   * stays readable. V3-015 is what says it out loud, and only if the room
+   * heard Sotto claim the question in the first place.
+   */
+  failed(ideaId: string, why = RESEARCH_NO_ANSWER): void {
+    const asked = this.questionCards.get(ideaId);
+    if (this.stopped || asked === undefined) return;
+    this.questionCards.delete(ideaId);
+    this.logger.log(`[research] ${asked.cardId} came back with nothing: ${why}`);
+    this.onDeliver(
+      {
+        id: asked.cardId,
+        variant: "research",
+        state: "error",
+        createdAtMs: this.clock.now(),
+        headline: "",
+        message: why,
+      },
+      null,
+    );
   }
 
   /**
@@ -193,6 +307,7 @@ export class ResearchCards {
         atMs: nowMs,
         packetId: packet.id,
         ideaId: packet.ideaId,
+        cardId: researchCardId(packet.id),
         title: packet.title,
         heldForMs: waited === undefined ? 0 : nowMs - waited.seenAtMs,
         waiting: this.waiting.length,
@@ -245,6 +360,36 @@ export class ResearchCards {
     return wait;
   }
 
+  /**
+   * Fills in the thinking card a question put up (V3-003).
+   *
+   * `heldForMs` is measured from the question rather than from the packet
+   * arriving, because that is the wait the room actually had, and nothing is
+   * added to {@link shownAtMs}: this card was already on the stage, so it
+   * spends no slot and starts no cooldown.
+   */
+  private fillIn(packet: ResearchPacket, asked: { cardId: string; askedAtMs: number }): void {
+    const nowMs = this.clock.now();
+    this.questionCards.delete(packet.ideaId);
+    this.delivered.add(packet.id);
+    this.onRecord({
+      kind: "card",
+      atMs: nowMs,
+      packetId: packet.id,
+      ideaId: packet.ideaId,
+      cardId: asked.cardId,
+      title: packet.title,
+      heldForMs: nowMs - asked.askedAtMs,
+      waiting: this.waiting.length,
+      shownInWindow: this.inWindow(nowMs),
+      filledIn: true,
+    });
+    this.logger.log(
+      `[research] ${asked.cardId} filled in after ${nowMs - asked.askedAtMs} ms: ${packet.title}`,
+    );
+    this.onDeliver({ ...cardForPacket(packet, nowMs), id: asked.cardId }, packet);
+  }
+
   private show(held: Waiting, nowMs: number, atSessionEnd: boolean): void {
     const packet = held.packet;
     this.shownAtMs.push(nowMs);
@@ -255,6 +400,7 @@ export class ResearchCards {
       atMs: nowMs,
       packetId: packet.id,
       ideaId: packet.ideaId,
+      cardId: card.id,
       title: packet.title,
       heldForMs: nowMs - held.seenAtMs,
       waiting: this.waiting.length,

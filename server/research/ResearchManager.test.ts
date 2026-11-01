@@ -8,6 +8,7 @@ import {
   type ResearchGateRecord,
   type ResearchIdeaRecord,
   type ResearchLogLine,
+  type ResearchPacket,
   type ResearchStartRecord,
 } from "../../shared/research.js";
 import type { TurnUpdate } from "../../shared/turns.js";
@@ -452,3 +453,129 @@ describe("ResearchManager: the planner", () => {
 async function tick(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+/** A question as V3-002's classifier hands it over. */
+function asked(overrides: Partial<Parameters<ResearchManager["acceptQuestion"]>[0]> = {}) {
+  return {
+    turnId: "0:12",
+    question: "How long is the drive from the city to the farmhouse venue?",
+    topic: "the drive time",
+    askedBy: "Craig",
+    askedAtMs: 12_000,
+    ...overrides,
+  };
+}
+
+describe("ResearchManager: the fast path from a question (V3-003)", () => {
+  it("searches at once, with no gate call at all", async () => {
+    const { manager, records, started, gateCalls } = harness();
+    const result = manager.acceptQuestion(asked());
+    await manager.flush();
+
+    expect(result?.outcome).toBe("accepted");
+    const ideas = ideaRecords(records);
+    expect(ideas[0]?.origin).toBe("open_question");
+    expect(ideas[0]?.idea.question).toBe(asked().question);
+    expect(ideas[0]?.idea.topic).toBe("the drive time");
+    expect(ideas[0]?.idea.askedAtMs).toBe(12_000);
+    expect(ideas[0]?.idea.sourceTurnIds).toEqual(["0:12"]);
+    // The whole point of the path: no judgment, because the classifier made it.
+    expect(gateCalls).toEqual([]);
+    expect(gateRecords(records)).toEqual([]);
+    expect(records.map((record) => record.kind)).toEqual(["idea", "start"]);
+    expect(started).toEqual(["idea-1"]);
+  });
+
+  it("still gates a hook beside it, which nobody is waiting for", async () => {
+    const { manager, records, started, gateCalls } = harness();
+    manager.acceptQuestion(asked());
+    manager.acceptHook(hook());
+    await manager.flush();
+
+    expect(gateCalls).toHaveLength(1);
+    expect(gateRecords(records).map((record) => record.ideaId)).toEqual(["idea-2"]);
+    expect(started.sort()).toEqual(["idea-1", "idea-2"]);
+  });
+
+  it("spends the same budget the planner and the hooks do", async () => {
+    const { manager, started, finish } = harness({ jobs: "held", extra: { maxConcurrent: 1 } });
+    manager.acceptHook(hook());
+    await tick();
+    expect(started).toEqual(["idea-1"]);
+
+    manager.acceptQuestion(asked());
+    // One slot, already taken: the question waits rather than racing it.
+    expect(started).toEqual(["idea-1"]);
+    expect(manager.queued().map((one) => one.id)).toEqual(["idea-2"]);
+
+    finish("idea-1");
+    await tick();
+    expect(started).toEqual(["idea-1", "idea-2"]);
+  });
+
+  it("goes ahead of a hook already waiting on the budget: the room is waiting for it", async () => {
+    const { manager, started, finish } = harness({
+      jobs: "held",
+      extra: { maxConcurrent: 1 },
+    });
+    manager.acceptHook(hook());
+    manager.acceptHook(hook({ id: "cand-2", headline: "What does a day rate at a farmhouse venue cost?" }));
+    await tick();
+    expect(started).toEqual(["idea-1"]);
+    expect(manager.queued().map((one) => one.id)).toEqual(["idea-2"]);
+
+    manager.acceptQuestion(asked());
+    expect(manager.queued().map((one) => one.id)).toEqual(["idea-3", "idea-2"]);
+    finish("idea-1");
+    await tick();
+    expect(started).toEqual(["idea-1", "idea-3"]);
+  });
+
+  it("answers a repeated question from the packet the first one found", async () => {
+    const packet: ResearchPacket = {
+      id: "packet-1",
+      ideaId: "idea-1",
+      title: "About two hours fifteen each way",
+      teaser: "The farmhouse is 78 miles out; 2h15 off-peak.",
+      keyPoints: ["78 miles, 2h15 off-peak"],
+      spokenAnswer: "About two hours fifteen each way.",
+      sources: [{ url: "https://example.com/route", title: "Route" }],
+      createdAtMs: 30_000,
+      latencyMs: 18_000,
+    };
+    const { manager, records, started } = harness({ extra: { packets: () => [packet] } });
+    manager.acceptQuestion(asked());
+    await manager.flush();
+    expect(started).toEqual(["idea-1"]);
+
+    const again = manager.acceptQuestion(
+      asked({ turnId: "0:20", question: "How long is that drive from the city to the farmhouse?" }),
+    );
+    await manager.flush();
+
+    expect(again?.outcome).toBe("reused");
+    expect(again?.outcome === "reused" ? again.packet.id : null).toBe("packet-1");
+    expect(ideaRecords(records)[1]?.duplicateOf).toBe("idea-1");
+    // No second search, and no second idea in the session's memory.
+    expect(started).toEqual(["idea-1"]);
+    expect(manager.ideas()).toHaveLength(1);
+  });
+
+  it("stops at the dedupe while the first search is still running", async () => {
+    const { manager, started } = harness({ jobs: "held" });
+    manager.acceptQuestion(asked());
+    await tick();
+    const again = manager.acceptQuestion(asked({ turnId: "0:20" }));
+
+    expect(again?.outcome).toBe("duplicate");
+    expect(again?.outcome === "duplicate" ? again.duplicateOf : null).toBe("idea-1");
+    expect(started).toEqual(["idea-1"]);
+  });
+
+  it("answers nothing once the session has stopped", () => {
+    const { manager, started } = harness();
+    manager.stop();
+    expect(manager.acceptQuestion(asked())).toBeNull();
+    expect(started).toEqual([]);
+  });
+});

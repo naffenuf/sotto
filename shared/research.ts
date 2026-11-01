@@ -2,15 +2,22 @@
  * What Sotto decides to look up, and why (PRD V2-012).
  *
  * A **research idea** is one checkable question worth putting to a web
- * search. Two things produce them: a `research_hook` candidate, which is the
+ * search. Three things produce them: a `research_hook` candidate, which is the
  * observer noticing that outside information would settle something
- * (V2-011), and the planner, which reads the board every couple of minutes
- * and proposes a couple of its own. Both arrive here as the same shape, are
- * deduplicated against everything the session has already thought of, and are
- * then scored by the **gate** — Muse Glimmer on this Mac, falling back to
- * Muse Spark (V2-010) — on the three questions that decide whether looking it
- * up is worth anything: is it useful to this group now, is it something they
- * do not already know, and can a search actually answer it.
+ * (V2-011), the planner, which reads the board every couple of minutes
+ * and proposes a couple of its own, and a question the room wondered aloud
+ * (V3-002). All three arrive here as the same shape and are
+ * deduplicated against everything the session has already thought of; the
+ * first two are then scored by the **gate** — Muse Glimmer on this Mac,
+ * falling back to Muse Spark (V2-010) — on the three questions that decide
+ * whether looking it up is worth anything: is it useful to this group now, is
+ * it something they do not already know, and can a search actually answer it.
+ *
+ * An `open_question` skips the gate (V3-003). The classifier that heard it has
+ * already judged it answerable by a lookup and asked by the room rather than
+ * of Sotto, so a second judgment on the same question would buy nothing and
+ * cost the only thing the answer has, which is arriving while it still
+ * matters. It still spends the budget: a search is a search.
  *
  * Noticing is cheap, searching is not, so the gate is deliberately a filter
  * rather than a ranking: everything it sees is written to `research.jsonl`,
@@ -27,8 +34,13 @@ import type { Citation } from "./cards.js";
 import { clipChars, clipWords } from "./candidates.js";
 import { DEFAULT_FREQUENCY, FREQUENCY_LIMITS } from "./policy.js";
 
-/** Where an idea came from. Recorded, because the two differ in quality. */
-export const researchOrigins = ["hook", "planner"] as const;
+/**
+ * Where an idea came from. Recorded, because they differ in quality — and, in
+ * one case, in route: an `open_question` is something the room wondered aloud
+ * (V3-002), and it skips the gate entirely (V3-003), because the classifier
+ * has already judged it answerable and asked by the group.
+ */
+export const researchOrigins = ["hook", "planner", "open_question"] as const;
 export type ResearchOrigin = (typeof researchOrigins)[number];
 
 /** Characters of topic. A handle for the idea, not a sentence. */
@@ -61,6 +73,16 @@ export interface ResearchIdea {
   why: string;
   /** Turn ids it came out of, copied from the transcript. */
   sourceTurnIds: string[];
+  /**
+   * When the room asked it, on the session clock — an `open_question` only
+   * (V3-003).
+   *
+   * The one piece of history an idea carries, and it is here rather than on
+   * the log record because the thing being measured spans the whole fast
+   * path: `questionToPacketMs` is the turn going final to the packet being
+   * ready, and the runner is what knows the second half of that.
+   */
+  askedAtMs?: number;
 }
 
 /** Collapses whitespace: every field of an idea is shown on one line. */
@@ -392,6 +414,36 @@ export function hookIdea(hook: {
   };
 }
 
+/**
+ * The idea inside a question the room wondered aloud (V3-002, V3-003).
+ *
+ * Cheaper than a hook's, because the classifier already returned both halves:
+ * `question` is the thing to look up, cleaned and standing on its own, and
+ * `topic` is the three-to-five words "I'll check the drive time" is built from
+ * (V3-015). All this adds is the `why`, which is written locally — nobody
+ * needs a model call to say that the room asked and nobody knew.
+ */
+export function questionIdea(asked: {
+  turnId: string;
+  question: string;
+  topic: string;
+  askedBy: string | null;
+  askedAtMs: number;
+}): Omit<ResearchIdea, "id"> {
+  const question = clipChars(oneLine(asked.question), QUESTION_MAX_CHARS);
+  const topic = clipChars(oneLine(asked.topic), TOPIC_MAX_CHARS);
+  return {
+    topic: topic === "" ? topicFromQuestion(question) : topic,
+    question,
+    why: clipWords(
+      `${asked.askedBy ?? "Somebody"} wondered this aloud and nobody in the room knew.`,
+      WHY_MAX_WORDS,
+    ),
+    sourceTurnIds: [asked.turnId],
+    askedAtMs: asked.askedAtMs,
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * The packet (V2-013): what one search came back with.
  * ------------------------------------------------------------------ */
@@ -410,6 +462,13 @@ export const MAX_KEY_POINTS = 5;
 
 /** Sources one packet may carry. One good page beats five weak ones. */
 export const MAX_PACKET_SOURCES = 5;
+
+/**
+ * Words of {@link ResearchPacket.spokenAnswer}. The PRD's "one or two
+ * sentences", as a number, and said out loud rather than read: the same
+ * allowance as the teaser, because a sentence is a sentence.
+ */
+export const PACKET_SPOKEN_MAX_WORDS = 40;
 
 /**
  * One finished piece of background research.
@@ -431,6 +490,19 @@ export interface ResearchPacket {
   teaser: string;
   /** The findings themselves, best first. */
   keyPoints: string[];
+  /**
+   * One or two sentences answering the question out loud (V3-003).
+   *
+   * Not the teaser: the teaser is read off a screen in a glance, and this is
+   * heard once, so it rounds its numbers, carries no URLs and no list, and
+   * says the answer first. It is what V3-004 speaks to the room when the room
+   * is the thing that asked.
+   *
+   * Absent when the model left it blank — and never present on a packet with
+   * no sources, because a packet with no sources is discarded before it
+   * exists.
+   */
+  spokenAnswer?: string;
   /** Pages the search really returned, resolved the way a verdict's are. */
   sources: Citation[];
   /**
@@ -478,6 +550,13 @@ export const PacketReplySchema = z.strictObject({
   keyPoints: z
     .array(z.string())
     .transform((list) => lines(list, KEY_POINT_MAX_WORDS, MAX_KEY_POINTS)),
+  // Deliberately tolerant: a search that came back with a title, a teaser and
+  // five findings is a good packet whether or not the model also wrote the
+  // spoken line, and losing it over a missing field would be the worse trade.
+  spokenAnswer: z
+    .string()
+    .optional()
+    .transform((text) => clipWords(oneLine(text ?? ""), PACKET_SPOKEN_MAX_WORDS)),
   sources: z.array(z.unknown()),
 });
 export type PacketReply = z.infer<typeof PacketReplySchema>;
@@ -514,6 +593,13 @@ export const researchPacketJsonSchema = {
         `${KEY_POINT_MAX_WORDS} words. Numbers, names, dates, rules — never advice.`,
       items: { type: "string" },
     },
+    spokenAnswer: {
+      type: "string",
+      description:
+        `One or two sentences — at most ${PACKET_SPOKEN_MAX_WORDS} words — answering the ` +
+        `question out loud, to be heard rather than read: the answer first, numbers rounded ` +
+        `the way a person would say them, no URLs, no list, no "according to".`,
+    },
     sources: {
       type: "array",
       description:
@@ -534,7 +620,7 @@ export const researchPacketJsonSchema = {
       },
     },
   },
-  required: ["title", "teaser", "keyPoints", "sources"],
+  required: ["title", "teaser", "keyPoints", "spokenAnswer", "sources"],
   additionalProperties: false,
 } as const;
 
@@ -564,10 +650,43 @@ export interface ResearchPacketRecord {
   title?: string;
   /** Real milliseconds the job took. */
   latencyMs: number;
+  /**
+   * The fast path's end-to-end latency (V3-003): the question turn going
+   * final to this job finishing, on the **session** clock.
+   *
+   * Absent for a hook's or the planner's idea, which nobody asked for out
+   * loud. It reads near zero in a `max`-speed replay, where simulated time
+   * stands still inside a tracked model call — `npm run e2e` is the clock
+   * that charges for a search, and the one the PRD's 25-second target is
+   * measured on.
+   */
+  questionToPacketMs?: number;
   /** Whether the model searched at all, as the API reported it. */
   searched: boolean;
   /** Why there is no packet, when there is none. */
   error?: string;
+}
+
+/**
+ * One line of `research.jsonl`: the card a question put up while it searched
+ * (V3-003).
+ *
+ * The room wondered something aloud, so a card goes on the stage *at once*,
+ * carrying the question and a thinking indicator, and the packet fills it in
+ * twenty seconds later. This is the line that says when the group first saw
+ * Sotto working, which is the only moment in the fast path no other record
+ * holds.
+ */
+export interface ResearchPendingRecord {
+  kind: "pending";
+  /** When the card went up, on the session clock. */
+  atMs: number;
+  ideaId: string;
+  /** The card it went up as, which the packet's own `card` line repeats. */
+  cardId: string;
+  question: string;
+  /** The packet an earlier identical question had already found, when there is one. */
+  reusedPacketId?: string;
 }
 
 /** One line of `research.jsonl`: a packet that reached the stage (V2-014). */
@@ -577,6 +696,16 @@ export interface ResearchCardRecord {
   atMs: number;
   packetId: string;
   ideaId: string;
+  /**
+   * The card's own id.
+   *
+   * Usually {@link researchCardId} of `packetId` and derivable from it, but
+   * not for a question's packet: that card went up as
+   * {@link researchQuestionCardId} before the packet existed (V3-003), and
+   * filling it in has to keep the id the stage already has. So readers take
+   * it from here rather than deriving it.
+   */
+  cardId?: string;
   /** The packet's own title, so the file reads without the packet beside it. */
   title: string;
   /** How long it waited for a pause and a budget slot. */
@@ -587,6 +716,15 @@ export interface ResearchCardRecord {
   shownInWindow: number;
   /** True when the conversation ended and the card went out anyway. */
   atSessionEnd?: boolean;
+  /**
+   * True when this push filled in a card that was already on the stage with a
+   * thinking indicator (V3-003).
+   *
+   * Like {@link broughtForward} it is not an unsolicited card: the room asked
+   * the question, the card is already there, and nothing new interrupts
+   * anybody — so it waits for no pause and spends no budget.
+   */
+  filledIn?: true;
   /**
    * True when somebody asked for this research and the card was brought to
    * the top of the stage, open, while Sotto briefed them on it (V2-015).
@@ -603,6 +741,7 @@ export type ResearchLogLine =
   | ResearchGateRecord
   | ResearchStartRecord
   | ResearchPacketRecord
+  | ResearchPendingRecord
   | ResearchCardRecord;
 
 /**
@@ -660,6 +799,20 @@ export function researchCardId(packetId: string): string {
   return `${RESEARCH_CARD_ID_PREFIX}${packetId}`;
 }
 
+/**
+ * The id the card for one *question* gets, from the moment the question is
+ * accepted (V3-003).
+ *
+ * Keyed on the idea rather than on the packet because there is no packet yet:
+ * the card goes up with a thinking indicator while the search runs, and the
+ * packet fills in the card the stage already has. Still under
+ * {@link RESEARCH_CARD_ID_PREFIX}, so `POST /api/feedback` can no more find a
+ * candidate behind this one than behind any other research card.
+ */
+export function researchQuestionCardId(ideaId: string): string {
+  return `${RESEARCH_CARD_ID_PREFIX}${ideaId}`;
+}
+
 /** What a research card is called on the stage, in the PRD's own words. */
 export const RESEARCH_CARD_PREFIX = "Research ready:";
 
@@ -667,6 +820,24 @@ export const RESEARCH_CARD_PREFIX = "Research ready:";
 export function researchCardHeadline(title: string): string {
   return `${RESEARCH_CARD_PREFIX} ${title}`;
 }
+
+/** What the card says while the search is still running (V3-003). */
+export const RESEARCH_LOOKING_PREFIX = "Looking up:";
+
+/**
+ * The thinking card's one line: the prefix and the question itself.
+ *
+ * The question rather than the topic, because this is the only thing on the
+ * stage that says what Sotto thought it heard — a room that reads "Looking up:
+ * how long the drive to the farmhouse takes" knows at a glance both that it
+ * was heard and that it was heard right.
+ */
+export function researchLookingHeadline(question: string): string {
+  return `${RESEARCH_LOOKING_PREFIX} ${oneLine(question)}`;
+}
+
+/** What the card says when the search came back with nothing showable (V3-003). */
+export const RESEARCH_NO_ANSWER = "Nothing solid on this one.";
 
 /**
  * How long after one research card the next one waits, at the default
