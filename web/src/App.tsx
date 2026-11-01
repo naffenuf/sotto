@@ -48,6 +48,8 @@ export function App() {
   const [notesOpen, setNotesOpen] = useStoredFlag("notes-open", true);
   /** The history fold: closed while a session runs, unless this browser chose otherwise. */
   const [historyOpenChoice, setHistoryOpen] = useStoredFlag("history-open", events.session === null);
+  /** The transcript's search text, which the notes light up too. */
+  const [query, setQuery] = useState("");
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useVoicePlayback(setProblem);
@@ -237,7 +239,7 @@ export function App() {
               {/* The conversation and the board at once: the transcript takes
                   what the folds leave, so a viewer sees words land and the
                   notes fill in the same frame. */}
-              <TranscriptPanel turns={events.turns} speakers={events.speakers} onRename={onRenameSpeaker} highlight={cited} />
+              <TranscriptPanel turns={events.turns} speakers={events.speakers} onRename={onRenameSpeaker} highlight={cited} onSearch={setQuery} />
               <Fold
                 name="notes"
                 title="Discussion notes"
@@ -254,6 +256,7 @@ export function App() {
                   updatedAt={events.boardReceivedAtMs}
                   updating={statuses.model.state === "connecting"}
                   bare
+                  query={query}
                 />
               </Fold>
             </>

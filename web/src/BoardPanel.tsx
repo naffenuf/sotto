@@ -10,6 +10,8 @@
  * folded behind one toggle rather than left to clutter four sections.
  */
 import { useEffect, useRef, useState } from "react";
+import { Marked } from "./Marked.js";
+import { matchesQuery } from "./search.js";
 import type { Board, BoardSection, Item } from "../../shared/index.js";
 import {
   HIGHLIGHT_MS,
@@ -38,9 +40,11 @@ export interface BoardPanelProps {
   historical?: boolean;
   /** Without its own title row: the fold it sits in carries the title and the freshness. */
   bare?: boolean;
+  /** The transcript's normalized search text, so the same word lights up here. */
+  query?: string;
 }
 
-export function BoardPanel({ board, changedIds, updatedAt, updating, historical = false, bare = false }: BoardPanelProps) {
+export function BoardPanel({ board, changedIds, updatedAt, updating, historical = false, bare = false, query = "" }: BoardPanelProps) {
   const highlighted = useHighlight(changedIds, updatedAt);
   const [showDropped, setShowDropped] = useState(false);
   const dropped = droppedCount(board);
@@ -70,7 +74,7 @@ export function BoardPanel({ board, changedIds, updatedAt, updating, historical 
           <>
             {board.summary !== "" && (
               <p className="board__summary" data-testid="board-summary">
-                {board.summary}
+                <Marked text={board.summary} query={query} />
               </p>
             )}
             {PANEL_SECTIONS.map((section) => (
@@ -79,6 +83,7 @@ export function BoardPanel({ board, changedIds, updatedAt, updating, historical 
                 section={section}
                 items={visibleItems(board[section], showDropped)}
                 highlighted={highlighted}
+                query={query}
               />
             ))}
             {dropped > 0 && (
@@ -103,10 +108,11 @@ interface BoardSectionListProps {
   section: BoardSection;
   items: readonly Item[];
   highlighted: ReadonlySet<string>;
+  query: string;
 }
 
 /** One section. An empty one is left out rather than shown as a stub. */
-function BoardSectionList({ section, items, highlighted }: BoardSectionListProps) {
+function BoardSectionList({ section, items, highlighted, query }: BoardSectionListProps) {
   if (items.length === 0) return null;
   return (
     <div className="board__section" data-testid="board-section" data-section={section}>
@@ -115,8 +121,11 @@ function BoardSectionList({ section, items, highlighted }: BoardSectionListProps
         {items.map((item) => (
           <li
             key={item.id}
-            className={`board__item board__item--${item.status}`}
+            className={`board__item board__item--${item.status}${
+              query !== "" && !matchesQuery(item.text, query) ? " board__item--dim" : ""
+            }`}
             data-testid="board-item"
+            data-match={query !== "" && matchesQuery(item.text, query) ? true : undefined}
             data-item-id={item.id}
             data-status={item.status}
             data-changed={highlighted.has(item.id)}
@@ -124,7 +133,9 @@ function BoardSectionList({ section, items, highlighted }: BoardSectionListProps
             <span className="board__box" aria-hidden="true">
               {item.status === "open" ? "☐" : "☑"}
             </span>
-            <span className="board__text">{item.text}</span>
+            <span className="board__text">
+              <Marked text={item.text} query={query} />
+            </span>
           </li>
         ))}
       </ul>

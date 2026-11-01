@@ -16,9 +16,11 @@
  * after a breath is one paragraph, with each turn a segment inside it so a
  * cited turn can still be pointed at.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SOTTO_SPEAKER, mergeRuns } from "../../shared/index.js";
 import type { SpeakerNames, TranscriptRun, TurnUpdate } from "../../shared/index.js";
+import { Marked } from "./Marked.js";
+import { matchesQuery, normalizeQuery } from "./search.js";
 
 /** How close to the bottom still counts as following the conversation. */
 const AT_BOTTOM_PX = 48;
@@ -77,6 +79,8 @@ export interface TranscriptPanelProps {
   onRename: (label: string, name: string | null) => void;
   /** The turn an evidence quote asked for, or `null` (US-015). */
   highlight?: TurnHighlight | null;
+  /** Told the (normalized) search text, so the notes can light up the same word. */
+  onSearch?: (query: string) => void;
 }
 
 export function TranscriptPanel({
@@ -84,12 +88,62 @@ export function TranscriptPanel({
   speakers,
   onRename,
   highlight = null,
+  onSearch,
 }: TranscriptPanelProps) {
   const list = useRef<HTMLDivElement>(null);
   /** True while the newest turn should stay in view. */
   const [following, setFollowing] = useState(true);
   /** The label being named, or `null` when nobody is being named. */
   const [editing, setEditing] = useState<string | null>(null);
+  /** What is typed in the search box, and the normalized form everything matches on. */
+  const [typed, setTyped] = useState("");
+  const query = normalizeQuery(typed);
+  /** Which match is being looked at, and when it was asked for (a repeat is a new scroll). */
+  const [focus, setFocus] = useState<{ index: number; at: number }>({ index: 0, at: 0 });
+
+  const runs = useMemo(() => mergeRuns(turns), [turns]);
+  /** Ids of the rows that contain the query, in order. */
+  const matchIds = useMemo(
+    () =>
+      query === ""
+        ? []
+        : runs
+            .filter((run) => run.segments.some((turn) => matchesQuery(turn.text, query)))
+            .map((run) => run.id),
+    [runs, query],
+  );
+
+  // A new query starts at its first match; the notes hear about it too.
+  useEffect(() => {
+    setFocus({ index: 0, at: Date.now() });
+    onSearch?.(query);
+  }, [query, onSearch]);
+
+  // Scroll the current match into view, the way a cited turn is.
+  useEffect(() => {
+    if (matchIds.length === 0 || focus.at === 0) return;
+    const id = matchIds[Math.min(focus.index, matchIds.length - 1)];
+    if (id === undefined) return;
+    const node = list.current;
+    if (node === null) return;
+    const row = node.querySelector(`[data-testid="turn"][data-turn-id="${CSS.escape(id)}"]`);
+    if (row === null) return;
+    setFollowing(false);
+    const rowBox = row.getBoundingClientRect();
+    const listBox = node.getBoundingClientRect();
+    node.scrollTop += rowBox.top - listBox.top - (listBox.height - rowBox.height) / 2;
+  }, [focus, matchIds]);
+
+  const step = useCallback(
+    (by: number) => {
+      setFocus((current) => {
+        if (matchIds.length === 0) return current;
+        const index = (((current.index + by) % matchIds.length) + matchIds.length) % matchIds.length;
+        return { index, at: Date.now() };
+      });
+    },
+    [matchIds.length],
+  );
 
   // Before the browser paints the new row, not after, so the list never
   // flashes the second-to-last turn.
@@ -142,7 +196,36 @@ export function TranscriptPanel({
 
   return (
     <section className="transcript" data-testid="transcript">
-      <h2 className="panel__title">Transcript</h2>
+      <div className="transcript__header">
+        <h2 className="panel__title">Transcript</h2>
+        <input
+          type="search"
+          className="search"
+          data-testid="transcript-search"
+          placeholder="Find…"
+          aria-label="Find in the conversation"
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          onKeyDown={(event) => {
+            // Enter walks the matches; Shift+Enter walks them backwards.
+            if (event.key === "Enter") {
+              event.preventDefault();
+              step(event.shiftKey ? -1 : 1);
+            } else if (event.key === "Escape") {
+              setTyped("");
+            }
+          }}
+        />
+        {query !== "" && (
+          <span className="search__nav" data-testid="search-nav">
+            <span className="search__count" data-testid="search-count">
+              {matchIds.length === 0 ? "0" : `${Math.min(focus.index, matchIds.length - 1) + 1} of ${matchIds.length}`}
+            </span>
+            <button type="button" className="search__step" title="Previous match (Shift+Enter)" disabled={matchIds.length === 0} onClick={() => step(-1)}>▲</button>
+            <button type="button" className="search__step" title="Next match (Enter)" disabled={matchIds.length === 0} onClick={() => step(1)}>▼</button>
+          </span>
+        )}
+      </div>
       {editing !== null && (
         <SpeakerNameForm
           label={editing}
@@ -157,12 +240,14 @@ export function TranscriptPanel({
             Nothing yet. Start a session and the conversation shows up here.
           </p>
         ) : (
-          mergeRuns(turns).map((run) => (
+          runs.map((run) => (
             <TranscriptRow
               key={run.id}
               run={run}
               speakers={speakers}
               citedTurnId={highlight?.turnId ?? null}
+              query={query}
+              focused={matchIds.length > 0 && run.id === matchIds[Math.min(focus.index, matchIds.length - 1)]}
               onName={setEditing}
             />
           ))
@@ -186,12 +271,20 @@ interface TranscriptRowProps {
   run: TranscriptRun;
   speakers: SpeakerNames;
   citedTurnId: string | null;
+  /** The normalized search text, or `""`. */
+  query: string;
+  /** True for the match being looked at. */
+  focused: boolean;
   onName: (label: string | null) => void;
 }
 
 /** One paragraph: the chip once, then every turn of the run as a segment. */
-function TranscriptRow({ run, speakers, citedTurnId, onName }: TranscriptRowProps) {
+function TranscriptRow({ run, speakers, citedTurnId, query, focused, onName }: TranscriptRowProps) {
   const cited = citedTurnId !== null && run.segments.some((turn) => turn.turnId === citedTurnId);
+  const matches = query !== "" && run.segments.some((turn) => matchesQuery(turn.text, query));
+  // While searching, what does not match steps back rather than disappearing:
+  // the conversation around a hit is what makes the hit mean anything.
+  const dim = query !== "" && !matches;
   // A row is a partial only while nothing in it is final yet.
   const final = run.segments.some((turn) => turn.final);
   const last = run.segments[run.segments.length - 1];
@@ -199,8 +292,10 @@ function TranscriptRow({ run, speakers, citedTurnId, onName }: TranscriptRowProp
     <p
       className={`turn ${final ? "turn--final" : "turn--partial"}${run.sotto ? " turn--sotto" : ""}${
         cited ? " turn--cited" : ""
-      }`}
+      }${dim ? " turn--dim" : ""}${focused ? " turn--found" : ""}`}
       data-testid="turn"
+      data-match={matches ? true : undefined}
+      data-found={focused ? true : undefined}
       data-turn-id={run.id}
       data-turn-ids={run.segments.map((turn) => turn.turnId).join(" ")}
       data-cited={cited ? true : undefined}
@@ -248,7 +343,7 @@ function TranscriptRow({ run, speakers, citedTurnId, onName }: TranscriptRowProp
             data-final={turn.final}
           >
             {index > 0 ? " " : ""}
-            {turn.text.trim()}
+            <Marked text={turn.text.trim()} query={query} />
           </span>
         ))}
       </span>
