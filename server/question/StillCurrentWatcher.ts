@@ -30,6 +30,7 @@ import { systemClock, type Clock } from "../clock.js";
 import {
   StillCurrentSchema,
   type StillCurrentClassifier,
+  type StillCurrentKind,
   type StillCurrentResult,
   type StillCurrentVerdict,
 } from "./stillCurrent.js";
@@ -55,6 +56,8 @@ export interface StillCurrentState {
 
 /** What is being watched: one question, and the answer Sotto found for it. */
 interface Watched {
+  /** A correction (V3-008) is framed differently to the model. */
+  kind: StillCurrentKind;
   question: string;
   answer: string;
   /** Session clock when the question went final; later turns are the context. */
@@ -100,10 +103,23 @@ export class StillCurrentWatcher {
   /**
    * A sourced answer is ready for one of the room's own questions: start
    * watching whether the room still wants it.
+   *
+   * V3-008 watches one more thing the same way — a correction a `bold`
+   * session may say out loud — keyed by its candidate id. The only difference
+   * is `kind`, which decides how the two are described to the model.
    */
-  watch(ideaId: string, asked: { question: string; answer: string; askedAtMs: number }): void {
+  watch(
+    ideaId: string,
+    asked: {
+      kind?: StillCurrentKind;
+      question: string;
+      answer: string;
+      askedAtMs: number;
+    },
+  ): void {
     if (this.stopped || this.watched.has(ideaId)) return;
     this.watched.set(ideaId, {
+      kind: asked.kind ?? "question",
       question: asked.question,
       answer: asked.answer,
       askedAtMs: asked.askedAtMs,
@@ -232,6 +248,7 @@ export class StillCurrentWatcher {
         await Promise.race([
           this.options.classify(
             {
+              kind: watched.kind,
               question: watched.question,
               answer: watched.answer,
               since,

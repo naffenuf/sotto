@@ -38,6 +38,7 @@ import type { SessionWriter } from "./SessionStore.js";
 import { emptyModel } from "../test/emptyModel.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
+import type { Boldness } from "../../shared/policy.js";
 import type { VoiceOut, VoiceUtterance } from "../voice/voiceOut.js";
 import type { GlimmerClient } from "../model/GlimmerClient.js";
 import { DIGEST_SECTIONS } from "./digest.js";
@@ -2685,5 +2686,192 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     // turns, and a run that left it watching made fifty checks.
     const checks = timing.filter((record) => record["stage"] === "still_current");
     expect(checks.length).toBeLessThan(4);
+  }, 60_000);
+});
+
+describe("SessionManager, Sotto's own corrections (V3-008)", () => {
+  /**
+   * A model that notices one wrong date, and a web check that agrees it is
+   * wrong — the only candidate in the six kinds that may ever be spoken.
+   */
+  class CorrectingModel implements ModelClient {
+    readonly labels: string[] = [];
+    private offered = false;
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "address") return { kind: "mention", question: "" };
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "research-planner") return { ideas: [] };
+      if (call.label === "question") return { kind: "none", question: "", topic: "" };
+      if (call.label === "still-current") {
+        return { verdict: "current", agrees: false, why: "still costing the timeline" };
+      }
+      if (call.label === "observer" && !this.offered) {
+        this.offered = true;
+        return {
+          candidates: [
+            {
+              type: "factual_error",
+              headline: "Instagram launched in 2010, not 2014",
+              detail: "The launch was October 2010, four years earlier.",
+              whyNow: "the timeline is being costed off that year",
+              evidenceTurnIds: ["0:3"],
+              relatedBoardItemIds: [],
+              scores: { relevance: 0.95, novelty: 0.9, importance: 0.9, confidence: 0.9 },
+            },
+          ],
+        };
+      }
+      return { candidates: [] };
+    }
+
+    async grounded(call: GroundedCall): Promise<GroundedReply> {
+      this.labels.push(call.label);
+      if (call.label !== "verify") throw new Error(`no grounded call for ${call.label}`);
+      return {
+        value: {
+          verdict: "wrong",
+          correction: "Instagram launched in October 2010.",
+          citations: [{ url: "https://example.com/instagram", title: "Instagram" }],
+        },
+        citations: [{ url: "https://example.com/instagram", title: "Instagram" }],
+        searchedUrls: ["https://example.com/instagram"],
+        searched: true,
+        functionCalls: 0,
+      };
+    }
+
+    async prose(): Promise<never> {
+      throw new Error("a correction is one sentence, written locally");
+    }
+  }
+
+  function timingWriter(timing: Record<string, unknown>[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: () => {},
+      appendTiming: (record: Record<string, unknown>) => timing.push(record),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  /** A voice that keeps every utterance, so a replay can be read back. */
+  class SpeakingVoice implements VoiceOut {
+    private count = 0;
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const id = `v${(this.count += 1)}`;
+      const spoken = (): string => parts.join(" ");
+      return Promise.resolve({
+        id,
+        append: (text) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      });
+    }
+  }
+
+  /** One `moment-fact` replay, with the boldness the session is set to. */
+  async function replay(boldness: Boldness): Promise<{
+    cards: StageCard[];
+    timing: Record<string, unknown>[];
+    voice: SpeakingVoice;
+    turns: TurnUpdate[];
+  }> {
+    const bus = new EventBus(quiet);
+    const timing: Record<string, unknown>[] = [];
+    const cards: StageCard[] = [];
+    const turns: TurnUpdate[] = [];
+    const voice = new SpeakingVoice();
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+      if (event.type === "turn") turns.push(event.turn);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => timingWriter(timing),
+      createModel: () => new CorrectingModel(),
+      createVoice: () => voice,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    sessions.setPolicySettings({ boldness });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-fact" });
+    await ended;
+    return { cards, timing, voice, turns };
+  }
+
+  it("shows the correction and says nothing at the default boldness", async () => {
+    const run = await replay("normal");
+
+    const correction = run.cards.find((card) => card.headline.includes("Instagram"));
+    expect(correction).toBeDefined();
+    // V3-017's hand: Sotto is holding this, and the room can call on it.
+    expect(correction?.raised).toBe(true);
+    expect(run.voice.utterances).toEqual([]);
+    expect(
+      run.timing.filter((record) => record["stage"] === "spoken_contribution"),
+    ).toEqual([]);
+    expect(run.turns.filter((turn) => isSottoTurn(turn))).toEqual([]);
+  }, 60_000);
+
+  it("says the verified one in a sentence when the room asked for bold", async () => {
+    const run = await replay("bold");
+
+    expect(run.voice.utterances).toEqual([
+      "Quick correction: Instagram launched in 2010, not 2014.",
+    ]);
+    const spoken = run.timing.filter(
+      (record) => record["stage"] === "spoken_contribution",
+    );
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0]).toMatchObject({
+      kind: "correction",
+      candidateId: "cand-1",
+      spoken: true,
+      yielded: false,
+      text: "Quick correction: Instagram launched in 2010, not 2014.",
+    });
+    // The card is still there, and no longer a raised hand: it was said.
+    const correction = run.cards.find((card) => card.headline.includes("Instagram"));
+    expect(correction?.raised).toBeUndefined();
+    // And the line is in the transcript as Sotto's (V2-008a).
+    const sotto = run.turns.filter((turn) => isSottoTurn(turn));
+    expect(sotto.map((turn) => turn.text)).toContain(
+      "Quick correction: Instagram launched in 2010, not 2014.",
+    );
   }, 60_000);
 });

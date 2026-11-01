@@ -203,6 +203,24 @@ describe.skipIf(apiKey === "")(`the observer after replaying ${fixture}`, () => 
     }
   });
 
+  // V3-008: a contradiction, an untested assumption and a dropped thread are
+  // handed to the group as *their* question rather than as Sotto's verdict,
+  // because the card is the whole contribution — nothing says it out loud.
+  it("phrases a correction as a question about what was said", () => {
+    const asQuestions = result.records
+      .map((record) => record.candidate)
+      .filter((candidate) =>
+        ["contradiction", "untested_assumption", "dropped_thread"].includes(candidate.type),
+      );
+    expect(asQuestions.length, "the fixture plants a contradiction").toBeGreaterThan(0);
+    for (const candidate of asQuestions) {
+      expect(candidate.headline, `${candidate.id} ${candidate.type}`).toContain("?");
+      // And a question about this conversation, not coach-speak that would
+      // fit any meeting ever held.
+      expect(candidate.headline.toLowerCase()).not.toContain("have you considered");
+    }
+  });
+
   it("stays quiet enough to be worth listening to", () => {
     // Twenty-six scripted lines with one planted moment. A handful of
     // candidates is the prompt working; one per board update is it padding.

@@ -475,7 +475,12 @@ export const observerCandidatesJsonSchema = {
           },
           headline: {
             type: "string",
-            description: `The point, in one sentence of at most ${HEADLINE_MAX_CHARS} characters.`,
+            description:
+              `The point, in one sentence of at most ${HEADLINE_MAX_CHARS} characters. ` +
+              "For contradiction, untested_assumption and dropped_thread: a specific " +
+              "question about what the group just said, never a verdict or a label. " +
+              "For factual_error: the correction itself. For unanswered_question and " +
+              "research_hook: the question, in the group's own words where there is one.",
           },
           detail: {
             type: "string",

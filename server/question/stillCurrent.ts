@@ -43,9 +43,26 @@ export const StillCurrentSchema = z.object({
 
 export type StillCurrentResult = z.infer<typeof StillCurrentSchema>;
 
+/**
+ * What is waiting to be said: an answer to one of the room's own questions
+ * (V3-004), or one of Sotto's own corrections at boldness `bold` (V3-008).
+ *
+ * The three verdicts mean the same thing either way — the group is still on
+ * it, somebody present has already said it, or the conversation has moved —
+ * but the two are *framed* differently to the model, because a correction's
+ * "question" is a claim somebody made rather than something anybody asked.
+ */
+export const stillCurrentKinds = ["question", "correction"] as const;
+export type StillCurrentKind = (typeof stillCurrentKinds)[number];
+
 /** Everything one check is made from. */
 export interface StillCurrentInput {
-  /** The question the room wondered aloud, as the classifier cleaned it up. */
+  /** Which of the two things is waiting; a question when nothing says. */
+  kind?: StillCurrentKind;
+  /**
+   * The question the room wondered aloud, as the classifier cleaned it up —
+   * or, for a `correction`, the claim in the room's own words.
+   */
   question: string;
   /** The sourced answer, so `agrees` can be judged against something. */
   answer: string;
@@ -70,15 +87,19 @@ export async function classifyStillCurrent(
     const speaker = turn.speaker === null ? "?" : input.speakers[turn.speaker] ?? turn.speaker;
     return `${speaker}: ${turn.text.trim()}`;
   };
+  const correction = input.kind === "correction";
   const value = await model.structured({
     label: "still-current",
     system: loadPrompt(PROMPTS.stillCurrent),
     user:
-      `The question somebody wondered aloud:\n${input.question}` +
-      `\n\nWhat Sotto found:\n${input.answer}` +
-      `\n\nEvery turn since the question, oldest first:\n${
-        input.since.map(named).join("\n") || "(none — nobody has spoken since)"
-      }`,
+      (correction
+        ? `What somebody in the room said, which Sotto believes is wrong:\n${input.question}` +
+          `\n\nThe correction Sotto is about to say:\n${input.answer}` +
+          `\n\nEvery turn since it was said, oldest first:\n`
+        : `The question somebody wondered aloud:\n${input.question}` +
+          `\n\nWhat Sotto found:\n${input.answer}` +
+          `\n\nEvery turn since the question, oldest first:\n`) +
+      `${input.since.map(named).join("\n") || "(none — nobody has spoken since)"}`,
     schemaName: "still_current",
     schema: {
       type: "object",

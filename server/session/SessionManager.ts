@@ -66,7 +66,8 @@ import { BoardUpdater } from "../board/BoardUpdater.js";
 import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
 import { CandidateGate, DEFAULT_GATE_MODE, type GateMode } from "../interject/CandidateGate.js";
-import { cardForInterjection } from "../interject/delivery.js";
+import { correctedClaim, spokenCorrection } from "../interject/corrections.js";
+import { cardForInterjection, deliveredCardId } from "../interject/delivery.js";
 import { InterjectionPolicy, type Interjection } from "../interject/InterjectionPolicy.js";
 import { Observer } from "../interject/Observer.js";
 import { Verifier } from "../interject/Verifier.js";
@@ -1196,7 +1197,37 @@ export class SessionManager {
       onRecord: (record) => { recordCandidate(record); onTiming({ stage: "policy_decision", ...record }); },
       // The stage (US-015). The level the policy chose becomes the card's
       // variant, and the card is kept so a 👍 can find its way back to it.
-      onDeliver: (interjection) => { this.deliver(info, deliveries, interjection); steering.noteContribution(); onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id }); },
+      //
+      // V3-008: everything Sotto notices about the conversation is delivered
+      // as a card and nothing else — at every frequency and every boldness —
+      // with one exception, which `spokenCorrection` is the whole of: a
+      // verified factual error at boldness `bold`, said in one sentence under
+      // V3-004's pause, still-current, yield and expiry rules. The card is
+      // still shown either way, and `raised` on it (set in
+      // `cardForInterjection`) is what V3-017's hand counts.
+      onDeliver: (interjection) => {
+        this.deliver(info, deliveries, interjection);
+        steering.noteContribution();
+        onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id });
+        const line = spokenCorrection(interjection);
+        if (line === null) return;
+        const candidate = interjection.candidate;
+        // Watched before it is queued, so the verdict the pause reads is
+        // already there: nothing has been said since the claim, which is
+        // `current` with no model call at all.
+        stillCurrent.watch(candidate.id, {
+          kind: "correction",
+          question: correctedClaim(interjection),
+          answer: line,
+          askedAtMs: candidate.createdAtMs,
+        });
+        reservations.correction({
+          candidateId: candidate.id,
+          turnId: candidate.evidence[0]?.turnId ?? candidate.evidenceTurnIds[0] ?? "",
+          headline: candidate.headline,
+          text: line,
+        });
+      },
     });
     // The second opinion (V2-016). Every candidate the policy ever sees comes
     // through here, including one the verifier has just checked, so the four
@@ -1359,6 +1390,13 @@ export class SessionManager {
         // answered on screen.
         if (record.kind === "answer" && record.retrying !== true) {
           stillCurrent.forget(record.ideaId);
+        }
+        // V3-008: a correction Sotto queued and then never said — no pause,
+        // cut off twice, the room moved on — is back to being something it is
+        // holding, so the hand goes up for it after all.
+        if (record.kind === "correction" && record.retrying !== true) {
+          stillCurrent.forget(record.ideaId);
+          if (!record.spoken) this.raiseHand(info, deliveries, record.ideaId);
         }
       },
       logger: this.logger,
@@ -1635,6 +1673,28 @@ export class SessionManager {
   }
 
   /**
+   * A correction Sotto meant to say and did not: put the hand up (V3-008).
+   *
+   * The card went out with `raised` unset because Sotto was about to speak
+   * it, and the sentence was then never said. Published again with the flag —
+   * the stage folds a card that arrives twice into the one already there
+   * (V2-015), keeping its place and whether it is open, so this changes the
+   * hand and nothing else.
+   */
+  private raiseHand(
+    info: SessionInfo,
+    deliveries: Map<string, Delivered>,
+    candidateId: string,
+  ): void {
+    const cardId = deliveredCardId(candidateId);
+    const delivered = deliveries.get(cardId);
+    if (delivered === undefined || delivered.card.raised === true) return;
+    const card: StageCard = { ...delivered.card, raised: true };
+    deliveries.set(cardId, { ...delivered, card });
+    if (this.current?.info.id === info.id) this.bus.publishCard(card);
+  }
+
+  /**
    * Files the group's verdict on a delivered card (US-015): one line in the
    * session folder's `feedback.jsonl`.
    *
@@ -1900,6 +1960,10 @@ async function drainLoops(
   // policy gets one look at that final pause and then accounts for whatever
   // is still waiting.
   loops.policy?.flush();
+  // V3-008: that last look is where a correction a `bold` session may say out
+  // loud comes from, and the silence a conversation ends in is a real pause —
+  // so the line, and the transcript row for it, still happen.
+  await loops.reservations?.flush();
   // V3-006: a command classified after this cannot change a setting the next
   // conversation starts with.
   loops.steering?.stop();

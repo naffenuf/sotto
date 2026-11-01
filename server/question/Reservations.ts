@@ -1,5 +1,5 @@
 /**
- * Claiming the question out loud (PRD V3-015).
+ * Everything Sotto says that nobody asked for (PRD V3-015, V3-004, V3-008).
  *
  *     open_question -> search starts (V3-003)
  *                   -> first gap within 5 s -> "I'll check the drive time."
@@ -54,6 +54,10 @@
  * "I'll check that" is the room telling Sotto it has the floor back.
  */
 import { isSottoTurn, sottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
+// The fourth kind of line is V3-008's: one correction, at boldness `bold`,
+// said under exactly the rules an answer is. See `correctionLine` and
+// `spokenCorrection` in `server/interject/corrections.ts` for which one and
+// in what words.
 import { RESEARCH_NO_ANSWER, type ResearchIdea, type ResearchPacket } from "../../shared/research.js";
 import type { PolicySettings } from "../../shared/policy.js";
 import type { Clock } from "../clock.js";
@@ -100,14 +104,26 @@ export const ANSWER_STALE_TURNS = 6;
  */
 export const MAX_ANSWER_YIELDS = 2;
 
-/** The kinds of unprompted line this module says. */
-export const spokenContributionKinds = ["reserve", "no_answer", "answer"] as const;
+/**
+ * The kinds of unprompted line this module says.
+ *
+ * The first three are the fast path's, about one of the room's own questions
+ * (V3-015, V3-004). `correction` is V3-008's one exception: a verified
+ * factual error at boldness `bold`, which is said under the same rules an
+ * answer is — a real pause, the cached still-current verdict, yielding to any
+ * voice with one retry, ninety seconds or six turns of expiry — and differs
+ * only in that it spends nothing, because the card it was delivered as
+ * already spent one interject.
+ */
+export const spokenContributionKinds = ["reserve", "no_answer", "answer", "correction"] as const;
 export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
 
 /**
  * Why a reservation was not said, for `timing.jsonl`.
  *
- * - `boldness`: a `cautious` session, which contributes on screen only.
+ * - `boldness`: a `cautious` session, which contributes on screen only. A
+ *   `correction` (V3-008) is only ever queued by a `bold` one, so the room
+ *   turning Sotto down mid-wait is the way it reads this.
  * - `cooldown` / `budget`: the frequency setting's, spent on something else.
  * - `no_gap`: nobody stopped talking inside {@link RESERVE_WINDOW_MS}.
  * - `unheard`: muted, or no page attached to play it — the card is the sign.
@@ -144,9 +160,17 @@ export interface SpokenContributionRecord {
   kind: SpokenContributionKind;
   /** When it was said, or when it was given up on, on the session clock. */
   atMs: number;
+  /**
+   * What is being spoken about: the research idea behind the question, or —
+   * for a `correction` (V3-008) — the candidate, which is the only thing that
+   * identifies it.
+   */
   ideaId: string;
-  /** The turn the question was heard in. */
+  /** The same id again on a `correction`, under the name a reader expects. */
+  candidateId?: string;
+  /** The turn the question was heard in, or the one a correction rests on. */
   turnId: string;
+  /** Three to five words naming it; a correction's is its headline. */
   topic: string;
   /**
    * Whether it was said at all: an utterance was opened and the words handed
@@ -306,6 +330,8 @@ export class Reservations {
   private readonly spent = new Set<string>();
   /** Answers already handed over, so a packet pushed twice says one thing. */
   private readonly answered = new Set<string>();
+  /** Corrections already queued, by candidate id (V3-008). */
+  private readonly corrections = new Set<string>();
   /** The utterance a human voice would cancel, while there is one. */
   private utterance: VoiceUtterance | undefined;
   /**
@@ -405,6 +431,51 @@ export class Reservations {
     this.review();
   }
 
+  /**
+   * One of Sotto's own corrections may be said out loud (PRD V3-008): a
+   * `factual_error` the web check came back `wrong` on, at boldness `bold`,
+   * delivered as a full interject. Everything else Sotto notices about the
+   * conversation is a card and stays one.
+   *
+   * It is queued exactly as an answer is — {@link SPEAK_PAUSE_MS}, the cached
+   * still-current verdict, one retry after a voice in the room cuts it off,
+   * {@link ANSWER_STALE_MS} or {@link ANSWER_STALE_TURNS} of expiry — and
+   * spends nothing: the card it was delivered as already spent the interject,
+   * and this is that contribution reaching the room's ears.
+   */
+  correction(input: {
+    candidateId: string;
+    /** The turn the correction rests on, for the log. */
+    turnId: string;
+    /** The card's headline, which the log calls the topic. */
+    headline: string;
+    /** The sentence, written by `correctionLine` in `server/interject`. */
+    text: string;
+  }): void {
+    if (this.stopped || input.text.trim() === "") return;
+    if (this.corrections.has(input.candidateId)) return;
+    this.corrections.add(input.candidateId);
+    const nowMs = this.clock.now();
+    this.waiting.push({
+      kind: "correction",
+      ideaId: input.candidateId,
+      turnId: input.turnId,
+      topic: input.headline,
+      text: input.text,
+      askedAtMs: nowMs,
+      sinceMs: nowMs,
+      pauseMs: SPEAK_PAUSE_MS,
+      expiry: {
+        afterMs: ANSWER_STALE_MS,
+        afterTurns: ANSWER_STALE_TURNS,
+        reason: "expired",
+      },
+      turnsWaited: 0,
+      yields: 0,
+    });
+    this.review();
+  }
+
   /** One line about one question, waiting from now, with nothing yet decided. */
   private line(
     ideaId: string,
@@ -439,7 +510,9 @@ export class Reservations {
    */
   private charges(line: Pending): boolean {
     if (line.kind === "reserve") return true;
-    if (line.kind === "no_answer") return false;
+    // A correction was already paid for by the interject card it was
+    // delivered as (V3-008), and a closing line is the end of a claim.
+    if (line.kind === "no_answer" || line.kind === "correction") return false;
     return !this.spent.has(line.ideaId);
   }
 
@@ -626,8 +699,12 @@ export class Reservations {
   /** Everything but the gap that can stop a line being said. */
   private reasonNotToSpeak(line: Pending): ReserveSkipReason | null {
     // A cautious session contributes on screen only, which is the same
-    // promise {@link boldnessAllows} keeps for a candidate.
-    if (this.options.settings().boldness === "cautious") return "boldness";
+    // promise {@link boldnessAllows} keeps for a candidate. A correction is
+    // the boldest thing Sotto says, so it needs the setting it was queued
+    // under to still be there — the header can turn it down mid-wait.
+    const boldness = this.options.settings().boldness;
+    if (boldness === "cautious") return "boldness";
+    if (line.kind === "correction" && boldness !== "bold") return "boldness";
     // Whether the room still wants this (V3-004). Read, never asked for: the
     // verdict is already cached, so nothing between here and the first audio
     // waits on a model. Not asked about a claim: that lives inside a
@@ -713,7 +790,8 @@ export class Reservations {
     // the answer, so it waits for another pause (V3-004). Twice is the room
     // saying it does not want to hear this, and the card is then the only
     // sign.
-    const retrying = yielded && line.kind === "answer" && yields < MAX_ANSWER_YIELDS;
+    const retried = line.kind === "answer" || line.kind === "correction";
+    const retrying = yielded && retried && yields < MAX_ANSWER_YIELDS;
     this.options.onRecord({
       stage: "spoken_contribution",
       kind: line.kind,
@@ -723,13 +801,19 @@ export class Reservations {
       topic: line.topic,
       spoken: true,
       text: line.text,
+      ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
       ...(line.kind === "answer"
         ? {
             questionToSpeechMs: decidedAtMs - line.askedAtMs,
             pauseWaitMs: decidedAtMs - line.sinceMs,
             ...(current === undefined ? {} : { stillCurrent: current }),
           }
-        : { questionToReserveMs: decidedAtMs - line.askedAtMs }),
+        : line.kind === "correction"
+          ? {
+              pauseWaitMs: decidedAtMs - line.sinceMs,
+              ...(current === undefined ? {} : { stillCurrent: current }),
+            }
+          : { questionToReserveMs: decidedAtMs - line.askedAtMs }),
       yielded,
       ...(yields === 0 ? {} : { yields }),
       ...(bargedIn ? { bargedIn } : {}),
@@ -738,7 +822,7 @@ export class Reservations {
     });
     if (retrying) {
       this.waiting.unshift({ ...line, yields });
-    } else if (yielded && line.kind === "answer") {
+    } else if (yielded && retried) {
       this.skip({ ...line, yields }, "yielded");
     }
     // Cut off before the page reported anything: nobody can say what was
@@ -772,7 +856,10 @@ export class Reservations {
       topic: line.topic,
       spoken: false,
       text: line.text,
-      ...(line.kind === "answer" ? { pauseWaitMs: nowMs - line.sinceMs } : {}),
+      ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
+      ...(line.kind === "answer" || line.kind === "correction"
+        ? { pauseWaitMs: nowMs - line.sinceMs }
+        : {}),
       ...(line.yields === 0 ? {} : { yields: line.yields }),
       reason,
     });

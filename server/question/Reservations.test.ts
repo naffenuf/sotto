@@ -3,7 +3,12 @@
  * stays quiet, and what happens when the search comes back with nothing.
  */
 import { describe, expect, it } from "vitest";
-import { FREQUENCY_LIMITS, type Frequency, type PolicySettings } from "../../shared/policy.js";
+import {
+  FREQUENCY_LIMITS,
+  type Boldness,
+  type Frequency,
+  type PolicySettings,
+} from "../../shared/policy.js";
 import {
   RESEARCH_NO_ANSWER,
   type ResearchIdea,
@@ -93,7 +98,7 @@ interface Harness {
   reservations: Reservations;
   records: SpokenContributionRecord[];
   spoken: TurnUpdate[];
-  settings: PolicySettings;
+  settings: { frequency: Frequency; boldness: Boldness };
   /** What the frequency's cooldown and allowance say right now. */
   spend: { verdict: SpendVerdict; spent: number };
   /** Somebody is talking. */
@@ -120,7 +125,9 @@ function setup(
   const clock = new SimulatedClock(0);
   const records: SpokenContributionRecord[] = [];
   const spoken: TurnUpdate[] = [];
-  const settings: PolicySettings = {
+  // Mutable on purpose: the header can move either slider mid-conversation,
+  // and V3-008's correction is only said while the boldness is still `bold`.
+  const settings: { frequency: Frequency; boldness: Boldness } = {
     frequency: "normal",
     boldness: "normal",
     ...options.settings,
@@ -1005,5 +1012,213 @@ describe("Reservations: speaking the answer (V3-004)", () => {
     voice.played();
     await harness.reservations.flush();
     expect(voice.opened).toBe(1);
+  });
+});
+
+describe("Reservations: Sotto's own correction (V3-008)", () => {
+  const LINE = "Quick correction: Instagram launched in 2010, not 2014.";
+
+  /** The correction, as `SessionManager`'s `onDeliver` hands it over. */
+  function correction(harness: Harness): void {
+    harness.reservations.correction({
+      candidateId: "cand-7",
+      turnId: "0:9",
+      headline: "Instagram launched in 2010, not 2014",
+      text: LINE,
+    });
+  }
+
+  it("is said at the first real pause, under the answer's threshold", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "bold" } });
+    harness.speak();
+    correction(harness);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS - 1);
+    harness.reservations.acceptTurn(partial());
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+
+    harness.clock.advanceBy(1);
+    harness.reservations.acceptTurn(partial());
+    await harness.tick();
+    expect(voice.opened).toBe(1);
+    expect(voice.said).toEqual([LINE]);
+  });
+
+  it("spends nothing: the card it was delivered as already paid", async () => {
+    const voice = new FakeVoice();
+    // The policy pushed an interject the instant it delivered the card, so
+    // the frequency's cooldown is spent by the time this is said. Charging it
+    // again would mean a bold session could never say one.
+    const harness = setup(voice, { settings: { boldness: "bold" }, verdict: "cooldown" });
+    correction(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(voice.said).toEqual([LINE]);
+    expect(harness.spend.spent).toBe(0);
+  });
+
+  it("records the wait and the candidate it is about", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "bold" } });
+    harness.speak();
+    correction(harness);
+    harness.clock.advanceBy(3_000);
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({
+      stage: "spoken_contribution",
+      kind: "correction",
+      candidateId: "cand-7",
+      ideaId: "cand-7",
+      turnId: "0:9",
+      topic: "Instagram launched in 2010, not 2014",
+      spoken: true,
+      text: LINE,
+      pauseWaitMs: 3_450,
+      yielded: false,
+    });
+    // Nothing was asked, so there is no question to measure from.
+    expect(harness.records[0]).not.toHaveProperty("questionToReserveMs");
+    expect(harness.records[0]).not.toHaveProperty("questionToSpeechMs");
+    // And it is Sotto's line in the transcript, like everything else said.
+    expect(harness.spoken[0]?.text).toBe(LINE);
+  });
+
+  it("yields to a voice in the room and tries once more, then gives up", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "bold" } });
+    correction(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    harness.reservations.yieldToHuman();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction", spoken: true, yielded: true, yields: 1, retrying: true,
+    });
+
+    harness.speak();
+    harness.clock.advanceBy(2_000);
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(2);
+    harness.reservations.yieldToHuman();
+    await harness.reservations.flush();
+    expect(harness.records.at(-1)).toMatchObject({
+      kind: "correction", spoken: false, reason: "yielded", yields: 2,
+    });
+  });
+
+  it("is a card only when the room moved on from the claim", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, {
+      settings: { boldness: "bold" },
+      stillCurrent: () => movedOn,
+    });
+    correction(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction", spoken: false, reason: "moved_on",
+    });
+  });
+
+  it("is a card only when somebody in the room corrected it themselves", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, {
+      settings: { boldness: "bold" },
+      stillCurrent: () => confirmed,
+    });
+    correction(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction", spoken: false, reason: "answered",
+    });
+  });
+
+  it("gives up after ninety seconds, or six turns, without a pause", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "bold" } });
+    harness.speak();
+    correction(harness);
+    harness.clock.advanceBy(ANSWER_STALE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction", spoken: false, reason: "expired", pauseWaitMs: ANSWER_STALE_MS,
+    });
+
+    const turns = setup(new FakeVoice(), { settings: { boldness: "bold" } });
+    turns.speak();
+    correction(turns);
+    for (let index = 0; index < ANSWER_STALE_TURNS; index += 1) {
+      turns.reservations.acceptTurn(final(`0:${20 + index}`));
+    }
+    await turns.tick();
+    expect(turns.records[0]).toMatchObject({ kind: "correction", reason: "expired" });
+  });
+
+  it("is not said once the room has turned the boldness back down", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "bold" } });
+    harness.speak();
+    correction(harness);
+    // The header moves the slider while the correction waits for a gap.
+    harness.settings.boldness = "normal";
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction", spoken: false, reason: "boldness",
+    });
+
+    const cautious = setup(new FakeVoice(), { settings: { boldness: "cautious" } });
+    correction(cautious);
+    cautious.clock.advanceBy(SPEAK_PAUSE_MS);
+    await cautious.tick();
+    expect(cautious.records[0]).toMatchObject({ reason: "boldness" });
+  });
+
+  it("is a card only when nobody can hear it", async () => {
+    const harness = setup(new FakeVoice("muted"), { settings: { boldness: "bold" } });
+    correction(harness);
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction", spoken: false, reason: "unheard",
+    });
+  });
+
+  it("says one correction per candidate, and nothing for an empty one", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "bold" } });
+    correction(harness);
+    correction(harness);
+    harness.reservations.correction({
+      candidateId: "cand-8",
+      turnId: "0:9",
+      headline: "  ",
+      text: "  ",
+    });
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(voice.opened).toBe(1);
+    expect(harness.records).toHaveLength(1);
   });
 });

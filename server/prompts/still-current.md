@@ -25,3 +25,12 @@ within rounding ("two hours fifteen" and "about two and a quarter hours" agree; 
 
 why is at most fifteen words, naming what in the conversation decided it — for the log, not for
 the room.
+
+<!-- V3-008: the same three verdicts, about a correction rather than an answer. -->
+Sometimes what is waiting is not an answer to a question but a **correction**: somebody in the
+room stated something as fact, a web check says otherwise, and Sotto is about to say so in one
+sentence. Read the verdicts the same way. current: they are still working with the thing that was
+said, so knowing it is wrong would change something. answered: somebody present has already
+corrected it themselves — agrees is true when their correction and Sotto's say the same thing.
+moved_on: that part of the conversation is over and nothing now rests on the claim, so correcting
+it would only be scoring a point.

@@ -48,6 +48,9 @@ describe("cardForInterjection", () => {
       state: "ready",
       createdAtMs: 52_000,
       headline: "A $12 solo tier does not fit the $4,000 a month floor",
+      // V3-008: Sotto is holding this and not saying it, which is what
+      // V3-017's raised hand counts.
+      raised: true,
       whyNow: "the price is about to be written down",
       detailMd: "At $12 a seat you need 333 paying solos to clear the floor.",
       evidence: [
@@ -119,6 +122,44 @@ describe("cardForInterjection", () => {
       state: "ready",
       createdAtMs: 52_000,
       headline: "A $12 solo tier does not fit the $4,000 a month floor",
+      raised: true,
+    });
+  });
+
+  // V3-008: every correction is shown and not said, so the hand goes up for
+  // all of them — bar the one sentence a `bold` session says out loud, which
+  // is on its way to the room's ears and needs no calling on.
+  describe("the raised hand", () => {
+    const verified = {
+      type: "factual_error" as const,
+      verification: {
+        verdict: "wrong" as const,
+        correction: "It was 2010.",
+        citations: [],
+        searched: true,
+      },
+    };
+
+    it("goes up for a correction Sotto is keeping to itself", () => {
+      expect(cardForInterjection(interjection()).raised).toBe(true);
+      expect(cardForInterjection(interjection({ level: "glow" })).raised).toBe(true);
+      expect(
+        cardForInterjection(
+          interjection({ candidate: candidate({ type: "untested_assumption" }) }),
+        ).raised,
+      ).toBe(true);
+      expect(
+        cardForInterjection(interjection({ candidate: candidate(verified) })).raised,
+      ).toBe(true);
+    });
+
+    it("stays down for the one correction a bold session speaks", () => {
+      const card = cardForInterjection({
+        ...interjection({ candidate: candidate(verified) }),
+        decision: { ...decision, settings: { frequency: "normal", boldness: "bold" } },
+      });
+
+      expect(card.raised).toBeUndefined();
     });
   });
 });

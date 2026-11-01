@@ -153,6 +153,19 @@ export interface StageCard {
    */
   note?: string;
   /**
+   * Sotto has this and has not said it out loud (V3-008).
+   *
+   * Set on every card the interjection policy delivers — a contradiction, a
+   * wrong number, an assumption nobody checked, a thread they dropped, a
+   * question nobody answered — except the one a `bold` session says in a
+   * sentence. It is what V3-017's raised hand counts: the stage shows that
+   * Sotto is holding something, and anybody can call on it, which is how a
+   * correction reaches the room's ears at the default settings. A card that
+   * was queued to be spoken and then never was — no pause, cut off twice, the
+   * room moved on — is published again with this set.
+   */
+  raised?: boolean;
+  /**
    * `research`: bring this card back to the top of the stage, open (V2-015).
    *
    * Set on the one push that happens because somebody *asked* for the

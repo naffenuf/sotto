@@ -11,9 +11,15 @@
  * The one thing that is not a straight copy is the evidence: the observer
  * attaches the diarization label a quote came from (`A`, `B`), and a group
  * reading the card wants the name they gave that label (US-007).
+ *
+ * Since V3-008 the card also says whether Sotto is *holding* it: every
+ * correction the policy delivers is shown and not said, so `raised` is set on
+ * all of them bar the one sentence a `bold` session says out loud, and
+ * V3-017's raised hand counts them.
  */
 import type { SpeakerNames } from "../../shared/events.js";
 import type { EvidenceQuote, StageCard } from "../../shared/cards.js";
+import { isCorrection, spokenCorrection } from "./corrections.js";
 import type { Interjection } from "./InterjectionPolicy.js";
 
 /** Prefix of a delivered card's id, so a log line says what it refers to. */
@@ -41,12 +47,16 @@ export function cardForInterjection(
 ): StageCard {
   const candidate = interjection.candidate;
   const evidence = namedQuotes(candidate.evidence, speakers);
+  // V3-008: a hand goes up for everything Sotto is holding and not saying,
+  // which is every correction but the one a `bold` session speaks.
+  const raised = isCorrection(candidate.type) && spokenCorrection(interjection) === null;
   return {
     id: deliveredCardId(candidate.id),
     variant: interjection.level,
     state: "ready",
     createdAtMs: interjection.atMs,
     headline: candidate.headline,
+    ...(raised ? { raised } : {}),
     ...(candidate.whyNow.trim() === "" ? {} : { whyNow: candidate.whyNow }),
     ...(candidate.detail.trim() === "" ? {} : { detailMd: candidate.detail }),
     ...(evidence.length === 0 ? {} : { evidence }),
