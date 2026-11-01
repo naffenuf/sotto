@@ -304,3 +304,45 @@ and closes the loop when nothing comes back.
   count cards, and `server/eval/runner.ts` passes no `createVoice` at all — so even
   `--boldness bold` records a correction as `unheard` and no gate moves. `npm run e2e` does have a
   voice, so a `--boldness bold` e2e run is the only place a correction is really spoken.
+
+[2026-11-01 09:55] V3-013 — completed — read-backs at decision points: the closing rides V3-002's
+classifier, the room's own question is quoted onto the read-back, and Sotto's own correction is
+pinned to the stage instead.
+
+What the next iteration needs to know.
+
+- **The signal cost one field and one pre-filter.** `closing: true` plus `decision` (a few words)
+  on `QuestionSchema`, four positive and four negative examples in `prompts/question.md`, and
+  `QuestionWatcher.onDecisionClosing`. But a closing is not question-shaped at all, so
+  `isClosingShaped` had to join `isQuestionShaped` in the new `worthClassifying`, which is what the
+  watcher asks now. Measured across all twelve older captures: **three** extra calls, every one a
+  real closing. `questionShape.test.ts` asserts the union per fixture.
+- **The one deviation from the PRD, and it is load-bearing** (in `tasks/decisions.md`): a read-back
+  whose attached question belongs to a candidate the policy has *already delivered as a card*
+  charges the frequency budget nothing. Measured: the card goes out 40–50 s before the decision it
+  bears on, an `interject` pushes `interjectedAtMs`, and at `normal`'s 180 s cooldown — `often`'s
+  90 s too — every read-back that had something to say was skipped as `cooldown`. It is V3-008's
+  own rule ("the card already spent the interject"). A **bare** read-back still pays, and is only
+  said at frequency `often`.
+- **Relevance is 1/3, after the dates and counts are dropped, and the first real run is why.** At
+  0.4 the real observer's "The bike mechanic — where does that fit with $1400 and nothing on top?"
+  missed "Saturday the 14th, mechanic and coffee cart" — one shared word of the three that mean
+  anything. A near miss is now logged as `bestRelevance`/`bestCandidateId` on the
+  `decision_closing` line, so "the bar is wrong" and "the observer noticed nothing" stop looking
+  identical. `brainstorm`'s best is 0.2, which is the headroom.
+- **`decision-closings` is in the eval set and `expectedLevel` grew `"speak"`.** `levelRank` puts
+  `speak` above everything, so a card for a speak moment is `caught_low` rather than a catch —
+  **this lowers the eval's measured recall until V3-010 scores spoken contributions**, which is
+  V3-010's job and the first thing to check when reading the next report. The fixture's two moments
+  are measured reachable (`eval:ceiling`: 1,571 ms and 743 ms of quiet in their windows), with the
+  caveat that the ceiling tool models an interjection — a read-back's candidate already exists when
+  the decision lands.
+- **V3-017 (next) needs nothing new from here.** The pinned card already carries `raised` (the hand
+  V3-017 counts), plus `forward` and a `note`; `pinToDecision` in `SessionManager` republishes a
+  delivered card and remembers a pin for one the policy is still holding, so `deliver()` applies it.
+  `Card.tsx` needed no change at all — `Note` renders in both the collapsed and the open path for
+  every variant.
+- **Costs and timings.** The fixture: render 8 s, capture 2.3 min, both one-off. The integration
+  test is two full replays with the real model (~7.3 min, roughly $0.5); the offline pipeline tests
+  in `SessionManager.test.ts` cover the same seven behaviours instantly with a fake model, so run
+  those while iterating and the integration test once.
