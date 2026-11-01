@@ -352,3 +352,17 @@
   ($0.50, last measured $0.4826) has to be re-measured. FOR A LATER STORY: the first line covers the
   first ~5 s of the wait, not all of it — on a hard search there is still ~10 s of quiet between the
   end of the line and the continuation. The PRD does not ask for more.
+[2026-11-01 00:22] V2-009 — completed — Opening hello (hello.md, spoken or shown) plus the one name nudge at the next pause after 2 minutes.
+  - server/session/Greeting.ts is both halves. Built only in SessionManager.startLive (mic + wav);
+    an `events` replay is never greeted, which is what keeps npm run eval's deliveries clean.
+  - New `notice` card variant: no "Sotto noticed…" label, no feedback row. eval's deliveriesFrom
+    and e2e's interjections() already filter on interject|glow, so neither needed a change.
+  - Criterion "the hello is excluded from the transcript and board by V2-006" is about the MIC's
+    echo of it (V2-009 was written before V2-008a existed). V2-008a is later and says the hello
+    appears as a Sotto line, so: transcript yes, board no, echo suppressed. All three tested.
+  - npm run verify:hello drives a real wav session twice — muted (notice card) and unmuted (real
+    ElevenLabs: speaking indicator, then the Sotto line at the top of the transcript).
+  - Pre-existing, not mine: npm run verify:cards fails two stale assertions (it expects the old
+    dark theme and the removed header source selector). The card checks themselves pass.
+  - Next: V2-010 (Glimmer client). Ollama must be serving muse-glimmer:30b-q4_K_M at
+    GLIMMER_BASE_URL; see the CLAUDE.md note on reasoning levels before choosing one.

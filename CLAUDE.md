@@ -920,3 +920,36 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   since the line opens it), so nothing downstream changed; the continuation needed one optional seam,
   `VoiceUtterance.audioMs()`, because inside one utterance the second half is heard where the first
   half's audio ends. The line covers the first ~5 s of the wait, not all of it.
+
+- **Sotto says hello to a room, not to a recording.** V2-009's `server/session/Greeting.ts` is
+  built in `SessionManager.startLive` only — `mic` and `wav`, as the PRD words it — so an `events`
+  replay is never greeted. That is not a detail: `npm run eval` replays captures and scores every
+  `interject`/`glow` card as a delivery, and one card at t=0 would fail the "every delivery in a
+  pause" gate on its own. The card it shows is a fourth `CardVariant`, **`notice`** (ids in
+  `NOTICE_CARD_IDS`): Sotto talking about itself rather than about the conversation, so no
+  "Sotto noticed…" label and no feedback row — `POST /api/feedback` only knows cards the *policy*
+  delivered. `server/eval/runner.ts`'s `deliveredLevel` and `server/e2e/checks.ts`'s
+  `interjections()` both already filtered on `interject|glow`, so neither needed changing; keep it
+  that way when adding a variant. The words are `server/prompts/hello.md`, read verbatim through
+  `loadPrompt` — the one "prompt" no model ever sees — so a session with no `MODEL_API_KEY` still
+  introduces itself.
+- **Three stories disagree about the hello, and the resolution is transcript yes, board no, echo
+  never.** V2-009 says it is "excluded from the transcript and board by V2-006"; V2-008a, written
+  later, lists "and later the hello" among the lines that appear labeled `Sotto`. V2-006 only ever
+  excluded what the *microphone* heard, which is what V2-009 can have meant — so the hello is a
+  Sotto turn (`sottoTurn({ utteranceId: "hello" })`, placed at `streamNow()` when the utterance
+  opened) and its echo is suppressed, and `recordSottoSpeech` is called with a `null` board because
+  the hello establishes no fact the notes want. A muted hello writes nothing at all: nothing was
+  heard.
+- **The nudge is armed by a deadline and fired by a pause.** `NAME_NUDGE_AFTER_MS` (120 s) only
+  decides *whether* to ask; the card goes up at the next `inPause(pauseState())` — the policy's own
+  rule on the same corrected silence — and the re-check is armed the way `InterjectionPolicy` arms
+  its own: a timer for `PAUSE_MS - silentForMs` when the room is quiet, and **nothing at all** while
+  somebody is talking, because the turn closing is what arrives next. A test that advances a fake
+  clock without also delivering that turn will watch the nudge never fire; drive it with a
+  `pauseState` derived from the clock, as `Greeting.test.ts` does.
+- **The header's Start button is the microphone now.** The old source `<select>` is gone from
+  `SessionControls`, so a Playwright check that wants a `wav` or `events` session has to
+  `fetch("/api/session/start", …)` from the page (as `scripts/verify-hello.mjs` does) rather than
+  pick an option. `scripts/verify-cards.mjs` and `scripts/verify-ui.mjs` still assert on that
+  selector and on the old dark theme, and fail on both; their card and layout checks are still good.
