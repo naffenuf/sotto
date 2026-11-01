@@ -761,6 +761,7 @@ describe("SessionManager, answers", () => {
     const bus = new EventBus(quiet);
     const model = new AnsweringModel();
     const answers: AnswerLogRecord[] = [];
+    const timing: Record<string, unknown>[] = [];
     const writer = {
       dir: "/tmp/not-a-real-folder",
       appendEvent: () => {},
@@ -771,6 +772,7 @@ describe("SessionManager, answers", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
+      appendTiming: (record: Record<string, unknown>) => timing.push(record),
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -785,7 +787,12 @@ describe("SessionManager, answers", () => {
       createStore: () => writer,
       createModel: () => model,
       replaySpeed: "max",
-      wallClock: instantWallClock(),
+      // Real time here, not `instantWallClock`: the address check's
+      // six-second deadline runs on the wall clock, and a clock where six
+      // seconds pass in a microtask would time every classification out and
+      // quietly test the lexical fallback instead. A `max` replay spends no
+      // wall time pacing, so this still finishes in a few hundred ms.
+      wallClock: systemClock,
     });
     const ended = new Promise<void>((resolve) => {
       const off = bus.subscribe((event) => {
@@ -801,7 +808,18 @@ describe("SessionManager, answers", () => {
     // One answer, pushed as it arrived: thinking, then the headline, then all
     // of it — every push under the same card id.
     expect(model.labels.filter((label) => label === "answer")).toHaveLength(1);
+    // And one classification, made while the question was still being asked:
+    // " Sotto what do the main" arrives 2.1 s before `speechEnd` in this
+    // capture, so V2-008b checked it there and the final turn reused the
+    // verdict — with its question read off the four words it added (V2-008b).
     expect(model.labels.filter((label) => label === "address")).toHaveLength(1);
+    expect(timing).toContainEqual(expect.objectContaining({
+      stage: "address_early", event: "started",
+    }));
+    expect(timing).toContainEqual(expect.objectContaining({
+      stage: "address_early", event: "reused", kind: "request", extraWords: 4,
+    }));
+    expect(timing).not.toContainEqual(expect.objectContaining({ stage: "address_fallback" }));
     expect(new Set(cards.map((card) => card.id))).toEqual(new Set(["card-ans-1"]));
     expect(cards.map((card) => card.state)).toEqual(["thinking", "thinking", "ready"]);
     const last = cards.at(-1)!;

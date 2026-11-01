@@ -132,6 +132,12 @@ export interface AskedQuestion {
   turnId: string | null;
   /** V2-007: continue resumes after heard text rather than repeating the original reply. */
   resume?: boolean;
+  /**
+   * V2-008b: real time the question's `speechEnd` reached the server, so the
+   * log can say what the room waited from the end of the question to the
+   * first sound. Absent for a typed question and for a replay.
+   */
+  heardAtMs?: number;
 }
 
 export interface AnswerAgentOptions {
@@ -463,6 +469,7 @@ export class AnswerAgent {
       feed({ ...halves, spokenComplete: true });
       const text = halves.screen === "" ? screenFromSpoken(halves.spoken) : splitAnswer(halves.screen);
       const spoken = await speech?.done();
+      this.recordVoiceLatency(answer, queued, spoken);
       const done: Answer = {
         ...answer,
         headline: text.headline,
@@ -491,6 +498,7 @@ export class AnswerAgent {
       // voice off mid-sentence would be the only audible sign of a failure
       // the card is about to explain anyway.
       const spoken = await speech?.done();
+      this.recordVoiceLatency(answer, queued, spoken);
       const failed: Answer = {
         ...answer,
         // Whatever reached the stage stays there — including a diagram that
@@ -636,6 +644,36 @@ export class AnswerAgent {
       characters: turn.text.length,
     });
     this.options.onSpoken?.(turn);
+  }
+
+  /**
+   * What the room waited for, in the units the room felt (V2-008b).
+   *
+   * `ackMs` and `firstAudioMs` count from the question arriving at the answer
+   * agent, which is a moment only the server knows. The number the PRD sets a
+   * target for starts earlier: the end of the question, which is the
+   * `speechEnd` the address watcher stamped on its way past
+   * ({@link AskedQuestion.heardAtMs}). Null for a typed question, and for a
+   * replay whose turns never closed in real time.
+   */
+  private recordVoiceLatency(
+    answer: Answer,
+    queued: Queued,
+    spoken: SpokenResult | undefined,
+  ): void {
+    if (spoken === undefined) return;
+    const heardAtMs = queued.asked.heardAtMs;
+    const toAsk = heardAtMs === undefined
+      ? null
+      : Math.max(0, queued.askedAtWallMs - heardAtMs);
+    const from = (latency: number | null): number | null =>
+      toAsk === null || latency === null ? null : toAsk + latency;
+    this.options.onTiming?.({
+      stage: "answer_voice", atMs: this.clock.now(), answerId: answer.id,
+      turnId: queued.asked.turnId, ackMs: spoken.ackMs, firstAudioMs: spoken.firstAudioMs,
+      speechEndToAskMs: toAsk, speechEndToAckMs: from(spoken.ackMs),
+      speechEndToAnswerMs: from(spoken.firstAudioMs),
+    });
   }
 
   /** The name the group would use for whoever asked. */

@@ -237,3 +237,41 @@ function questionAfter(text: string, from: number): string | null {
   if (first !== undefined && first.start === 0 && QUESTION_OPENERS.has(first.lower)) return question;
   return null;
 }
+
+/**
+ * Everything after the name, whether or not {@link detect} would trigger.
+ *
+ * V2-008b reuses an early classification when the final turn only *extends*
+ * the partial it ran on, and the model's `question` was written before those
+ * last words existed. The question has to come from the final text instead,
+ * and it has to come out of text that the strict rules in {@link detect} may
+ * well reject — a name mid-sentence, no comma, no wh-word. So this is the
+ * loose reading: the first whole-word spelling that is not a possessive and
+ * not `sotto voce`, and everything after it with any separator removed.
+ *
+ * Empty when there is no usable name in the text, which leaves the caller
+ * with the model's own wording.
+ */
+export function questionAfterName(text: string, options: WakeOptions = {}): string {
+  const spellings = options.spellings ?? DEFAULT_WAKE_SPELLINGS;
+  const all = words(text);
+  for (const word of all) {
+    if (!spellings.includes(word.lower)) continue;
+    const rest = text.slice(word.end);
+    if (/^['’]s\b/i.test(rest)) continue;
+    const next = words(rest)[0];
+    if (next !== undefined && BLOCKED_FOLLOWING_WORDS.includes(next.lower)) continue;
+    let at = 0;
+    while (at < rest.length) {
+      const character = rest[at] as string;
+      if (character.trim() === "" || SEPARATORS.has(character)) {
+        at += 1;
+        continue;
+      }
+      break;
+    }
+    const question = rest.slice(at).trim();
+    if (question !== "") return question;
+  }
+  return "";
+}

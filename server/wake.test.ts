@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WAKE_SPELLINGS, detect } from "./wake.js";
+import { DEFAULT_WAKE_SPELLINGS, detect, questionAfterName } from "./wake.js";
 
 /**
  * Sentences that are Sotto being addressed, with the question each should
@@ -99,5 +99,36 @@ describe("detect", () => {
 
   it("defaults to the spellings the transcription model produces", () => {
     expect(DEFAULT_WAKE_SPELLINGS).toEqual(["sotto", "soto", "sato", "sota"]);
+  });
+});
+
+/**
+ * V2-008b reads the question off the final text when an early classification
+ * is reused, so this has to work on text {@link detect} would reject.
+ */
+describe("reading the question off the name, loosely", () => {
+  it("takes everything after the name, with the separator removed", () => {
+    expect(questionAfterName(" Sato, what did you find on competitors? "))
+      .toBe("what did you find on competitors?");
+    expect(questionAfterName(" Sotto what do the main competitors charge per month. "))
+      .toBe("what do the main competitors charge per month.");
+  });
+
+  it("reads a name mid-sentence, which the strict rules refuse", () => {
+    const text = "I was wondering Soto can you give me the bull case";
+    expect(detect(text).triggered).toBe(false);
+    expect(questionAfterName(text)).toBe("can you give me the bull case");
+  });
+
+  it("looks past a possessive and sotto voce to a real address behind them", () => {
+    expect(questionAfterName("Soto's place — Sotto, what was his rule?"))
+      .toBe("what was his rule?");
+    expect(questionAfterName("Sotto voce. Sotto, how long have we got?"))
+      .toBe("how long have we got?");
+  });
+
+  it("is empty when there is no name, and when nothing follows it", () => {
+    expect(questionAfterName("what do rivals charge")).toBe("");
+    expect(questionAfterName(" Sotto, ")).toBe("");
   });
 });

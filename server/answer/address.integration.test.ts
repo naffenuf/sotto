@@ -143,9 +143,17 @@ describe.skipIf(apiKey === "")("V2-008 real address classification", () => {
     }
     await watcher.flush();
     watcher.stop();
-    console.log(`[address capture] ${fixture}: ${questions.length} requests`);
+    // V2-008b: how much of the check the room never waited for. `waitedMs` is
+    // what the final turn still had to wait for the early answer, so a small
+    // number there is the whole point of the story.
+    for (const event of timing.filter((one) => one.stage === "address_early")) {
+      console.log(`[address early] ${fixture}: ${JSON.stringify(event)}`);
+    }
+    console.log(`[address capture] ${fixture}: ${questions.length} requests: ${questions.join(" | ")}`);
     expect(questions).toHaveLength(expected);
     expect(timing.filter((event) => event.stage === "address_fallback")).toEqual([]);
+    // A reused verdict must not cost the question its last words.
+    if (fixture === "ask-search") expect(questions[0]).toContain("per month");
   });
 
   it("produces zero answers in a real-model no-wake session", async () => {

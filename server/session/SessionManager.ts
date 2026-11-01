@@ -731,6 +731,9 @@ export class SessionManager {
           question: trigger.question,
           askedBy: trigger.speaker,
           turnId: trigger.turnId,
+          // V2-008b: where the acknowledgment latency the room feels is
+          // measured from, which only the watcher that read `speechEnd` knows.
+          ...(trigger.heardAtMs === undefined ? {} : { heardAtMs: trigger.heardAtMs }),
         });
       },
     };

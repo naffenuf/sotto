@@ -159,6 +159,8 @@ interface Harness {
   voice: FakeVoice | undefined;
   /** Sotto's own transcript lines, in order (V2-008a). */
   spokenTurns: TurnUpdate[];
+  /** The lines written to `timing.jsonl`. */
+  timing: Record<string, unknown>[];
 }
 
 function harness(
@@ -187,6 +189,7 @@ function harness(
   const states: [string, string][] = [];
   const warnings: string[] = [];
   const spokenTurns: TurnUpdate[] = [];
+  const timing: Record<string, unknown>[] = [];
   const agent = new AnswerAgent({
     clock,
     model,
@@ -198,6 +201,7 @@ function harness(
       pushes.push(answer);
     },
     onRecord: (record) => records.push(record),
+    onTiming: (event) => timing.push(event),
     ...(options.onArtifact === undefined ? {} : { onArtifact: options.onArtifact }),
     wallClock: wall,
     ...(options.streamNow === undefined ? {} : { streamNow: options.streamNow }),
@@ -223,6 +227,7 @@ function harness(
     wall,
     voice: options.voice,
     spokenTurns,
+    timing,
   };
 }
 
@@ -615,6 +620,41 @@ describe("AnswerAgent out loud (V2-005)", () => {
     expect(record?.spokenSoFar).toBeUndefined();
     // And the card carries the spoken half for "transcript of answer".
     expect(h.cards.at(-1)?.spokenText).toBe(SAID);
+  });
+
+  it("logs what the room waited from the end of the question to the first sound", async () => {
+    const { h } = spoken([
+      async (call) => {
+        for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    // `speechEnd` reached the server 800 ms before the address check let the
+    // question through, and that wait is part of what the room felt (V2-008b).
+    h.wall.advanceBy(800);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2", heardAtMs: 0 });
+    await h.clock.settle();
+
+    expect(h.timing).toContainEqual(expect.objectContaining({
+      stage: "answer_voice", answerId: "ans-1", ackMs: 300,
+      speechEndToAskMs: 800, speechEndToAckMs: 1_100, speechEndToAnswerMs: 2_100,
+    }));
+  });
+
+  it("leaves the latency unmeasured when nothing saw the question end", async () => {
+    const { h } = spoken([
+      async (call) => {
+        for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    // Typed (US-019): there was no end of speech, so there is no number.
+    h.agent.ask({ question: "what do rivals charge?", askedBy: null, turnId: null });
+    await h.clock.settle();
+
+    expect(h.timing).toContainEqual(expect.objectContaining({
+      stage: "answer_voice", ackMs: 300, speechEndToAckMs: null,
+    }));
   });
 
   it("records what the room actually heard when speech was cut off", async () => {

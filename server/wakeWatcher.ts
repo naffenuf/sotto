@@ -28,6 +28,13 @@ export interface WakeTrigger {
   speaker: string | null;
   /** Everything after the wake word. */
   question: string;
+  /**
+   * V2-008b: real time this turn's `speechEnd` reached the server, which is
+   * what the acknowledgment latency the room feels is measured from. Absent
+   * when nothing saw the turn close — a typed question, or a replay of a
+   * capture whose partials were suppressed.
+   */
+  heardAtMs?: number;
 }
 
 export interface WakeWatcherOptions extends WakeOptions {
