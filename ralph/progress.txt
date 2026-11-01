@@ -394,3 +394,61 @@ What the next iteration needs to know.
   `spoken_contribution` with `kind: "called_on"` and a `cardId`, and it is **not** unprompted
   speech — the false-speech gate must exclude it, exactly as `deliveredLevel` and `interjections()`
   already exclude a research card.
+
+[2026-11-01 10:55] V3-010 — completed — Unprompted speech is scored like a card: three moment
+buckets, four new gates, a spoken-contributions table, and the same scoring in npm run e2e.
+
+What the next iteration needs to know.
+
+- **A replay with no voice is not a quiet Sotto, it is a Sotto that cannot speak.** `VoiceOut.
+  begin()` resolving `null` means "nobody would hear this", so before this story every unprompted
+  line in `npm run eval` was written off as `unheard` and V3's whole main form was unmeasurable.
+  `transcriptOnlyVoice()` in `server/voice/voiceOut.ts` is what the eval speaks through now
+  (`replayFixture` defaults to it): nothing is synthesized, no ElevenLabs call, no audio
+  latencies — and the decisions are real, which also means a claim now **spends the frequency's
+  allowance** in the eval as it does in a room, and Sotto's line reaches the transcript and the
+  board. Expect eval numbers to move slightly because of that; it is the faithful direction.
+- **Everything about a spoken line is placed on the transcription stream's timeline, off Sotto's
+  own transcript row.** `SpokenContributionRecord.atMs` is the session clock and a live session's
+  counts from the start of the *process*, so it cannot be subtracted from a turn's `startMs`.
+  `spokenTurnId(record)` derives the row id (`sotto:<kind>-<ideaId>[-<attempt+1>]`), and that is
+  the one trick that lets `server/eval/spoken.ts` serve both `npm run eval` and `npm run e2e`
+  with one implementation — a planted window is also on that clock, since `resolveMoments` reads
+  it off the turns the scripted lines produced.
+- **A `max` replay cannot tell whether Sotto talked over somebody.** The whole utterance sits
+  inside one `clock.track`ed call, so simulated time does not move: the claim and the answer
+  behind it both land at the instant the question did (measured: both at 80.5 s, both latencies
+  ~0), and the room's next scripted turn always looks as though it started mid-sentence. Hence
+  `SpokenInput.speechTakesTime` and `SpokenRecord.overrunMeasured`: the replay reports the
+  overrun as unmeasured (`?` in the table, "not measurable" in the gate detail) and
+  `npm run e2e` is where the rule is really checked. Same family as "a max replay cannot produce
+  a yield".
+- **Nothing records where speech stopped**, so `estimateSpokenMs` (19.6 characters a second, the
+  hello's measured rate in Sotto's own River voice) is how the overrun is computed at all. It is
+  an estimate on purpose and is documented as one.
+- **The three buckets.** A moment expecting `speak` is counted and gated apart from the policy's
+  and research's, exactly as V2-019 separated research — `caught_low` there means a card went up
+  instead of a sentence, and it is **not** in the numerator (a card is not speech). So
+  `MIN_MOMENT_RECALL` no longer sees the read-back moment V3-013 warned would lower it.
+  `plantedMoments()` in the report exists because `totals.moments` is one bucket and the
+  per-moment table must still print for a run whose moments are all hooks or all speak.
+- **What catches what, and what is judged.** Speech is judged against *every* moment of a fixture
+  (not only the speak ones), because "an unprompted utterance that matches no moment" is the
+  false-speech gate's own definition. A speak moment's pool is the speech **plus** the cards its
+  type would otherwise use, so `caught_low` stays measurable. A claim (V3-015) is matched to a
+  moment *structurally*, by the turn the question was heard in, and never by the judge: "I'll
+  check the drive time" is about the question, not about the issue the script planted, so a judge
+  would be right to say no.
+- **Measured, run 2026-11-01_104540** (`--fixtures rhetorical-questions`, $0.59, 55 model calls):
+  the Loom-price control is caught by Sotto saying the answer (speak recall 1/1, the judge matched
+  the sentence), the claim is in the `claimed` column, nothing was said about the twenty-eight
+  rhetorical questions around it, and the group's final decision earned a read-back that was
+  composed and then not said (`frequency`, which is V3-013's rule at `normal`). The report has a
+  `-notes.md` beside it saying it is a one-fixture verification rather than a full run.
+- **`fixtures/scripts/launch-workshop.json` is still untracked and still not mine.** It has no
+  WAV, no timing and no capture, so it is the only thing `npm run fixtures:check` complains about
+  (3 problems, all its). Left alone again.
+- **No full `npm run eval` or `npm run e2e` was paid for.** The nine-fixture set is ~$3.7 and
+  36 min and the e2e ~$2.3; neither is in V3-010's criteria. V3-016 (shadow run) and V3-011 (the
+  live checkpoint) are the next things that will exercise this, and V3-016 in particular should
+  reuse `spokenRecords`/`SpokenScore` rather than re-reading `timing.jsonl` itself.

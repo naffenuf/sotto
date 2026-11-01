@@ -1649,3 +1649,59 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   not a hint to say less. Anything later that counts *unprompted* speech — V3-010's false-speech
   gate — must exclude it, exactly as `deliveredLevel` and `interjections()` already exclude a
   research card.
+
+- **A replay with no voice is not a quiet Sotto, it is one that cannot speak.** `VoiceOut.begin()`
+  resolving `null` means "nobody would hear this", so before V3-010 every unprompted line in
+  `npm run eval` was recorded as `unheard` and the whole main form of v3 was unmeasurable.
+  `transcriptOnlyVoice()` (`server/voice/voiceOut.ts`) is the eval's instrument and
+  `replayFixture` defaults to it: nothing is synthesized, there is no ElevenLabs call and no audio
+  latency — and the *decisions* are real, which means a claim now spends V2-017's allowance in the
+  eval exactly as it does in a room, Sotto's line lands in the transcript and on the board, and a
+  searching wake answer pays for V2-008c's holding-line call. `nullSinkVoice` (real socket, audio
+  discarded) stays the e2e's; it is the only clock that can price speech.
+- **A spoken line is placed on the transcription stream's timeline, off Sotto's own transcript
+  row.** `SpokenContributionRecord.atMs` is the session clock, whose origin in a live session is
+  the *process*, so it can never be subtracted from a turn's `startMs`. `spokenTurnId(record)` in
+  `shared/spoken.ts` derives the row (`sotto:<kind>-<ideaId>[-<attempt+1>]`, the attempt recovered
+  from `yields` minus the yield that has just happened), and that one trick is why
+  `server/eval/spoken.ts` serves both the `max` eval and the real-time `npm run e2e` with one
+  implementation: a planted window is on the same clock, since `resolveMoments` reads it off the
+  turns the scripted lines produced. The record itself lives in `shared/spoken.ts` because three
+  things read it back and none of them wrote it.
+- **A `max` replay cannot tell whether Sotto talked over somebody, and says so.** The whole
+  utterance is inside one `clock.track`ed call, so simulated time does not move: a claim and the
+  answer behind it both land at the instant the question did (measured: both at 80.5 s, both
+  latencies ~0) and the room's next scripted turn always looks as though it started mid-sentence.
+  So `SpokenInput.speechTakesTime` is false there and `SpokenRecord.overrunMeasured` carries it
+  through to the gate, which reports `not measurable` rather than passing or failing on an
+  artifact. Nothing records where speech *stopped* either (`sottoTurn`'s `endMs` is its `startMs`),
+  so the overlap is computed from `estimateSpokenMs` — 19.6 characters a second, the hello's
+  measured rate in Sotto's own voice (V3-012). Same family as "a max replay cannot produce a
+  yield".
+- **Three kinds of moment, three buckets, three recall gates.** V3-010 finishes what V2-019
+  started: a moment expecting `speak` is counted and gated apart from the policy's and research's,
+  so nothing is held to two thresholds at once — and `caught_low` means the opposite thing in each
+  (a research card cannot exceed its level, so it counts as a catch; a *card* where a sentence was
+  wanted is a real shortfall and is **not** in `speakRecall`). `MIN_SPEAK_RECALL` is 0.6, lower
+  than the policy's 0.7 because speech has to clear a pause of its own, the still-current check
+  and nobody in the room having answered first. `plantedMoments()` in the report exists because
+  `totals.moments` is one bucket now and the per-moment table must still print for a run whose
+  moments are all hooks or all speak.
+- **Speech is judged against every moment; a claim is matched structurally and never judged.**
+  "An unprompted utterance that matches no moment" is how the false-speech gate is defined, so
+  every spoken line is judged against every moment of its fixture rather than only the `speak`
+  ones. A speak moment's pool is the speech **plus** whichever cards its type would otherwise use,
+  which is what keeps `caught_low` measurable. But a reservation (V3-015) is tied to a moment by
+  the turn its question was heard in, exactly as `server/e2e/checks.ts` ties a card: "I'll check
+  the drive time" is about the question, not about the issue the script planted, so a judge asked
+  whether it raises the moment would be right to say no.
+- **A `research_hook` may expect `research` or `speak`, and which one is a reading of the script.**
+  `offsite-plan`'s drive time is `speak` — the room says "somebody should check the drive", which
+  is V3-002's `open_question` and the whole point of the fast path — while
+  `research-business-idea`'s two stay `research`: line 22 asks for it "written down" and line 12
+  is an unverified claim nobody asked about. `rhetorical-questions` gained the one real lookup in
+  it (the Loom price, lines 17–20) as a `speak` moment, which makes it a positive control rather
+  than only a quiet fixture: "said nothing" and "noticed nothing" are now different results, and
+  it is one of the three fixtures (`SPEECH_QUIET_FIXTURES`) the false-speech gate is measured on.
+  `npm run eval:ceiling -- --speak` still keys off the *type*, so it needed no change and reports
+  the new window as reachable (13.3 s wide, 1,109 ms of real quiet, 659 ms of margin at 450).
