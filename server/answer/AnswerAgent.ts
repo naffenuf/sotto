@@ -22,6 +22,13 @@
  * whatever it was going to say: Sotto talking over its own answer is the one
  * thing worse than Sotto staying quiet.
  *
+ * V2-015 gave it the session's background research (V2-013). Every question
+ * is answered with the packets in context, and a question that *asks* what
+ * Sotto found is a **briefing**: the packets it is about come forward on the
+ * stage, open, and the spoken half starts within a few hundred milliseconds,
+ * because there is nothing to search for and so neither an acknowledgment nor
+ * a holding line to wait through.
+ *
  * V2-005 gave it a voice, which changes the shape of the reply rather than
  * adding a step after it. The model now writes **two halves** — the sentences
  * Sotto says out loud, then the headline and detail the stage shows
@@ -52,6 +59,13 @@ import {
 import type { Board } from "../../shared/board.js";
 import type { Citation, StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
+import {
+  briefingOpener,
+  packetSourceUrls,
+  packetsForBriefing,
+  renderPacketsForAnswer,
+  type ResearchPacket,
+} from "../../shared/research.js";
 import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { renderBoardMarkdown } from "../board/markdown.js";
 import { systemClock, type Clock } from "../clock.js";
@@ -174,6 +188,21 @@ export interface AnswerAgentOptions {
   transcript: () => readonly TurnUpdate[];
   /** The names the group has given its diarization labels (US-007). */
   speakers: () => SpeakerNames;
+  /**
+   * Every research packet this session has produced (V2-013, V2-015).
+   *
+   * Handed to the model with *every* question, not only the ones that ask for
+   * it: the research is about what the group is doing, so it is context in the
+   * same way the board is. Absent means a session with no research pipeline,
+   * which answers exactly as the core build did.
+   */
+  packets?: () => readonly ResearchPacket[];
+  /**
+   * Somebody asked for research, and these are the packets being briefed from
+   * (V2-015). Called once per answer, before a word is said, so their cards
+   * can come forward on the stage while Sotto talks about them.
+   */
+  onBriefing?: (packets: readonly ResearchPacket[]) => void;
   /**
    * Pushes the answer to the stage. Called several times for one answer — as
    * `thinking`, as a headline, and finished — always with the same id.
@@ -351,6 +380,8 @@ export class AnswerAgent {
       firstAudioMs: null,
       firstLineMs: null,
       continuationMs: null,
+      packetIds: [],
+      usedPacketIds: [],
     };
     this.logger.log(`[answer] ${answer.id} ${answer.askedBy} asked: ${question}`);
     this.options.onTiming?.({ stage: "answer_queued", atMs: this.clock.now(), answerId: answer.id, turnId: asked.turnId });
@@ -421,9 +452,28 @@ export class AnswerAgent {
     const artifacts: Artifact[] = [];
     const speech = this.speech(queued);
     this.activeSpeech = speech;
+    // V2-015: the research this session has done is context for every
+    // question, and when the question is *asking* for it the packets it is
+    // asking about also come forward on the stage, open, while Sotto talks.
+    const packets = this.options.packets?.() ?? [];
+    const briefing = asked.resume === true ? [] : packetsForBriefing(answer.question, packets);
+    if (briefing.length > 0) {
+      this.logger.log(
+        `[answer] ${answer.id} briefing from ${briefing.map((one) => one.id).join(", ")}`,
+      );
+      this.options.onTiming?.({
+        stage: "answer_briefing", atMs: this.clock.now(), answerId: answer.id,
+        turnId: asked.turnId, packetIds: briefing.map((one) => one.id),
+      });
+      this.options.onBriefing?.(briefing);
+    }
     // Out before the model has written a word: ten to twenty seconds of
     // silence after somebody says Sotto's name reads as "it didn't hear me".
-    if (!asked.resume) speech?.acknowledge(chooseAcknowledgment(answer.question));
+    // A briefing has nothing to wait for, so it says something real instead
+    // ({@link briefingOpener}) rather than acknowledging and then pausing.
+    if (!asked.resume && briefing.length === 0) {
+      speech?.acknowledge(chooseAcknowledgment(answer.question));
+    }
 
     // V2-008c: a searched answer leaves the room in silence for eight to
     // thirteen seconds after the acknowledgment. A second, far cheaper call
@@ -438,8 +488,16 @@ export class AnswerAgent {
     /** Everything the room hears, which is the holding line and then the answer. */
     const aloud = (): string =>
       firstLineText === "" ? spokenText : `${firstLineText} ${spokenText}`;
-    const wantsFirstLine = this.wantsFirstLine(queued);
-    const firstLine = (wantsFirstLine ? this.holdingLine(queued, holding.signal) : noLine())
+    const wantsFirstLine = briefing.length > 0 || this.wantsFirstLine(queued);
+    // A briefing's opening line is written here rather than by a model: the
+    // findings are already in hand, so the only thing left to wait for is the
+    // voice, and that is what makes it the fastest answer Sotto gives.
+    const opening = briefing.length > 0
+      ? Promise.resolve(speech === undefined ? "" : briefingOpener(briefing))
+      : wantsFirstLine
+        ? this.holdingLine(queued, holding.signal)
+        : noLine();
+    const firstLine = opening
       .then((line) => {
         if (line === "" || speech?.sayFirstLine(line) !== true) return;
         firstLineText = line;
@@ -500,7 +558,7 @@ export class AnswerAgent {
       const reply = await this.model.prose({
         label: ANSWER_TRACK_LABEL,
         system: loadPrompt(PROMPTS.answer),
-        user: this.render(answer, asked.resume === true, firstLineText),
+        user: this.render(answer, asked.resume === true, firstLineText, packets, briefing),
         maxTokens: ANSWER_MAX_TOKENS,
         functions: this.functions(answer, artifacts, () => pushedHeadline, aloud),
         onText: ({ itemId, text }) => {
@@ -531,11 +589,13 @@ export class AnswerAgent {
       const text = halves.screen === "" ? screenFromSpoken(halves.spoken) : splitAnswer(halves.screen);
       const spoken = await speech?.done();
       this.recordVoiceLatency(answer, queued, spoken, inContext);
+      const citations = this.citations(answer, text, reply.citations, reply.searchedUrls, briefing);
       const done: Answer = {
         ...answer,
         headline: text.headline,
         detailMd: text.detailMd,
-        citations: this.citations(answer, text, reply.citations, reply.searchedUrls),
+        citations,
+        ...packetsUsed(packets, briefing, citations),
         artifacts: [...artifacts],
         status: "done",
         latencyMs: this.elapsed(answer),
@@ -571,6 +631,7 @@ export class AnswerAgent {
         latencyMs: this.elapsed(answer),
         spokenText: aloud(),
         ...voiceTimings(spoken),
+        ...packetsUsed(packets, briefing, []),
         error: detail,
       };
       this.recordSpeech(answer, spoken, aloud(), spokeAtStreamMs);
@@ -595,6 +656,10 @@ export class AnswerAgent {
    * "what did we decide" is answered from the board in a second or two. There
    * is no point writing one with no voice configured, since nothing would say
    * it, and a `continue` after a barge-in is already mid-sentence.
+   *
+   * A briefing (V2-015) never gets here: its opening line is
+   * {@link briefingOpener}, which costs no call because the findings are
+   * already in hand.
    */
   private wantsFirstLine(queued: Queued): boolean {
     if (this.options.voice === undefined) return false;
@@ -815,10 +880,17 @@ export class AnswerAgent {
   }
 
   /** The user message for one question. */
-  private render(answer: Answer, resume: boolean, firstLine: string): string {
+  private render(
+    answer: Answer,
+    resume: boolean,
+    firstLine: string,
+    packets: readonly ResearchPacket[],
+    briefing: readonly ResearchPacket[],
+  ): string {
     const turns = recentTurns(this.options.transcript());
     const request = renderAnswerRequest(
-      this.options.board(), turns, this.options.speakers(), answer, firstLine,
+      this.options.board(), turns, this.options.speakers(), answer,
+      { firstLine, packets, briefing },
     );
     if (this.interrupted === undefined) return request;
     return `${request}\n\n## Your previous answer was cut off\n${JSON.stringify({
@@ -846,10 +918,15 @@ export class AnswerAgent {
     text: AnswerText,
     annotated: readonly Citation[],
     searchedUrls: readonly string[],
+    briefing: readonly ResearchPacket[],
   ): Citation[] {
     const byUrl = new Map<string, Citation>();
     for (const citation of annotated) byUrl.set(citation.url, citation);
-    const searched = searchedIndex(searchedUrls);
+    // A briefing (V2-015) rests on pages the *research* search returned, not
+    // on anything this call searched for — often it searched for nothing at
+    // all. Those pages were resolved against a real search when the packet
+    // was made, so they are admissible here exactly as this call's own are.
+    const searched = searchedIndex([...searchedUrls, ...packetSourceUrls(briefing)]);
     for (const listed of text.sources) {
       const url = resolveCitation(listed.url, searched);
       if (url === undefined) {
@@ -858,6 +935,14 @@ export class AnswerAgent {
       }
       if (byUrl.has(url)) continue;
       byUrl.set(url, { url, title: citationTitle(listed.title, url) });
+    }
+    // The briefing's own sources go on the card whether the model listed them
+    // or not: it was asked what the research found, and a finding the group
+    // cannot follow back is the thing V2-013 discards packets over.
+    for (const packet of briefing) {
+      for (const source of packet.sources) {
+        if (!byUrl.has(source.url)) byUrl.set(source.url, source);
+      }
     }
     return [...byUrl.values()];
   }
@@ -880,6 +965,31 @@ function voiceTimings(spoken: SpokenResult | undefined): Partial<Answer> {
     firstLineMs: spoken.firstLineMs,
     continuationMs: spoken.continuationMs,
     ...(spoken.interrupted ? { spokenSoFar: spoken.spokenSoFar } : {}),
+  };
+}
+
+/**
+ * Which packets one answer had and which it leaned on (V2-015).
+ *
+ * The briefing's packets by definition — their cards came forward and the
+ * model was told to brief from them — plus any packet whose pages the answer
+ * ended up citing, which is how a question that never mentioned research
+ * still records the research it was answered from.
+ */
+function packetsUsed(
+  packets: readonly ResearchPacket[],
+  briefing: readonly ResearchPacket[],
+  citations: readonly Citation[],
+): Pick<Answer, "packetIds" | "usedPacketIds"> {
+  const cited = new Set(citations.map((citation) => citation.url));
+  const used = new Set(briefing.map((packet) => packet.id));
+  for (const packet of packets) {
+    if (packet.sources.some((source) => cited.has(source.url))) used.add(packet.id);
+  }
+  return {
+    packetIds: packets.map((packet) => packet.id),
+    // In the order the packets were made, so the record reads with the file.
+    usedPacketIds: packets.filter((packet) => used.has(packet.id)).map((packet) => packet.id),
   };
 }
 
@@ -971,14 +1081,43 @@ export function renderAnswerRequest(
   turns: readonly TurnUpdate[],
   speakers: SpeakerNames,
   answer: Answer,
-  /**
-   * V2-008c: the holding line the room is already hearing, when there is one.
-   * This is the only way the searched answer can know not to say it again.
-   */
-  firstLine = "",
+  extra: {
+    /**
+     * V2-008c: the holding line the room is already hearing, when there is
+     * one. This is the only way the searched answer can know not to say it
+     * again.
+     */
+    firstLine?: string;
+    /** V2-015: every packet this session has researched. */
+    packets?: readonly ResearchPacket[];
+    /** V2-015: the packets this question is asking about, when it is. */
+    briefing?: readonly ResearchPacket[];
+  } = {},
 ): string {
+  const firstLine = extra.firstLine ?? "";
+  const packets = extra.packets ?? [];
+  const briefing = extra.briefing ?? [];
   const blocks = [
     ...contextBlocks(board, turns, speakers, answer),
+    ...(packets.length === 0
+      ? []
+      : [
+          "## Research you have already done",
+          renderPacketsForAnswer(packets),
+        ]),
+    ...(briefing.length === 0
+      ? []
+      : [
+          `## They are asking about ${briefing.map((one) => one.id).join(" and ")}`,
+          (briefing.length === 1
+            ? "That research is on their screen now, open, with its sources on it."
+            : "Those are on their screen now, open, with their sources on them." +
+              " Brief them on whichever of them answers what was asked, leading with" +
+              " the one that matters most to what they are deciding.") +
+            " Brief them from it: say what it found and what it means for what they" +
+            " are deciding. Only search if they asked for something the research" +
+            " does not cover, and say which part you had to go and find.",
+        ]),
     ...(firstLine === ""
       ? []
       : [

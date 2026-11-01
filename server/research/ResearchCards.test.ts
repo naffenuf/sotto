@@ -259,6 +259,60 @@ describe("ResearchCards", () => {
     expect(delivered).toHaveLength(1);
   });
 
+  it("brings a card already on the stage forward, open, when it is asked for", () => {
+    const h = harness();
+    h.hush();
+    h.clock.advanceBy(PAUSE_MS);
+    h.cards.accept(packet());
+    expect(h.delivered).toHaveLength(1);
+    expect(h.delivered[0]?.forward).toBeUndefined();
+
+    h.clock.advanceBy(5_000);
+    h.cards.bringForward([packet()]);
+    expect(h.delivered).toHaveLength(2);
+    expect(h.delivered[1]?.id).toBe("research-packet-1");
+    expect(h.delivered[1]?.forward).toBe(true);
+    const record = h.records.at(-1);
+    expect(record?.broughtForward).toBe(true);
+    expect(record?.atMs).toBe(PAUSE_MS + 5_000);
+  });
+
+  it("shows a packet nobody has seen yet the moment it is asked for, mid-sentence", () => {
+    const h = harness();
+    h.speak();
+    h.cards.accept(packet());
+    expect(h.delivered).toHaveLength(0);
+
+    h.cards.bringForward([packet()]);
+    expect(h.delivered.map((card) => card.forward)).toEqual([true]);
+    expect(h.records.at(-1)?.heldForMs).toBe(0);
+    // Taken out of the queue, so it cannot appear again later as though new.
+    expect(h.cards.waitingCount()).toBe(0);
+    h.hush();
+    h.clock.advanceBy(RESEARCH_CARD_WINDOW_MS);
+    expect(h.delivered).toHaveLength(1);
+  });
+
+  it("spends none of the unsolicited budget on a card the group asked for", () => {
+    const h = harness();
+    h.cards.bringForward([packet(), packet({ id: "packet-2" })]);
+    expect(h.delivered).toHaveLength(2);
+    expect(h.cards.shown()).toEqual([]);
+
+    // The next finding of its own still goes out at once: nothing is on cooldown.
+    h.hush();
+    h.clock.advanceBy(PAUSE_MS);
+    h.cards.accept(packet({ id: "packet-3" }));
+    expect(h.delivered.map((card) => card.id).at(-1)).toBe("research-packet-3");
+  });
+
+  it("says nothing once the session is over", () => {
+    const h = harness();
+    h.cards.stop();
+    h.cards.bringForward([packet()]);
+    expect(h.delivered).toHaveLength(0);
+  });
+
   it("keeps the shipped budget separate from the interjection one", () => {
     expect(RESEARCH_CARD_COOLDOWN_MS).toBeLessThan(RESEARCH_CARD_WINDOW_MS);
     expect(MAX_RESEARCH_CARDS_PER_WINDOW).toBeGreaterThan(0);

@@ -586,6 +586,14 @@ export interface ResearchCardRecord {
   shownInWindow: number;
   /** True when the conversation ended and the card went out anyway. */
   atSessionEnd?: boolean;
+  /**
+   * True when somebody asked for this research and the card was brought to
+   * the top of the stage, open, while Sotto briefed them on it (V2-015).
+   *
+   * A packet that was already on the stage gets a second `card` line this way
+   * — the first says when it appeared, this one says when it was asked for.
+   */
+  broughtForward?: true;
 }
 
 /** Every kind of line `research.jsonl` holds. */
@@ -682,3 +690,188 @@ export const RESEARCH_CARD_WINDOW_MS = 15 * 60_000;
  * it is what stops a long conversation turning into a feed.
  */
 export const MAX_RESEARCH_CARDS_PER_WINDOW = 4;
+
+/* ------------------------------------------------------------------ *
+ * The briefing (V2-015): what happens when somebody asks for it.
+ * ------------------------------------------------------------------ */
+
+/**
+ * How many packets one briefing is built from.
+ *
+ * "What did you find?" with four packets ready is not a request for four
+ * reports; it is a request for the ones that answer it. Three, because the
+ * search budget caps a window at {@link MAX_JOBS_PER_WINDOW} anyway, so this
+ * only bites when a long conversation has searched several times and somebody
+ * asks a question that matches all of it.
+ */
+export const MAX_BRIEFING_PACKETS = 3;
+
+/**
+ * The ways a question asks for research that has already been done.
+ *
+ * Matched on words rather than judged by a model, for the same reason the
+ * dedupe is: a question somebody asked out loud is waiting for an answer, and
+ * a classification call before the answering one is a second and a half of
+ * silence to learn something the phrasing already says. Guessing wrong in
+ * either direction is cheap — the packets are in the model's context for
+ * *every* question, so a missed match costs the card coming forward and the
+ * opener, not the findings.
+ */
+const ASKS_FOR_RESEARCH: readonly RegExp[] = [
+  /\bwhat did you (?:find|learn|get|turn up|dig up)\b/i,
+  /\bwhat (?:have|'ve) you (?:found|got|learned|turned up|dug up)\b/i,
+  /\bwhat you found\b/i,
+  /\bdid you (?:find|look|dig|search|check)\b/i,
+  /\b(?:that|the|those|your|any) research\b/i,
+  /\b(?:you|sotto) (?:looked|researched|searched)\b/i,
+  /\bresearch (?:you|sotto) (?:did|ran)\b/i,
+  /\b(?:tell|brief|fill) (?:us|me) (?:in|about|on)\b/i,
+  /\b(?:show|read) (?:us|me|it|them)\b/i,
+  /\bwhat do you have\b/i,
+  /\banything (?:on|about)\b/i,
+  /\bwhat'?s? the (?:verdict|answer) (?:on|about)\b/i,
+];
+
+/** Whether this question is asking for research Sotto has already done. */
+export function asksForResearch(question: string): boolean {
+  return ASKS_FOR_RESEARCH.some((pattern) => pattern.test(question));
+}
+
+/**
+ * The words of a request that are about *the subject* rather than about the
+ * asking: "what did you find on competitors" is a question about competitors.
+ *
+ * The filler has to go, or every question would match every packet on the
+ * word "find". What is left is matched on stems, because "competitors" in a
+ * question and "competitor" in a title are the same word.
+ */
+const ASKING_WORDS = new Set([
+  "find", "found", "finding", "findings", "research", "researched", "look", "looked", "looking",
+  "search", "searched", "dig", "dug", "turn", "turned", "learn", "learned", "tell", "brief",
+  "show", "read", "say", "give", "get", "got", "us", "me", "them", "it", "those", "verdict",
+  "answer", "sotto", "up", "anything", "something", "everything", "please", "again",
+]);
+
+/** A word as the briefing match compares it: lowercase, singular enough. */
+function stem(word: string): string {
+  if (word.length > 4 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
+  if (word.length > 4 && word.endsWith("es")) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  return word;
+}
+
+function stems(text: string): Set<string> {
+  const kept = new Set<string>();
+  for (const word of contentWords(text)) {
+    if (ASKING_WORDS.has(word)) continue;
+    kept.add(stem(word));
+  }
+  return kept;
+}
+
+/**
+ * How much of what the question is about this packet covers: 0 when they
+ * share no subject word, 1 when the packet covers all of it.
+ *
+ * Coverage of the *question*, not overlap of the two, because a packet is
+ * several sentences long and a question is a handful of words: Jaccard would
+ * score every packet near zero.
+ */
+export function packetRelevance(
+  question: string,
+  packet: Pick<ResearchPacket, "title" | "teaser" | "keyPoints">,
+): number {
+  const asked = stems(question);
+  if (asked.size === 0) return 0;
+  const about = stems([packet.title, packet.teaser, ...packet.keyPoints].join(" "));
+  let shared = 0;
+  for (const word of asked) if (about.has(word)) shared += 1;
+  return shared / asked.size;
+}
+
+/**
+ * The packets one question should be briefed from, best first — empty when it
+ * is not asking for research at all.
+ *
+ * A question that names its subject ("what did you find on competitors?")
+ * gets the packets about that subject. One that does not ("what did you
+ * find?") gets the most recent ones, because that is what it is asking for:
+ * the answer is still built by the model from the packets in its context, so
+ * this decides which cards come forward and what the record says the answer
+ * rested on.
+ */
+export function packetsForBriefing(
+  question: string,
+  packets: readonly ResearchPacket[],
+): readonly ResearchPacket[] {
+  if (packets.length === 0 || !asksForResearch(question)) return [];
+  const scored = packets
+    .map((packet, index) => ({ packet, index, score: packetRelevance(question, packet) }))
+    .filter((entry) => entry.score > 0)
+    // Best first, and the newer one first where they tie: a search that
+    // finished a minute ago is more likely to be the one being asked about.
+    .sort((a, b) => b.score - a.score || b.index - a.index);
+  const chosen = scored.length > 0 ? scored.map((entry) => entry.packet) : [...packets].reverse();
+  return chosen.slice(0, MAX_BRIEFING_PACKETS);
+}
+
+/**
+ * The first thing Sotto says when the findings are already in hand.
+ *
+ * It takes the place of both the acknowledgment and the holding line
+ * (V2-008c): those exist to cover the ten to twenty seconds a search needs,
+ * and there is no search here. Written locally rather than by a model for the
+ * same reason — a call to write one sentence would be the only wait left.
+ *
+ * Deliberately says nothing about *what* was found: the model's own first
+ * sentence is a beat behind this one, it is told this was said, and two
+ * versions of the same finding is the one thing worse than a beat of silence.
+ */
+export const BRIEFING_OPENER = "Yes, I looked into that.";
+
+/** The same, when the question matched more than one piece of research. */
+export const BRIEFING_OPENER_MANY = "Yes, I looked into a couple of those.";
+
+export function briefingOpener(packets: readonly ResearchPacket[]): string {
+  return packets.length > 1 ? BRIEFING_OPENER_MANY : BRIEFING_OPENER;
+}
+
+/**
+ * The packets as the answering model is given them (V2-015): a title, what
+ * the search found, the key points and the pages they came from.
+ *
+ * The sources are in here as full URLs on purpose. They are the one part of a
+ * packet the model has to be able to reproduce — a briefing whose pages the
+ * group cannot open is exactly the thing V2-013 throws packets away over —
+ * and they are already resolved against a real search, so copying one out is
+ * not a page anybody invented.
+ */
+export function renderPacketsForAnswer(packets: readonly ResearchPacket[]): string {
+  return packets
+    .map((packet) => {
+      const blocks = [`### ${packet.id} — ${packet.title}`, packet.teaser];
+      if (packet.keyPoints.length > 0) {
+        blocks.push(packet.keyPoints.map((point) => `- ${point}`).join("\n"));
+      }
+      if (packet.visual !== undefined) {
+        blocks.push(`A visual is on the group's screen with this: ${packet.visual.title}`);
+      }
+      blocks.push(
+        "Sources:",
+        packet.sources.map((source) => `- ${source.title} - ${source.url}`).join("\n"),
+      );
+      return blocks.join("\n\n");
+    })
+    .join("\n\n");
+}
+
+/** Every page any of these packets rests on, in order, without repeats. */
+export function packetSourceUrls(packets: readonly ResearchPacket[]): string[] {
+  const urls: string[] = [];
+  for (const packet of packets) {
+    for (const source of packet.sources) {
+      if (!urls.includes(source.url)) urls.push(source.url);
+    }
+  }
+  return urls;
+}

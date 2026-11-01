@@ -138,6 +138,24 @@ export interface Answer {
    */
   continuationMs: number | null;
   /**
+   * Every research packet (V2-013) the model was given as context, in the
+   * order it was given them.
+   *
+   * All of them, for every question: a packet is a few hundred words and the
+   * question may mean something only the research explains. Empty when the
+   * session has produced none, which is most questions in most conversations.
+   */
+  packetIds: string[];
+  /**
+   * The packets this answer was briefed from (V2-015) — the ones whose cards
+   * came forward on the stage, plus any whose pages the answer ended up
+   * citing.
+   *
+   * This is the PRD's "which packets were used". It is a subset of
+   * {@link packetIds}: context is what Sotto had, this is what it leaned on.
+   */
+  usedPacketIds: string[];
+  /**
    * What the room actually heard, when speech was cut off before the end
    * (the Stop button, V2-004; a barge-in, V2-007). Absent when all of it was
    * spoken, or when none of it was.

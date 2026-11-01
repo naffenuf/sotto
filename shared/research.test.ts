@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  BRIEFING_OPENER,
+  BRIEFING_OPENER_MANY,
   KEY_POINT_MAX_WORDS,
+  MAX_BRIEFING_PACKETS,
+  asksForResearch,
+  briefingOpener,
+  packetRelevance,
+  packetSourceUrls,
+  packetsForBriefing,
+  renderPacketsForAnswer,
   MAX_KEY_POINTS,
   MAX_PACKET_SOURCES,
   MAX_PLANNER_IDEAS,
@@ -425,5 +434,119 @@ describe("renderPacketMarkdown", () => {
 
   it("leaves the visual heading out when there is none", () => {
     expect(renderPacketMarkdown(packet(), "q")).not.toContain("## Visual");
+  });
+});
+
+describe("the briefing (V2-015)", () => {
+  const competitors = (): ResearchPacket => ({
+    id: "packet-1",
+    ideaId: "idea-1",
+    title: "Otter, Fireflies and Granola all only transcribe",
+    teaser: "The three named competitors ship transcripts and summaries; none of them speaks up.",
+    keyPoints: ["Otter reviews complain about summary quality", "Fireflies has no live prompts"],
+    sources: [{ url: "https://otter.ai/pricing", title: "Otter.ai — Pricing" }],
+    createdAtMs: 60_000,
+    latencyMs: 14_000,
+  });
+
+  const marketSize = (): ResearchPacket => ({
+    ...competitors(),
+    id: "packet-2",
+    ideaId: "idea-2",
+    title: "Meeting software was $3.5B in 2025",
+    teaser: "Analysts put the market at $3.5 billion, growing 18% a year.",
+    keyPoints: ["Two vendors raised $600M between them in 2024"],
+    sources: [{ url: "https://example.com/market", title: "Market size 2025" }],
+    createdAtMs: 100_000,
+  });
+
+  it("knows the ways a question asks what Sotto found", () => {
+    for (const asked of [
+      "what did you find on competitors?",
+      "what have you found?",
+      "tell us about that research",
+      "show us",
+      "did you look into the market size?",
+      "anything on pricing?",
+    ]) {
+      expect(asksForResearch(asked), asked).toBe(true);
+    }
+  });
+
+  it("leaves an ordinary question alone", () => {
+    for (const asked of [
+      "what do the main competitors charge per month?",
+      "what did we decide about pricing?",
+      "how long would that take to build?",
+      "who owns Otter?",
+    ]) {
+      expect(asksForResearch(asked), asked).toBe(false);
+    }
+  });
+
+  it("picks the packet the question is about, ignoring the asking words", () => {
+    const packets = [competitors(), marketSize()];
+    expect(
+      packetsForBriefing("what did you find on competitors?", packets).map((one) => one.id),
+    ).toEqual(["packet-1"]);
+    expect(
+      packetsForBriefing("what did you find on the market size?", packets).map((one) => one.id),
+    ).toEqual(["packet-2"]);
+  });
+
+  it("matches a subject the packet names in the singular", () => {
+    expect(packetRelevance("anything on competitors?", competitors())).toBeGreaterThan(0);
+    expect(packetRelevance("anything on competitors?", marketSize())).toBe(0);
+  });
+
+  it("offers the most recent research when the question names no subject", () => {
+    const packets = [competitors(), marketSize()];
+    expect(packetsForBriefing("what did you find?", packets).map((one) => one.id)).toEqual([
+      "packet-2",
+      "packet-1",
+    ]);
+  });
+
+  it("never offers more than it can brief on", () => {
+    const many = Array.from({ length: MAX_BRIEFING_PACKETS + 2 }, (_, index) => ({
+      ...competitors(),
+      id: `packet-${index + 1}`,
+    }));
+    expect(packetsForBriefing("what did you find?", many)).toHaveLength(MAX_BRIEFING_PACKETS);
+  });
+
+  it("is empty when the question is not asking, or there is nothing to ask about", () => {
+    expect(packetsForBriefing("what do rivals charge?", [competitors()])).toEqual([]);
+    expect(packetsForBriefing("what did you find?", [])).toEqual([]);
+  });
+
+  it("opens differently for one piece of research and for several", () => {
+    expect(briefingOpener([competitors()])).toBe(BRIEFING_OPENER);
+    expect(briefingOpener([competitors(), marketSize()])).toBe(BRIEFING_OPENER_MANY);
+  });
+
+  it("gives the model the title, the findings and the full URLs", () => {
+    const rendered = renderPacketsForAnswer([competitors(), marketSize()]);
+    expect(rendered).toContain("### packet-1 — Otter, Fireflies and Granola all only transcribe");
+    expect(rendered).toContain("- Otter reviews complain about summary quality");
+    expect(rendered).toContain("- Otter.ai — Pricing - https://otter.ai/pricing");
+    expect(rendered).toContain("### packet-2 — Meeting software was $3.5B in 2025");
+  });
+
+  it("says when a visual is already on the group's screen", () => {
+    const rendered = renderPacketsForAnswer([
+      {
+        ...competitors(),
+        visual: { title: "Feature grid", path: "artifacts/01-grid.html", url: "/api/x" },
+      },
+    ]);
+    expect(rendered).toContain("A visual is on the group's screen with this: Feature grid");
+  });
+
+  it("collects every page the briefing rests on, without repeats", () => {
+    expect(packetSourceUrls([competitors(), competitors(), marketSize()])).toEqual([
+      "https://otter.ai/pricing",
+      "https://example.com/market",
+    ]);
   });
 });

@@ -3,6 +3,7 @@ import type { StageCard } from "../../shared/index.js";
 import {
   QUIET_TRAY_MS,
   arrangeCards,
+  foldCard,
   nextTrayDueAt,
   trayLabel,
   type StageCardView,
@@ -101,5 +102,34 @@ describe("nextTrayDueAt", () => {
   it("ignores glows that are already past due, so the timer never spins", () => {
     const cards = [card("gone", "glow", NOW - QUIET_TRAY_MS - 1)];
     expect(nextTrayDueAt(cards, NOW)).toBeNull();
+  });
+});
+
+describe("foldCard", () => {
+  const stage = [card("research-packet-1", "research", NOW - 60_000), card("card-ans-1", "answer", NOW - 1_000)];
+
+  it("replaces a card in place, keeping where it is in the stack", () => {
+    const folded = foldCard(stage, { ...stage[0] as StageCard, headline: "more of it" }, NOW, 50);
+    expect(folded.map((one) => one.id)).toEqual(stage.map((one) => one.id));
+    expect(folded[0]?.headline).toBe("more of it");
+    expect(folded[0]?.receivedAtMs).toBe(NOW - 60_000);
+  });
+
+  it("stamps a card that arrives for the first time", () => {
+    const folded = foldCard(stage, card("research-packet-2", "research", 0), NOW, 50);
+    expect(folded).toHaveLength(3);
+    expect(folded[2]?.receivedAtMs).toBe(NOW);
+  });
+
+  it("brings a card the room asked for back to the top (V2-015)", () => {
+    const asked = { ...(stage[0] as StageCard), forward: true };
+    const folded = foldCard(stage, asked, NOW, 50);
+    expect(folded[0]?.receivedAtMs).toBe(NOW);
+    expect(arrangeCards(folded, NOW).stack[0]?.id).toBe("research-packet-1");
+  });
+
+  it("drops the oldest card once the cap is reached", () => {
+    const folded = foldCard(stage, card("card-ans-2", "answer", 0), NOW, 2);
+    expect(folded.map((one) => one.id)).toEqual(["card-ans-1", "card-ans-2"]);
   });
 });

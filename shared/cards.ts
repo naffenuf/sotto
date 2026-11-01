@@ -130,4 +130,15 @@ export interface StageCard {
   artifacts?: CardArtifact[];
   /** `state: "error"`: the muted line shown in place of the content. */
   message?: string;
+  /**
+   * `research`: bring this card back to the top of the stage, open (V2-015).
+   *
+   * Set on the one push that happens because somebody *asked* for the
+   * research — Sotto is briefing the room on it as the card arrives, so it is
+   * the thing being read, and the key points, the sources and the visual are
+   * what they asked to see. Everywhere else a card that arrives again keeps
+   * its place and its collapsed state, so an answer landing in pieces does
+   * not jump the stack.
+   */
+  forward?: boolean;
 }

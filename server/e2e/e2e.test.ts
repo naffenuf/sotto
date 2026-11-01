@@ -110,6 +110,8 @@ function answer(overrides: Partial<AnswerLogRecord> = {}): AnswerLogRecord {
     continuationMs: 18_600,
     createdAtMs: 40_000,
     latencyMs: 19_000,
+    packetIds: [],
+    usedPacketIds: [],
     ...overrides,
   };
 }

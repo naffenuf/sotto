@@ -236,6 +236,32 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
       },
     },
     {
+      title: "research — asked for",
+      note:
+        "The same card once somebody says \u201cSotto, what did you find?\u201d (V2-015):" +
+        " it comes to the top of the stage, opens itself and is accented while Sotto" +
+        " is briefing the room on it.",
+      card: {
+        id: "r-forward",
+        variant: "research",
+        state: "ready",
+        createdAtMs: now,
+        forward: true,
+        headline: "Research ready: Otter, Fireflies and Granola charge $8\u201319 a seat",
+        teaser:
+          "All three publish per-seat pricing with a free tier, and two of them" +
+          " charge extra for the features you were describing.",
+        detailMd:
+          "- Otter Business is $20 a seat a month, $16 billed annually\n" +
+          "- Fireflies Pro is $18 a seat, with an $10 annual tier\n" +
+          "- Granola is $10 a seat a month for the team plan",
+        citations: [
+          { url: "https://example.com/otter-pricing", title: "Otter.ai — Pricing" },
+          { url: "https://example.com/fireflies-pricing", title: "Fireflies.ai pricing" },
+        ],
+      },
+    },
+    {
       title: "notice — hello",
       note:
         "What a muted session shows instead of saying hello (V2-009): no label," +

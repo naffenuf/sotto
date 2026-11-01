@@ -1089,6 +1089,11 @@ export class SessionManager {
       board: () => board.board(),
       transcript,
       speakers: () => this.bus.speakerNames(),
+      // V2-015: the background research is context for every question, and a
+      // question that asks for it brings the packets' cards forward on the
+      // stage, open, while Sotto briefs the room from them.
+      packets: () => researchRunner.packets(),
+      onBriefing: (briefed) => researchCards.bringForward(briefed),
       // Published while this session still owns the stage — which it does
       // until the next one starts, not only while it is running: a question
       // typed after Stop (US-019) must put its answer somewhere.

@@ -34,7 +34,8 @@
     "verify:transcript": "node scripts/verify-sotto-transcript.mjs",
     "verify:hello": "node scripts/verify-hello.mjs",
     "verify:judgment": "node scripts/verify-judgment.mjs",
-    "verify:research": "node scripts/verify-research.mjs"
+    "verify:research": "node scripts/verify-research.mjs",
+    "verify:briefing": "node scripts/verify-briefing.mjs"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",

@@ -76,6 +76,8 @@ export class ResearchCards {
 
   /** Packets waiting for a pause and a budget slot, oldest first. */
   private waiting: Waiting[] = [];
+  /** Packets whose card is on the stage, so a second one is not a surprise. */
+  private readonly delivered = new Set<string>();
   /** When each card went up, oldest first: the cooldown and the window. */
   private readonly shownAtMs: number[] = [];
   private cancelTimer: (() => void) | undefined;
@@ -143,6 +145,49 @@ export class ResearchCards {
     for (const held of stranded) this.show(held, nowMs, true);
   }
 
+  /**
+   * Somebody asked for research, so its card comes to the top of the stage,
+   * open, while Sotto briefs them on it (V2-015).
+   *
+   * The two rules above do not apply here, and that is the point of it: the
+   * pause is irrelevant because the room is waiting for exactly this, and the
+   * budget is about *unsolicited* cards — a card the group asked for is not
+   * an interruption, so it neither spends a slot nor starts the cooldown.
+   * What it does do is take the packet out of the queue, so the same finding
+   * cannot appear again a minute later as though it were news.
+   */
+  bringForward(packets: readonly ResearchPacket[]): void {
+    if (this.stopped || packets.length === 0) return;
+    const nowMs = this.clock.now();
+    const asked = new Set(packets.map((packet) => packet.id));
+    const held = new Map(this.waiting.map((one) => [one.packet.id, one]));
+    this.waiting = this.waiting.filter((one) => !asked.has(one.packet.id));
+    for (const packet of packets) {
+      const waited = held.get(packet.id);
+      const already = this.delivered.has(packet.id);
+      this.delivered.add(packet.id);
+      this.onRecord({
+        kind: "card",
+        atMs: nowMs,
+        packetId: packet.id,
+        ideaId: packet.ideaId,
+        title: packet.title,
+        heldForMs: waited === undefined ? 0 : nowMs - waited.seenAtMs,
+        waiting: this.waiting.length,
+        shownInWindow: this.inWindow(nowMs),
+        broughtForward: true,
+      });
+      this.logger.log(
+        `[research] ${researchCardId(packet.id)} ${
+          already ? "brought forward" : "shown now, because they asked for it"
+        }: ${packet.title}`,
+      );
+      this.onDeliver({ ...cardForPacket(packet, nowMs), forward: true }, packet);
+    }
+    // The queue may have lost the packet a timer was armed for.
+    this.review();
+  }
+
   /** No more cards. Idempotent. */
   stop(): void {
     this.stopped = true;
@@ -181,6 +226,7 @@ export class ResearchCards {
   private show(held: Waiting, nowMs: number, atSessionEnd: boolean): void {
     const packet = held.packet;
     this.shownAtMs.push(nowMs);
+    this.delivered.add(packet.id);
     const card = cardForPacket(packet, nowMs);
     this.onRecord({
       kind: "card",
@@ -190,7 +236,7 @@ export class ResearchCards {
       title: packet.title,
       heldForMs: nowMs - held.seenAtMs,
       waiting: this.waiting.length,
-      shownInWindow: this.shownAtMs.filter((at) => nowMs - at < this.windowMs).length,
+      shownInWindow: this.inWindow(nowMs),
       ...(atSessionEnd ? { atSessionEnd: true } : {}),
     });
     this.logger.log(
@@ -221,6 +267,11 @@ export class ResearchCards {
       this.cancelTimer = undefined;
       this.review();
     }, Math.min(...due));
+  }
+
+  /** Cards shown in the window ending now, unsolicited ones only. */
+  private inWindow(nowMs: number): number {
+    return this.shownAtMs.filter((at) => nowMs - at < this.windowMs).length;
   }
 
   private disarm(): void {

@@ -3,6 +3,11 @@ import type { Answer, AnswerLogRecord } from "../../shared/answers.js";
 import { emptyBoard, type Board } from "../../shared/board.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
+import {
+  BRIEFING_OPENER,
+  BRIEFING_OPENER_MANY,
+  type ResearchPacket,
+} from "../../shared/research.js";
 import { SOTTO_SPEAKER, type TurnUpdate } from "../../shared/turns.js";
 import type { Artifact, ShowHtmlArgs } from "../../shared/artifacts.js";
 import { SimulatedClock } from "../clock.js";
@@ -189,6 +194,8 @@ interface Harness {
   spokenTurns: TurnUpdate[];
   /** The lines written to `timing.jsonl`. */
   timing: Record<string, unknown>[];
+  /** The packets each briefing brought forward, in order (V2-015). */
+  briefings: string[][];
 }
 
 function harness(
@@ -205,6 +212,8 @@ function harness(
     wall?: SimulatedClock;
     /** Where "now" is on the transcription stream's timeline (V2-008a). */
     streamNow?: () => number;
+    /** The research this session has done (V2-015). */
+    packets?: ResearchPacket[];
   } = {},
 ): Harness {
   const clock = new SimulatedClock(0);
@@ -218,12 +227,15 @@ function harness(
   const warnings: string[] = [];
   const spokenTurns: TurnUpdate[] = [];
   const timing: Record<string, unknown>[] = [];
+  const briefings: string[][] = [];
   const agent = new AnswerAgent({
     clock,
     model,
     board: () => options.board ?? emptyBoard(),
     transcript: () => options.turns ?? [],
     speakers: () => options.speakers ?? {},
+    packets: () => options.packets ?? [],
+    onBriefing: (briefed) => briefings.push(briefed.map((one) => one.id)),
     onCard: (card, answer) => {
       cards.push(card);
       pushes.push(answer);
@@ -256,6 +268,7 @@ function harness(
     voice: options.voice,
     spokenTurns,
     timing,
+    briefings,
   };
 }
 
@@ -1081,6 +1094,176 @@ describe("Sotto's speech in the transcript (V2-008a)", () => {
   });
 });
 
+describe("briefing from the research (V2-015)", () => {
+  function packet(overrides: Partial<ResearchPacket> = {}): ResearchPacket {
+    return {
+      id: "packet-1",
+      ideaId: "idea-1",
+      title: "Otter, Fireflies and Granola all only transcribe",
+      teaser: "All three ship transcripts; none of them speaks up in the meeting.",
+      keyPoints: ["Otter reviews complain about summaries"],
+      sources: [{ url: "https://otter.ai/pricing", title: "Otter.ai — Pricing" }],
+      createdAtMs: 60_000,
+      latencyMs: 14_000,
+      ...overrides,
+    };
+  }
+
+  const BRIEF = "Otter and Fireflies both stop at the transcript.";
+
+  /** A reply built from the research, with the packet's page under Sources. */
+  const briefed = async (call: ProseCall): Promise<ProseReply> => {
+    const text =
+      `Say this:\n${BRIEF}\n\nShow this:\nAll three only transcribe\n\n` +
+      "- Otter stops at the transcript\n\nSources:\n- Otter.ai — Pricing - https://otter.ai/pricing";
+    call.onText?.({ itemId: ANSWER_ITEM, text });
+    // Nothing was searched for: the research already had the pages.
+    return reply({ text, searched: false, searchedUrls: [] });
+  };
+
+  /** A harness with a voice and research already done. */
+  function asked(packets: ResearchPacket[], replies = [briefed]) {
+    const wall = new SimulatedClock(0);
+    const voice = new FakeVoice(wall);
+    const h = harness(replies, { voice, wall, packets });
+    return { h, voice };
+  }
+
+  it("gives the model every packet, whatever the question is about", async () => {
+    const { h } = asked([packet(), packet({ id: "packet-2", title: "Market was $3.5B" })]);
+    h.agent.ask({ question: "how long would that take to build?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    const user = h.model.calls[0]?.user ?? "";
+    expect(user).toContain("## Research you have already done");
+    expect(user).toContain("### packet-1 — Otter, Fireflies and Granola all only transcribe");
+    expect(user).toContain("### packet-2 — Market was $3.5B");
+    // Not a briefing: nothing came forward and nothing was asked about.
+    expect(h.briefings).toEqual([]);
+    expect(user).not.toContain("They are asking about");
+    expect(h.records[0]?.packetIds).toEqual(["packet-1", "packet-2"]);
+  });
+
+  it("brings the packet forward and opens out loud with no acknowledgment", async () => {
+    const { h, voice } = asked([packet()]);
+    h.agent.ask({ question: "what did you find on competitors?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.briefings).toEqual([["packet-1"]]);
+    // One utterance, opening with the line that makes an acknowledgment
+    // pointless: the findings were already in hand, so nothing was waited for.
+    expect(voice.utterances).toHaveLength(1);
+    expect(voice.utterances[0]?.said).toEqual([BRIEFING_OPENER, BRIEF]);
+    expect(h.records[0]?.ackMs).toBeNull();
+    // 300 ms, not the 1,300 an acknowledged answer measures: the opener *is*
+    // the answer's utterance, so the room hears a real sentence a whole
+    // utterance sooner than it would have heard "Let me check."
+    expect(h.records[0]?.firstLineMs).toBe(300);
+    expect(h.records[0]?.firstAudioMs).toBe(300);
+    expect(h.records[0]?.spokenText).toBe(`${BRIEFING_OPENER} ${BRIEF}`);
+    // And no model call was made to write that line.
+    expect(h.model.firstLineCalls).toHaveLength(0);
+  });
+
+  it("tells the model what the room is asking about and that it has started", async () => {
+    const { h } = asked([packet()]);
+    h.agent.ask({ question: "what did you find on competitors?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    const user = h.model.calls[0]?.user ?? "";
+    expect(user).toContain("## They are asking about packet-1");
+    expect(user).toContain("Brief them from it");
+    expect(user).toContain(BRIEFING_OPENER);
+    expect(user).toContain("already started answering out loud");
+  });
+
+  it("opens for several packets when the question named none of them", async () => {
+    const { h, voice } = asked([packet(), packet({ id: "packet-2" })]);
+    h.agent.ask({ question: "what did you find?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.briefings[0]).toEqual(["packet-2", "packet-1"]);
+    expect(voice.utterances[0]?.said[0]).toBe(BRIEFING_OPENER_MANY);
+  });
+
+  it("records which packets the answer was built from, and cites their pages", async () => {
+    const { h } = asked([
+      packet({ teaser: "The competitors all ship transcripts and nothing else." }),
+      packet({
+        id: "packet-2",
+        title: "Market was $3.5B",
+        teaser: "Analysts say $3.5 billion.",
+        keyPoints: [],
+        sources: [{ url: "https://example.com/market", title: "Market" }],
+      }),
+    ]);
+    h.agent.ask({ question: "what did you find on competitors?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    const record = h.records[0];
+    expect(record?.packetIds).toEqual(["packet-1", "packet-2"]);
+    expect(record?.usedPacketIds).toEqual(["packet-1"]);
+    // The packet's page is a real search result, so it is a citable source
+    // even though this call searched for nothing at all.
+    expect(record?.citations).toEqual([
+      { url: "https://otter.ai/pricing", title: "Otter.ai — Pricing" },
+    ]);
+    expect(h.warnings.join(" ")).not.toContain("never opened");
+  });
+
+  it("shows the sources even when the answer forgot to list them", async () => {
+    const { h } = asked([packet()], [
+      async (call: ProseCall) => {
+        const text = `Say this:\n${BRIEF}\n\nShow this:\nAll three only transcribe`;
+        call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text, searched: false, searchedUrls: [] });
+      },
+    ]);
+    h.agent.ask({ question: "tell us about that research", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.records[0]?.citations.map((one) => one.url)).toEqual(["https://otter.ai/pricing"]);
+  });
+
+  it("is cut off by the same barge-in any answer is", async () => {
+    const { h, voice } = asked([packet()], []);
+    const held = h.model.held();
+    h.agent.ask({ question: "what did you find on competitors?", askedBy: "A", turnId: "0:2" });
+    await microtasks();
+    expect(voice.utterances[0]?.said).toEqual([BRIEFING_OPENER]);
+
+    voice.utterances[0]!.heard = "Yes, I looked";
+    await h.agent.interrupt();
+    held.answer(reply({ text: `Say this:\n${BRIEF}\n\nShow this:\nAll three only transcribe` }));
+    await h.clock.settle();
+
+    expect(voice.utterances).toHaveLength(1);
+    expect(h.records[0]?.spokenSoFar).toBe("Yes, I looked");
+  });
+
+  it("says nothing of the sort when there is no research to brief from", async () => {
+    const { h, voice } = asked([]);
+    h.agent.ask({ question: "what did you find on competitors?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.briefings).toEqual([]);
+    expect(h.model.calls[0]?.user).not.toContain("Research you have already done");
+    // The ordinary path: an acknowledgment, then the answer.
+    expect(voice.utterances[0]?.text()).toBe(ACK_SEARCH);
+    expect(h.records[0]?.packetIds).toEqual([]);
+    expect(h.records[0]?.usedPacketIds).toEqual([]);
+  });
+
+  it("writes Sotto's whole spoken line into the transcript, opener and all", async () => {
+    const { h } = asked([packet()]);
+    h.agent.ask({ question: "what did you find on competitors?", askedBy: "A", turnId: "0:2" });
+    await h.clock.settle();
+
+    expect(h.spokenTurns).toHaveLength(1);
+    expect(h.spokenTurns[0]?.text).toBe(`${BRIEFING_OPENER} ${BRIEF}`);
+  });
+});
+
 describe("screenFromSpoken", () => {
   it("clips an over-long first sentence to the headline limit", () => {
     const long = `${"a very long opening clause ".repeat(6)}ends here. And more.`;
@@ -1186,6 +1369,8 @@ function cardAnswer(overrides: Partial<Answer>): Answer {
     firstAudioMs: null,
     firstLineMs: null,
     continuationMs: null,
+    packetIds: [],
+    usedPacketIds: [],
     ...overrides,
   };
 }

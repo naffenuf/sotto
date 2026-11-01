@@ -12,7 +12,7 @@ import type {
   TurnUpdate,
 } from "../../shared/index.js";
 import { defaultSettings, emptyBoard } from "../../shared/index.js";
-import type { StageCardView } from "./stageView.js";
+import { foldCard, type StageCardView } from "./stageView.js";
 
 /** How long to wait before dialling `/ws/events` again after it drops. */
 const RECONNECT_MS = 2_000;
@@ -214,23 +214,15 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
 }
 
 /**
- * Folds one card into the stage: a card with an id already there is replaced
- * in place, keeping the arrival time it was first stamped with, so an answer
- * that lands in pieces (thinking, headline, detail) neither doubles itself nor
- * jumps to the top of the stack each time.
+ * Folds one card into the stage ({@link foldCard}).
+ *
+ * The arrival time is the browser's: the session clock cannot say how long a
+ * card has been on screen — a `max`-speed replay runs it far ahead of the
+ * wall — so the stage reads `Date.now()` instead, exactly as the board
+ * panel's freshness line does.
  */
 function withCard(cards: StageCardView[], card: StageCard): StageCardView[] {
-  const index = cards.findIndex((existing) => existing.id === card.id);
-  if (index !== -1) {
-    const next = [...cards];
-    next[index] = { ...card, receivedAtMs: (cards[index] as StageCardView).receivedAtMs };
-    return next;
-  }
-  // The session clock cannot say how long a card has been on screen — a
-  // `max`-speed replay runs it far ahead of the wall — so the stage reads
-  // this instead, exactly as the board panel's freshness line does.
-  const next = [...cards, { ...card, receivedAtMs: Date.now() }];
-  return next.length > MAX_CARDS ? next.slice(next.length - MAX_CARDS) : next;
+  return foldCard(cards, card, Date.now(), MAX_CARDS);
 }
 
 /**

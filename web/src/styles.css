@@ -1036,6 +1036,14 @@ body {
   font-size: 0.9375rem;
 }
 
+/* Asked for, and being talked about (V2-015): the card somebody has just
+   asked about comes to the top of the stage, open, and is accented while it is
+   the thing being read. Still no movement — the stage never animates. */
+.card--research.card--forward {
+  border-left-color: var(--ok);
+  background: #f4f8f5;
+}
+
 /* A research card's key points are not behind a second toggle. */
 .card__markdown--inline {
   margin-top: 0.75rem;

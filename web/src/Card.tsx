@@ -18,11 +18,14 @@
  * the search drew and the sources — all of it at once, because one click is
  * the whole interaction. Like a notice it carries no feedback buttons: the
  * server only files a verdict against a card the policy decided to deliver.
+ * `forward` is one of those cards once somebody has *asked* about it
+ * (V2-015): it opens itself and is accented, because Sotto is talking about
+ * it as it arrives.
  *
  * Calm is a requirement, not a preference: no sound, no modal, nothing that
  * moves except the thinking indicator.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Block, Inline } from "./markdown.js";
 import { parseMarkdown } from "./markdown.js";
 import {
@@ -73,7 +76,14 @@ export function Card({
   onQuoteClick,
   onFeedback,
 }: CardProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(defaultExpanded || card.forward === true);
+  // V2-015: somebody asked for this research, so it opens where it stands —
+  // the card is already on the stage, collapsed, when the question arrives.
+  // Still collapsible afterwards: the reader keeps the last word on it.
+  const forward = card.forward === true;
+  useEffect(() => {
+    if (forward) setExpanded(true);
+  }, [forward]);
 
   if (isCollapsible(card.variant) && !expanded) {
     const research = card.variant === "research";
@@ -105,7 +115,7 @@ export function Card({
 
   return (
     <article
-      className={`card card--${card.variant}`}
+      className={`card card--${card.variant}${forward ? " card--forward" : ""}`}
       data-testid="card"
       data-variant={card.variant}
       data-state={card.state}

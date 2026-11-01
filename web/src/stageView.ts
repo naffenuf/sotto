@@ -15,6 +15,35 @@ export interface StageCardView extends StageCard {
   receivedAtMs: number;
 }
 
+/**
+ * Folds one card into the stage.
+ *
+ * A card with an id already there is replaced in place, keeping the arrival
+ * time it was first stamped with, so an answer that lands in pieces
+ * (thinking, headline, detail) neither doubles itself nor jumps to the top of
+ * the stack each time.
+ *
+ * `forward` is the one exception (V2-015): a research card that somebody has
+ * just asked for is stamped again, so it comes back to the top of the stage
+ * while Sotto briefs the room on it.
+ */
+export function foldCard(
+  cards: readonly StageCardView[],
+  card: StageCard,
+  now: number,
+  max: number,
+): StageCardView[] {
+  const index = cards.findIndex((existing) => existing.id === card.id);
+  if (index !== -1) {
+    const existing = cards[index] as StageCardView;
+    const next = [...cards];
+    next[index] = { ...card, receivedAtMs: card.forward === true ? now : existing.receivedAtMs };
+    return next;
+  }
+  const next = [...cards, { ...card, receivedAtMs: now }];
+  return next.length > max ? next.slice(next.length - max) : next;
+}
+
 /** How long a glow stays on the stage before it collapses into the tray. */
 export const QUIET_TRAY_MS = 120_000;
 
