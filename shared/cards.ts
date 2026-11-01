@@ -23,7 +23,8 @@
  *   never a decision the policy took, so it carries no feedback buttons.
  * - `notice`: Sotto talking about itself rather than about the conversation —
  *   the opening hello when the voice is muted, the one nudge for names
- *   (V2-009), and a wrap-up nothing could say out loud (V2-018). Plain, unaccented, and carrying no feedback buttons: there is no
+ *   (V2-009), a wrap-up nothing could say out loud (V2-018) and the note
+ *   saying the room just turned it down or up (V3-006). Plain, unaccented, and carrying no feedback buttons: there is no
  *   decision to speak here for the group to have an opinion about, which is
  *   also why the eval harness and the end-to-end checks never count one as a
  *   delivery.
@@ -48,6 +49,12 @@ export const NOTICE_CARD_IDS = {
    * other two, a group can ask for one more than once in a conversation.
    */
   wrapUp: "notice-wrapup",
+  /**
+   * "Sotto will speak up less" — the frequency the room just changed
+   * (V3-006), numbered, because a group can turn Sotto down and then up
+   * again in one conversation and each note says what changed.
+   */
+  steering: "notice-steering",
 } as const;
 
 /**

@@ -10,7 +10,7 @@ import { detectsAddress } from "../wake.js";
 import { BargeIn } from "./BargeIn.js";
 import type { AskedQuestion } from "./AnswerAgent.js";
 
-function setup(playingInitially = true, answering = false) {
+function setup(playingInitially = true, answering = false, unprompted = false) {
   const clock = new SimulatedClock(0);
   let playing = playingInitially;
   let stops = 0;
@@ -30,6 +30,7 @@ function setup(playingInitially = true, answering = false) {
     command: (asked) => commands.push(asked),
     onTiming: (record) => timing.push(record),
     onListening: (value) => listening.push(value),
+    unprompted: () => unprompted,
   });
   const transcription = new SessionTranscription({
     clock,
@@ -93,6 +94,30 @@ describe("barge-in at the transcription boundary", () => {
     expect(t.stops()).toBe(0);
     expect(t.commands).toEqual([]);
     expect(t.listening).toEqual([]);
+  });
+
+  it("routes a turn steering the frequency after an unprompted line (V3-006)", () => {
+    // Nothing is playing: "Sotto, not now" arrives in the quiet after the
+    // line it is about, which is the only time a group says it.
+    const t = setup(false, false, true);
+    t.start(1, "Sotto, not now");
+    t.end(1, "Sotto, not now");
+    expect(t.stops()).toBe(0);
+    expect(t.commands.map((asked) => asked.question)).toEqual(["Sotto, not now"]);
+  });
+
+  it("leaves an ordinary request in that window to the address classifier", () => {
+    const t = setup(false, false, true);
+    t.start(1, "Sotto, what do the main competitors charge?");
+    t.end(1, "Sotto, what do the main competitors charge?");
+    expect(t.commands).toEqual([]);
+  });
+
+  it("does not route a steering turn with no unprompted line behind it", () => {
+    const t = setup(false);
+    t.start(1, "Sotto, not now");
+    t.end(1, "Sotto, not now");
+    expect(t.commands).toEqual([]);
   });
 
   it("ignores Sotto's own name and unrelated side talk", () => {

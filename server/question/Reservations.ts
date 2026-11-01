@@ -228,6 +228,14 @@ export interface ReservationsOptions {
    * search agrees with them, and the correction on screen when it does not.
    */
   onAnswered?: (ideaId: string, state: StillCurrentState) => void;
+  /**
+   * The room is hearing an unprompted line right now (V3-006).
+   *
+   * Called where the words reach the voice, which is what makes "during an
+   * unprompted contribution" a thing {@link Steering} can read off a clock —
+   * the record this writes afterwards covers the fifteen seconds after it.
+   */
+  onSaying?: () => void;
   windowMs?: number;
   logger?: Logger;
 }
@@ -672,6 +680,9 @@ export class Reservations {
     this.utterance = utterance;
     // A voice in the room while this was opening: it never gets a word out.
     if (this.yielded) utterance.cancel();
+    // V3-006: the room is about to hear something nobody asked for, which is
+    // what makes an addressed "stop" in the next few seconds about *that*.
+    this.options.onSaying?.();
     // Playback starts inside ElevenLabs' first chunk (measured at 299 ms), so
     // this is where the line belongs on the conversation's timeline.
     const startMs = this.options.streamNow();

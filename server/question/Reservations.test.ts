@@ -3,14 +3,16 @@
  * stays quiet, and what happens when the search comes back with nothing.
  */
 import { describe, expect, it } from "vitest";
-import { FREQUENCY_LIMITS, type PolicySettings } from "../../shared/policy.js";
+import { FREQUENCY_LIMITS, type Frequency, type PolicySettings } from "../../shared/policy.js";
 import {
   RESEARCH_NO_ANSWER,
   type ResearchIdea,
   type ResearchPacket,
 } from "../../shared/research.js";
+import type { StageCard } from "../../shared/cards.js";
 import { SOTTO_SPEAKER, type PauseState, type TurnUpdate } from "../../shared/turns.js";
 import { SimulatedClock } from "../clock.js";
+import { Steering } from "../session/Steering.js";
 import { PAUSE_MS, SPEAK_PAUSE_MS, type SpendVerdict } from "../interject/policy.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
 import type { StillCurrentState } from "./StillCurrentWatcher.js";
@@ -100,6 +102,8 @@ interface Harness {
   hush: () => void;
   /** Lets the voice's promises settle. */
   tick: () => Promise<void>;
+  /** How many times the room was told it is hearing something unasked (V3-006). */
+  sayings: () => number;
 }
 
 function setup(
@@ -122,6 +126,7 @@ function setup(
     ...options.settings,
   };
   const spend = { verdict: options.verdict ?? ("ok" as SpendVerdict), spent: 0 };
+  let sayings = 0;
   // The room is quiet when the session opens, and the silence grows with the
   // clock — exactly what the assembler's pause state does.
   const state: { quietSince: number | null } = { quietSince: 0 };
@@ -141,6 +146,9 @@ function setup(
     },
     onSpoken: (turn) => spoken.push(turn),
     onRecord: (record) => records.push(record),
+    onSaying: () => {
+      sayings += 1;
+    },
     ...(options.answering === undefined ? {} : { answering: options.answering }),
     ...(options.stillCurrent === undefined ? {} : { stillCurrent: options.stillCurrent }),
     ...(options.onAnswered === undefined ? {} : { onAnswered: options.onAnswered }),
@@ -166,6 +174,7 @@ function setup(
       await Promise.resolve();
       await Promise.resolve();
     },
+    sayings: () => sayings,
   };
 }
 
@@ -399,6 +408,27 @@ describe("Reservations: claiming a question", () => {
   });
 });
 
+describe("Reservations: telling the room it is hearing something unasked (V3-006)", () => {
+  it("reports at the moment the words reach the voice", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    harness.reservations.claim(idea, asked());
+    expect(harness.sayings()).toBe(0);
+    harness.clock.advanceBy(PAUSE_MS);
+    await harness.tick();
+    expect(harness.sayings()).toBe(1);
+  });
+
+  it("reports nothing for a line nobody could hear", async () => {
+    const harness = setup(null);
+    harness.reservations.claim(idea, asked());
+    harness.clock.advanceBy(PAUSE_MS);
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({ spoken: false, reason: "unheard" });
+    expect(harness.sayings()).toBe(0);
+  });
+});
+
 describe("Reservations: yielding", () => {
   it("stops the moment a human voice arrives, and keeps what was heard", async () => {
     const voice = new FakeVoice();
@@ -439,6 +469,38 @@ describe("Reservations: yielding", () => {
     const harness = setup(voice);
     harness.reservations.yieldToHuman();
     expect(voice.cancelled).toBe(0);
+  });
+
+  /**
+   * V3-006's two-yields rule against the records a real claim produces, so
+   * the hint cannot drift from what `Reservations` actually writes down —
+   * `SessionManager` hands every one of these to `Steering.observe`.
+   */
+  it("is the hint that two of turn the frequency down (V3-006)", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    let frequency: Frequency = "normal";
+    const cards: StageCard[] = [];
+    const steering = new Steering({
+      clock: harness.clock,
+      frequency: () => frequency,
+      setFrequency: (next) => {
+        frequency = next;
+      },
+      onCard: (card) => cards.push(card),
+      logger: quiet,
+    });
+    for (const attempt of [0, 1]) {
+      harness.reservations.claim({ ...idea, id: `idea-${attempt}` }, asked(harness.clock.now()));
+      harness.clock.advanceBy(PAUSE_MS);
+      await harness.tick();
+      harness.reservations.yieldToHuman();
+      await harness.reservations.flush();
+      for (const record of harness.records.splice(0)) steering.observe(record);
+      harness.hush();
+    }
+    expect(frequency).toBe("rare");
+    expect(cards.map((card) => card.headline)).toEqual(["Sotto will speak up less"]);
   });
 
   it("does not count a stopped session as a yield", async () => {

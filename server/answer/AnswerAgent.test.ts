@@ -196,6 +196,8 @@ interface Harness {
   timing: Record<string, unknown>[];
   /** The packets each briefing brought forward, in order (V2-015). */
   briefings: string[][];
+  /** Every steering command the room gave, in order (V3-006). */
+  steers: [command: string, turnId: string | null][];
 }
 
 function harness(
@@ -228,6 +230,7 @@ function harness(
   const spokenTurns: TurnUpdate[] = [];
   const timing: Record<string, unknown>[] = [];
   const briefings: string[][] = [];
+  const steers: [string, string | null][] = [];
   const agent = new AnswerAgent({
     clock,
     model,
@@ -248,6 +251,7 @@ function harness(
     onSpoken: (turn) => spokenTurns.push(turn),
     ...(options.voice === undefined ? {} : { voice: options.voice }),
     onThinking: (value) => thinking.push(value),
+    onSteer: (command, turnId) => steers.push([command, turnId]),
     onModelState: (state, detail) => states.push([state, detail]),
     logger: {
       log: () => {},
@@ -269,6 +273,7 @@ function harness(
     spokenTurns,
     timing,
     briefings,
+    steers,
   };
 }
 
@@ -607,6 +612,27 @@ describe("AnswerAgent out loud (V2-005)", () => {
     expect(h.records.map((record) => record.question)).toEqual([
       "What do rivals charge?", "How about annual pricing?",
     ]);
+  });
+
+  it.each(["quieter", "louder"])(
+    "hands %s to the room's steering instead of answering it (V3-006)",
+    async (command) => {
+      const { h, voice } = spoken([]);
+      h.model.commands.push({ command, question: "" });
+      h.agent.command({ question: "Sotto, not now", askedBy: "A", turnId: "0:2" });
+      await h.clock.settle();
+      expect(h.steers).toEqual([[command, "0:2"]]);
+      expect(voice.utterances).toEqual([]);
+      expect(h.records).toEqual([]);
+    },
+  );
+
+  it("reports a stop too, leaving what it was about to the caller (V3-006)", async () => {
+    const h = harness();
+    h.model.commands.push({ command: "stop", question: "" });
+    h.agent.command({ question: "Sotto stop", askedBy: "A", turnId: "0:4" });
+    await h.clock.settle();
+    expect(h.steers).toEqual([["stop", "0:4"]]);
   });
 
   it("stays silent on invalid classification or continue with no interrupted answer", async () => {

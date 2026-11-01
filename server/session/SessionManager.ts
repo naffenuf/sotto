@@ -92,6 +92,7 @@ import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.
 import { SessionDigest, asksForWrapUp } from "./digest.js";
 import { WrapUp } from "./WrapUp.js";
 import { SessionTranscription } from "./SessionTranscription.js";
+import { Steering } from "./Steering.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
 
@@ -320,6 +321,16 @@ interface ModelLoops {
    * no model call.
    */
   stillCurrent: StillCurrentWatcher | null;
+  /**
+   * The room turning Sotto down or up by talking to it (V3-006), or `null`
+   * with no model client.
+   *
+   * It needs no model of its own — stepping a setting and showing a note is
+   * all it does — but both ways in run through things a session without one
+   * does not have: the command classifier (V2-007) and the unprompted lines
+   * `Reservations` says.
+   */
+  steering: Steering | null;
 }
 
 /** One card that reached the stage, kept so feedback can be filed on it. */
@@ -850,6 +861,9 @@ export class SessionManager {
         this.bus.setListening(listening);
         if (listening) loops.policy?.wakePhraseDetected();
       },
+      // V3-006: "Sotto, not now" lands in the quiet after the line it is
+      // about, so the command classifier has to be reachable there too.
+      unprompted: () => loops.steering?.inWindow() === true,
     });
     return new SessionTranscription({
       clock,
@@ -1136,6 +1150,7 @@ export class SessionManager {
         questions: null,
         reservations: null,
         stillCurrent: null,
+        steering: null,
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
@@ -1150,6 +1165,25 @@ export class SessionManager {
       store.writer?.appendCandidate(record);
       store.digest.candidate(record);
     };
+    // V3-006: the room steering how much Sotto says, by talking to it. Built
+    // before everything that feeds it — the policy's deliveries, the
+    // reservations' spoken lines and the command classifier all report here —
+    // and it only ever moves the frequency, never the boldness.
+    const steering = new Steering({
+      clock,
+      frequency: () => this.currentSettings.frequency,
+      // Through the one place a setting changes, so the header, `session.json`
+      // and both rationed loops pick it up exactly as a click would.
+      setFrequency: (frequency) => {
+        if (this.current?.info.id !== info.id) return;
+        this.setPolicySettings({ frequency });
+      },
+      onCard: (card) => {
+        if (this.current?.info.id === info.id) this.bus.publishCard(card);
+      },
+      onTiming,
+      logger: this.logger,
+    });
     const policy = new InterjectionPolicy({
       clock,
       pauseState,
@@ -1162,7 +1196,7 @@ export class SessionManager {
       onRecord: (record) => { recordCandidate(record); onTiming({ stage: "policy_decision", ...record }); },
       // The stage (US-015). The level the policy chose becomes the card's
       // variant, and the card is kept so a 👍 can find its way back to it.
-      onDeliver: (interjection) => { this.deliver(info, deliveries, interjection); onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id }); },
+      onDeliver: (interjection) => { this.deliver(info, deliveries, interjection); steering.noteContribution(); onTiming({ stage: "interjection_publish", atMs: clock.now(), candidateId: interjection.candidate.id, published: this.current?.info.id === info.id }); },
     });
     // The second opinion (V2-016). Every candidate the policy ever sees comes
     // through here, including one the verifier has just checked, so the four
@@ -1236,6 +1270,13 @@ export class SessionManager {
           ? { ...record, packet: undefined, packetId: record.packet?.id, sources: record.packet?.sources.length ?? 0 }
           : record;
       onTiming({ stage: `research_${record.kind}`, ...detail });
+      // V3-006: a card the group did not ask for is an unprompted
+      // contribution, so an addressed "that's too much" in the next fifteen
+      // seconds is about it. One brought forward (V2-015) or filling in a
+      // question's own card (V3-003) was asked for, and is not.
+      if (record.kind === "card" && record.broughtForward !== true && record.filledIn !== true) {
+        steering.noteContribution();
+      }
     };
     // The quiet end of the research pipeline (V2-014): a compact card per
     // packet, shown only in a pause — the policy's own rule, read off the
@@ -1300,8 +1341,17 @@ export class SessionManager {
       // been noticed, which is long after this returns.
       answering: () => (answers.pending() ?? 0) > 0,
       onSpoken: (turn) => this.recordSottoSpeech(info, store, null, turn),
+      // V3-006: the words have just been handed to the voice, so "during an
+      // unprompted contribution" is inside the window too, not only the
+      // fifteen seconds after the record is written.
+      onSaying: () => steering.noteContribution(),
       onRecord: (record) => {
         onTiming({ ...record });
+        // V3-006: everything said here is unprompted, so a line the room
+        // actually heard opens the fifteen-second window an addressed "stop"
+        // is read inside, and a line a voice in the room cut off is the hint
+        // that two of, inside ten minutes, turn Sotto down.
+        steering.observe(record);
         // V3-004: once the answer has been said, shown or written off, nothing
         // more will be said about this question — so stop paying for a verdict
         // on every remaining final turn. A measured run that left the watcher
@@ -1416,6 +1466,10 @@ export class SessionManager {
       onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
       // Sotto does not interject over its own answer.
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
+      // V3-006: "not now" and "you can jump in more" steer the frequency; a
+      // bare "stop" does too, but only when Sotto has just said something
+      // unasked — during an answer to a direct question it means this answer.
+      onSteer: (command, turnId) => steering.commanded(command, turnId),
       onModelState,
     });
     // V3-002: what the room wonders aloud, noticed per final turn rather than
@@ -1434,7 +1488,7 @@ export class SessionManager {
       onOpenQuestion: (question) =>
         this.noticeQuestion(info, store, question, research, researchCards, reservations),
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations, stillCurrent };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, research, researchRunner, researchCards, questions, reservations, stillCurrent, steering };
   }
 
   /**
@@ -1846,6 +1900,9 @@ async function drainLoops(
   // policy gets one look at that final pause and then accounts for whatever
   // is still waiting.
   loops.policy?.flush();
+  // V3-006: a command classified after this cannot change a setting the next
+  // conversation starts with.
+  loops.steering?.stop();
 }
 
 /** What the model dot says about a session: ready, or not running at all. */

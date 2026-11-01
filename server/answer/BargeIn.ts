@@ -10,6 +10,22 @@ import type { Clock } from "../clock.js";
 import { detectsAddress } from "../wake.js";
 import type { AskedQuestion } from "./AnswerAgent.js";
 
+/**
+ * The shape of a turn that is steering Sotto rather than asking it something
+ * (V3-006).
+ *
+ * A pre-filter, not the decision: the classifier decides between `stop`,
+ * `quieter` and `louder`, and this only decides whether an addressed final
+ * turn goes to it at all when nothing is playing. It exists because the
+ * fifteen-second window after an unprompted contribution would otherwise send
+ * *every* addressed turn through a classifier that has no `mention` kind —
+ * somebody saying "that's the thing Sotto picked up" would be read as a
+ * request. The words come from the PRD's examples and the obvious neighbours;
+ * a bare "stop" is already covered by the control words beside it.
+ */
+export const STEER_SHAPE =
+  /\b(not now|not just now|too much|too chatty|talking too much|enough|be quiet|quiet down|pipe down|butt out|back off|stay out|hold off|let us|leave us|we're fine|we are fine|jump in more|speak up more|chime in|more often|don't be shy|do not be shy|less often|stop jumping)\b/i;
+
 /** Effects stay injectable so partial-to-silence timing can be tested without a microphone. */
 export interface BargeInOptions {
   clock: Clock;
@@ -20,6 +36,15 @@ export interface BargeInOptions {
   command: (asked: AskedQuestion) => void;
   onTiming: (record: Record<string, unknown>) => void;
   onListening: (listening: boolean) => void;
+  /**
+   * V3-006: whether Sotto has just contributed something nobody asked for.
+   *
+   * Inside that window an addressed turn that is {@link STEER_SHAPE} belongs
+   * to the command classifier even though nothing is playing — "Sotto, not
+   * now" arrives seconds *after* the line it is about, which is exactly when
+   * no playback is going on.
+   */
+  unprompted?: () => boolean;
 }
 
 /** Owns only turns addressed to Sotto, leaving unrelated side talk to the ordinary pipeline. */
@@ -67,7 +92,11 @@ export class BargeIn {
     // Ordinary requests (including "thanks Soto ... can you ...") belong to
     // V2-008's address classifier, even after an earlier interruption.
     const followUpControl = control && (this.hasInterrupted || this.options.answering?.() === true);
-    if (!duringPlayback && !this.owns(turn.turnId) && !followUpControl) return;
+    // V3-006: and the same courtesy for a turn steering how much Sotto says,
+    // which lands in the quiet *after* the contribution it is about.
+    const steer =
+      this.options.unprompted?.() === true && (control || STEER_SHAPE.test(turn.text));
+    if (!duringPlayback && !this.owns(turn.turnId) && !followUpControl && !steer) return;
     this.commands.add(turn.turnId);
     this.options.command({ question: turn.text, askedBy: turn.speaker, turnId: turn.turnId });
   }

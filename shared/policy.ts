@@ -217,3 +217,28 @@ export interface PolicyDecision {
   /** What the frequency setting allowed: the cooldown and the budget. */
   limits: FrequencyLimits;
 }
+
+/**
+ * Which way the room asked Sotto to go (V3-006).
+ *
+ * The two things a group can say about *how much* Sotto contributes, as
+ * opposed to what it contributes: "not now" / "that's too much" steps the
+ * frequency down, "you can jump in more" steps it up. Boldness is not
+ * steerable out loud — a group telling Sotto to be quiet is asking for less,
+ * not for a higher bar.
+ */
+export const steerDirections = ["quieter", "louder"] as const;
+export type SteerDirection = (typeof steerDirections)[number];
+
+/**
+ * One step down or up {@link frequencyLevels}, clamped at either end.
+ *
+ * Returns the frequency unchanged when there is nowhere further to go, which
+ * is how the caller knows there is nothing to tell the room about.
+ */
+export function steppedFrequency(frequency: Frequency, direction: SteerDirection): Frequency {
+  const index = frequencyLevels.indexOf(frequency);
+  const next = index + (direction === "quieter" ? -1 : 1);
+  if (next < 0 || next >= frequencyLevels.length) return frequency;
+  return frequencyLevels[next] as Frequency;
+}

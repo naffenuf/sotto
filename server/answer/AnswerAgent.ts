@@ -223,6 +223,15 @@ export interface AnswerAgentOptions {
    * when the last one is done. Nothing is interjected in between.
    */
   onThinking?: (thinking: boolean) => void;
+  /**
+   * The room steering how much Sotto says (V3-006).
+   *
+   * `quieter` and `louder` are always about the setting; a `stop` is about
+   * the setting only when Sotto has just contributed something unasked,
+   * which is a question only the caller can answer — so the raw command
+   * comes through and {@link Steering} decides.
+   */
+  onSteer?: (command: "stop" | "quieter" | "louder", turnId: string | null) => void;
   /** The model status dot, shared with the board loop and the observer. */
   onModelState?: (state: "connecting" | "active" | "error", detail: string) => void;
   /**
@@ -319,7 +328,16 @@ export class AnswerAgent {
           stage: "voice_command", atMs: this.clock.now(), turnId: asked.turnId,
           command: command.command,
         });
-        if (command.command === "stop") return;
+        // V3-006: the two kinds that are about Sotto's behaviour rather than
+        // about this answer, and a stop that may be about either.
+        if (command.command === "quieter" || command.command === "louder") {
+          this.options.onSteer?.(command.command, asked.turnId);
+          return;
+        }
+        if (command.command === "stop") {
+          this.options.onSteer?.("stop", asked.turnId);
+          return;
+        }
         // Let the interrupted answer finish recording its flushed position before
         // rendering context for the follow-up. Its speech feeder stays cancelled.
         if (this.running !== undefined) await this.running;

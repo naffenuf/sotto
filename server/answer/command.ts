@@ -6,9 +6,21 @@ import { z } from "zod";
 import type { ModelClient } from "../model/client.js";
 import { loadPrompt, PROMPTS } from "../prompts/index.js";
 
+/**
+ * What a turn addressed to Sotto mid-contribution is asking for.
+ *
+ * V3-006 added the two that are about *how much* Sotto says rather than about
+ * what it is saying now: `quieter` ("not now", "that's too much") and
+ * `louder` ("you can jump in more"). They are classified here because this is
+ * already the classifier an addressed turn reaches while Sotto is speaking or
+ * has just spoken unasked — the two moments a group says either of them.
+ */
+export const commandKinds = ["stop", "new_question", "continue", "quieter", "louder"] as const;
+export type CommandKind = (typeof commandKinds)[number];
+
 /** Validate even strict model replies before allowing them to restart speech. */
 export const CommandSchema = z.object({
-  command: z.enum(["stop", "new_question", "continue"]),
+  command: z.enum(commandKinds),
   question: z.string(),
 });
 
@@ -24,7 +36,7 @@ export async function classifyCommand(model: ModelClient, text: string) {
       additionalProperties: false,
       required: ["command", "question"],
       properties: {
-        command: { type: "string", enum: ["stop", "new_question", "continue"] },
+        command: { type: "string", enum: [...commandKinds] },
         question: { type: "string" },
       },
     },

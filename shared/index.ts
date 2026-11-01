@@ -144,6 +144,8 @@ export {
   frequencyLevels,
   limitsFor,
   policySettingsLabel,
+  steerDirections,
+  steppedFrequency,
   thresholdsFor,
 } from "./policy.js";
 export type {
@@ -157,6 +159,7 @@ export type {
   FrequencyLimits,
   PolicyDecision,
   PolicySettings,
+  SteerDirection,
 } from "./policy.js";
 export {
   SessionSettingsRequestSchema,
