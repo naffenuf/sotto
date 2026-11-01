@@ -35,8 +35,8 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "server/question/: questionShape.ts (pure pre-filter), question.ts (schema + one low-effort Spark call), QuestionWatcher.ts (final turns only, concurrent calls each tracked on the clock, 6 s wall deadline -> kind none + fallback: true). Prompt is server/prompts/question.md. Pre-filter measured on the captures rather than the scripts: sentence-initial question words plus a trailing ?, plus a \"wondering\" family (\"no idea whether\", \"I wonder\", \"does anyone know\", \"how long/much\", \"what does ... charge\") - brainstorm 2/24 (8%) against the PRD's quarter, and every open question in the fixtures passes. Wired in SessionManager.modelLoops as loops.questions, routed beside the wake watcher (an addressed turn is skipped and logged question_skipped; echoes and barge-in turns are remembered as context only), flushed in drainLoops before the research manager, stopped with the session. A verdict is a record of its own: a log line plus timing.jsonl stage open_question - no candidate, no card, no policy. observer.md now says a question just wondered aloud is neither a hook nor an unanswered_question. New fixture rhetorical-questions (129 s, 29 lines) rendered, captured, fixtures:check green and added to the eval set beside brainstorm/no-wake. Integration test (real Spark, four captures): offsite-plan's drive time noticed in 1,376-2,563 ms (also legitimately flags the Thursday availability), rhetorical-questions yields exactly one (Loom pricing) with 4 rhetorical / 4 decision / 1 answered / 1 none, brainstorm and no-wake yield none. Gated on the median call rather than the max: the first call of a process is ~5.9 s of SDK connection setup and low-effort Spark has a tail (one call in forty reached the 6 s deadline and fell back, which is the designed behaviour). The decision kind is returned and logged but has nowhere to go until V3-013 adds closing to it; inFollowUpWindow is an option V3-014 wires up."
     },
     {
       "id": "V3-003",

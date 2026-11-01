@@ -1341,3 +1341,32 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   windows of 18.2 s and 23.2 s, 22/22 checks and $1.31 of a $2.30 allowance. When a timing
   decision is on the table, `npm run e2e -- --fixtures <the two>` is ~$1.3 and eight minutes;
   a replay's report cannot answer it at any price.
+
+- **A question the room asks itself is noticed per turn, and the pre-filter is what makes that
+  affordable.** V3-002's `server/question/` is one low-effort Spark call on a final turn, and
+  `questionShape.ts` decides whether to make it. The rules are written against the **captures**,
+  never the scripts: a final turn usually keeps its question mark (`" Is it an hour and a half? "`)
+  but `ask-search`'s came back with neither comma nor question mark, and a wh-word *anywhere*
+  passes most of `brainstorm` ("respect what you don't have", "what's on hand"). So the test is
+  *sentence-initial* question words — minus `which`, which in the captures only ever starts a
+  relative clause ("Which nobody loves") — a trailing `?`, and a "wondering" family that catches a
+  question with the question taken off the front ("I have no idea whether they have a Thursday
+  free"). Measured: `brainstorm` 2/24 (8%) against the PRD's quarter, `research-business-idea`
+  12/38, `rhetorical-questions` 12/29. Real Spark then returns the verdict in **1.4–2.6 s**, well
+  inside the four seconds the story is given.
+- **Gate a model-latency assertion on the median, never the max.** Low-effort Spark answers this
+  prompt in ~1.5 s and occasionally in five, and the **first call of a process costs ~5.9 s** of
+  SDK connection setup (measured 5,855 ms against 1,152–3,900 for the eight that followed it in
+  the same conversation). Two attempts at V3-002's integration test failed on assertions about
+  *every* call: one on the cold start, one on a single 6 s timeout that the watcher had already
+  handled exactly as designed (`kind: "none"`, `fallback: true`). Assert the PRD's number on the
+  thing the PRD is about, and report the distribution.
+- **An open question is a record, not a candidate, which is why it was cheap to add.** Nothing in
+  the interjection pipeline learned a new type: `open_question` goes to
+  `SessionManager.noticeQuestion` — a log line and `timing.jsonl` — and never near the observer,
+  the candidate gate or the policy. The two prompts had to be told, though: `observer.md` now says
+  a question somebody just wondered aloud is already in hand, so it is neither a `research_hook`
+  (which would spend a search slot twice) nor an `unanswered_question` (which keeps the questions
+  only the group can answer). And `question.md` has to rule out the *reply* — "No idea at all, I
+  haven't looked at their pricing since last year" is an answer to the question before it, and
+  without that rule it comes back as a second `open_question` about the same thing.

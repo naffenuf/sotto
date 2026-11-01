@@ -35,3 +35,34 @@ own scores, no second call) gates interjections, Glimmer keeps the research gate
   5/6, research recall 1/3). Don't pay for a fresh full run just to re-measure it; the
   research-recall shortfall there was traced to search-slot allocation (hooks splitting), not
   to the candidate gate, which a `research_hook` never reaches.
+
+[2026-11-01 07:02] V3-002 — completed — the room's open questions are noticed per final turn by
+their own Spark classifier, not by the observer.
+- `server/question/` is the new piece: `questionShape.ts` (pure pre-filter), `question.ts`
+  (`QuestionSchema`, `classifyQuestion`, `OpenQuestion`), `QuestionWatcher.ts` (finals only,
+  one call per question-shaped turn, concurrent and each `clock.track`ed, 6 s **wall** deadline
+  -> `none` + `fallback: true`). Prompt: `server/prompts/question.md`.
+- The pre-filter was written against the **captures**, not the scripts, and the numbers are in
+  its doc comment: sentence-initial question words (minus "which") plus a trailing `?`, plus a
+  "wondering" family. `brainstorm` 2/24 = 8% against the PRD's quarter; every open question in
+  the fixtures passes. `questionShape.test.ts` re-measures all twelve captures, per fixture.
+- Wiring: `SessionManager.modelLoops` builds `loops.questions`; the assembler routes finals to
+  it beside the wake watcher, `drainLoops` flushes it **before** the research manager (V3-003
+  will turn a verdict into a search), and `stop()`/`finish()` retire it. A verdict is its own
+  record — `[question]` in the log and `stage: "open_question"` in `timing.jsonl`. Nothing
+  else: no candidate, no card, no policy.
+- Measured against real Spark (`npm run test:integration server/question`, ~48 s, four
+  captures): `offsite-plan`'s drive time noticed in **1,376–2,563 ms** (it also, correctly,
+  flags the venue's Thursday availability); `rhetorical-questions` gives **exactly one**
+  (Loom's per-seat price) with 4 rhetorical, 4 decision, 1 `answered`, 1 `none`; `brainstorm`
+  and `no-wake` give none. The test gates on the **median** call: the first call of a process
+  is ~5.9 s of SDK setup, and one call in forty hits the 6 s deadline.
+- New fixture `rhetorical-questions` (129 s, 29 lines, Craig and EJ killing a status meeting)
+  rendered, captured, `fixtures:check` green, in `fixtures/README.md` and in the eval set with
+  the quiet ones (`isEvalFixture`, `evalFixtures` ranks the three quiet ones first now).
+- Next (V3-003) should know: `OpenQuestion` (`turnId`, `question`, `topic`, `askedBy`,
+  `askedAtMs`) is the handoff shape, and `SessionManager.noticeQuestion` is the single call
+  site to extend — give the question to `ResearchManager` there, skipping the planner and the
+  gate. `questions.flush()` already runs before `research.flush()` in `drainLoops`.
+  `QuestionWatcherOptions.inFollowUpWindow` is the seam V3-014 wires; the `decision` kind is
+  classified and logged but has nowhere to go until V3-013 adds `closing` to it.
