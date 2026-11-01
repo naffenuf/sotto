@@ -1,11 +1,17 @@
 /**
- * One card, in three variants (US-011).
+ * One card, in four variants (US-011, V2-009).
  *
  * The headline carries the message and everything else is opt-in: the detail
  * is behind "details ▾", and a `glow` is a single muted line until somebody
  * opens it, at which point it becomes exactly the card an `interject` would
  * have been. That is why there is one component and not three — the policy
  * (US-014) picks the level, not the content.
+ *
+ * A `notice` (V2-009) is Sotto talking about itself rather than about the
+ * conversation — the hello, and the nudge for names. Same card, read at
+ * speaking size rather than across-the-table size, with no label above it and
+ * no feedback buttons under it: there was no decision to speak to have an
+ * opinion about.
  *
  * Calm is a requirement, not a preference: no sound, no modal, nothing that
  * moves except the thinking indicator.
@@ -113,6 +119,9 @@ export function Card({
 
 /** The line above the headline: the question for an answer, the label otherwise. */
 function CardLabel({ card, onCollapse }: { card: StageCard; onCollapse: () => void }) {
+  // A `notice` is Sotto talking about itself (V2-009), so "Sotto noticed…"
+  // would be the wrong label and there is nothing else worth putting there.
+  if (card.variant === "notice") return null;
   if (card.variant === "answer") {
     if (card.question === undefined || card.question === "") return null;
     return (
@@ -250,11 +259,12 @@ function Feedback({
 }) {
   const [chosen, setChosen] = useState<FeedbackVerdict | null>(null);
   if (onFeedback === undefined) return null;
-  // Not on an answer (US-018): the verdicts are about an interjection *call* —
-  // "useful", "not useful", "wrong moment" are what the policy (US-014) learns
-  // from — and the server only records one against a card it decided to
-  // deliver, so a button here would have nothing to file.
-  if (card.variant === "answer") return null;
+  // Not on an answer (US-018) and not on a notice (V2-009): the verdicts are
+  // about an interjection *call* — "useful", "not useful", "wrong moment" are
+  // what the policy (US-014) learns from — and the server only records one
+  // against a card it decided to deliver, so a button here would have nothing
+  // to file.
+  if (card.variant === "answer" || card.variant === "notice") return null;
   return (
     <div className="card__feedback" data-testid="card-feedback">
       {feedbackVerdicts.map((verdict) => (

@@ -11,6 +11,7 @@ import { silentVoice } from "../../shared/voice.js";
 import { SimulatedClock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
 import type { ModelClient } from "../model/client.js";
+import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import type { SpeechPlayback } from "../voice/selfEcho.js";
 import { SessionManager } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
@@ -180,6 +181,24 @@ describe("self-echo suppression throughout a session", () => {
     }
     expect(JSON.stringify(t.prompts)).not.toContain("watermelon");
     expect(JSON.stringify(t.raw)).not.toContain("watermelon");
+  });
+
+  it("keeps the opening hello out of the transcript, the files and the board (V2-009)", async () => {
+    const t = setup();
+    const hello = loadPrompt(PROMPTS.hello);
+    // The microphone hears Sotto introduce itself, word for word.
+    t.play(hello);
+    t.say(hello);
+    expect(t.turns).toEqual([]);
+    expect(t.raw).toEqual([]);
+    expect(t.events.filter((event) => event.type === "turn")).toEqual([]);
+    expect(t.bus.speakerNames()).toEqual({});
+    t.endPlayback();
+
+    t.say("So, pricing. Where did we land on the per-seat number?");
+    expect(t.turns).toHaveLength(1);
+    await t.sessions.stop();
+    expect(JSON.stringify(t.prompts)).not.toContain("just say");
   });
 
   it.each([false, true])("releases held cards after playback (late echo: %s)", async (lateEcho) => {

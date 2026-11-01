@@ -1,0 +1,1 @@
+Hi, I'm Sotto. I'm listening in and keeping notes, and I'll only speak up when I think it's worth it. If you want me, just say "Sotto" and ask. Before you get going, would you each say your name, so I know who's here?

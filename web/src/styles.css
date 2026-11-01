@@ -617,6 +617,20 @@ body {
   border-left-color: #9a6a2e;
 }
 
+/* A notice is Sotto talking about itself (V2-009): quieter than anything it
+   has noticed, and read at talking length rather than across a table. */
+.card--notice {
+  background: transparent;
+  border-style: dashed;
+}
+
+.card--notice .card__headline {
+  font-size: 1.0625rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+
 .card__label {
   margin: 0 0 0.375rem;
   font-size: 0.75rem;

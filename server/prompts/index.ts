@@ -32,6 +32,14 @@ export const PROMPTS = {
   address: "address",
   /** Deciding whether a delivered card raises a planted moment (US-016). */
   judge: "judge",
+  /**
+   * The opening hello, said out loud at the start of a session (V2-009).
+   *
+   * The one prompt that is not a prompt: it is read verbatim rather than sent
+   * to a model, so that what the room hears can be edited in the same place
+   * as everything else Sotto says, and so that it is the same every time.
+   */
+  hello: "hello",
 } as const;
 
 export type PromptName = (typeof PROMPTS)[keyof typeof PROMPTS];

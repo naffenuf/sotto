@@ -185,6 +185,36 @@ function samples(now: number): { title: string; note: string; card: StageCard }[
         message: "The observer's call failed; this thought is incomplete.",
       },
     },
+    {
+      title: "notice — hello",
+      note:
+        "What a muted session shows instead of saying hello (V2-009): no label," +
+        " no feedback buttons, read at talking size.",
+      card: {
+        id: "n-hello",
+        variant: "notice",
+        state: "ready",
+        createdAtMs: now,
+        headline:
+          "Hi, I'm Sotto. I'm listening in and keeping notes, and I'll only speak up" +
+          " when I think it's worth it. If you want me, just say \u201cSotto\u201d and ask." +
+          " Before you get going, would you each say your name, so I know who's here?",
+      },
+    },
+    {
+      title: "notice — names",
+      note: "The one nudge, shown at a pause two minutes in if a speaker is unnamed.",
+      card: {
+        id: "n-names",
+        variant: "notice",
+        state: "ready",
+        createdAtMs: now,
+        headline: "I'd love to know who's here",
+        detailMd:
+          "Say \u201cHi, I'm \u2026\u201d and I'll pick the name up, or click a speaker" +
+          " label in the transcript to set it.",
+      },
+    },
   ];
 }
 

@@ -17,9 +17,29 @@
  * - `answer`: a reply to a question, spoken (US-017) or typed (US-019).
  * - `interject`: Sotto raising its hand — same size as an answer, accented.
  * - `glow`: a quiet thought, one muted line until somebody opens it.
+ * - `notice`: Sotto talking about itself rather than about the conversation —
+ *   the opening hello when the voice is muted, and the one nudge for names
+ *   (V2-009). Plain, unaccented, and carrying no feedback buttons: there is no
+ *   decision to speak here for the group to have an opinion about, which is
+ *   also why the eval harness and the end-to-end checks never count one as a
+ *   delivery.
  */
-export const cardVariants = ["answer", "interject", "glow"] as const;
+export const cardVariants = ["answer", "interject", "glow", "notice"] as const;
 export type CardVariant = (typeof cardVariants)[number];
+
+/**
+ * Ids the {@link CardVariant} `notice` cards take (V2-009).
+ *
+ * Derived rather than counted, like a delivered card's id, and one per kind:
+ * there is exactly one hello and at most one name nudge in a session, so
+ * pushing either twice replaces it rather than stacking a second copy.
+ */
+export const NOTICE_CARD_IDS = {
+  /** The opening hello, shown when the voice could not say it. */
+  hello: "notice-hello",
+  /** "I'd love to know who's here", once, at a pause. */
+  names: "notice-names",
+} as const;
 
 /**
  * - `thinking`: on its way. The headline may already be there, or not.

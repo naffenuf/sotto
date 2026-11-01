@@ -28,6 +28,7 @@ import type {
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
 import { emptyModel } from "../test/emptyModel.js";
+import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import type { VoiceOut, VoiceUtterance } from "../voice/voiceOut.js";
 
@@ -1610,5 +1611,142 @@ describe("SessionManager and generated artifacts (US-020)", () => {
     expect(sessions.artifactFile("events-no-wake-1", "01-user-flow.html")).toBe(
       "/tmp/not-a-real-folder/artifacts/01-user-flow.html",
     );
+  });
+});
+
+describe("SessionManager, the opening hello (V2-009)", () => {
+  /** A voice that remembers every utterance; `npm test` never synthesizes. */
+  class RecordingVoice implements VoiceOut {
+    private count = 0;
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const id = `v${(this.count += 1)}`;
+      const spoken = (): string => parts.join(" ");
+      return Promise.resolve({
+        id,
+        append: (text: string) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      });
+    }
+  }
+
+  /** Every board prompt a session sent, so the hello can be checked out of it. */
+  class WatchingModel implements ModelClient {
+    readonly boardCalls: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      if (call.label === "board") this.boardCalls.push(call.user);
+      return call.label === "board" ? { operations: [] } : { candidates: [] };
+    }
+    async grounded(): Promise<never> {
+      throw new Error("nothing to check");
+    }
+    async prose(): Promise<never> {
+      throw new Error("nothing to answer");
+    }
+  }
+
+  function live(voice: VoiceOut | null) {
+    const bus = new EventBus(quiet);
+    const cards: StageCard[] = [];
+    const turnsSeen: TurnUpdate[] = [];
+    const saved: TurnUpdate[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+      if (event.type === "turn") turnsSeen.push(event.turn);
+    });
+    const model = new WatchingModel();
+    const clock = new SimulatedClock(0);
+    const writer = {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: (turn: TurnUpdate) => saved.push(turn),
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+    let client: FakeAsrClient | undefined;
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writer,
+      createModel: () => model,
+      createVoice: () => voice,
+      liveClock: clock,
+      createAsrClient: ({ onFrame }) => {
+        client = new FakeAsrClient(onFrame);
+        return client;
+      },
+    });
+    return { bus, sessions, cards, turnsSeen, saved, model, clock, client: () => client };
+  }
+
+  it("says it out loud and writes it into the transcript, but not onto the board", async () => {
+    const voice = new RecordingVoice();
+    const t = live(voice);
+    t.sessions.start({ kind: "wav", fixture: "brainstorm" });
+    await waitFor(() => voice.utterances.length === 1, "the hello to be said");
+
+    expect(voice.utterances[0]).toBe(loadPrompt(PROMPTS.hello));
+    // Spoken, so the stage stays empty.
+    expect(t.cards).toEqual([]);
+
+    const mine = t.turnsSeen.filter(isSottoTurn);
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({
+      turnId: "sotto:hello",
+      speaker: SOTTO_SPEAKER,
+      text: loadPrompt(PROMPTS.hello),
+      final: true,
+    });
+    expect(t.saved.filter(isSottoTurn)).toHaveLength(1);
+
+    // The board never hears it: the hello establishes nothing (V2-009).
+    t.client()?.deliverTurn();
+    await t.sessions.stop();
+    await waitFor(() => t.model.boardCalls.length > 0, "a board update");
+    expect(t.model.boardCalls.join("\n")).not.toContain("just say");
+  });
+
+  it("shows it as a card when there is nowhere to say it, and writes no turn", async () => {
+    const t = live({ begin: async () => null });
+    t.sessions.start({ kind: "wav", fixture: "brainstorm" });
+    await waitFor(() => t.cards.length === 1, "the hello card");
+
+    expect(t.cards[0]).toMatchObject({
+      id: "notice-hello",
+      variant: "notice",
+      state: "ready",
+      headline: loadPrompt(PROMPTS.hello),
+    });
+    expect(t.turnsSeen.filter(isSottoTurn)).toEqual([]);
+    await t.sessions.stop();
+  });
+
+  it("never greets an events replay: that conversation already happened", async () => {
+    const { sessions, events, ended } = harness({ apiKey: "test-key" });
+    const done = ended();
+    sessions.start({ kind: "events", fixture: "moment-fact" });
+    await done;
+    expect(events.filter((event) => event.type === "card")).toEqual([]);
+    expect(turns(events).filter(isSottoTurn)).toEqual([]);
   });
 });

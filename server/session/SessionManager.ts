@@ -64,6 +64,7 @@ import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
 import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
+import { Greeting } from "./Greeting.js";
 import { introducedName } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 import { SessionTranscription } from "./SessionTranscription.js";
@@ -265,6 +266,13 @@ interface RunningSession {
   policy: InterjectionPolicy | null;
   /** The answer agent (US-018), or `null` when there is no model client. */
   answers: AnswerAgent | null;
+  /**
+   * The opening hello and the name nudge (V2-009), or `null` for an `events`
+   * replay — a recording of a conversation that has already happened is not a
+   * room to say hello to, and greeting one would put a card the policy never
+   * delivered in front of the eval harness.
+   */
+  greeting: Greeting | null;
   /** The cards this session has put on the stage, by card id (US-015). */
   deliveries: Map<string, Delivered>;
   /** The session's clock: simulated for a replay, live otherwise. */
@@ -443,6 +451,9 @@ export class SessionManager {
     this.bus.setStatus("transcription", ...running.transcription);
     this.bus.setStatus("model", ...running.model);
     this.watch(running);
+    // After the `session` event, which is what clears the stage: a card
+    // published before it would be swept away by its own session (V2-009).
+    running.greeting?.start();
     this.logger.log(`[session] ${info.id} started (${describeSource(source)})`);
     return info;
   }
@@ -457,6 +468,7 @@ export class SessionManager {
     if (running === undefined) return false;
     running.stopRequested = true;
     running.address?.stop();
+    running.greeting?.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
     running.stop();
@@ -486,7 +498,7 @@ export class SessionManager {
       () => assembler.streamNow(),
       voice,
     );
-    const assembler = this.assembler(info, clock, store, loops, voice);
+    const assembler = this.assembler(info, clock, store, loops, voice, null);
     let source: EventReplaySource;
     try {
       source = EventReplaySource.forFixture(fixture, {
@@ -507,6 +519,7 @@ export class SessionManager {
       store,
       mic: undefined,
       ...loops,
+      greeting: null,
       clock,
       transcription: ["active", `replaying ${fixture} events at ${this.replaySpeed}`],
       model: modelStatus(loops.board),
@@ -575,7 +588,15 @@ export class SessionManager {
       () => assembler.streamNow(),
       voice,
     );
-    const assembler = this.assembler(info, this.liveClock, store, loops, voice);
+    const greeting = this.greeting(
+      info,
+      this.liveClock,
+      store,
+      voice,
+      () => assembler.pauseState(),
+      () => assembler.streamNow(),
+    );
+    const assembler = this.assembler(info, this.liveClock, store, loops, voice, greeting);
     const client = this.createAsrClient({
       apiKey,
       clock: this.liveClock,
@@ -603,6 +624,7 @@ export class SessionManager {
       store,
       mic,
       ...loops,
+      greeting,
       clock: this.liveClock,
       transcription: [
         "connecting",
@@ -614,7 +636,7 @@ export class SessionManager {
       stop: () => client.stop(),
       done: client.run(audio)
         .finally(() => assembler.finish())
-        .then(() => drainLoops(loops)),
+        .then(() => drainLoops(loops, undefined, greeting)),
       stopRequested: false,
     };
   }
@@ -625,6 +647,7 @@ export class SessionManager {
     store: StoreSlot,
     loops: ModelLoops,
     voice: VoiceOut | null,
+    greeting: Greeting | null,
   ): SessionTranscription {
     const wake = this.wakeWatcher(info, loops, clock, store);
     const barge = new BargeIn({
@@ -665,6 +688,9 @@ export class SessionManager {
           const name = introducedName(turn.text);
           if (name !== null) this.renameSpeaker(turn.speaker, name);
         }
+        // V2-009: who is in the room, and when the room is quiet enough to
+        // ask. It skips Sotto's own lines itself.
+        greeting?.acceptTurn(turn);
         loops.board?.acceptTurn(turn);
         loops.observer?.acceptTurn(turn);
         if (turn.final && loops.board && loops.observer) {
@@ -687,6 +713,43 @@ export class SessionManager {
           wake.acceptTurn(turn);
         }
       },
+    });
+  }
+
+  /**
+   * The opening hello and the one nudge for names (V2-009).
+   *
+   * Live sources only — `mic` and `wav`, as the PRD says. An `events` replay
+   * is a conversation that has already happened: there is nobody to say hello
+   * to, and the card would reach the eval harness as a delivery the policy
+   * never made.
+   *
+   * It needs no model client: the words are a file, so a session with no
+   * `MODEL_API_KEY` still introduces itself.
+   */
+  private greeting(
+    info: SessionInfo,
+    clock: Clock,
+    store: StoreSlot,
+    voice: VoiceOut | null,
+    pauseState: () => PauseState,
+    streamNow: () => number,
+  ): Greeting {
+    return new Greeting({
+      clock,
+      voice,
+      streamNow,
+      pauseState,
+      names: () => this.bus.speakerNames(),
+      logger: this.logger,
+      onCard: (card) => {
+        if (this.current?.info.id === info.id) this.bus.publishCard(card);
+      },
+      // Not to the board: the hello establishes no fact about the
+      // conversation, and V2-009 says to keep it out of the notes. It goes to
+      // the transcript like any other line of Sotto's (V2-008a).
+      onSpoken: (turn) => this.recordSottoSpeech(info, store, null, turn),
+      onTiming: (record) => store.writer?.appendTiming?.(record),
     });
   }
 
@@ -898,7 +961,9 @@ export class SessionManager {
    *
    * It goes exactly where a human turn goes — the live transcript, the
    * session folder's `transcript.md`, and the board, which reads it labeled
-   * `Sotto` so a fact Sotto established can reach the notes. It goes nowhere
+   * `Sotto` so a fact Sotto established can reach the notes. A `null` board is
+   * the opening hello (V2-009): it is Sotto's line in the transcript like any
+   * other, and it has nothing to tell the notes. It goes nowhere
    * near the things that listen to the room: no wake or address check, no
    * barge-in, no speaker introduction, no observer and no policy. Sotto
    * reacting to its own voice is the one loop none of them could get out of,
@@ -913,7 +978,7 @@ export class SessionManager {
   private recordSottoSpeech(
     info: SessionInfo,
     store: StoreSlot,
-    board: BoardUpdater,
+    board: BoardUpdater | null,
     turn: TurnUpdate,
   ): void {
     if (this.last?.sessionId !== info.id) return;
@@ -923,7 +988,7 @@ export class SessionManager {
     );
     this.bus.publish({ type: "turn", turn });
     store.writer?.appendTurn(turn);
-    board.acceptTurn(turn);
+    board?.acceptTurn(turn);
   }
 
   /**
@@ -1096,6 +1161,7 @@ export class SessionManager {
     running.verifier?.stop();
     running.policy?.stop();
     running.address?.stop();
+    running.greeting?.stop();
     // Not `running.answers`: a question typed after Stop is answered against
     // the conversation that just ended (US-019), so the agent is only
     // retired when the next session supersedes it.
@@ -1150,7 +1216,14 @@ export class SessionManager {
  * everything the conversation produced is in the policy's hands, and before
  * the policy's own last look, which is what that silence is for.
  */
-async function drainLoops(loops: ModelLoops, beforePolicy?: () => void): Promise<void> {
+async function drainLoops(
+  loops: ModelLoops,
+  beforePolicy?: () => void,
+  greeting?: Greeting | null,
+): Promise<void> {
+  // The hello is usually long finished; a session stopped two seconds in is
+  // the case this covers, so its line still reaches the transcript.
+  await greeting?.flush();
   await loops.address?.flush();
   await loops.board?.flush();
   await loops.observer?.flush();
