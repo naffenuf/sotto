@@ -1612,3 +1612,40 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   lands. Real run, `decision-closings` end to end: all three closings detected, and the read-back
   said *"Got it: six sheds, one per association. B asked, What if only one of them actually signs
   the agreement when it lands. Did that get settled?"*
+
+- **The raised hand is two objects, and the split is the whole design.** V3-017's count is derived
+  in the **browser** (`raisedCards` in `web/src/stageView.ts`) from `StageCard.raised` on the cards
+  it already has, minus the ones the reader expanded and minus the glows `arrangeCards` has trayed
+  — because "opened" is the one of the PRD's three clearing rules only the stage can know, and
+  "expired" for a glow is screen time rather than conversation time. The **queue** is the server's
+  (`server/session/raisedHand.ts`): a `call_on` has to be answered with no model call and no file
+  read, so every raised card arrives there with the sentence it would be read out in already
+  written (`calledOnCardLine` = headline + detail, `calledOnPacketLine` = the packet's
+  `spokenAnswer` or a local briefing off its title and teaser). `RaisedHand.observe(card, line,
+  atMs)` is called with **every** card that goes to the stage and a card without `raised` leaves
+  the queue, which is what makes "spoken" and "expired" one rule rather than three.
+- **`raised` goes both ways now.** V3-008 only ever set it; `SessionManager.lowerHand` republishes
+  a card with `raised: false` the moment it is said — called on, spoken by a `bold` session, or
+  V3-004's answer landing on its research card. The card itself stays on the stage either way
+  (V3-008's promise), so anything counting what Sotto is holding has to read the flag rather than
+  the card's presence. Research cards raise a hand too (`cardForPacket`), and `researchCardByIdea`
+  in `modelLoops` is how a spoken answer finds the card to lower: that id is **not** derivable,
+  because a question the room wondered aloud fills in the question's thinking card (V3-003).
+- **The raised count is part of the address prompt, because the spelling is not enough — again.**
+  `call_on` is V2-008's fourth kind, and "Soto" alone is an invitation when Sotto is holding
+  something and the start of a question when it is not; the classifier is told which. So a
+  bare-name `call_on` **still arms the speaker** for `ADDRESS_ARM_MS` — the transcription cannot
+  tell "Sotto?" from "Sotto" and the request may be two seconds away — and an early `call_on` the
+  final extends is rechecked, like a `mention`. Measured on real Spark: 20 cases at 0.9–2.9 s, all
+  correct, though one full run in three read "never mind" after a bare name as a `request` (it
+  passes 3/3 in isolation — model flake on an edge case, not the new kind).
+- **`called_on` is the one `Reservations` kind the room asked for, and it is defined by what does
+  not apply.** `asked: true` skips `inPause` entirely, `reasonNotToSpeak` returns early (no
+  boldness, no frequency, no still-current), `charges()` is false, and `yieldToHuman` ignores it —
+  so `interrupt()` no longer goes through `yieldToHuman`, because V2-007's barge-in is the only
+  thing that may still stop it. It is also kept out of V3-006's steering window in **both** places
+  (`onSaying` in `Reservations.speak`, `steering.observe` in `SessionManager`): a "stop" after
+  being called on is about the card, and being talked over while answering a direct question is
+  not a hint to say less. Anything later that counts *unprompted* speech — V3-010's false-speech
+  gate — must exclude it, exactly as `deliveredLevel` and `interjections()` already exclude a
+  research card.

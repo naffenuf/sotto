@@ -346,3 +346,51 @@ What the next iteration needs to know.
   test is two full replays with the real model (~7.3 min, roughly $0.5); the offline pipeline tests
   in `SessionManager.test.ts` cover the same seven behaviours instantly with a fake model, so run
   those while iterating and the integration test once.
+
+[2026-11-01 10:25] V3-017 — completed — Raised hand in the header with a count, and "Sotto, go
+ahead" reads out the newest thing it is holding.
+
+What the next iteration needs to know.
+
+- **The hand is deliberately two objects, and the split is the design.** The *count* is derived
+  in the browser (`raisedCards` in `web/src/stageView.ts`) from `StageCard.raised` on the cards
+  it already has, minus the ones the reader expanded and minus the glows that have aged into the
+  tray — because "opened" is the one of the PRD's three clearing rules only the stage can know.
+  The *queue* is the server's (`server/session/raisedHand.ts`), because a `call_on` has to be
+  answered with no model call and no file read, so each raised card arrives there with the
+  sentence it would be said in already written. `RaisedHand.observe(card, line, atMs)` is called
+  with **every** card that goes to the stage and a card without `raised` leaves the queue, which
+  is what makes "spoken" and "expired" one rule rather than three.
+- **`raised` now goes both ways.** V3-008 only ever set it; `SessionManager.lowerHand` now
+  republishes a card with `raised: false` when it has been said (called on, or spoken by a `bold`
+  session, or V3-004's answer landing on its research card). The card itself stays on the stage
+  either way — that is V3-008's whole promise — so the browser must read the flag rather than the
+  card's presence.
+- **Research cards raise a hand too** (`cardForPacket` sets `raised: true`), and `researchCardByIdea`
+  in `modelLoops` is how a spoken V3-004 answer finds the card to lower: the id is *not* derivable,
+  because a question the room wondered aloud fills in the question's thinking card (V3-003).
+- **`call_on` is the fourth address kind, and the raised count is part of the prompt.** The
+  classifier is told "Sotto is holding N things it has not said", because that is the only thing
+  separating "Soto" said as an invitation from "Soto" said on the way to a question. A bare-name
+  `call_on` therefore **still arms the speaker** for `ADDRESS_ARM_MS`, since the transcription
+  cannot tell "Sotto?" from "Sotto" and the request may be two seconds away. An early `call_on`
+  that the final extends is rechecked, like a `mention`.
+- **`called_on` is the one `Reservations` kind the room asked for**, and it is defined by what does
+  not apply: no gap (`asked: true` skips `inPause`), no boldness or frequency check, `charges()`
+  false, and `yieldToHuman` ignores it — only `interrupt()` (V2-007's barge-in) stops it, which is
+  why `interrupt` no longer goes through `yieldToHuman`. It is also kept out of V3-006's steering
+  window in both places (`onSaying` in `Reservations.speak`, `steering.observe` in SessionManager):
+  a "stop" after being called on is about the card, and being talked over while answering a direct
+  question is not a hint to say less.
+- **Measured.** `npm run verify:hand` is 14/14 (`/dev/cards` shows `✋ 3`, opening a held card
+  takes it to 2, clicking the hand clears it; a mocked `/ws/events` goes 2 → 1 → none as cards are
+  republished without the flag, and the cards stay on the stage). The address integration test is
+  green against real Spark — 20 cases, 0.9–2.9 s — but one full run in three had case 14
+  ("never mind" after a bare name) come back `request` at 4.9 s; it passes 3/3 in isolation, so
+  that is model flake on an edge case the prompt has always been thin on, not a V3-017 regression.
+- **`fixtures/scripts/launch-workshop.json` is untracked and is not mine.** It appeared in the
+  working tree mid-iteration, nothing in the repo references it, and it was left alone.
+- **V3-010 (next) needs nothing new from here**, but note that a `called_on` line is a
+  `spoken_contribution` with `kind: "called_on"` and a `cardId`, and it is **not** unprompted
+  speech — the false-speech gate must exclude it, exactly as `deliveredLevel` and `interjections()`
+  already exclude a research card.
