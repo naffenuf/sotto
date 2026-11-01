@@ -26,7 +26,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { AnswerLogRecord } from "../../shared/answers.js";
 import type { Board } from "../../shared/board.js";
-import type { DecisionLogRecord } from "../../shared/candidates.js";
+import type { DecisionLogRecord, GateMode } from "../../shared/candidates.js";
 import type { E2eFiles, E2eObserved, VoiceSpend } from "../../shared/e2e.js";
 import type { ResearchLogLine } from "../../shared/research.js";
 import type { SessionRecord } from "../../shared/session.js";
@@ -65,6 +65,12 @@ export interface LiveRunOptions {
    * replay, pays for the verdict in real seconds (V2-021).
    */
   createGlimmer?: GlimmerClientFactory;
+  /**
+   * Who scores interjection candidates (V3-001). Left out, the shipped
+   * default applies; `--gate glimmer` forces the local gate back on, and this
+   * is the only check whose clock charges it for the seconds it takes.
+   */
+  gate?: GateMode;
   /**
    * Sotto's voice (V2-005). `scripts/e2e.ts` passes a metered null sink: the
    * ElevenLabs socket, the streaming, the alignment and the latencies are the
@@ -116,6 +122,7 @@ export async function runLive(options: LiveRunOptions): Promise<E2eObserved> {
     bus,
     apiKey: options.apiKey,
     createModel: options.createModel,
+    ...(options.gate === undefined ? {} : { gate: options.gate }),
     ...(options.createGlimmer === undefined ? {} : { createGlimmer: options.createGlimmer }),
     ...(options.createVoice === undefined ? {} : { createVoice: options.createVoice }),
     logger,

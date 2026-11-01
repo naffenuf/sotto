@@ -229,20 +229,31 @@ export interface GateResult {
   detail: string;
 }
 
-/** What the judgment gate did and cost, over one group of fixtures (V2-016). */
-export interface GateScore {
-  /** Who scored the candidates: the local gate, or the observer itself. */
-  mode: GateMode;
+/**
+ * What one judgment path's gate calls cost, over a group of fixtures.
+ *
+ * V3-001 split the two paths — Spark gates interjections, Glimmer gates
+ * research — so latency is reported per path, since that is the whole basis
+ * of the split: 16–21 s inside a 16–21 s search is affordable and 24–34 s
+ * inside a 12–29 s interjection window is not.
+ */
+export interface PathGateScore {
   /** How many gate calls came back. Zero under `--gate spark`, which makes none. */
   calls: number;
   /** Of those, how many ran on Muse Glimmer rather than falling back to Spark. */
   local: number;
-  /** Calls that came back with no verdict; the observer's scores then stood. */
+  /** Calls that came back with no verdict. */
   failed: number;
   /** Median real milliseconds a call took, or `null` when none were made. */
   medianLatencyMs: number | null;
   /** The slowest call: what the worst-case moment paid. */
   maxLatencyMs: number | null;
+}
+
+/** What the interjection gate did and cost, over one group of fixtures (V2-016). */
+export interface GateScore extends PathGateScore {
+  /** Who scored the candidates: the local gate, or the observer itself. */
+  mode: GateMode;
 }
 
 /** Everything one pair of settings scored. */
@@ -260,8 +271,10 @@ export interface SettingsScore {
   pauseRate: number;
   /** Median delay from the trigger line's end to delivery, over matched moments. */
   medianDelayMs: number | null;
-  /** What the judgment gate did and cost in this group (V2-016). */
+  /** What the interjection gate did and cost in this group (V2-016). */
   gate: GateScore;
+  /** What the research gate did and cost in this group (V2-012, reported V3-001). */
+  researchGate: PathGateScore;
   gates: GateResult[];
   passed: boolean;
 }
@@ -648,6 +661,7 @@ export function scoreSettings(
     pauseRate,
     medianDelayMs: median(delays),
     gate: scoreGate(gateMode, runs),
+    researchGate: scoreResearchGate(runs),
     gates,
     passed: gates.every((one) => one.status !== "fail"),
   };
@@ -669,6 +683,34 @@ export function scoreGate(mode: GateMode, runs: readonly FixtureRunRecord[]): Ga
     calls: calls.length,
     local: calls.filter((call) => call.gate === "glimmer").length,
     failed: calls.filter((call) => call.error !== undefined).length,
+    medianLatencyMs: median(latencies),
+    maxLatencyMs: latencies.length === 0 ? null : Math.max(...latencies),
+  };
+}
+
+/**
+ * The research gate's own numbers (V2-012), reported per path by V3-001.
+ *
+ * Read off each run's `research.gateLatencyMs`, which comes straight from
+ * `research.jsonl` — a record written before V3-001 has none, and then the
+ * call count is all the report can say.
+ */
+export function scoreResearchGate(runs: readonly FixtureRunRecord[]): PathGateScore {
+  const latencies = runs.flatMap((run) => run.research?.gateLatencyMs ?? []);
+  let calls = 0;
+  let local = 0;
+  let failed = 0;
+  for (const run of runs) {
+    const research = run.research;
+    if (research === undefined) continue;
+    calls += research.queued + research.rejected + research.gateFailed;
+    local += research.localGateCalls;
+    failed += research.gateFailed;
+  }
+  return {
+    calls,
+    local,
+    failed,
     medianLatencyMs: median(latencies),
     maxLatencyMs: latencies.length === 0 ? null : Math.max(...latencies),
   };

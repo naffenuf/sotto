@@ -6,20 +6,40 @@
  * criterion is about; `--fixtures` exists because diagnosing one failing
  * conversation should not cost the other three.
  */
+import { DEFAULT_GATE_MODE, gateModes, type GateMode } from "../../shared/candidates.js";
 import { E2E_FIXTURES } from "../../shared/e2e.js";
 
-export const E2E_USAGE = `usage: npm run e2e -- [--fixtures <name,name>]\n  fixtures: ${E2E_FIXTURES.join(", ")}`;
+export const E2E_USAGE =
+  `usage: npm run e2e -- [--fixtures <name,name>] [--gate ${gateModes.join("|")}]\n` +
+  `  fixtures: ${E2E_FIXTURES.join(", ")}\n` +
+  `  gate: which model scores interjection candidates (default ${DEFAULT_GATE_MODE})`;
 
 export interface E2eOptions {
   /** The conversations to run, in order. */
   fixtures: string[];
+  /**
+   * Who gates interjection candidates (V3-001). The default is `spark` — the
+   * observer's own scores, no second call — and `glimmer` forces the local
+   * gate back on, which is the A/B this flag exists for: the e2e is the only
+   * check that charges a judgment call for the seconds it really takes.
+   */
+  gate: GateMode;
 }
 
 /** What the arguments meant, or the first thing wrong with them. */
 export function parseE2eArgs(argv: readonly string[]): E2eOptions | { error: string } {
-  const options: E2eOptions = { fixtures: [...E2E_FIXTURES] };
+  const options: E2eOptions = { fixtures: [...E2E_FIXTURES], gate: DEFAULT_GATE_MODE };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] as string;
+    if (arg === "--gate") {
+      const asked = argv[++index];
+      if (asked === undefined) return { error: "--gate needs a value" };
+      if (!isGateMode(asked)) {
+        return { error: `not a gate: ${asked} (expected ${gateModes.join(" or ")})` };
+      }
+      options.gate = asked;
+      continue;
+    }
     if (arg !== "--fixtures") return { error: `unknown argument ${JSON.stringify(arg)}` };
     const asked = argv[++index];
     if (asked === undefined) return { error: "--fixtures needs a value" };
@@ -37,4 +57,8 @@ export function parseE2eArgs(argv: readonly string[]): E2eOptions | { error: str
     options.fixtures = E2E_FIXTURES.filter((name) => names.includes(name));
   }
   return options;
+}
+
+function isGateMode(value: string): value is GateMode {
+  return (gateModes as readonly string[]).includes(value);
 }

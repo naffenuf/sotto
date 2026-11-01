@@ -20,6 +20,12 @@
  * answer it, and why the eval measures its latency
  * (`npm run eval -- --gate glimmer`).
  *
+ * Since V3-001 it is **off by default** ({@link DEFAULT_GATE_MODE} is
+ * `spark`): a local verdict's 24–34 s is wider than the moment it is judging,
+ * so the observer's own Spark scores stand and the candidate loses no time at
+ * all. `--gate glimmer` on the eval and the e2e turns it back on for an A/B
+ * run, which is what the mode exists for now.
+ *
  * Unlike the research gate, a call that does not come back is **not** a
  * rejection: the candidate goes on with the observer's own scores, which is
  * exactly the behaviour the gate replaced. Losing the gate should cost

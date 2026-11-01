@@ -155,3 +155,66 @@ the right to the floor, and what makes it give the floor back?
 
 **Where it lives:** the PRD's "Why open questions bypass the observer" section,
 V3-002, V3-004, V3-006, V3-013, V3-015, V3-016, FR-V3-8/9 and the build order.
+
+---
+
+## 2026-11-01 — The judgment gate splits: Spark for interjections, Glimmer for research
+
+**What changed:** `DEFAULT_GATE_MODE` in `shared/candidates.ts` is now
+`"spark"` — the observer's own four scores stand and `CandidateGate` makes no
+call at all — while `ResearchGate` is untouched and still goes to Muse Glimmer
+on this Mac, falling back to Spark when the local server is unreachable
+(FR-V7). This reverses [the entry above](#2026-11-01--muse-glimmer-stays-the-default-candidate-gate),
+written the same day on the max-speed eval's numbers. `--gate glimmer|spark`
+forces the interjection path either way for an A/B, on `npm run eval` and now
+on `npm run e2e` too, and the eval report prints **median gate latency per
+path** so the two are never again compared on one number.
+
+**Why:** the local gate's judgment is good and its latency is wider than the
+moment it is judging.
+
+- A Glimmer verdict costs **24–34 s** (V2-020 median 23.7; re-measured here at
+  24.7 s median over three candidates, [`2026-11-01_062711`](../eval/reports/2026-11-01_062711.md)).
+  A planted interjection window is **12–29 s** wide. The candidate is held for
+  the verdict, so the verdict arrives after the moment.
+- `npm run eval` cannot see this. Simulated time does not move inside
+  `clock.track`, so 25 s of local thinking is free in a replay and the report
+  passed. The real-time e2e said otherwise: V2-021 delivered both planted
+  contradictions **31.9 s and 50.1 s past their deadline** with every assertion
+  still green, because the check does not gate on moment latency.
+- On judgment itself, Spark was not worse. Over the nine-fixture set with
+  identical prompts: recall 9/9 against Glimmer's 7/9, interject precision 5/6
+  against 4/5, and Glimmer suppressed two verified moments
+  ([glimmer](../eval/reports/2026-11-01_030103.md),
+  [spark](../eval/reports/2026-11-01_034450.md)).
+- Research is the opposite shape, so Glimmer keeps it. A gate verdict of
+  27.8 s (median, max 34.9) sits in front of a 16–21 s search whose answer is
+  for the rest of the conversation, not for the next ten seconds — nobody is
+  waiting out loud — and it is the judgment that stops an unvetted search
+  reaching the screen. It also keeps a real role for the open-weight model.
+
+**Measured after the change**, `npm run e2e -- --fixtures
+moment-contradiction,research-business-idea`, 22/22 checks, $1.31 of a $2.30
+allowance:
+
+| fixture | moment | window | trigger → delivery | overnight (Glimmer gate) |
+|---|---|---|---|---|
+| `moment-contradiction` | `budget-contradiction` | 18.2s | **4.6s**, before the deadline | 31.9s past it |
+| `research-business-idea` | `audience-contradiction` | 23.2s | **8.4s**, before the deadline | 50.1s past it |
+
+Research still ran on Glimmer in both conversations (2 and 5 local gate calls),
+and `research-business-idea` still produced three sourced packets and a spoken
+briefing.
+
+**What this costs:** the interjection path loses its second opinion. That is a
+judgment regression accepted on the measurement above — a verdict that arrives
+after the moment is worth less than no verdict — and it is recoverable:
+`--gate glimmer` is one flag, and a faster local model or a Spark-side gate
+call (2–3 s) would make the gate affordable again. The thing that must not
+happen is reading a replay's report as though it had charged the gate for its
+seconds.
+
+**Where it lives:** `shared/candidates.ts` (`DEFAULT_GATE_MODE`),
+`server/interject/CandidateGate.ts`, `server/e2e/options.ts` (`--gate`),
+`server/eval/score.ts` (`scoreResearchGate`), `server/eval/report.ts`
+(the two headline rows), PRD V3-001.

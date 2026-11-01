@@ -166,6 +166,15 @@ export interface ResearchRunRecord {
   gateFailed: number;
   /** Gate verdicts that ran on the local model, which is billed at nothing. */
   localGateCalls: number;
+  /**
+   * Real milliseconds each gate call took, in log order (V3-001).
+   *
+   * The research path is the one judgment call Glimmer kept, so this is the
+   * number the report prints beside the interjection path's: 16–21 s inside a
+   * 16–21 s search is affordable, and 24–34 s inside a 12–29 s interjection
+   * window is not. Absent on runs recorded before V3-001.
+   */
+  gateLatencyMs?: number[];
   /** Sourced packets: the searches that produced something showable. */
   packets: number;
   /** Packets discarded for having no source the search really returned. */

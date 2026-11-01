@@ -238,8 +238,25 @@ export type CandidateGateWhere = (typeof candidateGates)[number];
 export const gateModes = ["glimmer", "spark"] as const;
 export type GateMode = (typeof gateModes)[number];
 
-/** Judgment is local by default; V2-016 is the story that made it so. */
-export const DEFAULT_GATE_MODE: GateMode = "glimmer";
+/**
+ * The interjection path is gated by Muse Spark, which is to say by the
+ * observer's own scores and no second call at all (PRD V3-001).
+ *
+ * V2-016 made this `glimmer`, and the overnight A/B of 2026-11-01 took it
+ * back: a local verdict costs **24–34 s** (median 23.7) while a planted
+ * interjection window is 12–29 s wide, so the gate's judgment arrives after
+ * the moment it was about — measured in the real-time e2e as deliveries
+ * 31.9 s and 50.1 s *past* their deadline. With the same prompts, Spark beat
+ * Glimmer on moment recall (9/9 against 7/9) and precision (5/6 against 4/5)
+ * and suppressed nothing verified. The `max`-speed eval hides all of this,
+ * because simulated time stands still inside a tracked model call.
+ *
+ * Glimmer keeps the judgment call nobody is waiting on: `ResearchGate`
+ * (V2-012), where 16–21 s sits inside a 16–21 s search and the open-weight
+ * model does the vetting for free. `--gate glimmer` still forces this path
+ * back onto it for an A/B run.
+ */
+export const DEFAULT_GATE_MODE: GateMode = "spark";
 
 /** What one gate call decided about one candidate. */
 export interface CandidateGateVerdict {

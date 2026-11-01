@@ -200,8 +200,11 @@ export interface SessionManagerOptions {
   settings?: PolicySettings;
   /**
    * Who scores a candidate before the policy sees it (V2-016). Defaults to
-   * {@link DEFAULT_GATE_MODE}; `spark` leaves the observer's own scores
-   * alone, which is what `npm run eval -- --gate spark` measures.
+   * {@link DEFAULT_GATE_MODE}, which V3-001 made `spark`: the observer's own
+   * scores stand and no second call is made, because a local verdict's
+   * 24–34 s is wider than the moment it is judging. `glimmer` forces the
+   * local gate on, which is what `npm run eval -- --gate glimmer` and
+   * `npm run e2e -- --gate glimmer` measure.
    */
   gate?: GateMode;
 }

@@ -9,7 +9,7 @@
  */
 import type { AnswerLogRecord } from "../../shared/answers.js";
 import { emptyBoard, type Board, type Item } from "../../shared/board.js";
-import type { DecisionLogRecord } from "../../shared/candidates.js";
+import { DEFAULT_GATE_MODE, type DecisionLogRecord } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { E2eFiles, E2eObserved, E2eResearch, Stamped } from "../../shared/e2e.js";
 import { RESEARCH_FIXTURE } from "../../shared/e2e.js";
@@ -946,13 +946,26 @@ describe("the arguments", () => {
         "ask-diagram",
         RESEARCH_FIXTURE,
       ],
+      gate: DEFAULT_GATE_MODE,
     });
   });
 
   it("takes a subset, in the set's own order", () => {
     expect(parseE2eArgs(["--fixtures", "ask-diagram,brainstorm"])).toEqual({
       fixtures: ["brainstorm", "ask-diagram"],
+      gate: DEFAULT_GATE_MODE,
     });
+  });
+
+  it("forces either interjection gate, for an A/B against real seconds (V3-001)", () => {
+    expect(DEFAULT_GATE_MODE).toBe("spark");
+    expect(parseE2eArgs(["--gate", "glimmer"])).toMatchObject({ gate: "glimmer" });
+    expect(parseE2eArgs(["--gate", "spark"])).toMatchObject({ gate: "spark" });
+    expect(parseE2eArgs(["--gate"])).toEqual({ error: "--gate needs a value" });
+    expect(parseE2eArgs(["--gate", "llama"])).toEqual({
+      error: "not a gate: llama (expected glimmer or spark)",
+    });
+    expect(E2E_USAGE).toContain("--gate");
   });
 
   it("refuses a fixture that is not in the set, and says what is", () => {

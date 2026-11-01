@@ -91,8 +91,8 @@ describe("parseEvalArgs", () => {
     });
   });
 
-  it("takes either gate, and defaults to the local one (V2-016)", () => {
-    expect(parseEvalArgs([])).toMatchObject({ gate: "glimmer" });
+  it("takes either gate, and defaults to the observer's own scores (V3-001)", () => {
+    expect(parseEvalArgs([])).toMatchObject({ gate: "spark" });
     expect(parseEvalArgs(["--gate", "spark"])).toMatchObject({ gate: "spark" });
     expect(parseEvalArgs(["--gate", "glimmer"])).toMatchObject({ gate: "glimmer" });
   });

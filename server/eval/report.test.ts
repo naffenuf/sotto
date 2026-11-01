@@ -194,7 +194,7 @@ describe("headlines", () => {
     const group = score.groups[0];
     if (group === undefined) throw new Error("no group");
     const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
-    const gate = metrics.get("judgment gate (glimmer)");
+    const gate = metrics.get("interjection gate (glimmer)");
     expect(gate).toContain("3 call(s)");
     expect(gate).toContain("2 on Glimmer, 1 on Spark");
     expect(gate).toContain("1 with no verdict");
@@ -208,7 +208,7 @@ describe("headlines", () => {
     const group = score.groups[0];
     if (group === undefined) throw new Error("no group");
     const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
-    expect(metrics.get("judgment gate (spark)")).toContain("the observer's own scores");
+    expect(metrics.get("interjection gate (spark)")).toContain("the observer's own scores");
   });
 
   it("reads a run recorded before V2-016 as the spark baseline", () => {
@@ -267,7 +267,7 @@ describe("renderReportMarkdown", () => {
   it("records the settings, the commit and the judge prompt", () => {
     expect(markdown).toContain("| git commit | abc1234+ |");
     expect(markdown).toContain("| frequency/boldness | normal/normal |");
-    expect(markdown).toContain("| gate | glimmer |");
+    expect(markdown).toContain("| interjection gate | glimmer |");
     expect(markdown).toContain("| judge prompt | 162841b6b7d8 |");
     expect(markdown).toContain("| judge calls | 1 (1 cached) |");
     expect(markdown).toContain("- **interject precision**: 1/2 (50%)");
@@ -346,6 +346,7 @@ describe("the research sections", () => {
       rejected: 2,
       gateFailed: 0,
       localGateCalls: 5,
+      gateLatencyMs: [19_000, 26_000, 39_000, 31_000, 21_000],
       packets: 2,
       unsourced: 1,
       failed: 0,
@@ -455,6 +456,29 @@ describe("the research sections", () => {
     expect(packets).toContain("1 unsourced");
     expect(packets).toContain("2 card(s), 1 in a pause");
     expect(packets).toContain("1 after the conversation ended");
+  });
+
+  it("states the research gate's own latency, the other path (V3-001)", () => {
+    const group = score.groups[0];
+    if (group === undefined) throw new Error("no group");
+    const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
+    const gate = metrics.get("research gate (glimmer)");
+    // Five verdicts: three queued, two rejected, all answered locally.
+    expect(gate).toContain("5 call(s), all on Glimmer");
+    expect(gate).toContain("median latency 26.0s");
+    expect(gate).toContain("max 39.0s");
+  });
+
+  it("says so rather than printing a zero when the latency was not recorded", () => {
+    const { gateLatencyMs: _dropped, ...research } = researchRun.research!;
+    const before = scoreRun({
+      ...withResearch,
+      runs: [{ ...researchRun, research }],
+    });
+    const group = before.groups[0];
+    if (group === undefined) throw new Error("no group");
+    const metrics = new Map(headlines(group).map((one) => [one.label, one.value]));
+    expect(metrics.get("research gate (glimmer)")).toContain("latency not recorded");
   });
 
   it("gates research recall and names the threshold", () => {

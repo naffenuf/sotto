@@ -3,6 +3,8 @@
  *
  *   npm run e2e                                   # all five conversations
  *   npm run e2e -- --fixtures ask-search          # just one
+ *   npm run e2e -- --gate glimmer                 # the local candidate gate,
+ *                                                 # charged for its real seconds
  *
  * Five fixture WAVs are streamed at real-time pace into the *real* realtime
  * transcription and through the whole loop — board, observer, candidate gate,
@@ -90,7 +92,8 @@ async function main(): Promise<void> {
 
   console.log(
     `[e2e] ${id}: ${parsed.fixtures.length} fixture(s) at real-time pace ` +
-      `through the real APIs — ${parsed.fixtures.join(", ")}`,
+      `through the real APIs, interjection gate ${parsed.gate} — ` +
+      `${parsed.fixtures.join(", ")}`,
   );
 
   const fixtures: E2eFixtureReport[] = [];
@@ -112,6 +115,7 @@ async function main(): Promise<void> {
       // What `server/app.ts` passes: Glimmer when the local server is there,
       // and Muse Spark for every judgment when it is not (FR-V7).
       createGlimmer: () => glimmerFromEnv(),
+      gate: parsed.gate,
       createVoice: () => voice,
       voiceSpend: () => voice.spent(),
     });

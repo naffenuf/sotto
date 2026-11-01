@@ -19,6 +19,7 @@ import type {
   GateResult,
   GateScore,
   MomentScore,
+  PathGateScore,
   RunScore,
   ScoreTotals,
   SettingsScore,
@@ -190,8 +191,12 @@ export function headlines(group: SettingsScore): Headline[] {
       value: String(totals.quietFalseInterjects),
     },
     {
-      label: `judgment gate (${group.gate.mode})`,
+      label: `interjection gate (${group.gate.mode})`,
       value: describeGate(group.gate),
+    },
+    {
+      label: "research gate (glimmer)",
+      value: describeResearchGate(group.researchGate),
     },
     {
       label: "deliveries in a pause",
@@ -217,6 +222,26 @@ function describeGate(gate: GateScore): string {
     `${gate.calls} call(s), ${where}` +
     (gate.failed > 0 ? `, ${gate.failed} with no verdict` : "") +
     `, median latency ${seconds(gate.medianLatencyMs)} (max ${seconds(gate.maxLatencyMs)})`
+  );
+}
+
+/**
+ * The other judgment path (V3-001): the one Glimmer kept, because nobody is
+ * waiting on it out loud. Reported next to the interjection gate's so the
+ * two latencies can be read against the windows they sit inside.
+ */
+function describeResearchGate(gate: PathGateScore): string {
+  if (gate.calls === 0) return "no ideas reached it";
+  const where =
+    gate.local === gate.calls
+      ? "all on Glimmer"
+      : `${gate.local} on Glimmer, ${gate.calls - gate.local} on Spark`;
+  return (
+    `${gate.calls} call(s), ${where}` +
+    (gate.failed > 0 ? `, ${gate.failed} with no verdict` : "") +
+    (gate.medianLatencyMs === null
+      ? ", latency not recorded"
+      : `, median latency ${seconds(gate.medianLatencyMs)} (max ${seconds(gate.maxLatencyMs)})`)
   );
 }
 
@@ -370,7 +395,7 @@ export function renderReportMarkdown(context: ReportContext): string {
     ["finished", record.finishedAt],
     ["git commit", record.gitCommit ?? "(not a checkout)"],
     ["frequency/boldness", settingsAsked(record).map(policySettingsLabel).join(", ")],
-    ["gate", record.gate ?? "spark (recorded before V2-016)"],
+    ["interjection gate", record.gate ?? "spark (recorded before V2-016)"],
     ["fixtures", record.fixtures.join(", ")],
     ["judge model", record.judge.model],
     ["judge prompt", record.judge.promptHash === "" ? "(judging skipped)" : record.judge.promptHash],

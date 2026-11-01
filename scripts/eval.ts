@@ -4,8 +4,9 @@
  *   npm run eval                                  # every eval fixture, normal
  *   npm run eval -- --boldness all                # cautious, normal and bold
  *   npm run eval -- --frequency rare              # the sparing budget
- *   npm run eval -- --gate spark                  # the observer's own scores
- *                                                 # (default: the local gate)
+ *   npm run eval -- --gate glimmer                # the local candidate gate
+ *                                                 # (default: the observer's
+ *                                                 # own scores, V3-001)
  *   npm run eval -- --fixtures moment-fact        # one conversation
  *   npm run eval -- --no-judge                    # replay only, match nothing
  *

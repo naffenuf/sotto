@@ -63,9 +63,10 @@ export interface EvalOptions {
    */
   settings: PolicySettings[];
   /**
-   * Who scores the candidates (V2-016): `glimmer` for the local gate, `spark`
-   * for the observer's own scores, which is the baseline it is measured
-   * against. One per run — two gates are two experiments.
+   * Who scores the candidates (V2-016): `spark` for the observer's own
+   * scores, which is what V3-001 made the default, and `glimmer` for the
+   * local gate, which this flag now exists to force back on for an A/B. One
+   * per run — two gates are two experiments.
    */
   gate: GateMode;
   /** Fixture names, or `null` for "the whole eval set that is captured". */

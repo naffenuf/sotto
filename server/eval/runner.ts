@@ -389,6 +389,12 @@ export function researchFrom(replay: ReplayResult): ResearchRunRecord {
     rejected: counted((line) => line.kind === "gate" && line.decision === "rejected"),
     gateFailed: counted((line) => line.kind === "gate" && line.decision === "failed"),
     localGateCalls: counted((line) => line.kind === "gate" && line.where === "local"),
+    // V3-001: the research path's latency, beside the interjection path's
+    // (`gateCallsFrom`). Wall clock, which is the one measurement a `max`
+    // replay can still make honestly about a model call.
+    gateLatencyMs: replay.researchLog.flatMap((line) =>
+      line.kind === "gate" ? [line.latencyMs] : [],
+    ),
     packets: counted((line) => line.kind === "packet" && line.outcome === "ready"),
     unsourced: counted((line) => line.kind === "packet" && line.outcome === "unsourced"),
     failed: counted((line) => line.kind === "packet" && line.outcome === "failed"),

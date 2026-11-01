@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { emptyBoard, type Board } from "../../shared/board.js";
 import {
   CANDIDATE_GATE_SCHEMA_NAME,
+  DEFAULT_GATE_MODE,
   type Candidate,
   type CandidateGateLogRecord,
 } from "../../shared/candidates.js";
@@ -73,7 +74,9 @@ function gateFor(
   const clock = new SimulatedClock(0);
   const gate = new CandidateGate({
     clock,
-    ...(options.mode === undefined ? {} : { mode: options.mode }),
+    // V3-001 made `spark` the default, so a test about the gate *running* has
+    // to ask for it; the one about not running still says `spark` out loud.
+    mode: options.mode ?? "glimmer",
     client: () => Promise.resolve(client),
     board: () => options.board ?? emptyBoard(),
     turns: () => options.turns ?? [],
@@ -162,9 +165,10 @@ describe("CandidateGate", () => {
     expect(records[0]?.error).toContain("no model");
   });
 
-  it("makes no call at all in spark mode, and hands the candidate straight on", async () => {
+  it("makes no call at all in spark mode, which is the default (V3-001)", async () => {
     const { client, calls } = judge(() => Promise.resolve(verdict));
-    const { gate, records, scored } = gateFor(client, { mode: "spark" });
+    const { gate, records, scored } = gateFor(client, { mode: DEFAULT_GATE_MODE });
+    expect(DEFAULT_GATE_MODE).toBe("spark");
     const one = candidate();
     gate.accept(one);
     // Synchronously: not gating costs the candidate nothing.
