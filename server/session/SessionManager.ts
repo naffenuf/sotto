@@ -34,7 +34,7 @@ import {
 } from "../../shared/artifacts.js";
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { StageCard } from "../../shared/cards.js";
-import type { Candidate, CandidateType } from "../../shared/candidates.js";
+import type { CandidateType } from "../../shared/candidates.js";
 import type { StatusState } from "../../shared/events.js";
 import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
 import type { Chattiness, DeliveredLevel } from "../../shared/policy.js";
@@ -61,6 +61,7 @@ import { Verifier } from "../interject/Verifier.js";
 import { MuseClient, type ModelClient } from "../model/client.js";
 import type { GlimmerClient } from "../model/GlimmerClient.js";
 import { JudgmentRouter } from "../model/judgment.js";
+import { ResearchManager } from "../research/ResearchManager.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
@@ -223,12 +224,14 @@ interface ModelLoops {
   /** Every card the policy delivered, by card id (US-015). */
   deliveries: Map<string, Delivered>;
   /**
-   * The `research_hook` candidates this session noticed, oldest first
-   * (V2-011). They never go to the interjection policy: a hook is an idea to
-   * look something up, not something to say, so it waits here for the
-   * research gate (V2-012) to score it.
+   * What Sotto decides to look up, and how much of it (V2-012).
+   *
+   * A `research_hook` candidate never goes to the interjection policy: a hook
+   * is an idea to look something up, not something to say, so it comes here
+   * to be deduplicated, gated and — within the budget — searched. The
+   * planner inside it proposes ideas of its own every two minutes.
    */
-  researchHooks: Candidate[];
+  research: ResearchManager | null;
 }
 
 /** One card that reached the stage, kept so feedback can be filed on it. */
@@ -305,8 +308,8 @@ interface RunningSession {
   greeting: Greeting | null;
   /** The cards this session has put on the stage, by card id (US-015). */
   deliveries: Map<string, Delivered>;
-  /** The research ideas the observer noticed, waiting for the gate (V2-011). */
-  researchHooks: Candidate[];
+  /** The research planner, gate and job budget (V2-012). */
+  research: ResearchManager | null;
   /** The session's clock: simulated for a replay, live otherwise. */
   clock: Clock;
   /** What the transcription dot shows once the session is published. */
@@ -512,6 +515,7 @@ export class SessionManager {
     running.stopRequested = true;
     running.address?.stop();
     running.greeting?.stop();
+    running.research?.stop();
     running.judgment.stop();
     this.current = undefined;
     this.logger.log(`[session] ${running.info.id} stopping`);
@@ -738,6 +742,9 @@ export class SessionManager {
         greeting?.acceptTurn(turn);
         loops.board?.acceptTurn(turn);
         loops.observer?.acceptTurn(turn);
+        // V2-012: the planner's input, and the gate's context. It drops
+        // Sotto's own lines itself.
+        loops.research?.acceptTurn(turn);
         if (turn.final && loops.board && loops.observer) {
           // The board reads Sotto's own lines (V2-008a) and the observer must
           // not: an interjection arguing with Sotto's last answer is the one
@@ -909,16 +916,13 @@ export class SessionManager {
         policy: null,
         answers: null,
         deliveries: new Map(),
-        researchHooks: [],
+        research: null,
       };
     }
     const onModelState = (state: "connecting" | "active" | "error", detail: string): void => {
       if (this.current?.info.id === info.id) this.bus.setStatus("model", state, detail);
     };
     const deliveries = new Map<string, Delivered>();
-    // The hooks this session noticed, oldest first. They are already in
-    // `candidates.jsonl`; this is the queue V2-012's gate reads.
-    const researchHooks: Candidate[] = [];
     const onTiming = (event: Record<string, unknown>): void => store.writer?.appendTiming?.(event);
     const policy = new InterjectionPolicy({
       clock,
@@ -946,12 +950,12 @@ export class SessionManager {
       logger: this.logger,
       onRecord: (record) => store.writer?.appendCandidate(record),
       // Three destinations. A claim that looks wrong is checked against the
-      // web before it can be said to anyone (US-013); a research hook is an
-      // idea for the research gate (V2-011) and is never said to the room at
-      // all, so it leaves the interjection path here — V2-012 attaches the
-      // gate to this branch; and everything else goes straight to the policy.
+      // web before it can be said to anyone (US-013); a research hook leaves
+      // the interjection path altogether for the research gate (V2-012) and
+      // is never said to the room at all; and everything else goes straight
+      // to the policy.
       onCandidate: (candidate) => {
-        if (candidate.type === "research_hook") { researchHooks.push(candidate); this.logger.log(`[research] hook ${candidate.id}: ${candidate.headline}`); onTiming({ stage: "research_hook", atMs: clock.now(), candidateId: candidate.id, headline: candidate.headline }); }
+        if (candidate.type === "research_hook") { research.acceptHook(candidate); onTiming({ stage: "research_hook", atMs: clock.now(), candidateId: candidate.id, headline: candidate.headline }); }
         else if (candidate.type === "factual_error") { onTiming({ stage: "verification_start", atMs: clock.now(), candidateId: candidate.id }); verifier.verify(candidate); }
         else policy.accept(candidate);
       },
@@ -973,6 +977,21 @@ export class SessionManager {
         });
       },
       onModelState,
+    });
+    // The background half (V2-012): hooks and the planner's own ideas, gated
+    // by whichever model judgment runs on, and started a few at a time. It
+    // reads the board the same way the observer does and waits for nothing —
+    // the gate registers itself on the clock, so a replay waits for it
+    // without the pipeline ever awaiting it.
+    const research = new ResearchManager({
+      clock,
+      model,
+      client: () => judgment.client(),
+      board: () => board.board(),
+      wallClock: this.wallClock,
+      logger: this.logger,
+      onModelState,
+      onRecord: (record) => { store.writer?.appendResearch(record); onTiming({ stage: `research_${record.kind}`, ...record }); },
     });
     // Its own queue, on purpose: an answer must not wait behind a board
     // update, and the group must not wait for the board loop to let go of the
@@ -1011,7 +1030,7 @@ export class SessionManager {
       onThinking: (thinking) => policy.setAnswerThinking(thinking),
       onModelState,
     });
-    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, researchHooks };
+    return { modelClient: model, judgment, board, observer, verifier, policy, answers, deliveries, research };
   }
 
   /**
@@ -1241,6 +1260,7 @@ export class SessionManager {
     running.policy?.stop();
     running.address?.stop();
     running.greeting?.stop();
+    running.research?.stop();
     running.judgment.stop();
     // Not `running.answers`: a question typed after Stop is answered against
     // the conversation that just ended (US-019), so the agent is only
@@ -1309,6 +1329,10 @@ async function drainLoops(
   await loops.board?.flush();
   await loops.observer?.flush();
   await loops.verifier?.flush();
+  // After the observer, because its last look is where the last hooks come
+  // from: every idea gets its gate verdict written down even though nothing
+  // will be searched now. The planner does not take a final look (V2-012).
+  await loops.research?.flush();
   // An answer asked in the last seconds of a conversation is still owed to
   // whoever asked for it, and the policy must not be left thinking one is
   // still being written.

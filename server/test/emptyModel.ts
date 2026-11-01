@@ -11,6 +11,9 @@ export const emptyModel: ModelClient = {
     if (call.label === "board") return { operations: [] };
     // V2-008c: nothing worth saying while it searches, which is a valid reply.
     if (call.label === "first_line") return { line: "" };
+    // V2-012: the planner proposes nothing, which is its usual answer, and
+    // the gate is never reached because there is nothing to score.
+    if (call.label === "research-planner") return { ideas: [] };
     return { candidates: [] };
   },
   grounded: async () => {

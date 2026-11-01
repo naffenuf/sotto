@@ -20,6 +20,10 @@ export const PROMPTS = {
   board: "board",
   /** Noticing things worth raising, and scoring them (US-012). */
   observer: "observer",
+  /** Proposing things worth looking up in the background (V2-012). */
+  researchPlanner: "research-planner",
+  /** Deciding whether one research idea is worth a search (V2-012). */
+  researchGate: "research-gate",
   /** Checking a claim against the web before raising it (US-013). */
   verify: "verify",
   /** Answering a question somebody asked Sotto out loud (US-018). */

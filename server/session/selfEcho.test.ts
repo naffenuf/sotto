@@ -34,6 +34,7 @@ function setup(withModel = true) {
     appendTurn: (turn) => turns.push(turn),
     appendTiming: (record) => timing.push(record),
     appendAnswer: (answer) => answers.push(answer),
+    appendResearch: () => {},
     renameSpeaker: () => {},
     setSettings: () => {},
     writeBoard: () => {},

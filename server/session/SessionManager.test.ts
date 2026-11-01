@@ -14,6 +14,11 @@ import type {
   CandidateLogRecord,
   DecisionLogRecord,
 } from "../../shared/candidates.js";
+import type {
+  ResearchGateRecord,
+  ResearchIdeaRecord,
+  ResearchLogLine,
+} from "../../shared/research.js";
 import type { FeedbackLogRecord } from "../../shared/feedback.js";
 import { TYPED_ASKER, type AnswerLogRecord } from "../../shared/answers.js";
 import type { StageCard } from "../../shared/cards.js";
@@ -352,6 +357,7 @@ describe("SessionManager, board and observer", () => {
       appendCandidate: (record: unknown) => logged.push(record as CandidateLogLine),
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -492,6 +498,7 @@ describe("SessionManager, board and observer", () => {
       appendCandidate: (record: unknown) => lines.push(record as CandidateLogLine),
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -560,6 +567,10 @@ describe("SessionManager, board and observer", () => {
 
       async structured(call: StructuredCall): Promise<unknown> {
         if (call.label === "board") return { operations: [] };
+        // V2-012: the planner has nothing to add here, and the gate passes
+        // every hook, so the research log shows the whole path.
+        if (call.label === "research-planner") return { ideas: [] };
+        if (call.label === "research-gate") return { useful: 0.9, unknown: 0.9, answerable: 0.9 };
         this.looks += 1;
         const subject = subjects[(this.looks - 1) % subjects.length];
         const shared = {
@@ -588,6 +599,7 @@ describe("SessionManager, board and observer", () => {
 
     const bus = new EventBus(quiet);
     const lines: CandidateLogLine[] = [];
+    const research: ResearchLogLine[] = [];
     const timing: Record<string, unknown>[] = [];
     const writer = {
       dir: "/tmp/not-a-real-folder",
@@ -599,6 +611,7 @@ describe("SessionManager, board and observer", () => {
       appendCandidate: (record: unknown) => lines.push(record as CandidateLogLine),
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: (record: unknown) => research.push(record as ResearchLogLine),
       appendTiming: (event: Record<string, unknown>) => timing.push(event),
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
@@ -651,10 +664,26 @@ describe("SessionManager, board and observer", () => {
 
     // Each one that got through is in the timing log as a hook, which is the
     // seam the research gate (V2-012) attaches to.
+    const passedHooks = hooks.filter((candidate) => candidate.duplicateOf === undefined);
     const logged = timing.filter((event) => event.stage === "research_hook");
     expect(logged.map((event) => event.candidateId)).toEqual(
-      hooks.filter((candidate) => candidate.duplicateOf === undefined).map((one) => one.id),
+      passedHooks.map((one) => one.id),
     );
+
+    // V2-012: and each one is an idea in `research.jsonl`, with the gate's
+    // verdict beside it.
+    const ideas = research.filter(
+      (record): record is ResearchIdeaRecord => record.kind === "idea",
+    );
+    expect(ideas.map((record) => record.candidateId)).toEqual(passedHooks.map((one) => one.id));
+    expect(ideas.every((record) => record.origin === "hook")).toBe(true);
+    expect(ideas[0]?.idea.question).toBe(passedHooks[0]?.headline);
+    const scored = research.filter(
+      (record): record is ResearchGateRecord => record.kind === "gate",
+    );
+    const fresh = ideas.filter((record) => record.duplicateOf === undefined);
+    expect(scored.map((record) => record.ideaId)).toEqual(fresh.map((record) => record.idea.id));
+    expect(scored.every((record) => record.decision === "queued")).toBe(true);
   });
 });
 
@@ -734,6 +763,7 @@ describe("SessionManager, delivery and feedback", () => {
       appendCandidate: (record: unknown) => candidates.push(record as CandidateLogLine),
       appendFeedback: (record: unknown) => feedback.push(record as FeedbackLogRecord),
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -918,6 +948,7 @@ describe("SessionManager, answers", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
+      appendResearch: () => {},
       appendTiming: (record: Record<string, unknown>) => timing.push(record),
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
@@ -1070,6 +1101,7 @@ describe("SessionManager, Sotto's speech in the transcript (V2-008a)", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1161,6 +1193,7 @@ describe("SessionManager, typed questions", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: (record: unknown) => answers.push(record as AnswerLogRecord),
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1330,6 +1363,7 @@ describe("SessionManager, chattiness", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1547,6 +1581,7 @@ describe("SessionManager, speaker names", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;
@@ -1658,6 +1693,7 @@ describe("SessionManager and generated artifacts (US-020)", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string, html: string) => {
         written.push([fileName, html]);
         return options.fail === true ? null : `artifacts/${fileName}`;
@@ -1824,6 +1860,7 @@ describe("SessionManager, the opening hello (V2-009)", () => {
       appendCandidate: () => {},
       appendFeedback: () => {},
       appendAnswer: () => {},
+      appendResearch: () => {},
       writeArtifact: (fileName: string) => `artifacts/${fileName}`,
       end: () => {},
     } satisfies SessionWriter;

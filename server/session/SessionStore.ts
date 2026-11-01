@@ -49,6 +49,7 @@ export const SESSION_FILES = {
   candidates: "candidates.jsonl",
   feedback: "feedback.jsonl",
   answers: "answers.jsonl",
+  research: "research.jsonl",
   timing: "timing.jsonl",
 } as const;
 
@@ -87,6 +88,8 @@ export interface SessionWriter {
   appendFeedback(feedback: unknown): void;
   /** Appends one answer record (US-018). */
   appendAnswer(answer: unknown): void;
+  /** Appends one research idea, gate verdict or job start (V2-012). */
+  appendResearch(record: unknown): void;
   /** Diagnostic events on the pipeline clock. */
   appendTiming?(event: unknown): void;
   /**
@@ -258,6 +261,10 @@ export class SessionStore implements SessionWriter {
 
   appendAnswer(answer: unknown): void {
     this.appendLine(SESSION_FILES.answers, JSON.stringify(answer));
+  }
+
+  appendResearch(record: unknown): void {
+    this.appendLine(SESSION_FILES.research, JSON.stringify(record));
   }
 
   appendTiming(event: unknown): void {
