@@ -248,3 +248,59 @@ and closes the loop when nothing comes back.
   opening lines overlap Sotto's playback and carry V2-006's `suppressTriggers`. The four wake
   lines in the fixtures all land far later, and `npm run e2e` pays ~0.015 USD more per fixture in
   TTS characters.
+
+[2026-11-01 09:10] V3-008 — completed — corrections are cards in every mode, one verified factual error at boldness bold is said in a sentence, and the three judgment types are now phrased as the group's own question.
+
+- **Most of this story was already true, and the test says so.** Nothing in the interjection path
+  has ever had a voice, so `contradiction`/`factual_error`/`untested_assumption`/`dropped_thread`/
+  `unanswered_question` were already cards only. `server/interject/corrections.ts` is where that is
+  now *stated*: `CORRECTION_TYPES` (every candidate type but `research_hook`, which never reaches
+  the policy at all) and a table test over 3 boldnesses x 5 types x 2 levels whose only spoken cell
+  is `bold/factual_error/interject`.
+- **The exception's four conditions are each load-bearing.** Verified, because the room is being
+  told it has a fact wrong; `bold`, because the default asked to be left alone; `interject`,
+  because a glow is both the quiet level the policy *chose* and the level the budget *downgrades*
+  to — speaking a downgraded card would take a floor V2-017 has just said is not there.
+- **`charges()` is false for a correction, and that is not a loophole.** `InterjectionPolicy`
+  pushes an `interjectedAtMs` the instant it delivers an interject, so by the time the correction
+  reaches `Reservations` the frequency's cooldown is already spent — charging it again would mean a
+  `bold` session could *never* say one. One contribution, one spend, taken at the card.
+- **`drainLoops` needed a third reservations flush**, after `loops.policy?.flush()`: the policy's
+  last look (into the trailing silence) is where a correction delivered at the end of a
+  conversation comes from, and without it that line is written off as `session_ended`. Measured:
+  the V3-008 pipeline test speaks mid-conversation and does not need it, so it is defensive.
+- **The still-current check generalised in one field.** `StillCurrentInput.kind` makes a
+  correction's user message "what somebody said, which Sotto believes is wrong" + "the correction
+  Sotto is about to say", and `still-current.md` reads the three verdicts for one. The claim comes
+  from `candidate.evidence[0].quote`, never the headline — a headline states the *correction*
+  (US-013's lesson), so asking whether the room has moved on from it asks about the wrong sentence.
+  No turn since the claim is `current` with no call, which is the usual case, so a bold correction
+  normally costs nothing.
+- **Criterion 2 is two edits, because the JSON Schema is part of the prompt.** `observer.md` gained
+  a "Say it as a question" section (four good examples, four bad, including the PRD's named
+  "Have you considered your audience?") *and* `observerCandidatesJsonSchema`'s `headline`
+  description was rewritten per type — on Muse Spark a description has outvoted the prompt before
+  (V2-012's lesson), so leaving "The point, in one sentence" there would have fought the new rule.
+  `factual_error` keeps stating the correction (the verifier reads it) and `unanswered_question`
+  keeps the group's own words.
+- **Measured, four real observer replays of `moment-contradiction`** (~$0.10 and 2 min each):
+  3 of 4 caught the planted moment citing the trigger turn, and in all four every
+  contradiction/assumption/dropped-thread headline carried a "?". The last run returned exactly one
+  candidate in the whole conversation — "The $20k studio — where does that sit against the $4k for
+  v1?" citing 0:20 — which is the same shape as the pre-V3-008 runs. The one miss produced a
+  contradiction citing another turn; that is this test's known variance, not a regression, but if a
+  later story sees it again the first thing to check is whether the new section crowded out
+  "**Always include the turn where the thing you are reacting to was actually said**".
+  `candidateTypes.integration.test.ts` was *not* re-run: it replays `research-business-idea` with
+  the research pipeline live (~$1), and nothing in this change touches how the three types it
+  asserts on are *detected*.
+- **Criterion 3 is the data, and V3-017 owns the pixels.** `StageCard.raised` is set on every
+  correction card Sotto is holding and not saying, and set again by `SessionManager.raiseHand` on
+  one it queued and then never said (republished; `foldCard` keeps its place and collapsed state).
+  The header indicator with a count, and the `call_on` kind on the address classifier, are V3-017 —
+  which the criterion itself cross-references and which carries the browser check for exactly that.
+  **V3-017: count the cards with `raised`.** The spoken one deliberately has no flag.
+- **The eval gates needed nothing** (criterion 4): `deliveredLevel` and `interjections()` both
+  count cards, and `server/eval/runner.ts` passes no `createVoice` at all — so even
+  `--boldness bold` records a correction as `unheard` and no gate moves. `npm run e2e` does have a
+  voice, so a `--boldness bold` e2e run is the only place a correction is really spoken.

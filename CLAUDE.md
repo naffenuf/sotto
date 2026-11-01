@@ -1517,3 +1517,41 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   that it is listening, how to address it, the invitation to introduce themselves — all have to
   survive, and every reader loads the words through `loadPrompt(PROMPTS.hello)` or reads the file,
   so none of them needs changing.
+
+- **Sotto's corrections were already silent; V3-008 is the one sentence that is not.**
+  `server/interject/corrections.ts` names the five types that are Sotto's own reading of the
+  conversation (every `CandidateType` but `research_hook`, which never reaches the policy) and the
+  single cell of the 3 boldnesses x 5 types x 2 levels table that may be *spoken*:
+  `bold/factual_error/interject`. Each condition is load-bearing — verified because the room is
+  being told it has a fact wrong, `bold` because the default asked to be left alone, and
+  **`interject` because a glow is both the quiet level the policy chose and the level the budget
+  downgrades to**, so speaking a downgraded card would take a floor V2-017 has just said is not
+  there. It is said by `Reservations` as a fourth kind of line, under V3-004's rules, and
+  `charges()` is **false** for it: `InterjectionPolicy` pushes an `interjectedAtMs` the instant it
+  delivers an interject, so charging the sentence again would mean a `bold` session could never say
+  one. One contribution, one spend, taken at the card. The boldness is re-read at speaking time, so
+  the header turning Sotto down mid-wait silences it, and `drainLoops` flushes the reservations once
+  more *after* `policy.flush()`, because the policy's last look into the trailing silence is where a
+  correction delivered at the end of a conversation comes from.
+- **A card can say that Sotto is holding it.** `StageCard.raised` is set on every correction card
+  the policy delivers bar the spoken one, and set again (republished, so `foldCard` keeps its place
+  and collapsed state) on one that was queued to be spoken and never was. That is the set V3-017's
+  raised hand counts — the route by which a correction reaches the room's ears at the default
+  settings is being *called on*, never being volunteered.
+- **Turn a correction into the group's own question, and do it in both places.** `observer.md`'s
+  "Say it as a question" section makes a `contradiction`, an `untested_assumption` and a
+  `dropped_thread` a specific question tied to what was just said ("Before six gardens: what if
+  only one signs up?"), with "Have you considered your audience?" named as the bad example — **and**
+  `observerCandidatesJsonSchema`'s `headline` description had to be rewritten per type, because on
+  Muse Spark a schema description has outvoted the prompt before. A `factual_error` still states the
+  correction (the verifier reads the headline as what Sotto believes) and an `unanswered_question`
+  stays the group's own words. Measured over four real `moment-contradiction` observer replays:
+  every headline of those three types carried a "?", 3 of 4 cited the planted trigger turn, and the
+  clean run returned exactly one candidate in the whole conversation.
+- **The still-current check (V3-004) takes a `kind`, and a correction's "question" is the quote.**
+  `StillCurrentInput.kind: "correction"` reframes the user message as "what somebody said, which
+  Sotto believes is wrong" plus "the correction Sotto is about to say", and the claim comes from
+  `candidate.evidence[0].quote` rather than the headline — the headline states the correction
+  (US-013), so asking whether the room has moved on from *it* asks about the wrong sentence. Nothing
+  said since the claim is `current` with no call, which is the usual case for a correction the
+  policy has just delivered into a pause, so the exception normally costs no model call at all.
