@@ -55,3 +55,38 @@ behaviour change outside V2-020's scope:
   splitting one out-loud request into two hooks — "market size" and "who's
   funded" — spent a slot and lost the moment. The sharpest lever left on
   research recall is `observer.md`: one hook per thing the group asked for.
+
+---
+
+## 2026-11-01 — The end-to-end check is budgeted per conversation, not per run
+
+**What changed:** `npm run e2e`'s cost gate. The core PRD's flat $0.50 on a run
+(US-021) became a table of per-conversation allowances in
+`server/e2e/report.ts` (`FIXTURE_BUDGET_USD`), summed over whatever fixtures
+were asked for. `MAX_RUN_COST_USD` is gone.
+
+**Why:** the $0.50 was measured ($0.4826, 3.5% under) against a pipeline that
+neither searched the web nor spoke. V2 gave Sotto both, and both are charged
+per conversation rather than per run:
+
+- **Every** fixture now runs the research planner, so a two-minute
+  conversation can spend a grounded search — and a grounded call with a tool
+  declared resends its whole request each round (V2-013), so one search is
+  tens of thousands of input tokens. `ask-search`, a 48-second conversation,
+  searched twice and cost $0.4700 on its own — three times what two minutes of
+  `brainstorm` cost, because `brainstorm` searched not at all.
+- Every fixture says hello out loud, and ElevenLabs bills by the character:
+  $0.4129 of the full run's $2.3409.
+
+Keeping one flat number would have meant either a gate no run could pass or a
+gate so loose that `--fixtures <one>` proved nothing. A table says what each
+conversation is expected to cost, which is also the number a reader wants when
+one of them gets expensive. The four core conversations share one $0.70
+allowance — what separates them is whether the planner happened to spend a
+search, not how long they are — and the research conversation gets $1.60
+against a measured $1.1354. `npm run e2e` prints each conversation's bill
+against its own allowance, and the first full run came to $2.3409 of $4.20.
+
+**Where it lives:** `FIXTURE_BUDGET_USD` and `budgetFor` in
+`server/e2e/report.ts`, with `DEFAULT_FIXTURE_BUDGET_USD` for a conversation
+nobody has measured.

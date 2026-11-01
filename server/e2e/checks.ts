@@ -16,7 +16,14 @@
 import { ANSWER_HEADLINE_MAX_CHARS } from "../../shared/answers.js";
 import type { Board, Item } from "../../shared/board.js";
 import type { StageCard } from "../../shared/cards.js";
-import type { E2eCheck, E2eFiles, E2eObserved, Stamped } from "../../shared/e2e.js";
+import type {
+  E2eCheck,
+  E2eFiles,
+  E2eObserved,
+  E2eResearch,
+  Stamped,
+} from "../../shared/e2e.js";
+import { RESEARCH_FIXTURE } from "../../shared/e2e.js";
 import type { MomentRecord } from "../../shared/eval.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
 
@@ -41,6 +48,7 @@ export const MIN_TRANSCRIPT_LINES: Record<string, number> = {
   "moment-contradiction": 10,
   "ask-search": 5,
   "ask-diagram": 5,
+  [RESEARCH_FIXTURE]: 10,
 };
 
 /** How many times each fixture addresses Sotto by name (US-017). */
@@ -49,6 +57,7 @@ export const EXPECTED_WAKE_TRIGGERS: Record<string, number> = {
   "moment-contradiction": 0,
   "ask-search": 1,
   "ask-diagram": 1,
+  [RESEARCH_FIXTURE]: 1,
 };
 
 /**
@@ -132,6 +141,19 @@ function commonChecks(input: E2eCheckInput): E2eCheck[] {
       "wake triggers",
       triggers === wanted,
       `${triggers} (want ${wanted}); indicator rose ${observed.wakeAtMs.length} time(s)`,
+    ),
+    // V2-021: Sotto spoke, and the spoken-so-far tracking worked. A line in
+    // the transcript labelled `Sotto` exists only because something reported
+    // *playing* the utterance (V2-008a), so it is the proof the alignment came
+    // back and was read; the hello gives every conversation one.
+    check(
+      "voice",
+      observed.voice.utterances > 0 &&
+        observed.voice.characters > 0 &&
+        observed.sottoTurns.length > 0 &&
+        observed.sottoTurns.every((stamped) => stamped.value.text.trim() !== ""),
+      `${observed.voice.utterances} utterance(s), ${observed.voice.characters} character(s), ` +
+        `${observed.sottoTurns.length} line(s) heard`,
     ),
   ];
 }
@@ -352,6 +374,108 @@ function artifactChecks(input: E2eCheckInput): E2eCheck[] {
   ];
 }
 
+/** Every research-ready card that reached the stage, first push first. */
+export function researchCards(observed: E2eObserved): Stamped<StageCard>[] {
+  const seen = new Set<string>();
+  return observed.cards.filter((stamped) => {
+    if (stamped.value.variant !== "research" || seen.has(stamped.value.id)) return false;
+    seen.add(stamped.value.id);
+    return true;
+  });
+}
+
+/**
+ * What the research pipeline did, off its own log and the stage (V2-021).
+ *
+ * The counts are decisions rather than cards, because two of the three
+ * outcomes never become one: a `rejected` idea never searches and an
+ * `unsourced` packet is thrown away (V2-013). The cards are taken from the bus
+ * instead, keeping each id's *first* push — a packet brought forward because
+ * somebody asked for it (V2-015) pushes its own card again, and the time that
+ * matters here is when the group first saw it.
+ */
+export function researchFrom(input: E2eCheckInput): E2eResearch {
+  const log = input.files.research;
+  const counted = (predicate: (line: (typeof log)[number]) => boolean): number =>
+    log.filter(predicate).length;
+  return {
+    ideas: counted((line) => line.kind === "idea"),
+    queued: counted((line) => line.kind === "gate" && line.decision === "queued"),
+    rejected: counted((line) => line.kind === "gate" && line.decision === "rejected"),
+    gateFailed: counted((line) => line.kind === "gate" && line.decision === "failed"),
+    localGateCalls: counted((line) => line.kind === "gate" && line.where === "local"),
+    packets: counted((line) => line.kind === "packet" && line.outcome === "ready"),
+    unsourced: counted((line) => line.kind === "packet" && line.outcome === "unsourced"),
+    failed: counted((line) => line.kind === "packet" && line.outcome === "failed"),
+    cardAtMs: researchCards(input.observed).map((stamped) => stamped.atMs),
+  };
+}
+
+/**
+ * When the room asked Sotto its question, on the wall clock.
+ *
+ * The wake indicator going up is the earliest sign: it rises on the first
+ * partial that matched (US-017), before the question has finished being
+ * asked. A run where it never rose but an answer happened anyway falls back to
+ * the answer card, which is late by a model call but still after the question.
+ */
+export function askedAtMs(observed: E2eObserved): number | null {
+  const wake = observed.wakeAtMs[0];
+  if (wake !== undefined) return wake;
+  const answer = observed.cards.find((stamped) => stamped.value.variant === "answer");
+  return answer?.atMs ?? null;
+}
+
+/**
+ * {@link RESEARCH_FIXTURE}: it looked things up, showed one, and briefed from
+ * it when asked (V2-021).
+ *
+ * The three criteria of the story, each read off a published contract rather
+ * than judged: the packets off `research.jsonl` and `research/`, the card off
+ * the bus with the moment it arrived, and the briefing off `answers.jsonl` —
+ * `usedPacketIds` is V2-015's record of which packets an answer leaned on, so
+ * "a spoken briefing that uses a packet" is a non-empty one plus words that
+ * were really spoken.
+ */
+function researchChecks(input: E2eCheckInput): E2eCheck[] {
+  const { files, observed } = input;
+  const research = researchFrom(input);
+  const asked = askedAtMs(observed);
+  const before = research.cardAtMs.filter((atMs) => asked !== null && atMs < asked);
+  const answer = files.answers.find((one) => one.turnId !== null);
+  const used = answer?.usedPacketIds ?? [];
+  const spoken = (answer?.spokenText ?? "").trim();
+  // One `.json` and one `.md` per packet (V2-013), so two files each.
+  const saved = files.researchFiles.filter((name) => name.endsWith(".json")).length;
+
+  return [
+    check(
+      "research packets",
+      research.packets > 0 && saved === research.packets,
+      `${research.ideas} idea(s), ${research.queued} queued, ${research.rejected} rejected, ` +
+        `${research.packets} packet(s) (${research.unsourced} unsourced, ${research.failed} failed), ` +
+        `${saved} saved in research/`,
+    ),
+    check(
+      "research card before the question",
+      before.length > 0,
+      asked === null
+        ? "nobody asked Sotto anything"
+        : `${before.length} of ${research.cardAtMs.length} card(s) before ` +
+          `${(asked / 1000).toFixed(0)}s: ` +
+          (research.cardAtMs.map((atMs) => `${(atMs / 1000).toFixed(0)}s`).join(", ") || "none"),
+    ),
+    check(
+      "spoken briefing from a packet",
+      used.length > 0 && spoken !== "",
+      answer === undefined
+        ? "nothing was answered out loud"
+        : `${used.length} packet(s) used of ${answer.packetIds.length} given, ` +
+          `${spoken.length} character(s) spoken`,
+    ),
+  ];
+}
+
 /** Every check for one fixture, in the order a reader wants them. */
 export function checkFixture(input: E2eCheckInput): E2eCheck[] {
   const checks = [...commonChecks(input), ...boardChecks(input)];
@@ -364,6 +488,8 @@ export function checkFixture(input: E2eCheckInput): E2eCheck[] {
       return [...checks, ...answerChecks(input, /competitors charge/i), ...citationChecks(input)];
     case "ask-diagram":
       return [...checks, ...answerChecks(input, /sketch/i), ...artifactChecks(input)];
+    case RESEARCH_FIXTURE:
+      return [...checks, ...answerChecks(input, /did you find/i), ...researchChecks(input)];
     default:
       return checks;
   }

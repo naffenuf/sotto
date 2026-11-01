@@ -2,11 +2,11 @@
  * What `npm run e2e` observes and reports (PRD US-021).
  *
  * The end-to-end check is the only thing in the project that drives the whole
- * loop from *audio* against the real APIs: four fixture WAVs streamed at
+ * loop from *audio* against the real APIs: five fixture WAVs streamed at
  * real-time pace into the real transcription, the real board, observer,
- * verifier, policy and answer agent, and the real session folder. Everything
- * else either replays captured events (`npm run eval`, the integration tests)
- * or fakes a seam.
+ * verifier, policy, research pipeline, answer agent and voice, and the real
+ * session folder. Everything else either replays captured events
+ * (`npm run eval`, the integration tests) or fakes a seam.
  *
  * So these are the shapes of what one run saw. They are deliberately split in
  * three — what came over the bus ({@link E2eObserved}), what landed on disk
@@ -19,8 +19,18 @@ import type { Board } from "./board.js";
 import type { DecisionLogRecord } from "./candidates.js";
 import type { StageCard } from "./cards.js";
 import type { MomentRecord, RunTokenUsage } from "./eval.js";
+import type { ResearchLogLine } from "./research.js";
 import type { SessionRecord } from "./session.js";
 import type { TurnUpdate } from "./turns.js";
+
+/**
+ * The conversation V2-021 added: the one with background research in it.
+ *
+ * Named, because three things key off it — the checks it gets, the latencies
+ * worth printing for it, and the budget, since three web searches and a
+ * spoken briefing cost several times what the core four do.
+ */
+export const RESEARCH_FIXTURE = "research-business-idea";
 
 /**
  * The conversations the check drives, in the order it runs them.
@@ -28,12 +38,16 @@ import type { TurnUpdate } from "./turns.js";
  * The two long ones first: `brainstorm` is where a false interjection shows
  * up and `moment-contradiction` is where a real one has to, and both are
  * cheaper to diagnose before an answer has been paid for.
+ * {@link RESEARCH_FIXTURE} runs last for the same reason, from the other end:
+ * it is three minutes of audio, three web searches and a spoken briefing, so
+ * it is the one worth reaching with everything else already known good.
  */
 export const E2E_FIXTURES = [
   "brainstorm",
   "moment-contradiction",
   "ask-search",
   "ask-diagram",
+  RESEARCH_FIXTURE,
 ] as const;
 
 /**
@@ -69,6 +83,17 @@ export interface E2eObserved {
   sessionDir: string | null;
   /** Wall-clock length of the run, start to the session ending. */
   elapsedMs: number;
+  /** What Sotto handed to the voice, which is what ElevenLabs bills per. */
+  voice: VoiceSpend;
+  /**
+   * Sotto's own lines in the transcript (V2-008a), with when each was pushed.
+   *
+   * One of these exists only because something reported *playing* the
+   * utterance: it is written at playback start and carries the text that was
+   * heard. So it is the evidence that the spoken-so-far tracking worked, which
+   * is why it is kept apart from {@link turns} rather than counted among them.
+   */
+  sottoTurns: Stamped<TurnUpdate>[];
   /** Set when the session could not be started or run at all. */
   error?: string;
 }
@@ -91,6 +116,10 @@ export interface E2eFiles {
   artifacts: string[];
   /** Those files' HTML, by file name: one check reads the document itself. */
   artifactHtml: Record<string, string>;
+  /** `research.jsonl`, parsed: the ideas, the verdicts and the packets (V2-021). */
+  research: ResearchLogLine[];
+  /** File names in `research/`: one `.json` and one `.md` per packet (FR-V9). */
+  researchFiles: string[];
 }
 
 /** One assertion, and why it came out that way. */
@@ -110,13 +139,65 @@ export interface MomentLatency {
   beforeDeadline: boolean | null;
 }
 
-/** The three latencies the story asks to be printed. */
+/** The latencies the story asks to be printed. */
 export interface E2eLatency {
   /** Wake phrase heard → a headline on the stage. */
   wakeToHeadlineMs: number | null;
   /** Wake phrase heard → the answer finished. */
   wakeToDoneMs: number | null;
+  /**
+   * The question arriving → the acknowledgment's first audio, in **real**
+   * milliseconds (V2-021), off `answers.jsonl`.
+   *
+   * `null` when nothing was acknowledged out loud, which is the normal case
+   * for a briefing: a question Sotto has already done the work for skips both
+   * the acknowledgment and the holding line and goes straight to speech
+   * (V2-015), so {@link firstAudioMs} is the number that says it answered.
+   */
+  ackMs: number | null;
+  /** The question arriving → the first audio of the answer itself, in real ms. */
+  firstAudioMs: number | null;
   moments: MomentLatency[];
+}
+
+/**
+ * What Sotto said out loud, counted the way ElevenLabs bills it (V2-021).
+ *
+ * Characters *handed to* the voice rather than characters heard: a cancelled
+ * utterance was still synthesized and is still on the invoice.
+ */
+export interface VoiceSpend {
+  /** Utterances opened on the socket: a hello, an acknowledgment, an answer. */
+  utterances: number;
+  characters: number;
+}
+
+/**
+ * What the research pipeline did in one live run (V2-021), off
+ * `research.jsonl` and the stage.
+ *
+ * Two of the three outcomes never become a card — a `rejected` idea never
+ * searches and an `unsourced` packet is discarded (V2-013) — so the counts
+ * come from the log, and only the cards come from the bus, which is where
+ * "before the wake question" can be measured.
+ */
+export interface E2eResearch {
+  /** Ideas the session thought of, duplicates included. */
+  ideas: number;
+  /** Ideas the gate let through, turned down, and could not score. */
+  queued: number;
+  rejected: number;
+  gateFailed: number;
+  /** Gate verdicts that ran on the local model (V2-010), billed at nothing. */
+  localGateCalls: number;
+  /** Sourced packets: searches that produced something showable. */
+  packets: number;
+  /** Packets discarded for having no source the search really returned. */
+  unsourced: number;
+  /** Searches that did not come back at all. */
+  failed: number;
+  /** Wall-clock arrival of each research-ready card's first push, oldest first. */
+  cardAtMs: number[];
 }
 
 /** Everything one fixture's run produced. */
@@ -132,6 +213,18 @@ export interface E2eFixtureReport {
   checks: E2eCheck[];
   latency: E2eLatency;
   moments: MomentRecord[];
+  /** What the research pipeline did (V2-021). All zeros for most fixtures. */
+  research: E2eResearch;
+  /** What was spoken, and what it is billed as (V2-021). */
+  voice: VoiceSpend;
+  /**
+   * What this conversation's own model calls spent (V2-021).
+   *
+   * Per fixture rather than only per run, because the conversations differ by
+   * several times — one that searches resends its whole request each round —
+   * and "which one is expensive" is the question a reader has.
+   */
+  usage: RunTokenUsage;
   error?: string;
 }
 
@@ -145,6 +238,9 @@ export interface E2eRunReport {
   audioSeconds: number;
   modelCostUsd: number;
   asrCostUsd: number;
+  /** Characters handed to ElevenLabs across every fixture (V2-021). */
+  ttsCharacters: number;
+  ttsCostUsd: number;
   totalCostUsd: number;
   /** Every check passed, every fixture ran, and the cost stayed under budget. */
   passed: boolean;

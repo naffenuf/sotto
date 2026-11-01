@@ -66,6 +66,29 @@ export function estimateAsrCostUsd(seconds: number): number {
   return (seconds / 3600) * ASR_USD_PER_HOUR;
 }
 
+/**
+ * ElevenLabs, per character of speech (V2-021).
+ *
+ * Billed in credits, and `eleven_flash_v2_5` — the model Sotto speaks with —
+ * is "50% lower price per character for API generations"
+ * (https://elevenlabs.io/docs/models), i.e. half a credit each. A credit's
+ * price is the plan's: the Creator plan is $22 a month for 121,000 of them
+ * (https://elevenlabs.io/pricing), so a character is about $0.00009 and a
+ * thousand are about nine cents.
+ *
+ * Plan-dependent, which is the one reason this is an estimate rather than the
+ * bill: a bigger plan buys the same characters cheaper. The characters
+ * themselves are counted exactly, at the voice seam (`meteredVoice`), so the
+ * report prints both and a reader can reprice it.
+ */
+export const TTS_CREDITS_PER_CHAR = 0.5;
+export const TTS_USD_PER_CREDIT = 22 / 121_000;
+
+/** What `characters` of Flash speech cost, in US dollars. */
+export function estimateTtsCostUsd(characters: number): number {
+  return characters * TTS_CREDITS_PER_CHAR * TTS_USD_PER_CREDIT;
+}
+
 /** `$0.0123`, or `$0.00` for nothing. Four places: a run is cents, not dollars. */
 export function formatUsd(amount: number): string {
   return amount === 0 ? "$0.00" : `$${amount.toFixed(4)}`;

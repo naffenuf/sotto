@@ -5,7 +5,10 @@ import {
   UsageMeter,
   addUsage,
   emptyUsage,
+  TTS_CREDITS_PER_CHAR,
+  TTS_USD_PER_CREDIT,
   estimateCostUsd,
+  estimateTtsCostUsd,
   formatUsd,
 } from "./cost.js";
 
@@ -31,6 +34,19 @@ describe("estimateCostUsd", () => {
   it("costs nothing for nothing", () => {
     expect(estimateCostUsd(emptyUsage())).toBe(0);
     expect(formatUsd(0)).toBe("$0.00");
+  });
+});
+
+describe("estimateTtsCostUsd", () => {
+  it("prices a thousand Flash characters at half a credit each", () => {
+    expect(estimateTtsCostUsd(1_000)).toBeCloseTo(1_000 * 0.5 * TTS_USD_PER_CREDIT);
+    expect(TTS_CREDITS_PER_CHAR).toBe(0.5);
+    // About nine cents a thousand on the plan this is priced against.
+    expect(estimateTtsCostUsd(1_000)).toBeCloseTo(0.0909, 4);
+  });
+
+  it("costs nothing for a session nobody heard", () => {
+    expect(estimateTtsCostUsd(0)).toBe(0);
   });
 });
 

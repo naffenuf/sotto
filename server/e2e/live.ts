@@ -4,11 +4,18 @@
  *
  * This is the only place in the project that runs the pipeline from *audio*
  * outside a browser: `WavReplaySource` at real-time pace into the real
- * realtime transcription, the real board, observer, verifier, policy and
- * answer agent, and a real session folder. Nothing is faked and nothing is
- * special — it starts an ordinary `{ kind: "wav" }` session and watches the
- * same event bus a browser watches, exactly as the eval harness does with
- * captured events (US-016).
+ * realtime transcription, the real board, observer, verifier, policy,
+ * research pipeline, answer agent and voice, and a real session folder.
+ * Nothing is faked and nothing is special — it starts an ordinary
+ * `{ kind: "wav" }` session and watches the same event bus a browser watches,
+ * exactly as the eval harness does with captured events (US-016).
+ *
+ * It is also the only check that runs against a real wall clock, which is the
+ * one thing a replay cannot measure: simulated time does not move inside a
+ * tracked model call, so the local gate's twenty-odd seconds of judgment and
+ * a research search's fifteen are free in `npm run eval` and are not free in
+ * a room (V2-020). Hence `createGlimmer` and `createVoice` here: this runs
+ * what `server/app.ts` runs.
  *
  * Real-time pace is the point of the story, and it is also what makes the run
  * affordable: the board updates, the observer's looks and the checks all
@@ -20,7 +27,8 @@ import { join } from "node:path";
 import type { AnswerLogRecord } from "../../shared/answers.js";
 import type { Board } from "../../shared/board.js";
 import type { DecisionLogRecord } from "../../shared/candidates.js";
-import type { E2eFiles, E2eObserved } from "../../shared/e2e.js";
+import type { E2eFiles, E2eObserved, VoiceSpend } from "../../shared/e2e.js";
+import type { ResearchLogLine } from "../../shared/research.js";
 import type { SessionRecord } from "../../shared/session.js";
 import { isSottoTurn } from "../../shared/turns.js";
 import { fixtureAudioPath } from "../audio/WavReplaySource.js";
@@ -28,9 +36,18 @@ import { readWavFile } from "../audio/wav.js";
 import { AUDIO_SAMPLE_RATE } from "../../shared/audio.js";
 import { EventBus } from "../events/bus.js";
 import { deliveredDecisions, readCandidateLog } from "../eval/runner.js";
-import type { ModelClientFactory } from "../session/SessionManager.js";
+import type {
+  GlimmerClientFactory,
+  ModelClientFactory,
+  VoiceFactory,
+} from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
-import { ARTIFACTS_DIR, SESSION_FILES, SessionStore } from "../session/SessionStore.js";
+import {
+  ARTIFACTS_DIR,
+  RESEARCH_DIR,
+  SESSION_FILES,
+  SessionStore,
+} from "../session/SessionStore.js";
 
 type Logger = Pick<Console, "log" | "warn" | "error">;
 
@@ -42,6 +59,20 @@ export interface LiveRunOptions {
   sessionRoot: string;
   /** So the run's token usage lands in the caller's meter. */
   createModel: ModelClientFactory;
+  /**
+   * The local judgment model (V2-010), so the run gates candidates and
+   * research ideas the way the shipped server does — and, unlike a `max`
+   * replay, pays for the verdict in real seconds (V2-021).
+   */
+  createGlimmer?: GlimmerClientFactory;
+  /**
+   * Sotto's voice (V2-005). `scripts/e2e.ts` passes a metered null sink: the
+   * ElevenLabs socket, the streaming, the alignment and the latencies are the
+   * live ones, and nothing comes out of a speaker.
+   */
+  createVoice?: VoiceFactory;
+  /** Characters the voice was handed, read back after the run for the bill. */
+  voiceSpend?: () => VoiceSpend;
   logger?: Logger;
 }
 
@@ -71,6 +102,8 @@ export async function runLive(options: LiveRunOptions): Promise<E2eObserved> {
     errors: [],
     sessionDir: null,
     elapsedMs: 0,
+    voice: { utterances: 0, characters: 0 },
+    sottoTurns: [],
   };
   try {
     observed.audioSeconds = fixtureAudioSeconds(options.fixture);
@@ -83,6 +116,8 @@ export async function runLive(options: LiveRunOptions): Promise<E2eObserved> {
     bus,
     apiKey: options.apiKey,
     createModel: options.createModel,
+    ...(options.createGlimmer === undefined ? {} : { createGlimmer: options.createGlimmer }),
+    ...(options.createVoice === undefined ? {} : { createVoice: options.createVoice }),
     logger,
     createStore: (info) => {
       const store = SessionStore.create(info, { root: options.sessionRoot, logger });
@@ -97,10 +132,13 @@ export async function runLive(options: LiveRunOptions): Promise<E2eObserved> {
   const at = (): number => Date.now() - startedAt;
   const ended = new Promise<void>((resolve) => {
     const off = bus.subscribe((event) => {
-      // V2-008a: the latency map and the moment checks read the room's turns;
-      // Sotto's own lines carry no `endMs` the API reported.
-      if (event.type === "turn" && event.turn.final && !isSottoTurn(event.turn)) {
-        observed.turns.push({ value: event.turn, atMs: at() });
+      // V2-008a: the room's turns and Sotto's own are kept apart. The latency
+      // map and the moment checks read the room's; Sotto's carry no `endMs`
+      // the API reported, and their own existence is what proves the voice was
+      // heard (V2-021).
+      if (event.type === "turn" && event.turn.final) {
+        const into = isSottoTurn(event.turn) ? observed.sottoTurns : observed.turns;
+        into.push({ value: event.turn, atMs: at() });
       }
       if (event.type === "card") observed.cards.push({ value: event.card, atMs: at() });
       if (event.type === "wake" && event.listening) observed.wakeAtMs.push(at());
@@ -122,6 +160,7 @@ export async function runLive(options: LiveRunOptions): Promise<E2eObserved> {
     observed.error = message(error);
   }
   observed.elapsedMs = at();
+  if (options.voiceSpend !== undefined) observed.voice = options.voiceSpend();
   return observed;
 }
 
@@ -138,6 +177,8 @@ export function readSessionFiles(dir: string | null): E2eFiles {
     candidates: 0,
     artifacts: [],
     artifactHtml: {},
+    research: [],
+    researchFiles: [],
   };
   if (dir === null) return files;
 
@@ -154,10 +195,16 @@ export function readSessionFiles(dir: string | null): E2eFiles {
     deliveredDecisions(log) as Map<string, DecisionLogRecord>,
   );
 
+  files.research = readJsonLines<ResearchLogLine>(join(dir, SESSION_FILES.research));
   try {
     files.artifacts = readdirSync(join(dir, ARTIFACTS_DIR));
   } catch {
     // No folder until the first artifact is written (US-020).
+  }
+  try {
+    files.researchFiles = readdirSync(join(dir, RESEARCH_DIR));
+  } catch {
+    // Nor until the first packet is saved (V2-013).
   }
   for (const file of files.artifacts) {
     const html = readText(join(dir, ARTIFACTS_DIR, file));

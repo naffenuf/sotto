@@ -11,8 +11,10 @@ import type { AnswerLogRecord } from "../../shared/answers.js";
 import { emptyBoard, type Board, type Item } from "../../shared/board.js";
 import type { DecisionLogRecord } from "../../shared/candidates.js";
 import type { StageCard } from "../../shared/cards.js";
-import type { E2eFiles, E2eObserved, Stamped } from "../../shared/e2e.js";
+import type { E2eFiles, E2eObserved, E2eResearch, Stamped } from "../../shared/e2e.js";
+import { RESEARCH_FIXTURE } from "../../shared/e2e.js";
 import type { MomentRecord } from "../../shared/eval.js";
+import type { ResearchLogLine, ResearchPacket } from "../../shared/research.js";
 import { DEFAULT_BOLDNESS, defaultPolicySettings, limitsFor, thresholdsFor } from "../../shared/policy.js";
 import type { SessionRecord } from "../../shared/session.js";
 import type { TurnUpdate } from "../../shared/turns.js";
@@ -21,16 +23,26 @@ import { describe, expect, it } from "vitest";
 import {
   EXPECTED_WAKE_TRIGGERS,
   MIN_TRANSCRIPT_LINES,
+  askedAtMs,
   candidateIdOf,
   checkFixture,
   finalCards,
   interjections,
+  researchCards,
+  researchFrom,
   spokenTriggers,
   type E2eCheckInput,
 } from "./checks.js";
-import { answerLatency, fixtureLatency, onWall, wallOffsetMs } from "./latency.js";
+import { answerLatency, fixtureLatency, onWall, voiceLatency, wallOffsetMs } from "./latency.js";
 import { E2E_USAGE, parseE2eArgs } from "./options.js";
-import { MAX_RUN_COST_USD, renderFixture, renderRun, runPassed } from "./report.js";
+import {
+  DEFAULT_FIXTURE_BUDGET_USD,
+  FIXTURE_BUDGET_USD,
+  renderFixture,
+  renderRun,
+  runBudgetUsd,
+  runPassed,
+} from "./report.js";
 
 function turn(overrides: Partial<TurnUpdate> = {}): TurnUpdate {
   return {
@@ -160,6 +172,10 @@ function observed(overrides: Partial<E2eObserved> = {}): E2eObserved {
     errors: [],
     sessionDir: "/tmp/e2e/wav-brainstorm-1",
     elapsedMs: 126_000,
+    voice: { utterances: 1, characters: 217 },
+    sottoTurns: [
+      { value: turn({ turnId: "sotto:hello", speaker: "Sotto", sotto: true }), atMs: 1_500 },
+    ],
     ...overrides,
   };
 }
@@ -176,7 +192,96 @@ function files(overrides: Partial<E2eFiles> = {}): E2eFiles {
     candidates: 0,
     artifacts: [],
     artifactHtml: {},
+    research: [],
+    researchFiles: [],
     ...overrides,
+  };
+}
+
+function packet(overrides: Partial<ResearchPacket> = {}): ResearchPacket {
+  return {
+    id: "packet-1",
+    ideaId: "idea-1",
+    title: "What rivals miss",
+    teaser: "All three only transcribe; none of them speaks.",
+    keyPoints: ["Otter stops at a transcript", "Fireflies is priced per seat"],
+    sources: [{ url: "https://example.com/review", title: "Reviews" }],
+    createdAtMs: 60_000,
+    latencyMs: 14_000,
+    ...overrides,
+  };
+}
+
+/** A `research.jsonl` that got two ideas through the gate and one onto the stage. */
+function researchLog(): ResearchLogLine[] {
+  return [
+    {
+      kind: "idea",
+      atMs: 40_000,
+      origin: "hook",
+      idea: {
+        id: "idea-1",
+        topic: "competitor gaps",
+        question: "where do the top three meeting note takers fall short?",
+        why: "They want complaints, not marketing copy.",
+        sourceTurnIds: ["s1:4"],
+      },
+    },
+    {
+      kind: "gate",
+      atMs: 44_000,
+      ideaId: "idea-1",
+      question: "where do the top three meeting note takers fall short?",
+      decision: "queued",
+      where: "local",
+      score: 0.81,
+      threshold: 0.6,
+      latencyMs: 23_700,
+    },
+    {
+      kind: "gate",
+      atMs: 46_000,
+      ideaId: "idea-2",
+      question: "would our team rather build this in Rust?",
+      decision: "rejected",
+      where: "local",
+      score: 0.31,
+      threshold: 0.6,
+      latencyMs: 21_100,
+    },
+    {
+      kind: "start",
+      atMs: 44_100,
+      ideaId: "idea-1",
+      question: "where do the top three meeting note takers fall short?",
+      running: 1,
+      startedInWindow: 1,
+    },
+    {
+      kind: "packet",
+      atMs: 60_000,
+      ideaId: "idea-1",
+      question: "where do the top three meeting note takers fall short?",
+      outcome: "ready",
+      packet: packet(),
+      latencyMs: 14_000,
+      searched: true,
+    },
+  ];
+}
+
+/** What the report prints for a conversation that looked nothing up. */
+function noResearch(): E2eResearch {
+  return {
+    ideas: 0,
+    queued: 0,
+    rejected: 0,
+    gateFailed: 0,
+    localGateCalls: 0,
+    packets: 0,
+    unsourced: 0,
+    failed: 0,
+    cardAtMs: [],
   };
 }
 
@@ -264,12 +369,23 @@ describe("the checks common to every fixture", () => {
     expect(checks[2]?.detail).toContain("OUT OF ORDER");
   });
 
-  it("wants one wake trigger from the ask fixtures and none from the rest", () => {
+  it("wants Sotto to have spoken and to know what was heard", () => {
+    // The hello gives every conversation one utterance and one line.
+    expect(failures(checkFixture(input("brainstorm")))).toEqual([]);
+    const silent = { voice: { utterances: 0, characters: 0 }, sottoTurns: [] };
+    expect(failures(checkFixture(input("brainstorm", silent)))).toEqual(["voice"]);
+    // Synthesized but nothing reported playing it: V2-008a writes no line, so
+    // there is no spoken-so-far to read.
+    expect(failures(checkFixture(input("brainstorm", { sottoTurns: [] })))).toEqual(["voice"]);
+  });
+
+  it("wants one wake trigger from the fixtures that ask and none from the rest", () => {
     expect(EXPECTED_WAKE_TRIGGERS).toEqual({
       brainstorm: 0,
       "moment-contradiction": 0,
       "ask-search": 1,
       "ask-diagram": 1,
+      [RESEARCH_FIXTURE]: 1,
     });
     // A conversation nobody addressed Sotto in that answered anyway.
     expect(
@@ -680,10 +796,156 @@ describe("the latencies", () => {
   });
 });
 
+describe("the research conversation", () => {
+  /** A passing `research-business-idea` run: a card at 67s, the question at 160s. */
+  function passingResearch(): E2eCheckInput {
+    return input(
+      RESEARCH_FIXTURE,
+      {
+        wakeAtMs: [160_000],
+        cards: [
+          { value: card({ id: "research-packet-1", variant: "research" }), atMs: 67_300 },
+          {
+            value: card({ id: "card-ans-1", variant: "answer", state: "thinking", headline: "" }),
+            atMs: 161_000,
+          },
+          {
+            value: card({
+              id: "card-ans-1",
+              variant: "answer",
+              state: "ready",
+              headline: answer().headline,
+            }),
+            atMs: 162_000,
+          },
+        ],
+      },
+      {
+        research: researchLog(),
+        researchFiles: ["packet-1.json", "packet-1.md"],
+        answers: [
+          answer({
+            question: "what did you find on competitors?",
+            usedPacketIds: ["packet-1"],
+            packetIds: ["packet-1"],
+            ackMs: null,
+            firstAudioMs: 392,
+          }),
+        ],
+      },
+    );
+  }
+
+  it("passes a run that researched, showed a card and briefed from it", () => {
+    expect(failures(checkFixture(passingResearch()))).toEqual([]);
+  });
+
+  it("counts the ideas, the verdicts and the packets off research.jsonl", () => {
+    expect(researchFrom(passingResearch())).toEqual({
+      ideas: 1,
+      queued: 1,
+      rejected: 1,
+      gateFailed: 0,
+      localGateCalls: 2,
+      packets: 1,
+      unsourced: 0,
+      failed: 0,
+      cardAtMs: [67_300],
+    });
+  });
+
+  it("keeps only the first push of each research card", () => {
+    // V2-015: a packet brought forward pushes its card again, and the time
+    // that matters is when the group first saw it.
+    const run = passingResearch();
+    const brought = { value: card({ id: "research-packet-1", variant: "research" }), atMs: 161_500 };
+    expect(
+      researchCards({ ...run.observed, cards: [...run.observed.cards, brought] }).map(
+        (one) => one.atMs,
+      ),
+    ).toEqual([67_300]);
+  });
+
+  it("fails when nothing was looked up, or when a packet never reached disk", () => {
+    const run = passingResearch();
+    expect(failures(checkFixture({ ...run, files: { ...run.files, research: [] } }))).toContain(
+      "research packets",
+    );
+    expect(
+      failures(checkFixture({ ...run, files: { ...run.files, researchFiles: [] } })),
+    ).toContain("research packets");
+  });
+
+  it("fails when the only research card arrived after the question", () => {
+    const run = passingResearch();
+    const late = run.observed.cards.map((one) =>
+      one.value.variant === "research" ? { ...one, atMs: 170_000 } : one,
+    );
+    const checks = checkFixture({ ...run, observed: { ...run.observed, cards: late } });
+    expect(failures(checks)).toEqual(["research card before the question"]);
+  });
+
+  it("fails when the answer was written without leaning on a packet", () => {
+    const run = passingResearch();
+    const answers = [answer({ question: "what did you find on competitors?", usedPacketIds: [] })];
+    expect(failures(checkFixture({ ...run, files: { ...run.files, answers } }))).toEqual([
+      "spoken briefing from a packet",
+    ]);
+  });
+
+  it("fails when the briefing was shown but never said out loud", () => {
+    const run = passingResearch();
+    const answers = [
+      answer({
+        question: "what did you find on competitors?",
+        usedPacketIds: ["packet-1"],
+        spokenText: "",
+      }),
+    ];
+    expect(failures(checkFixture({ ...run, files: { ...run.files, answers } }))).toEqual([
+      "spoken briefing from a packet",
+    ]);
+  });
+
+  it("takes the question's moment from the indicator, falling back to the answer", () => {
+    const run = passingResearch();
+    expect(askedAtMs(run.observed)).toBe(160_000);
+    expect(askedAtMs({ ...run.observed, wakeAtMs: [] })).toBe(161_000);
+    expect(askedAtMs(observed())).toBeNull();
+  });
+
+  it("leaves a research_hook moment out of the moment latencies", () => {
+    // A research card cites no turns, so there is nothing to match it to a
+    // moment by; the card times are reported on their own line instead.
+    const run = passingResearch();
+    const hook = moment({ id: "competitor-gaps", type: "research_hook", expectedLevel: "research" });
+    const latency = fixtureLatency({ ...run, moments: [hook, moment()] });
+    expect(latency.moments.map((one) => one.momentId)).toEqual(["budget-contradiction"]);
+  });
+
+  it("reads the voice latencies off the answer that was asked out loud", () => {
+    const run = passingResearch();
+    expect(voiceLatency(run.files)).toEqual({ ackMs: null, firstAudioMs: 392 });
+    // A typed answer says nothing about reacting to being addressed, so a
+    // spoken one is preferred over it whatever the order in the log.
+    const typed = answer({ turnId: null, ackMs: 999, firstAudioMs: 999 });
+    expect(
+      voiceLatency({ ...run.files, answers: [typed, ...run.files.answers] }),
+    ).toEqual({ ackMs: null, firstAudioMs: 392 });
+    expect(voiceLatency(files())).toEqual({ ackMs: null, firstAudioMs: null });
+  });
+});
+
 describe("the arguments", () => {
-  it("runs all four conversations by default", () => {
+  it("runs all five conversations by default, the expensive one last", () => {
     expect(parseE2eArgs([])).toEqual({
-      fixtures: ["brainstorm", "moment-contradiction", "ask-search", "ask-diagram"],
+      fixtures: [
+        "brainstorm",
+        "moment-contradiction",
+        "ask-search",
+        "ask-diagram",
+        RESEARCH_FIXTURE,
+      ],
     });
   });
 
@@ -722,15 +984,26 @@ describe("the report", () => {
           cards: 1,
           candidates: 0,
           checks: [{ name: "one answer", ok: true, detail: "1 answer(s), status done" }],
-          latency: { wakeToHeadlineMs: 18_400, wakeToDoneMs: 19_200, moments: [] },
+          latency: {
+            wakeToHeadlineMs: 18_400,
+            wakeToDoneMs: 19_200,
+            ackMs: 420,
+            firstAudioMs: 2_100,
+            moments: [],
+          },
           moments: [],
+          research: noResearch(),
+          voice: { utterances: 2, characters: 310 },
+          usage: { calls: 6, inputTokens: 12_000, outputTokens: 9_000, reasoningTokens: 7_000 },
         },
       ],
       usage: { calls: 6, inputTokens: 12_000, outputTokens: 9_000, reasoningTokens: 7_000 },
       audioSeconds: observedRun.audioSeconds,
       modelCostUsd: 0.053,
       asrCostUsd: 0.006,
-      totalCostUsd: 0.059,
+      ttsCharacters: 310,
+      ttsCostUsd: 0.0282,
+      totalCostUsd: 0.0872,
       passed: true,
     };
   };
@@ -741,6 +1014,66 @@ describe("the report", () => {
     expect(text).toContain("ok    one answer");
     expect(text).toContain("wake -> headline 18.4s, wake -> done 19.2s");
     expect(text).toContain("/tmp/e2e/wav-ask-search-1");
+  });
+
+  it("prints what this one conversation cost, against its own allowance", () => {
+    const text = renderFixture(passing().fixtures[0]!);
+    expect(text).toContain("cost     $0.0838 of a $0.7000 allowance (6 call(s)");
+    expect(text).toContain("310 spoken character(s)");
+  });
+
+  it("prints the voice latencies and what was spoken", () => {
+    const text = renderFixture(passing().fixtures[0]!);
+    expect(text).toContain("voice    ack 0.4s, first audio 2.1s; 2 utterance(s), 310 character(s)");
+  });
+
+  it("prints a briefing's missing acknowledgment as a result, not a gap", () => {
+    // V2-015: a question Sotto has already done the work for skips the
+    // acknowledgment and goes straight to speech.
+    const report = passing().fixtures[0]!;
+    const text = renderFixture({
+      ...report,
+      latency: { ...report.latency, ackMs: null, firstAudioMs: 392 },
+    });
+    expect(text).toContain("voice    ack —, first audio 0.4s");
+  });
+
+  it("prints what the research pipeline did, and nothing when it did nothing", () => {
+    const report = passing().fixtures[0]!;
+    const text = renderFixture({
+      ...report,
+      research: {
+        ideas: 4,
+        queued: 3,
+        rejected: 1,
+        gateFailed: 0,
+        localGateCalls: 4,
+        packets: 2,
+        unsourced: 1,
+        failed: 0,
+        cardAtMs: [67_300, 110_000],
+      },
+    });
+    expect(text).toContain(
+      "research 4 idea(s), 3 queued, 1 rejected, 2 packet(s), 1 unsourced; " +
+        "2 card(s) at 67.3s, 110.0s; 4 local gate call(s)",
+    );
+    expect(renderFixture(report)).not.toContain("research ");
+  });
+
+  it("budgets each conversation, so one fixture is gated on its own cost", () => {
+    expect(runBudgetUsd([{ fixture: "ask-search" }])).toBe(FIXTURE_BUDGET_USD["ask-search"]);
+    expect(runBudgetUsd([{ fixture: "ask-search" }, { fixture: RESEARCH_FIXTURE }])).toBeCloseTo(
+      (FIXTURE_BUDGET_USD["ask-search"] as number) +
+        (FIXTURE_BUDGET_USD[RESEARCH_FIXTURE] as number),
+    );
+    // The research conversation is the expensive one: it searches, and a
+    // grounded call resends its whole request each round.
+    expect(FIXTURE_BUDGET_USD[RESEARCH_FIXTURE]).toBeGreaterThan(
+      FIXTURE_BUDGET_USD["ask-search"] as number,
+    );
+    expect(runBudgetUsd([])).toBe(0);
+    expect(runBudgetUsd([{ fixture: "no-wake" }])).toBe(DEFAULT_FIXTURE_BUDGET_USD);
   });
 
   it("prints a moment's delay and whether it beat the deadline", () => {
@@ -784,7 +1117,15 @@ describe("the report", () => {
         ],
       }),
     ).toBe(false);
-    expect(runPassed({ ...run, totalCostUsd: MAX_RUN_COST_USD })).toBe(false);
+    expect(runPassed({ ...run, totalCostUsd: runBudgetUsd(run.fixtures) })).toBe(false);
+    // …and the ceiling moves with the fixtures, not with the run: the same
+    // bill passes once the conversation that searches is in the set.
+    const withResearch = {
+      ...run,
+      fixtures: [...run.fixtures, { ...run.fixtures[0]!, fixture: RESEARCH_FIXTURE }],
+      totalCostUsd: runBudgetUsd(run.fixtures),
+    };
+    expect(runPassed(withResearch)).toBe(true);
   });
 
   it("names the failures and prices the run", () => {
@@ -803,8 +1144,9 @@ describe("the report", () => {
       passed: false,
     });
     expect(text).toContain("1/2 check(s) passed; failed: ask-search: citations");
-    expect(text).toContain("$0.0590");
+    expect(text).toContain("$0.0872");
     expect(text).toContain("of transcription");
+    expect(text).toContain("310 character(s)");
     expect(text).toContain("E2E FAILED");
   });
 });

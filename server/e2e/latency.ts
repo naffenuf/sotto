@@ -1,7 +1,10 @@
 /**
- * The three latencies `npm run e2e` prints (PRD US-021).
+ * The latencies `npm run e2e` prints (PRD US-021, V2-021).
  *
- * All three cross between two timelines, which is the whole difficulty. A
+ * The ones measured here cross between two timelines, which is the whole
+ * difficulty. (The two V2-021 added — the acknowledgment and the first audio
+ * of a spoken answer — do not: they are real milliseconds, recorded by the
+ * voice itself, and {@link voiceLatency} only reads them back.) A
  * turn's `startMs`/`endMs` are positions in the *audio stream*; a card's
  * `createdAtMs` is read off the live `Clock`, whose origin is the process. So
  * nothing can be subtracted until both ends are on the wall clock, which is
@@ -19,7 +22,13 @@
  * Pure.
  */
 import type { StageCard } from "../../shared/cards.js";
-import type { E2eLatency, E2eObserved, MomentLatency, Stamped } from "../../shared/e2e.js";
+import type {
+  E2eFiles,
+  E2eLatency,
+  E2eObserved,
+  MomentLatency,
+  Stamped,
+} from "../../shared/e2e.js";
 import type { MomentRecord } from "../../shared/eval.js";
 import { deliveredForMoment, type E2eCheckInput } from "./checks.js";
 
@@ -100,10 +109,39 @@ export function momentLatency(input: E2eCheckInput, moment: MomentRecord): Momen
   };
 }
 
-/** Every latency one fixture's run can be asked for. */
+/**
+ * What the room heard, and when (V2-021).
+ *
+ * Taken off `answers.jsonl` rather than measured here, because these two are
+ * already recorded in real milliseconds by the thing that did the speaking:
+ * they are latencies a person in the room felt, and the session clock they
+ * would otherwise be read off does not move during a model call. The first
+ * *spoken* answer is the one reported — a typed question has nothing to say
+ * about how quickly Sotto reacted to being addressed.
+ */
+export function voiceLatency(files: E2eFiles): Pick<E2eLatency, "ackMs" | "firstAudioMs"> {
+  const answer = files.answers.find((one) => one.turnId !== null) ?? files.answers[0];
+  return {
+    ackMs: answer?.ackMs ?? null,
+    firstAudioMs: answer?.firstAudioMs ?? null,
+  };
+}
+
+/**
+ * Every latency one fixture's run can be asked for.
+ *
+ * A `research_hook` moment is left out of the moment latencies: it is caught
+ * by a research-ready card and nothing else (V2-002), and a research card
+ * cites no turns, so there is nothing structural to match it to a moment by —
+ * `npm run eval` has a judge for that, and this check has to come out the same
+ * every run. The research card times are reported on their own line instead.
+ */
 export function fixtureLatency(input: E2eCheckInput): E2eLatency {
   return {
     ...answerLatency(input.observed),
-    moments: input.moments.map((moment) => momentLatency(input, moment)),
+    ...voiceLatency(input.files),
+    moments: input.moments
+      .filter((moment) => moment.expectedLevel !== "research")
+      .map((moment) => momentLatency(input, moment)),
   };
 }

@@ -15,6 +15,7 @@
  * test and the end-to-end check speak through — the timings and the
  * spoken-so-far tracking are real, only the speakers are missing.
  */
+import type { VoiceSpend } from "../../shared/e2e.js";
 import type { SpeechEndReason, Speaker } from "./Speaker.js";
 import type { SpeechPlayback } from "./selfEcho.js";
 
@@ -120,4 +121,55 @@ export function nullSinkVoice(create: () => Speaker): VoiceOut {
       };
     },
   };
+}
+
+/** A voice that also says what it was asked to say, in characters. */
+export interface MeteredVoice extends VoiceOut {
+  /** Utterances opened and characters handed over so far. */
+  spent(): VoiceSpend;
+}
+
+/**
+ * `voice`, counting what went through it (V2-021).
+ *
+ * ElevenLabs bills by characters, so the end-to-end check has to know how
+ * many were sent before it can price a run. Counted here rather than inside
+ * {@link Speaker} because the text is handed over at this seam — one tally
+ * covers the hello, the acknowledgment, the holding line and the answer, and
+ * it survives the several `Speaker`s one session gets through.
+ *
+ * Characters *appended*, not characters heard: a barge-in stops the sound and
+ * not the invoice. Every move is delegated explicitly rather than spread, so
+ * a voice whose utterance is a class instance keeps its `this`.
+ */
+export function meteredVoice(voice: VoiceOut): MeteredVoice {
+  const spend: VoiceSpend = { utterances: 0, characters: 0 };
+  const metered: MeteredVoice = {
+    spent: () => ({ ...spend }),
+    async begin(): Promise<VoiceUtterance | null> {
+      const utterance = await voice.begin();
+      // A muted or unattached voice is not billed for anything.
+      if (utterance === null) return null;
+      spend.utterances += 1;
+      const wrapped: VoiceUtterance = {
+        id: utterance.id,
+        append: (text) => {
+          spend.characters += text.length;
+          utterance.append(text);
+        },
+        finish: () => utterance.finish(),
+        firstAudioMs: () => utterance.firstAudioMs(),
+        cancel: () => utterance.cancel(),
+      };
+      // Optional on the interface, so it is only offered when the inner
+      // utterance really has it — V2-008c's continuation checks for it.
+      const { audioMs } = utterance;
+      if (audioMs !== undefined) wrapped.audioMs = () => audioMs.call(utterance);
+      return wrapped;
+    },
+  };
+  const { interrupt, playback } = voice;
+  if (interrupt !== undefined) metered.interrupt = () => interrupt.call(voice);
+  if (playback !== undefined) metered.playback = () => playback.call(voice);
+  return metered;
 }
