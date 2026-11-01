@@ -953,3 +953,30 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `fetch("/api/session/start", …)` from the page (as `scripts/verify-hello.mjs` does) rather than
   pick an option. `scripts/verify-cards.mjs` and `scripts/verify-ui.mjs` still assert on that
   selector and on the old dark theme, and fail on both; their card and layout checks are still good.
+
+- **Glimmer's schema constrains the tokens; it does not brief the model.** Ollama compiles a
+  `response_format` JSON Schema into a grammar, so the keys and types always come back right and
+  the model never reads a word of it — a probe whose properties were described as `"0-1"` returned
+  `{"useful": 8, "unknown": 2, "answerable": 9}` while its own reasoning said "No schema given".
+  Ranges, limits and units belong in the **prompt** for Glimmer; Muse Spark's strict structured
+  output does show descriptions, so they can live in both. `server/model/GlimmerClient.ts` is the
+  seam (same shape as `MuseClient.structured`, validated by the caller with zod) and it carries
+  three more measured facts: `keep_alive: "30m"` in the `/v1` body **is** honoured (checked against
+  `/api/ps`'s `expires_at`) and is on every call, because Ollama unloads after five idle minutes
+  and the reload is ~44 s; `reasoning_effort` defaults to `"low"` here, since the model's own
+  default spends ~35 s on a short prompt and thinking off is unusable for scores and leaks
+  `<|eot|>` into `content` (stripped anyway); and nothing sends `temperature`, because Glimmer must
+  not run greedy. Measured: a four-field gate call 17.0 s, in-range scores once the prompt said the
+  range.
+- **The judgment dot is the one that reads out its detail.** `server/model/judgment.ts`'s
+  `JudgmentRouter` is built per session and decides once — `check()` starts the health check and
+  returns, a role `await`s `client()` — so nothing waits at session start and a verdict landing
+  after the session has gone changes no dot (`stop()`). That health check is a **models listing**
+  (38 ms), not a trivial generation: a cold structured request is ~44 s, and `GlimmerClient.warm()`
+  pays that in the background instead; `ralph/preflight.sh` is where the real structured request is
+  sent. Glimmer unreachable is a **warning, not an error** — every judgment call goes to Muse Spark
+  — so the dot is `active` either way and its `detail` (`local`/`cloud`) is what the header prints,
+  which is why `statusChannels` is four long now and the bus snapshot is **nine** events plus one
+  per card. `SessionManager.createGlimmer` defaults to `() => null` and `server/app.ts` supplies
+  `glimmerFromEnv()`, exactly as it does for the voice: that is what keeps `npm test` off the local
+  server as surely as it is off the network.

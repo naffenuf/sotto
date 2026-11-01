@@ -366,3 +366,37 @@
     dark theme and the removed header source selector). The card checks themselves pass.
   - Next: V2-010 (Glimmer client). Ollama must be serving muse-glimmer:30b-q4_K_M at
     GLIMMER_BASE_URL; see the CLAUDE.md note on reasoning levels before choosing one.
+
+[2026-11-01 00:40] V2-010 — completed — Glimmer client, per-session judgment router, and a fourth status dot.
+  - server/model/GlimmerClient.ts: structured() is the same shape as MuseClient's, against
+    GLIMMER_BASE_URL/GLIMMER_MODEL. health() is a MODELS LISTING on purpose (38 ms) — a cold
+    structured request is ~44 s and session start must not hang on it — and warm() fires a trivial
+    structured call in the background so the first real verdict is not the one that pays the load.
+    The criterion's "trivial structured request" is in ralph/preflight.sh, which can afford to wait
+    (5 s warm, 90 s cap).
+  - server/model/judgment.ts: JudgmentRouter, one per session. check() starts the health check and
+    returns; a role awaits client(). Glimmer up -> local; unreachable or serving another model ->
+    one warning and every judgment call goes to Muse Spark; neither configured -> null.
+  - shared/events.ts statusChannels gained `judgment`, so the bus snapshot is NINE events plus one
+    per card, and the header has four dots. It is the one channel whose dot text is its `detail`:
+    `local` and `cloud` are both working states, so the state says it works and the detail says
+    where (StatusDots.describe, plus data-detail for Playwright).
+  - createGlimmer defaults to () => null on SessionManager and is supplied by server/app.ts
+    (glimmerFromEnv), exactly like createVoice — that is what keeps npm test off the local server.
+  MEASURED on the real Ollama endpoint: health 38 ms; a four-field gate call 17.0 s at
+  reasoning_effort low, returning in-range scores {useful 0.9, already_known 0.15, answerable 0.95}.
+  keep_alive: "30m" in the /v1 body IS honoured (checked against /api/ps expires_at).
+  THE TRAP WORTH KNOWING: Ollama compiles the JSON Schema into a grammar and the model never sees
+  it — a probe whose properties were described as "0-1" returned 8/2/9 while its own reasoning said
+  "No schema given". Ranges, limits and units must be in the PROMPT. Spark is not like this.
+  Checked: npm run typecheck, npm test (67 files, 916 tests), npm run build,
+  npx vitest run --config vitest.integration.config.ts server/model/glimmer.integration.test.ts
+  (5/5, real local server), npm run verify:judgment (real browser: "judgment: local", green).
+  The full npm run test:integration was not re-run — nothing outside server/model changed behaviour
+  for it, and it costs real Meta API calls.
+  FOR V2-012: the gate client is `await running.judgment.client()`; RunningSession.judgment is
+  already there. server/eval/runner.ts and server/e2e/live.ts build their own SessionManagers and do
+  NOT pass createGlimmer, so they judge in the cloud — wire glimmerFromEnv() into both when the gate
+  exists, and remember the PRD's success metric compares Glimmer-gate recall to Spark's within 0.1.
+  Budget the gate's 17 s: it must stay off the critical path of a spoken answer.
+  NEXT: V2-011 (new candidate types). 11 stories left.

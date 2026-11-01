@@ -223,8 +223,8 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done. All 7 criteria met; npm run typecheck, npm test (67 files, 916 tests), npm run build, the real-local-server integration test (5/5) and npm run verify:judgment (real browser, dot reads \"judgment: local\") all pass. server/model/GlimmerClient.ts is the structured-call seam (keep_alive 30m, reasoning_effort low, finish_reason checked, <|eot|> stripped); server/model/judgment.ts is the per-session JudgmentRouter that health-checks once and falls back to Muse Spark with a warning. Measured: health 38 ms, a four-field gate call 17.0 s. The session-start check is a MODELS LISTING, not a generation \u2014 a cold structured request is ~44 s and the dot must not hang on it; warm() pays that load in the background. preflight.sh does send the structured request (5 s warm). V2-012 should take its gate client from RunningSession.judgment (await router.client()), and wire createGlimmer into server/eval/runner.ts and server/e2e/live.ts, which currently default to null and therefore judge in the cloud."
     },
     {
       "id": "V2-011",
