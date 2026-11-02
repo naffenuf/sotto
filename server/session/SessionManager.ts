@@ -82,6 +82,7 @@ import type { GlimmerClient } from "../model/GlimmerClient.js";
 import { JudgmentRouter } from "../model/judgment.js";
 import { ResearchCards } from "../research/ResearchCards.js";
 import { ResearchManager } from "../research/ResearchManager.js";
+import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
 import { ResearchRunner } from "../research/ResearchRunner.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
@@ -167,6 +168,14 @@ export type SessionStoreFactory = (info: SessionInfo) => SessionWriter | null;
 export type VoiceFactory = () => VoiceOut | null;
 
 /**
+ * Reads the group's own files for one session (V3-009), or returns `null` for
+ * a session that answers from the web alone — which is every session without
+ * a knowledge folder, and what the unit tests do so `npm test` reads nothing
+ * off the disk.
+ */
+export type KnowledgeFactory = () => KnowledgeIndex | null;
+
+/**
  * Builds the model client a session's board, observer and answers call, or
  * returns `null` to run a session with no model at all — which is what
  * happens without `MODEL_API_KEY`, and what the unit tests do so `npm test`
@@ -228,6 +237,13 @@ export interface SessionManagerOptions {
    * passes the one {@link VoiceHub} the browser's `/ws/voice` is attached to.
    */
   createVoice?: VoiceFactory;
+  /**
+   * Reads the group's own files, once per session (V3-009). Defaults to none,
+   * so a SessionManager built without one answers from the web alone and
+   * `npm test` never reads the filesystem; `server/app.ts` passes a loader
+   * over {@link loadKnowledgeDir}.
+   */
+  createKnowledge?: KnowledgeFactory;
   /** Clock for live sessions; a replay brings its own simulated one. */
   liveClock?: Clock;
   /** Real time that a `1x` replay paces itself against. */
@@ -521,6 +537,7 @@ export class SessionManager {
   private readonly createModel: ModelClientFactory;
   private readonly createGlimmer: GlimmerClientFactory;
   private readonly createVoice: VoiceFactory;
+  private readonly createKnowledge: KnowledgeFactory;
   private readonly liveClock: Clock;
   private readonly wallClock: Clock;
   private readonly replaySpeed: ReplaySpeed;
@@ -563,6 +580,8 @@ export class SessionManager {
     // {@link glimmerFromEnv}.
     this.createGlimmer = options.createGlimmer ?? ((): GlimmerClient | null => null);
     this.createVoice = options.createVoice ?? ((): VoiceOut | null => null);
+    // Same default and the same reason: no folder means the web alone.
+    this.createKnowledge = options.createKnowledge ?? ((): KnowledgeIndex | null => null);
     // V2-006: playback can end after generation, with no new ASR frame to
     // re-check held cards. The bus has already folded the voice state here.
     this.bus.subscribe((event) => {
@@ -1423,6 +1442,11 @@ export class SessionManager {
           turnId: candidate.evidence[0]?.turnId ?? candidate.evidenceTurnIds[0] ?? "",
           headline: candidate.headline,
           text: line,
+          // V3-009: present means the group's own records contradicted the
+          // claim, which is what lets this be said at boldness `normal`.
+          ...(candidate.verification?.file === undefined
+            ? {}
+            : { fromFile: candidate.verification.file }),
         });
       },
     });
@@ -1447,9 +1471,15 @@ export class SessionManager {
         policy.accept(candidate);
       },
     });
+    // The group's own files, read once at the start of the session (V3-009).
+    // `null` for every session without a knowledge folder, which is the
+    // ordinary case: then the verifier checks the web alone and the research
+    // runner is handed no `search_knowledge` tool.
+    const knowledge = this.createKnowledge();
     const verifier = new Verifier({
       clock,
       model,
+      knowledge,
       logger: this.logger,
       onRecord: (record) => { recordCandidate(record); onTiming({ stage: "verification_complete", ...record }); },
       // A claim that really is wrong has the correction in its detail by now,
@@ -1749,6 +1779,7 @@ export class SessionManager {
     const researchRunner = new ResearchRunner({
       clock,
       model,
+      knowledge,
       wallClock: this.wallClock,
       logger: this.logger,
       onModelState,

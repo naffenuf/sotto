@@ -1,0 +1,5 @@
+plan,list_price_per_seat_monthly_usd,minimum_seats,annual_discount_percent,max_sales_discount_percent
+Starter,15,1,0,0
+Team,30,5,10,10
+Pro,40,10,20,15
+Enterprise,50,100,25,25

@@ -21,6 +21,11 @@
  *     logged as `unsourced`. A research card is a claim about the world; a
  *     group that cannot follow it back is worse off than one that never saw
  *     it.
+ *   - **The group's own files come first.** When the session has a knowledge
+ *     folder (V3-009) the model is handed a `search_knowledge` tool beside
+ *     `web_search`, and what it reads out of a file is cited as
+ *     `file: customers.csv` — resolved against the files the search really
+ *     read, exactly as a URL is resolved against the pages it really opened.
  *   - **Nothing waits for it.** A job is never awaited by the pipeline. It
  *     registers itself with {@link Clock.track} so a `max`-speed replay stops
  *     for it, which is also what puts its `createdAtMs` at the moment the
@@ -40,6 +45,15 @@ import {
 import { ModelCitationSchema } from "../../shared/candidates.js";
 import type { Citation } from "../../shared/cards.js";
 import {
+  SEARCH_KNOWLEDGE_TOOL,
+  SearchKnowledgeArgsSchema,
+  knowledgeCitation,
+  renderKnowledgeResults,
+  resolveKnowledgeCitation,
+  searchKnowledgeDescription,
+  searchKnowledgeJsonSchema,
+} from "../../shared/knowledge.js";
+import {
   MAX_PACKET_SOURCES,
   PacketReplySchema,
   RESEARCH_PACKET_SCHEMA_NAME,
@@ -52,7 +66,8 @@ import {
 } from "../../shared/research.js";
 import { systemClock, type Clock } from "../clock.js";
 import { resolveCitation, searchedIndex } from "../interject/Verifier.js";
-import { ModelCallError, type ModelClient } from "../model/client.js";
+import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
+import { ModelCallError, type FunctionTool, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 
 /** The label a research job is tracked under on the clock and in the logs. */
@@ -95,6 +110,14 @@ export interface ResearchRunnerOptions {
   logger?: Logger;
   /** How much search context the model is given. */
   searchContextSize?: "low" | "medium" | "high";
+  /**
+   * The group's own files (V3-009), when the session has a knowledge folder.
+   *
+   * Present means one more tool on the table beside `web_search`, and a
+   * packet that may cite `file: customers.csv`; absent means the web alone,
+   * which is every session without a `knowledge/` folder.
+   */
+  knowledge?: KnowledgeIndex | null;
 }
 
 export class ResearchRunner {
@@ -134,13 +157,16 @@ export class ResearchRunner {
     const startedAt = this.wallClock.now();
     const id = `packet-${(this.packetCount += 1)}`;
     const artifacts: Artifact[] = [];
+    // The knowledge files this search actually read, which is what decides
+    // whether a `file:` citation may be shown (V3-009).
+    const read = new Set<string>();
     this.options.onModelState?.("connecting", `looking up ${idea.topic}`);
 
     let reply: PacketReply;
     let searched = false;
     let sources: Citation[];
     try {
-      const result = await this.request(id, idea, artifacts);
+      const result = await this.request(id, idea, read, artifacts);
       reply = result.reply;
       searched = result.searched;
       sources = result.sources;
@@ -216,9 +242,10 @@ export class ResearchRunner {
   private async request(
     id: string,
     idea: ResearchIdea,
+    read: Set<string>,
     artifacts: Artifact[],
   ): Promise<{ reply: PacketReply; sources: Citation[]; searched: boolean }> {
-    const functions = this.functions(id, artifacts);
+    const functions = this.functions(id, read, artifacts);
     const result = await this.model.grounded({
       label: RUNNER_TRACK_LABEL,
       system: loadPrompt(PROMPTS.researchPacket),
@@ -240,7 +267,7 @@ export class ResearchRunner {
     }
     return {
       reply: parsed.data,
-      sources: this.sources(id, parsed.data.sources, result.citations, result.searchedUrls),
+      sources: this.sources(id, parsed.data.sources, result.citations, result.searchedUrls, read),
       searched: result.searched,
     };
   }
@@ -260,6 +287,7 @@ export class ResearchRunner {
     listed: readonly unknown[],
     annotated: readonly Citation[],
     searchedUrls: readonly string[],
+    read: ReadonlySet<string>,
   ): Citation[] {
     const byUrl = new Map<string, Citation>();
     for (const citation of annotated) byUrl.set(citation.url, citation);
@@ -272,6 +300,14 @@ export class ResearchRunner {
         continue;
       }
       const named = one.data.url.trim();
+      // One of the group's own files (V3-009), which has no URL to resolve:
+      // the test is whether this search really read it.
+      const file = resolveKnowledgeCitation(named, read);
+      if (file !== undefined) {
+        const citation = knowledgeCitation(file);
+        if (!byUrl.has(citation.url)) byUrl.set(citation.url, citation);
+        continue;
+      }
       const url = resolveCitation(named, searched);
       if (url === undefined) {
         this.logger.warn(`[research] ${id} cited a page it never opened: ${named}`);
@@ -284,15 +320,53 @@ export class ResearchRunner {
   }
 
   /**
-   * `show_html`, or nothing when there is nowhere to write it.
+   * The tools on the table for one search: `search_knowledge` when the
+   * session has a knowledge folder (V3-009), `show_html` when there is
+   * somewhere to write a visual, and nothing at all when neither applies —
+   * which is the `web_search`-only request V2-013 measured.
    *
-   * The handler never throws, for the reason the answer agent's does not: a
-   * packet in words is a far better outcome than no packet because a table
-   * would not save.
+   * Neither handler ever throws, for the reason the answer agent's does not:
+   * a packet in words is a far better outcome than no packet because a table
+   * would not save or a file would not read.
    */
-  private functions(id: string, artifacts: Artifact[]) {
+  private functions(id: string, read: Set<string>, artifacts: Artifact[]) {
+    const tools = [...this.knowledgeTool(id, read), ...this.htmlTool(id, artifacts)];
+    return tools.length === 0 ? undefined : tools;
+  }
+
+  /** `search_knowledge`, or nothing when there are no files to search. */
+  private knowledgeTool(id: string, read: Set<string>): FunctionTool[] {
+    const knowledge = this.options.knowledge;
+    if (knowledge === undefined || knowledge === null) return [];
+    return [
+      {
+        name: SEARCH_KNOWLEDGE_TOOL,
+        description: searchKnowledgeDescription(knowledge.files()),
+        parameters: searchKnowledgeJsonSchema,
+        run: (args: unknown): string => {
+          const parsed = SearchKnowledgeArgsSchema.safeParse(args);
+          if (!parsed.success) {
+            const why = parsed.error.issues.map((issue) => issue.message).join("; ");
+            this.logger.warn(`[research] ${id} searched the files with nothing: ${why}`);
+            return `That search could not be run (${why}). Search again with a few words, or answer from the web instead.`;
+          }
+          const snippets = knowledge.search(parsed.data.query);
+          // Only a file the search really returned may be cited, exactly as
+          // only a page the web search returned may be (US-013).
+          for (const snippet of snippets) read.add(snippet.file);
+          this.logger.log(
+            `[research] ${id} searched the files for "${parsed.data.query}": ${snippets.length} line(s)`,
+          );
+          return renderKnowledgeResults(parsed.data.query, snippets);
+        },
+      },
+    ];
+  }
+
+  /** `show_html`, or nothing when there is nowhere to write it. */
+  private htmlTool(id: string, artifacts: Artifact[]): FunctionTool[] {
     const save = this.options.onArtifact;
-    if (save === undefined) return undefined;
+    if (save === undefined) return [];
     return [
       {
         name: SHOW_HTML_TOOL,

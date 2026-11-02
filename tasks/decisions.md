@@ -453,3 +453,64 @@ them with `turnsForLine`'s slack. An answer to any other turn is a false answer
 and the gate is zero. The capture also shows why no lexical rule could do this
 job: "glass hire" came back as **"glass higher"**, and "And how much of that
 would just be the glass higher?" is a follow-up only in context.
+
+## V3-009: the knowledge folder
+
+**The folder is read, not indexed.** `KNOWLEDGE_DIR` (default `knowledge/`,
+git-ignored at the root so `server/knowledge/` is not hidden too) is a handful
+of `.md`, `.txt` and `.csv` files, read whole at session start by
+`KnowledgeIndex.load` and searched by matching the query's content words
+against each line. No embeddings, which is what the PRD allows, and for a few
+kilobytes also the right answer: a group asking "when does Harborview renew"
+wants the line with those words on it. Two rules do the work that a bare
+`includes` would not — **a CSV row carries its header** (`Harborview
+Clinic,Pro,2027-03-01` means nothing without `customer,plan,renews_on`), and
+the query is reduced to content words first, so "when does the Harborview
+contract renew?" does not match every line that contains "the".
+`load` returns **`null`** for a folder that is missing *or* empty, because that
+is the one value every caller already branches on.
+
+**A file is a source with no URL, and it is resolved the same way a page is.**
+`knowledgeCitation("customers.csv")` is `{ url: "file:customers.csv", title:
+"file: customers.csv" }`, and only a file **this search actually read** may be
+cited — `resolveKnowledgeCitation` tolerates every spelling the model uses
+(`customers.csv`, `knowledge/customers.csv`, `file: Customers.CSV`) and rejects
+anything with a scheme, because it runs *before* US-013's URL resolution and
+`https://x.com/prices.csv` is a page. The card renders a file source as text
+rather than as a link: there is nothing for a reader to open.
+
+**The group's own records are checked before the web, and that is what makes
+one correction speakable at `normal`.** `Verifier` searches the folder with the
+room's own words (never the headline — US-013's lesson), and only when lines
+come back does it make one *ungrounded* Spark call against
+`prompts/verify-knowledge.md`. Anything but `wrong` — and a `wrong` naming no
+file we showed it, and a call that failed — falls straight through to the web
+check, so losing the knowledge half never costs the web half. A `wrong` sets
+`CandidateVerification.file`, which is the only thing that tells the two kinds
+of correction apart downstream, and `spokenCorrectionAllowed` adds exactly one
+cell to V3-008's table: `normal/factual_error/interject`. `cautious` is still
+silent and a web-verified error still needs `bold`. The reasoning is the
+read-back's: a group's own sheet quoted back is their sentence, they can check
+it in ten seconds, and nothing on the web could have settled it.
+
+**Measured on the real model** (`server/knowledge/knowledge.integration.test.ts`,
+two calls, ~17 s): the renewal question came back in **7.8 s** citing
+`file:customers.csv` with "Harborview Clinic renews March 1, 2027" and a spoken
+line of "Harborview Clinic renews March first, twenty twenty-seven" — a year
+spelled out because the line is written to be *heard*, which is worth knowing
+before asserting on digits. The `$49` claim was settled by `notes.md` with no
+web search at all, and said at boldness `normal` as "From notes.md: the notes
+have Pro at $40 a seat a month on the list price sheet."
+
+**The lead-in is dropped when the correction already names the file.** Asked
+for the file's own phrasing the model sometimes writes the file name into the
+sentence ("notes.md has Pro at $40"), and `From notes.md: notes.md has…` says
+it twice; `fileCorrectionLine` uses such a sentence as the whole line. The
+prompt now asks for the record's human name ("the price sheet", "the customer
+list") instead, since the file name is attached separately.
+
+**The eval, the e2e and the shadow run get no folder.** `createKnowledge`
+defaults to none, exactly as `createVoice` and `createGlimmer` do, so `npm
+test` reads nothing off the disk and a replay's result never depends on what
+happens to be in `knowledge/` on this Mac. `server/app.ts` is the one place
+that loads it.

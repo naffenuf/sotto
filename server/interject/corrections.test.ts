@@ -15,6 +15,7 @@ import {
   CORRECTION_TYPES,
   correctedClaim,
   correctionLine,
+  fileCorrectionLine,
   isCorrection,
   spokenCorrection,
   spokenCorrectionAllowed,
@@ -78,6 +79,8 @@ describe("the five corrections", () => {
   });
 
   it("says none of them out loud, at any boldness — bar the one exception", () => {
+    // A web-verified correction: V3-009's softening needs a file, so this
+    // table is the one V3-008 shipped.
     const spoken: string[] = [];
     for (const boldness of boldnessLevels) {
       for (const type of CORRECTION_TYPES) {
@@ -93,6 +96,37 @@ describe("the five corrections", () => {
       }
     }
     expect(spoken).toEqual(["bold/factual_error/interject"]);
+  });
+
+  it("adds exactly one cell when the group's own files settled it (V3-009)", () => {
+    const spoken: string[] = [];
+    for (const boldness of boldnessLevels) {
+      for (const type of CORRECTION_TYPES) {
+        for (const level of ["interject", "glow"] as const) {
+          const allowed = spokenCorrectionAllowed({
+            boldness,
+            type,
+            verified: true,
+            level,
+            file: "prices.csv",
+          });
+          if (allowed) spoken.push(`${boldness}/${type}/${level}`);
+        }
+      }
+    }
+    // `normal` joins `bold`; `cautious` is still silent, and a glow is still
+    // the level the budget downgraded to.
+    expect(spoken).toEqual(["normal/factual_error/interject", "bold/factual_error/interject"]);
+    // An empty file name is no file: the model left it blank.
+    expect(
+      spokenCorrectionAllowed({
+        boldness: "normal",
+        type: "factual_error",
+        verified: true,
+        level: "interject",
+        file: "",
+      }),
+    ).toBe(false);
   });
 
   it("will not speak a factual error the web check never confirmed", () => {
@@ -111,6 +145,50 @@ describe("spokenCorrection", () => {
     expect(spokenCorrection(interjection())).toBe(
       "Quick correction: Instagram launched in 2010, not 2014.",
     );
+  });
+
+  it("reads the group's own file back, named, at the default boldness", () => {
+    const fromFile = interjection({
+      boldness: "normal",
+      candidate: {
+        headline: "Pro is $40 a seat, not $49",
+        verification: {
+          verdict: "wrong",
+          correction: "the price sheet has Pro at $40 a seat",
+          citations: [{ url: "file:prices.csv", title: "file: prices.csv" }],
+          searched: false,
+          file: "prices.csv",
+        },
+      },
+    });
+    // The file's words, under the file's name — not Sotto's headline.
+    expect(spokenCorrection(fromFile)).toBe(
+      "From prices.csv: the price sheet has Pro at $40 a seat.",
+    );
+    expect(fileCorrectionLine("prices.csv", "it is $40.")).toBe("From prices.csv: it is $40.");
+    // Measured: the model sometimes writes the file name into the sentence,
+    // and the lead-in would then say it twice.
+    expect(fileCorrectionLine("notes.md", "notes.md has Pro at $40 a seat")).toBe(
+      "Notes.md has Pro at $40 a seat.",
+    );
+    expect(fileCorrectionLine("prices.csv", "  ")).toBe("");
+    expect(fileCorrectionLine(" ", "it is $40")).toBe("");
+  });
+
+  it("stays silent about a file-backed correction in a cautious session", () => {
+    const fromFile = interjection({
+      boldness: "cautious",
+      candidate: {
+        verification: {
+          verdict: "wrong",
+          correction: "the price sheet has Pro at $40 a seat",
+          citations: [],
+          searched: false,
+          file: "prices.csv",
+        },
+      },
+    });
+    expect(spokenCorrection(fromFile)).toBeNull();
   });
 
   it("gives every other session nothing", () => {

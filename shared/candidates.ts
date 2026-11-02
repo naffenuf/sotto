@@ -360,7 +360,7 @@ export function correctedDetail(detail: string, correction: string): string {
   return `${detail}\n\n${CORRECTION_LABEL} ${checked}`;
 }
 
-/** One claim, checked against the web. */
+/** One claim, checked against the group's own files or against the web. */
 export interface CandidateVerification {
   verdict: VerificationVerdict;
   /** The right fact, when the verdict is `wrong`. Empty otherwise. */
@@ -377,6 +377,16 @@ export interface CandidateVerification {
    * way is worth telling apart from a grounded one in the log.
    */
   searched: boolean;
+  /**
+   * The group's own file that settled it (V3-009), when one did.
+   *
+   * Present means the knowledge folder was checked *before* the web and
+   * contradicted the claim, which is the one correction Sotto may say at
+   * boldness `normal`: a group's own record quoted back is the same move as
+   * a read-back, not a stranger with a search engine. Absent means the web
+   * decided it, and V3-008's `bold`-only rule applies.
+   */
+  file?: string;
 }
 
 /**
@@ -635,6 +645,57 @@ export const verificationJsonSchema = {
     },
   },
   required: ["verdict", "correction", "citations"],
+  additionalProperties: false,
+} as const;
+
+/** The `json_schema.name` a knowledge check sends (V3-009). */
+export const KNOWLEDGE_VERIFICATION_SCHEMA_NAME = "file_verification";
+
+/**
+ * The reply when a claim is checked against the group's own files (V3-009).
+ *
+ * The same three questions the web check answers, plus the one thing only
+ * this check can say: **which file** settled it. A verdict with no file is
+ * read as `unclear` by the verifier — a correction the group cannot trace to
+ * one of their own records is exactly what the web check is for.
+ */
+export const KnowledgeVerificationReplySchema = z.strictObject({
+  verdict: z.enum(verificationVerdicts),
+  correction: z.string().transform((text) => clipWords(oneLine(text), CORRECTION_MAX_WORDS)),
+  file: z.string().transform((name) => oneLine(name)),
+});
+
+/**
+ * {@link KnowledgeVerificationReplySchema} as a JSON Schema, in the subset
+ * strict structured output accepts. Kept honest by
+ * `shared/candidates.test.ts`, like its web sibling.
+ */
+export const knowledgeVerificationJsonSchema = {
+  type: "object",
+  properties: {
+    verdict: {
+      type: "string",
+      description:
+        "wrong: one of the files says something different from the claim, plainly enough to read out. " +
+        "right: the files agree with the claim. " +
+        "unclear: the files do not settle it — say this whenever you are reaching.",
+      enum: [...verificationVerdicts],
+    },
+    correction: {
+      type: "string",
+      description:
+        `When the verdict is wrong: what the file says, in at most ${CORRECTION_MAX_WORDS} words, ` +
+        `as one sentence a person could say out loud, phrased as the file's own ` +
+        `("the price sheet has that at $49"). Empty string for any other verdict.`,
+    },
+    file: {
+      type: "string",
+      description:
+        "The name of the one file the verdict rests on, exactly as it was given to you " +
+        "(\"prices.csv\"). Empty string when no file settles it.",
+    },
+  },
+  required: ["verdict", "correction", "file"],
   additionalProperties: false,
 } as const;
 

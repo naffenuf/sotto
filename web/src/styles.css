@@ -1058,6 +1058,13 @@ body {
   text-underline-offset: 0.1875rem;
 }
 
+/* V3-009: one of the group's own files. Named, never linked — there is no
+   page to open — so it reads as a source without inviting a click. */
+.card__source-file {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
 .card__sources {
   margin: 0.875rem 0 0;
   padding: 0;

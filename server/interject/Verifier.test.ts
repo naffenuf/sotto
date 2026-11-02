@@ -1,12 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   CORRECTION_LABEL,
   type Candidate,
   type VerificationLogRecord,
 } from "../../shared/candidates.js";
 import { SimulatedClock } from "../clock.js";
-import type { GroundedCall, GroundedReply, ModelClient } from "../model/client.js";
-import { VERIFY_MAX_TOKENS, VERIFY_TRACK_LABEL, Verifier, renderVerificationRequest } from "./Verifier.js";
+import { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
+import type {
+  GroundedCall,
+  GroundedReply,
+  ModelClient,
+  StructuredCall,
+} from "../model/client.js";
+import {
+  KNOWLEDGE_TRACK_LABEL,
+  KNOWLEDGE_VERIFY_MAX_TOKENS,
+  VERIFY_MAX_TOKENS,
+  VERIFY_TRACK_LABEL,
+  Verifier,
+  claimText,
+  renderKnowledgeVerificationRequest,
+  renderVerificationRequest,
+} from "./Verifier.js";
 
 /** A grounded reply, with everything the tests do not care about defaulted. */
 function reply(overrides: Partial<GroundedReply> & { value: unknown }): GroundedReply {
@@ -395,5 +413,178 @@ describe("renderVerificationRequest", () => {
     expect(renderVerificationRequest(candidate({ whyNow: "  " }))).not.toContain(
       "## Why it matters here",
     );
+  });
+});
+
+/**
+ * V3-009: the group's own files, asked before the web.
+ *
+ * The folder is a real one under `os.tmpdir()` rather than a stub, because
+ * {@link KnowledgeIndex} is what decides whether a call is made at all — a
+ * fake that always returns a snippet would hide the free case.
+ */
+describe("the knowledge check in front of the web one", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "sotto-verify-files-"));
+    writeFileSync(
+      join(dir, "prices.csv"),
+      ["plan,price_per_seat_monthly_usd", "Pro,40", "Starter,15"].join("\n"),
+    );
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** The claim the price sheet contradicts. */
+  function priced(): Candidate {
+    return candidate({
+      id: "cand-9",
+      headline: "Pro is $40 a seat, not $49",
+      evidence: [{ turnId: "0:7", speaker: "A", quote: "Pro is $49 a seat a month.", }],
+    });
+  }
+
+  interface FileHarness extends Harness {
+    structuredCalls: StructuredCall[];
+  }
+
+  function fileHarness(
+    files: unknown[],
+    grounded: (() => Promise<GroundedReply>)[] = [],
+  ): FileHarness {
+    const clock = new SimulatedClock(0);
+    const base = new FakeModel(grounded);
+    const structuredCalls: StructuredCall[] = [];
+    const records: VerificationLogRecord[] = [];
+    const verified: Candidate[] = [];
+    const warnings: string[] = [];
+    const model: ModelClient = {
+      structured: async (call: StructuredCall) => {
+        structuredCalls.push(call);
+        const next = files.shift();
+        if (next === undefined) throw new Error("unexpected file check");
+        if (next instanceof Error) throw next;
+        return next;
+      },
+      prose: () => base.prose(),
+      grounded: (call: GroundedCall) => base.grounded(call),
+    };
+    const verifier = new Verifier({
+      clock,
+      model,
+      knowledge: KnowledgeIndex.load(dir, { logger: { log: () => {}, warn: () => {} } }),
+      onRecord: (record) => records.push(record),
+      onVerified: (candidate) => verified.push(candidate),
+      logger: { log: () => {}, warn: (text: string) => warnings.push(text) },
+    });
+    return { clock, model: base, verifier, records, verified, states: [], warnings, structuredCalls };
+  }
+
+  it("settles a claim the price sheet contradicts, without touching the web", async () => {
+    const harness = fileHarness([
+      { verdict: "wrong", correction: "the price sheet has Pro at $40 a seat", file: "prices.csv" },
+    ]);
+    harness.verifier.verify(priced());
+    await harness.verifier.flush();
+
+    // No grounded call at all: the files answered it.
+    expect(harness.model.calls).toEqual([]);
+    const call = harness.structuredCalls[0] as StructuredCall;
+    expect(call.label).toBe(KNOWLEDGE_TRACK_LABEL);
+    expect(call.maxTokens).toBe(KNOWLEDGE_VERIFY_MAX_TOKENS);
+    // The room's own words, and the file's line, and nothing about the web.
+    expect(call.user).toContain("Pro is $49 a seat a month.");
+    expect(call.user).toContain("prices.csv");
+    expect(call.user).toContain("Pro,40");
+
+    const verified = harness.verified[0];
+    expect(verified?.verification?.verdict).toBe("wrong");
+    expect(verified?.verification?.file).toBe("prices.csv");
+    expect(verified?.verification?.searched).toBe(false);
+    expect(verified?.citations).toEqual([{ url: "file:prices.csv", title: "file: prices.csv" }]);
+    expect(verified?.detail).toContain("the price sheet has Pro at $40 a seat");
+    expect(harness.records[0]?.outcome).toBe("verified");
+    expect(harness.records).toHaveLength(1);
+  });
+
+  it("falls through to the web when the files do not settle it", async () => {
+    const harness = fileHarness(
+      [{ verdict: "unclear", correction: "", file: "" }],
+      [async () => reply({ value: verdict("right") })],
+    );
+    harness.verifier.verify(priced());
+    await harness.verifier.flush();
+
+    expect(harness.structuredCalls).toHaveLength(1);
+    expect(harness.model.calls).toHaveLength(1);
+    // One check, one record: the knowledge half is not a verdict of its own.
+    expect(harness.records).toHaveLength(1);
+    expect(harness.records[0]?.outcome).toBe("unverified");
+    expect(harness.records[0]?.verification?.file).toBeUndefined();
+  });
+
+  it("falls through when the files agree with the claim", async () => {
+    const harness = fileHarness(
+      [{ verdict: "right", correction: "", file: "prices.csv" }],
+      [async () => reply({ value: verdict("unclear") })],
+    );
+    harness.verifier.verify(priced());
+    await harness.verifier.flush();
+    expect(harness.model.calls).toHaveLength(1);
+  });
+
+  it("falls through when the verdict names no file we showed it", async () => {
+    const harness = fileHarness(
+      [{ verdict: "wrong", correction: "the sheet says $40", file: "revenue.csv" }],
+      [async () => reply({ value: verdict("right") })],
+    );
+    harness.verifier.verify(priced());
+    await harness.verifier.flush();
+    expect(harness.model.calls).toHaveLength(1);
+    expect(harness.verified).toEqual([]);
+    expect(harness.warnings.join(" ")).toContain("without a usable file");
+  });
+
+  it("falls through when the file check itself fails", async () => {
+    const harness = fileHarness(
+      [new Error("ollama is asleep")],
+      [async () => reply({ value: verdict("right") })],
+    );
+    harness.verifier.verify(priced());
+    await harness.verifier.flush();
+    // Losing the knowledge half must never cost the web half, and it is not
+    // recorded as a failed check: the claim was still checked.
+    expect(harness.model.calls).toHaveLength(1);
+    expect(harness.records[0]?.outcome).toBe("unverified");
+    expect(harness.warnings.join(" ")).toContain("the file check failed");
+  });
+
+  it("makes no call at all when the folder knows nothing about the claim", async () => {
+    const harness = fileHarness([], [async () => reply({ value: verdict("right") })]);
+    harness.verifier.verify(
+      candidate({ evidence: [{ turnId: "0:3", quote: "The tide turns at four." }] }),
+    );
+    await harness.verifier.flush();
+    expect(harness.structuredCalls).toEqual([]);
+    expect(harness.model.calls).toHaveLength(1);
+  });
+
+  it("searches the folder with the room's words, not with Sotto's correction", () => {
+    // The headline states the correction, so searching for it looks for the
+    // fact Sotto believes rather than the one the files might disagree with.
+    expect(claimText(priced())).toBe("Pro is $49 a seat a month.");
+    expect(claimText(candidate({ evidence: [] }))).toContain("Instagram launched in 2010");
+  });
+
+  it("leads the request with the words and the files, in that order", () => {
+    const text = renderKnowledgeVerificationRequest(priced(), [
+      { file: "prices.csv", line: 2, text: "plan,price_per_seat_monthly_usd | Pro,40" },
+    ]);
+    expect(text.indexOf("## What was said")).toBeLessThan(text.indexOf("## The group's own files"));
+    expect(text).toContain("**prices.csv** (line 2)");
+    expect(text).not.toContain("web");
   });
 });

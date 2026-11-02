@@ -30,6 +30,8 @@ export const PROMPTS = {
   researchPacket: "research-packet",
   /** Checking a claim against the web before raising it (US-013). */
   verify: "verify",
+  /** Checking a claim against the group's own files, before the web (V3-009). */
+  verifyKnowledge: "verify-knowledge",
   /** Answering a question somebody asked Sotto out loud (US-018). */
   answer: "answer",
   /** The holding sentence said while a searched answer is written (V2-008c). */

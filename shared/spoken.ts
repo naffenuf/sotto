@@ -187,6 +187,15 @@ export interface SpokenContributionRecord {
   bargedIn?: boolean;
   /** True on an answer that was cut off and will be tried again (V3-004). */
   retrying?: boolean;
+  /**
+   * The group's own file a `correction` came out of (V3-009), when one did.
+   *
+   * Recorded rather than derived because it is the one thing that tells the
+   * two kinds of correction apart after the fact: a file-backed one is the
+   * only correction Sotto says at the default boldness, so the shadow report
+   * and the live checkpoint count it separately from a web-verified one.
+   */
+  fromFile?: string;
   /** What the room actually heard, when that is less than {@link text}. */
   heard?: string;
   /** Why nothing was said, when nothing was. */

@@ -86,6 +86,8 @@ export type {
   ListedSource,
 } from "./answers.js";
 export { NOTICE_CARD_IDS, cardStates, cardVariants } from "./cards.js";
+/** V3-009: a source that is one of the group's own files, not a page. */
+export { KNOWLEDGE_CITATION_PREFIX, isKnowledgeCitation } from "./knowledge.js";
 export type {
   CardArtifact,
   CardState,

@@ -19,10 +19,11 @@ import {
 import { EventBus } from "./events/bus.js";
 import { listFixtures } from "./fixtures.js";
 import { SessionManager, SessionStartError } from "./session/SessionManager.js";
+import { KnowledgeIndex } from "./knowledge/KnowledgeIndex.js";
 import { glimmerFromEnv } from "./model/GlimmerClient.js";
 import { listHistory, readHistory } from "./session/history.js";
 import { VoiceTestRequestSchema, type VoiceActionResponse } from "../shared/voice.js";
-import { loadElevenLabsApiKey, loadSottoVoiceId } from "./config.js";
+import { loadElevenLabsApiKey, loadKnowledgeDir, loadSottoVoiceId } from "./config.js";
 import { Speaker } from "./voice/Speaker.js";
 import { VoiceHub } from "./voice/VoiceHub.js";
 
@@ -63,6 +64,10 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       // read here rather than inside the session manager so a test that
       // builds its own never reaches the local server.
       createGlimmer: () => glimmerFromEnv(),
+      // V3-009: the group's own files, read at the start of every session.
+      // `.env` is read here for the same reason Glimmer's is — a test that
+      // builds its own session manager reads nothing off the disk.
+      createKnowledge: () => KnowledgeIndex.load(loadKnowledgeDir()),
     });
 
   await app.register(websocket);

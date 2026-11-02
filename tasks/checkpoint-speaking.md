@@ -72,6 +72,20 @@ Not changed, and noted for the next run: a plain interruption (no name) does not
 by V2-007's design; both "not now"s did. And one `question` classification in nine timed out at
 6 s and fell back, V3-002's known one-in-forty.
 
+## File-backed corrections (V3-009)
+
+Not exercised: this session ran before the knowledge folder existed, and there was no
+`knowledge/` folder on the machine, so every check the verifier made went to the web.
+
+A file-backed correction is the one correction Sotto says out loud at the default
+boldness, so a re-run with a knowledge folder records them **separately from the table
+above**: a `spoken_contribution` line with `kind: "correction"` and a `fromFile` naming
+the file (`timing.jsonl`), and the matching `verification` line in `candidates.jsonl`
+whose `verification.file` is set and `searched` is false. The question to answer about one
+is not "was it welcome" but the sharper version: *did quoting our own file back land like
+a colleague checking the sheet, or like being contradicted?* Everything in the table above
+is a web-verified correction or an answer, and those keep V3-008's `bold`-only rule.
+
 ## Would you leave it on?
 
 Craig: "We have to — it's the core feature of the app. It will take lots of tweaking. So yes."

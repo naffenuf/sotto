@@ -20,6 +20,9 @@ import {
   correctedDetail,
   observerCandidatesJsonSchema,
   verificationJsonSchema,
+  KNOWLEDGE_VERIFICATION_SCHEMA_NAME,
+  KnowledgeVerificationReplySchema,
+  knowledgeVerificationJsonSchema,
   verificationVerdicts,
 } from "./candidates.js";
 
@@ -288,6 +291,49 @@ describe("verificationJsonSchema", () => {
   it("states the limit it cannot express as a keyword", () => {
     const properties = verificationJsonSchema.properties as Record<string, JsonSchemaNode>;
     expect(properties.correction?.description).toContain(String(CORRECTION_MAX_WORDS));
+  });
+});
+
+describe("knowledgeVerificationJsonSchema (V3-009)", () => {
+  it("is named, closed and fully required all the way down", () => {
+    expect(KNOWLEDGE_VERIFICATION_SCHEMA_NAME).toBe("file_verification");
+    for (const { path, node } of walk(knowledgeVerificationJsonSchema)) {
+      for (const keyword of unsupportedKeywords) {
+        expect(node[keyword], `${path} uses ${keyword}`).toBeUndefined();
+      }
+      if (node.type !== "object") continue;
+      expect(node.additionalProperties, `${path} is open`).toBe(false);
+      const properties = Object.keys(node.properties as JsonSchemaNode);
+      expect(node.required, `${path} does not require every property`).toEqual(properties);
+    }
+  });
+
+  it("offers the same verdicts the web check does", () => {
+    const verdict = (knowledgeVerificationJsonSchema.properties as Record<string, JsonSchemaNode>)
+      .verdict!;
+    expect(verdict.enum).toEqual([...verificationVerdicts]);
+  });
+
+  it("describes a reply zod then accepts, with every field required", () => {
+    const full = sample(knowledgeVerificationJsonSchema as unknown as JsonSchemaNode);
+    expect(KnowledgeVerificationReplySchema.safeParse(full).success).toBe(true);
+    for (const key of Object.keys(full)) {
+      const { [key]: _dropped, ...without } = full;
+      expect(
+        KnowledgeVerificationReplySchema.safeParse(without).success,
+        `${key} is optional`,
+      ).toBe(false);
+    }
+  });
+
+  it("asks for the file by name, and for the file's own phrasing", () => {
+    const properties = knowledgeVerificationJsonSchema.properties as Record<
+      string,
+      JsonSchemaNode
+    >;
+    expect(properties.correction?.description).toContain(String(CORRECTION_MAX_WORDS));
+    expect(properties.correction?.description).toContain("the price sheet has that at $49");
+    expect(properties.file?.description).toContain("one file");
   });
 });
 

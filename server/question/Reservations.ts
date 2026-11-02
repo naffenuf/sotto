@@ -309,6 +309,11 @@ interface Pending {
   cardId?: string;
   /** The packet an `offer` is offering (V3-005). */
   packetId?: string;
+  /**
+   * The group's own file a `correction` came out of (V3-009). Present lowers
+   * the boldness this line needs from `bold` to `normal`.
+   */
+  fromFile?: string;
 }
 
 export class Reservations {
@@ -440,9 +445,10 @@ export class Reservations {
 
   /**
    * One of Sotto's own corrections may be said out loud (PRD V3-008): a
-   * `factual_error` the web check came back `wrong` on, at boldness `bold`,
-   * delivered as a full interject. Everything else Sotto notices about the
-   * conversation is a card and stays one.
+   * `factual_error` the check came back `wrong` on, at boldness `bold` — or
+   * at `normal` when it was one of the group's *own files* that contradicted
+   * it (V3-009) — delivered as a full interject. Everything else Sotto
+   * notices about the conversation is a card and stays one.
    *
    * It is queued exactly as an answer is — {@link SPEAK_PAUSE_MS}, the cached
    * still-current verdict, one retry after a voice in the room cuts it off,
@@ -458,6 +464,8 @@ export class Reservations {
     headline: string;
     /** The sentence, written by `correctionLine` in `server/interject`. */
     text: string;
+    /** The group's own file that settled it, when one did (V3-009). */
+    fromFile?: string;
   }): void {
     if (this.stopped || input.text.trim() === "") return;
     if (this.corrections.has(input.candidateId)) return;
@@ -479,6 +487,7 @@ export class Reservations {
       },
       turnsWaited: 0,
       yields: 0,
+      ...(input.fromFile === undefined ? {} : { fromFile: input.fromFile }),
     });
     this.review();
   }
@@ -972,7 +981,13 @@ export class Reservations {
     // under to still be there — the header can turn it down mid-wait.
     const boldness = this.options.settings().boldness;
     if (boldness === "cautious") return "boldness";
-    if (line.kind === "correction" && boldness !== "bold") return "boldness";
+    // V3-009: a correction out of the group's own files is said at `normal`
+    // too, because it is their own record read back rather than Sotto's
+    // reading of the world. Re-read here, so turning the header down
+    // mid-wait still silences a web-verified one.
+    if (line.kind === "correction" && boldness !== "bold" && (line.fromFile ?? "") === "") {
+      return "boldness";
+    }
     // A read-back with nothing on it is a courtesy rather than a
     // contribution, so only a session asked to speak up `often` says one; the
     // decision lands on the board at every setting (V3-013).
@@ -1089,6 +1104,7 @@ export class Reservations {
       spoken: true,
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
+      ...(line.fromFile === undefined ? {} : { fromFile: line.fromFile }),
       ...(line.cardId === undefined ? {} : { cardId: line.cardId }),
       ...(line.packetId === undefined ? {} : { packetId: line.packetId }),
       ...(line.kind === "readback" ? readBackFields(line) : {}),
@@ -1147,6 +1163,7 @@ export class Reservations {
       spoken: false,
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
+      ...(line.fromFile === undefined ? {} : { fromFile: line.fromFile }),
       ...(line.cardId === undefined ? {} : { cardId: line.cardId }),
       ...(line.packetId === undefined ? {} : { packetId: line.packetId }),
       ...(line.kind === "readback" ? readBackFields(line) : {}),

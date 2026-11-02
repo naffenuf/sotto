@@ -93,15 +93,27 @@ function spokenSection(run: ShadowRunRecord): string {
       `That is the designed answer at ${policySettingsLabel(run.settings)} rather than` +
       ` a gap: it speaks unasked only to answer something the room wondered aloud and` +
       ` it could look up (V3-002, V3-004), to read back a decision at frequency` +
-      ` \`often\` (V3-013), or to correct a verified factual error at boldness \`bold\`` +
-      ` (V3-008). Everything else it noticed is in the two sections below. Run it again` +
+      ` \`often\` (V3-013), to correct a verified factual error at boldness \`bold\`` +
+      ` (V3-008), or — at any boldness but \`cautious\` — to read back what one of the` +
+      ` group's own files says when it contradicts a claim, if there is a knowledge` +
+      ` folder (V3-009). Everything else it noticed is in the two sections below. Run it again` +
       ` with \`--frequency often --boldness bold\` to read what the most forward` +
       ` settings would have produced.`
     );
   }
   const said = run.spoken.filter((one) => one.record.spoken).length;
+  // V3-009: a correction out of the group's own files is the only one Sotto
+  // says at the default boldness, so it is counted apart from a web-verified
+  // one rather than read as "Sotto corrected somebody".
+  const fromFiles = run.spoken.filter((one) => (one.record.fromFile ?? "") !== "");
   const blocks = [
-    `${run.spoken.length} unprompted line(s) reached a decision; ${said} would have been said.`,
+    `${run.spoken.length} unprompted line(s) reached a decision; ${said} would have been said.` +
+      (fromFiles.length === 0
+        ? ""
+        : ` ${fromFiles.length} of them came out of the group's own files` +
+          ` (${[...new Set(fromFiles.map((one) => one.record.fromFile))].join(", ")}),` +
+          ` which is the one correction spoken at boldness \`normal\` (V3-009) —` +
+          ` read those first.`),
   ];
   run.spoken.forEach((one, index) => {
     blocks.push(spokenBlock(one, index + 1));
@@ -150,6 +162,12 @@ function details(one: ShadowSpoken): string {
         (current.latencyMs === 0 ? "no call made" : `${seconds(current.latencyMs)} call`) +
         `${current.fallback ? ", fallback" : ""}`,
   );
+  if ((record.fromFile ?? "") !== "") {
+    bullets.push(
+      `- From the group's own files: \`${record.fromFile}\` — a file-backed correction,` +
+        ` which is said at boldness \`normal\` where a web-verified one needs \`bold\` (V3-009)`,
+    );
+  }
   if (record.attached !== undefined && record.attached !== null) {
     bullets.push(`- Attached: the ${record.attached === "group" ? "group's own" : "its own"} open question`);
   }

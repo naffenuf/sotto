@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Artifact } from "../../shared/artifacts.js";
 import { SHOW_HTML_TOOL } from "../../shared/artifacts.js";
 import {
@@ -7,7 +10,9 @@ import {
   type ResearchIdea,
   type ResearchPacketRecord,
 } from "../../shared/research.js";
+import { SEARCH_KNOWLEDGE_TOOL } from "../../shared/knowledge.js";
 import { SimulatedClock } from "../clock.js";
+import { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
 import {
   ModelCallError,
   type GroundedCall,
@@ -87,7 +92,10 @@ interface Harness {
   wallClock: SimulatedClock;
 }
 
-function harness(replies: Reply[], options: { artifacts?: "none" | "fails" } = {}): Harness {
+function harness(
+  replies: Reply[],
+  options: { artifacts?: "none" | "fails"; knowledge?: string } = {},
+): Harness {
   const clock = new SimulatedClock(60_000);
   const wallClock = new SimulatedClock(1_000);
   const model = new FakeModel(replies);
@@ -114,6 +122,9 @@ function harness(replies: Reply[], options: { artifacts?: "none" | "fails" } = {
             };
           },
         }),
+    ...(options.knowledge === undefined
+      ? {}
+      : { knowledge: KnowledgeIndex.load(options.knowledge, { logger: quiet }) }),
   });
   return { runner, model, records, written, saved, clock, wallClock };
 }
@@ -388,5 +399,109 @@ describe("a packet for a question the room wondered aloud (V3-003)", () => {
 
     expect(records[0]?.outcome).toBe("unsourced");
     expect(records[0]?.questionToPacketMs).toBe(15_000);
+  });
+});
+
+/**
+ * V3-009: the group's own files on the table beside `web_search`.
+ */
+describe("ResearchRunner and the knowledge folder", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "sotto-runner-files-"));
+    writeFileSync(
+      join(dir, "customers.csv"),
+      ["customer,renews_on", "Harborview Clinic,2027-03-01"].join("\n"),
+    );
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const renewal = (): ResearchIdea =>
+    idea({
+      id: "idea-9",
+      topic: "Harborview renewal",
+      question: "When does the Harborview Clinic contract renew?",
+    });
+
+  it("declares search_knowledge first, and names the files in its description", async () => {
+    const { runner, model } = harness(
+      [() => Promise.resolve(reply({ value: packetReply() }))],
+      { knowledge: dir },
+    );
+    await runner.run(renewal());
+
+    const tools = (model.calls[0] as GroundedCall).functions ?? [];
+    expect(tools.map((tool) => tool.name)).toEqual([SEARCH_KNOWLEDGE_TOOL, SHOW_HTML_TOOL]);
+    expect(tools[0]?.description).toContain("customers.csv");
+  });
+
+  it("declares nothing when there is no folder and nowhere to draw", async () => {
+    const { runner, model } = harness([() => Promise.resolve(reply({ value: packetReply() }))], {
+      artifacts: "none",
+    });
+    await runner.run(renewal());
+    expect((model.calls[0] as GroundedCall).functions).toBeUndefined();
+  });
+
+  it("cites a file the search really read, as `file: <name>`", async () => {
+    const { runner, records } = harness(
+      [
+        async (call) => {
+          const tool = call.functions?.find((one) => one.name === SEARCH_KNOWLEDGE_TOOL);
+          const result = await tool?.run({ query: "Harborview renewal" });
+          expect(result).toContain("2027-03-01");
+          return reply({
+            value: packetReply({
+              title: "Harborview Clinic renews on 1 March 2027",
+              spokenAnswer: "Harborview renews on the first of March 2027.",
+              sources: [{ url: "file: customers.csv", title: "customers.csv" }],
+            }),
+            searchedUrls: [],
+            searched: false,
+          });
+        },
+      ],
+      { knowledge: dir },
+    );
+
+    const packet = await runner.run(renewal());
+    expect(packet?.sources).toEqual([{ url: "file:customers.csv", title: "file: customers.csv" }]);
+    expect(packet?.spokenAnswer).toBe("Harborview renews on the first of March 2027.");
+    expect(records[0]?.outcome).toBe("ready");
+  });
+
+  it("drops a file the search never returned, as it drops an unopened page", async () => {
+    const { runner, records } = harness(
+      [
+        async () =>
+          // Never searched the files, so nothing may be cited from them.
+          reply({
+            value: packetReply({ sources: [{ url: "file: revenue.csv", title: "revenue.csv" }] }),
+            searchedUrls: [],
+          }),
+      ],
+      { knowledge: dir },
+    );
+    expect(await runner.run(renewal())).toBeNull();
+    expect(records[0]?.outcome).toBe("unsourced");
+  });
+
+  it("tells the model in words when a search cannot be run", async () => {
+    const { runner } = harness(
+      [
+        async (call) => {
+          const tool = call.functions?.find((one) => one.name === SEARCH_KNOWLEDGE_TOOL);
+          expect(await tool?.run({ query: "   " })).toContain("could not be run");
+          expect(await tool?.run({})).toContain("could not be run");
+          return reply({ value: packetReply() });
+        },
+      ],
+      { knowledge: dir },
+    );
+    expect(await runner.run(renewal())).not.toBeNull();
   });
 });

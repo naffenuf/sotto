@@ -1,0 +1,9 @@
+customer,plan,seats,annual_value_usd,renews_on,owner,notes
+Harborview Clinic,Pro,45,21600,2027-03-01,Priya,Fictional. Renewed once. Wants SSO before they sign again.
+Calder & Fennimore,Team,12,4320,2026-12-15,Dan,Fictional. Paying monthly until renewal.
+Brightsend Logistics,Enterprise,310,186000,2027-07-01,Priya,"Fictional. Biggest account. Procurement review every renewal."
+Mapleford Schools Trust,Team,60,21600,2026-11-30,Erin,Fictional. Budget year ends in August.
+Oakhurst Dental,Starter,6,1080,2027-01-20,Dan,Fictional. Signed last month.
+Tessellate Studio,Pro,20,9600,2026-12-01,Erin,Fictional. Asked twice about the usage cap.
+Nordgren Freight,Pro,38,18240,2027-05-12,Priya,Fictional. Churn risk — two support escalations.
+Quillhaven Media,Starter,4,720,2027-02-28,Erin,Fictional. Came in through the website.

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_KNOWLEDGE_DIR } from "../shared/knowledge.js";
 import {
   DEFAULT_PORT,
   HOST,
   loadConfig,
+  loadKnowledgeDir,
   loadSottoVoiceId,
   MissingApiKeyError,
 } from "./config.js";
@@ -46,5 +48,18 @@ describe("loadSottoVoiceId", () => {
 
   it("honours ELEVENLABS_VOICE_ID", () => {
     expect(loadSottoVoiceId({ ELEVENLABS_VOICE_ID: "custom-voice" })).toBe("custom-voice");
+  });
+});
+
+describe("loadKnowledgeDir", () => {
+  it("falls back to the default folder, which may not exist", () => {
+    expect(loadKnowledgeDir({})).toBe(DEFAULT_KNOWLEDGE_DIR);
+    expect(loadKnowledgeDir({ KNOWLEDGE_DIR: "  " })).toBe(DEFAULT_KNOWLEDGE_DIR);
+  });
+
+  it("honours KNOWLEDGE_DIR", () => {
+    expect(loadKnowledgeDir({ KNOWLEDGE_DIR: "fixtures/knowledge-demo" })).toBe(
+      "fixtures/knowledge-demo",
+    );
   });
 });

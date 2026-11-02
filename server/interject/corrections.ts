@@ -23,6 +23,16 @@
  *   speaking one would ask for a floor the frequency setting has already
  *   said is not there.
  *
+ * **And one softening of it (V3-009).** When what contradicted the claim was
+ * one of the group's *own files* rather than a page on the web, the same
+ * correction may be said at boldness `normal` — phrased as the file's and
+ * cited by name ("From prices.csv: the price sheet has Pro at $40 a seat").
+ * A group's own record quoted back is the read-back's move, not a stranger
+ * with a search engine: it is their sentence, they can check it in ten
+ * seconds, and it is the one thing in the room that nothing on the web can
+ * settle. `cautious` is still silent, and a web-verified error is still
+ * `bold` only.
+ *
  * It is then said under V3-004's rules, by {@link Reservations}: a real
  * pause, the cached still-current verdict, yield to any human voice with one
  * retry, and ninety seconds or six turns of expiry. No budget of its own —
@@ -70,20 +80,25 @@ export const CORRECTION_LEAD_IN = "Quick correction";
 export interface SpokenCorrectionInput {
   boldness: Boldness;
   type: CandidateType;
-  /** Whether the web check came back `wrong` on it (US-013). */
+  /** Whether the check came back `wrong` on it (US-013). */
   verified: boolean;
   /** The level the policy delivered it at, budget downgrades included. */
   level: DeliveredLevel;
+  /**
+   * The group's own file that contradicted the claim (V3-009), when one did.
+   * That is what lowers the bar from `bold` to `normal`.
+   */
+  file?: string;
 }
 
 /** Whether this delivered card is the one correction that may be spoken. */
 export function spokenCorrectionAllowed(input: SpokenCorrectionInput): boolean {
-  return (
-    input.boldness === "bold" &&
-    input.type === "factual_error" &&
-    input.verified &&
-    input.level === "interject"
-  );
+  if (input.type !== "factual_error" || !input.verified || input.level !== "interject") {
+    return false;
+  }
+  if (input.boldness === "bold") return true;
+  // V3-009: the group's own records, quoted back, at the default setting.
+  return input.boldness === "normal" && (input.file ?? "") !== "";
 }
 
 /**
@@ -96,6 +111,26 @@ export function spokenCorrectionAllowed(input: SpokenCorrectionInput): boolean {
  * been (US-015). A headline clipped at ninety characters keeps its ellipsis
  * on screen and loses it here — a pause read aloud says nothing.
  */
+/**
+ * The lead-in a file-backed correction takes instead (V3-009): the file's own
+ * name, because the whole of why this one may be said is that it is the
+ * group's record rather than Sotto's reading of the world.
+ */
+export function fileCorrectionLine(file: string, correction: string): string {
+  const text = correction.replace(/\s+/g, " ").trim();
+  const name = file.trim();
+  if (text === "" || name === "") return "";
+  const said = /[.?!]$/.test(text) ? text : `${text}.`;
+  // Measured against the real model: asked for the file's own phrasing it
+  // sometimes writes the file name into the sentence ("notes.md has Pro at
+  // $40"), and the lead-in would then say it twice. A sentence that already
+  // cites the file is already the whole line.
+  if (said.toLowerCase().includes(name.toLowerCase())) {
+    return `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
+  }
+  return `From ${name}: ${said}`;
+}
+
 export function correctionLine(headline: string): string {
   const text = headline.replace(/\s+/g, " ").trim().replace(/[…]+$/, "").trim();
   if (text === "") return "";
@@ -111,17 +146,24 @@ export function correctionLine(headline: string): string {
  */
 export function spokenCorrection(interjection: Interjection): string | null {
   const candidate = interjection.candidate;
+  const file = candidate.verification?.file;
   if (
     !spokenCorrectionAllowed({
       boldness: interjection.decision.settings.boldness,
       type: candidate.type,
       verified: candidate.verification !== undefined,
       level: interjection.level,
+      ...(file === undefined ? {} : { file }),
     })
   ) {
     return null;
   }
-  const line = correctionLine(candidate.headline);
+  // The file's words where a file settled it, Sotto's headline where the web
+  // did (V3-009).
+  const line =
+    file === undefined || file === ""
+      ? correctionLine(candidate.headline)
+      : fileCorrectionLine(file, candidate.verification?.correction ?? candidate.headline);
   return line === "" ? null : line;
 }
 

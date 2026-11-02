@@ -33,6 +33,7 @@ import { parseMarkdown } from "./markdown.js";
 import {
   NOTICE_CARD_IDS,
   feedbackVerdicts,
+  isKnowledgeCitation,
   type CardArtifact,
   type FeedbackVerdict,
   type StageCard,
@@ -543,14 +544,22 @@ function Sources({ card }: { card: StageCard }) {
           <span className="card__source-number" aria-hidden="true">
             [{index + 1}]
           </span>
-          <a
-            className="card__source-link"
-            href={citation.url}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            {citation.title === "" ? citation.url : citation.title}
-          </a>
+          {/* V3-009: one of the group's own files has no page to open, so it
+              is named rather than linked. */}
+          {isKnowledgeCitation(citation.url) ? (
+            <span className="card__source-file" data-testid="card-source-file">
+              {citation.title === "" ? citation.url : citation.title}
+            </span>
+          ) : (
+            <a
+              className="card__source-link"
+              href={citation.url}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              {citation.title === "" ? citation.url : citation.title}
+            </a>
+          )}
         </li>
       ))}
     </ol>

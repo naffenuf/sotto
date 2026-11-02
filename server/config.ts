@@ -1,4 +1,5 @@
 import { config as loadDotenv } from "dotenv";
+import { DEFAULT_KNOWLEDGE_DIR } from "../shared/knowledge.js";
 import { DEFAULT_SOTTO_VOICE_ID } from "./voice/Speaker.js";
 
 /** Server-side configuration. The model API key never leaves this process. */
@@ -90,4 +91,17 @@ export function loadGlimmerConfig(env: NodeJS.ProcessEnv = process.env): Glimmer
 export function loadSottoVoiceId(env: NodeJS.ProcessEnv = process.env): string {
   loadDotenv({ quiet: true });
   return (env.ELEVENLABS_VOICE_ID ?? "").trim() || DEFAULT_SOTTO_VOICE_ID;
+}
+
+/**
+ * Where the group's own files are (V3-009): `KNOWLEDGE_DIR` when it is set,
+ * otherwise {@link DEFAULT_KNOWLEDGE_DIR} under the current directory.
+ *
+ * A path rather than an index, and never an error: the folder is optional and
+ * most sessions have none — {@link KnowledgeIndex.load} returns `null` for a
+ * folder that is missing or empty, which is what every caller branches on.
+ */
+export function loadKnowledgeDir(env: NodeJS.ProcessEnv = process.env): string {
+  loadDotenv({ quiet: true });
+  return (env.KNOWLEDGE_DIR ?? "").trim() || DEFAULT_KNOWLEDGE_DIR;
 }

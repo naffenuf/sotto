@@ -8,6 +8,15 @@
  * quiet. Only a `wrong` verdict goes on, carrying the correction and the
  * pages it rests on.
  *
+ * Since V3-009 a check has two halves, and the first one is **the group's own
+ * files**. A claim their price sheet contradicts is settled by that sheet —
+ * the web cannot correct a company's own prices — and a correction that comes
+ * out of their records is the one Sotto may say out loud at the default
+ * boldness (V3-008's exception), phrased as the file's and cited by name. The
+ * files are only consulted when they have lines about the same things, and a
+ * verdict of anything but `wrong` falls straight through to the web check, so
+ * a folder that knows nothing about the claim costs a conversation nothing.
+ *
  * Unlike the board loop and the observer, checks run **concurrently**: one
  * candidate waiting on a search must not hold up the next one. Each check is
  * registered with {@link Clock.track} before {@link Verifier.verify} returns,
@@ -15,17 +24,26 @@
  */
 import {
   CORRECTION_MAX_WORDS,
+  KNOWLEDGE_VERIFICATION_SCHEMA_NAME,
+  KnowledgeVerificationReplySchema,
   ModelCitationSchema,
   VERIFICATION_SCHEMA_NAME,
   VerificationReplySchema,
   correctedDetail,
+  knowledgeVerificationJsonSchema,
   verificationJsonSchema,
   type Candidate,
   type CandidateVerification,
   type VerificationLogRecord,
 } from "../../shared/candidates.js";
 import type { Citation, EvidenceQuote } from "../../shared/cards.js";
+import {
+  knowledgeCitation,
+  resolveKnowledgeCitation,
+  type KnowledgeSnippet,
+} from "../../shared/knowledge.js";
 import type { Clock } from "../clock.js";
+import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
 import { ModelCallError, citationTitle, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 
@@ -39,6 +57,15 @@ export const VERIFY_TRACK_LABEL = "verify";
  * alone before writing the verdict.
  */
 export const VERIFY_MAX_TOKENS = 8_192;
+
+/** The label the knowledge half of a check is tracked under (V3-009). */
+export const KNOWLEDGE_TRACK_LABEL = "verify-files";
+
+/**
+ * Budget for the knowledge half. Far smaller than the web half's: there is no
+ * search and no reading, only a handful of lines and one comparison.
+ */
+export const KNOWLEDGE_VERIFY_MAX_TOKENS = 4_096;
 
 type Logger = Pick<Console, "log" | "warn">;
 
@@ -55,6 +82,11 @@ export interface VerifierOptions {
   onVerified: (candidate: Candidate) => void;
   /** The model status dot, shared with the board loop and the observer. */
   onModelState?: (state: "connecting" | "active" | "error", detail: string) => void;
+  /**
+   * The group's own files (V3-009), when the session has a knowledge folder.
+   * Present means they are checked before the web.
+   */
+  knowledge?: KnowledgeIndex | null;
   logger?: Logger;
 }
 
@@ -64,6 +96,7 @@ export class Verifier {
   private readonly onRecord: (record: VerificationLogRecord) => void;
   private readonly onVerified: (candidate: Candidate) => void;
   private readonly onModelState: VerifierOptions["onModelState"];
+  private readonly knowledge: KnowledgeIndex | null;
   private readonly logger: Logger;
 
   /** The checks in flight, so {@link flush} can wait for all of them. */
@@ -82,6 +115,7 @@ export class Verifier {
     this.onRecord = options.onRecord;
     this.onVerified = options.onVerified;
     this.onModelState = options.onModelState;
+    this.knowledge = options.knowledge ?? null;
     this.logger = options.logger ?? console;
   }
 
@@ -132,6 +166,18 @@ export class Verifier {
 
   /** One check, start to written-down finish. Never rejects. */
   private async check(candidate: Candidate): Promise<void> {
+    // The group's own records first (V3-009). Only a `wrong` stops here: the
+    // files not settling it is the ordinary case, and the web check is next.
+    //
+    // Not awaited when there is no folder, which is most sessions: an `await`
+    // on the way to the web call would put a microtask between `verify()` and
+    // the request, and the whole point of starting the check inside `verify`
+    // is that it is under way by the time it returns.
+    const fromFiles = this.knowledge === null ? null : await this.checkFiles(candidate);
+    if (fromFiles !== null) {
+      this.finish(candidate, fromFiles);
+      return;
+    }
     let verification: CandidateVerification;
     try {
       verification = await this.request(candidate);
@@ -154,6 +200,18 @@ export class Verifier {
       return;
     }
 
+    this.finish(candidate, verification);
+  }
+
+  /**
+   * Writes one verdict down and, when it is `wrong`, hands the candidate on.
+   *
+   * Shared by both halves of a check (V3-009): a file-backed verdict and a
+   * web-backed one are the same record and the same handover, and the only
+   * thing that tells them apart downstream is
+   * {@link CandidateVerification.file}.
+   */
+  private finish(candidate: Candidate, verification: CandidateVerification): void {
     this.checkCount += 1;
     const atMs = this.clock.now();
     const wrong = verification.verdict === "wrong";
@@ -168,7 +226,8 @@ export class Verifier {
     this.logger.log(
       `[verify] ${candidate.id} is ${verification.verdict}` +
         ` (${verification.citations.length} citation(s)` +
-        `${verification.searched ? "" : ", no search"}): ${candidate.headline}`,
+        `${verification.file === undefined ? (verification.searched ? "" : ", no search") : `, from ${verification.file}`})` +
+        `: ${candidate.headline}`,
     );
     if (!wrong || this.stopped) return;
     this.onVerified({
@@ -177,6 +236,70 @@ export class Verifier {
       verification,
       citations: verification.citations,
     });
+  }
+
+  /**
+   * The group's own files, asked before the web (V3-009).
+   *
+   * Returns a verification only when a file really contradicts the claim;
+   * `null` means "not settled here", which covers a folder with no lines
+   * about this, a verdict of `right` or `unclear`, a correction the model
+   * could not attach to a file it was shown, and a call that failed. All four
+   * fall through to the web check — losing the knowledge half must never cost
+   * the web half.
+   */
+  private async checkFiles(candidate: Candidate): Promise<CandidateVerification | null> {
+    const knowledge = this.knowledge;
+    if (knowledge === null) return null;
+    const snippets = knowledge.search(claimText(candidate));
+    // Nothing in the folder mentions any of it: no call, no cost.
+    if (snippets.length === 0) return null;
+    try {
+      const reply = await this.model.structured({
+        label: KNOWLEDGE_TRACK_LABEL,
+        system: loadPrompt(PROMPTS.verifyKnowledge),
+        user: renderKnowledgeVerificationRequest(candidate, snippets),
+        schemaName: KNOWLEDGE_VERIFICATION_SCHEMA_NAME,
+        schema: knowledgeVerificationJsonSchema,
+        maxTokens: KNOWLEDGE_VERIFY_MAX_TOKENS,
+      });
+      const parsed = KnowledgeVerificationReplySchema.safeParse(reply);
+      if (!parsed.success) {
+        this.logger.warn(
+          `[verify] ${candidate.id}: the file check did not match the schema: ${issues(parsed.error.issues)}`,
+        );
+        return null;
+      }
+      if (parsed.data.verdict !== "wrong") {
+        this.logger.log(
+          `[verify] ${candidate.id}: the group's files say ${parsed.data.verdict}; checking the web`,
+        );
+        return null;
+      }
+      const file = resolveKnowledgeCitation(
+        parsed.data.file,
+        snippets.map((snippet) => snippet.file),
+      );
+      // A correction nobody can trace to one of their own files is what the
+      // web check exists for, so it is not one of these.
+      if (file === undefined || parsed.data.correction === "") {
+        this.logger.warn(
+          `[verify] ${candidate.id}: the file check said wrong without a usable file; checking the web`,
+        );
+        return null;
+      }
+      return {
+        verdict: "wrong",
+        correction: parsed.data.correction,
+        citations: [knowledgeCitation(file)],
+        searched: false,
+        file,
+      };
+    } catch (error) {
+      // Not a failed check: the web half has not run yet.
+      this.logger.warn(`[verify] ${candidate.id}: the file check failed: ${message(error)}`);
+      return null;
+    }
   }
 
   /** One grounded call, validated. */
@@ -342,6 +465,66 @@ export function renderVerificationRequest(candidate: Candidate): string {
       `${CORRECTION_MAX_WORDS} words if it is wrong, and the pages you read.`,
   );
   return blocks.join("\n\n");
+}
+
+/**
+ * The user message for the knowledge half: what was said, then the lines of
+ * the group's own files that mention the same things (V3-009).
+ *
+ * The lines come with their file names and nothing else is offered — no web,
+ * no general knowledge — because the question being asked is narrower than
+ * the web check's: not "is this true" but "do these records say otherwise".
+ */
+export function renderKnowledgeVerificationRequest(
+  candidate: Candidate,
+  snippets: readonly KnowledgeSnippet[],
+): string {
+  const blocks = ["## What was said"];
+  if (candidate.evidence.length > 0) {
+    blocks.push(
+      "Said out loud in a meeting, in these words. The claim in here is what you check.",
+      candidate.evidence.map(renderQuote).join("\n"),
+    );
+  } else {
+    blocks.push(
+      "The exact words were not recorded. All there is to go on is the note below, which " +
+        "states what a listener believes the group got wrong.",
+    );
+  }
+  blocks.push(
+    "## What a listener made of it",
+    "This may be wrong. It is a reason to look, not a finding.",
+    `${candidate.headline}\n\n${candidate.detail}`,
+  );
+  blocks.push(
+    "## The group's own files",
+    "Every line here is from a file they keep. Nothing else is available to you.",
+    snippets
+      .map((snippet) => `- **${snippet.file}** (line ${snippet.line}): ${snippet.text}`)
+      .join("\n"),
+  );
+  blocks.push(
+    `Reply with the verdict, the file it rests on, and — only if the files say otherwise — ` +
+      `what the file says, in at most ${CORRECTION_MAX_WORDS} words.`,
+  );
+  return blocks.join("\n\n");
+}
+
+/**
+ * The words the knowledge folder is searched with: what the room said, else
+ * the listener's note.
+ *
+ * The quotes rather than the headline, for the reason the web check already
+ * learned (US-013) — a headline states the *correction*, so searching for it
+ * looks for the fact Sotto believes rather than the one the files might
+ * disagree with.
+ */
+export function claimText(candidate: Candidate): string {
+  const quotes = candidate.evidence
+    .map((evidence) => evidence.quote.trim())
+    .filter((quote) => quote !== "")
+    .join(" ");
+  return quotes === "" ? `${candidate.headline} ${candidate.detail}` : quotes;
 }
 
 /** One quote, attributed where the diarization gave it a label. */

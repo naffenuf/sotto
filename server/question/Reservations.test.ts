@@ -1179,6 +1179,50 @@ describe("Reservations: Sotto's own correction (V3-008)", () => {
     expect(turns.records[0]).toMatchObject({ kind: "correction", reason: "expired" });
   });
 
+  it("is said at boldness normal when it came out of the group's own files (V3-009)", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "normal" } });
+    const FILE_LINE = "From prices.csv: the price sheet has Pro at $40 a seat.";
+    harness.reservations.correction({
+      candidateId: "cand-8",
+      turnId: "0:7",
+      headline: "Pro is $40 a seat, not $49",
+      text: FILE_LINE,
+      fromFile: "prices.csv",
+    });
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    voice.played();
+    await harness.reservations.flush();
+    expect(voice.said).toEqual([FILE_LINE]);
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction",
+      spoken: true,
+      fromFile: "prices.csv",
+    });
+  });
+
+  it("is still silent about a file-backed correction in a cautious session", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { settings: { boldness: "cautious" } });
+    harness.reservations.correction({
+      candidateId: "cand-8",
+      turnId: "0:7",
+      headline: "Pro is $40 a seat, not $49",
+      text: "From prices.csv: the price sheet has Pro at $40 a seat.",
+      fromFile: "prices.csv",
+    });
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({
+      kind: "correction",
+      spoken: false,
+      reason: "boldness",
+      fromFile: "prices.csv",
+    });
+  });
+
   it("is not said once the room has turned the boldness back down", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice, { settings: { boldness: "bold" } });
