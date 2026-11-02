@@ -1793,3 +1793,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   "so to speak" eighteen times; `Soto's`, "I asked Soto earlier" and `sotto voce` are not
   addresses and are left as said. Tests that build turns through the real assembler now see
   `Sotto` (`BargeIn.test.ts`'s "Soto stop" did).
+- **Every spoken question gets a holding line now, and a notes question gets one that says so.**
+  V2-008c reserved the line for questions that search, on the theory that "what did we decide" is
+  answered from the board in a second or two; the checkpoint session's "where are we at" measured
+  **9.8 s** of silence after "Mm-hm" while the model read a full board and composed a long status
+  answer. `wantsFirstLine` is true for anything with a voice that is not a `continue`;
+  `renderFirstLineRequest` takes `searching` (from `searchLikely`) and tells the model whether it
+  is going to the web or back through the notes, and `firstline.md` has an example of each. The
+  prose call still waits up to `FIRST_LINE_CONTEXT_WAIT_MS` for the line, so a notes answer's
+  full text lands a couple of seconds later than before and its first words seven seconds sooner.
+- **A second name introduced inside somebody else's turn waits for the next new voice.** The
+  service ends a turn on silence, not on a change of voice, so "I'm Craig. I'm EJ. Okay, so…" read
+  back to back arrived as one turn under label A and EJ stayed `B` for the whole session.
+  `introducedNames` (beside `introducedName`) finds every sentence-anchored introduction in a turn;
+  `SessionManager.assembler` names the turn's own speaker from the first and queues the rest in
+  `pendingIntroductions`, handing one to the next label that has not had a final turn yet
+  (`labelsMet`) unless that turn introduces itself. A third voice with an empty queue gets
+  nothing: nobody is guessed. It is a patch for the introduction beat; nothing on this side can
+  split a turn by voice, and across 198 captured turns plus this session the API never has.

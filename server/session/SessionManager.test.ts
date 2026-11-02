@@ -1737,6 +1737,65 @@ describe("SessionManager, speaker names", () => {
     await sessions.stop();
   });
 
+  it("hands a second name introduced in one turn to the next voice the session meets", async () => {
+    // The checkpoint session: "I'm Craig. I'm EJ. Okay, so…" arrived as one
+    // turn under one label, because the service ends a turn on silence, not
+    // on a change of voice. EJ is named when B first speaks alone.
+    const bus = new EventBus(quiet);
+    const { renames, writer } = recordingWriter();
+    let emit: ((record: AsrFrameRecord) => void) | undefined;
+    const sessions = new SessionManager({
+      bus, apiKey: "test-key", logger: quiet, createStore: () => writer,
+      createModel: () => null,
+      createAsrClient: ({ onFrame }) => { emit = onFrame; return new FakeAsrClient(onFrame); },
+    });
+    sessions.start({ kind: "mic" });
+    const say = (id: number, label: string, text: string): void => {
+      for (const frame of [
+        { type: "speechStart", turnId: id, audioProcessedMs: id * 1000 },
+        { type: "speaker", label, audioProcessedMs: id * 1000 + 100 },
+        { type: "speechEnd", turnId: id, audioProcessedMs: id * 1000 + 200 },
+        { type: "speechComplete", turnId: id, audioProcessedMs: id * 1000 + 200, transcript: text },
+      ]) emit?.({ atMs: frame.audioProcessedMs, session: 0, frame });
+    };
+    say(1, "A", "I'm Craig. I'm EJ. Okay, so we're three weeks out from the launch workshop.");
+    expect(bus.speakerNames()).toEqual({ A: "Craig" });
+    // A, already met, saying more does not take the waiting name.
+    say(2, "A", "Venue's easy, the makerspace said yes.");
+    expect(bus.speakerNames()).toEqual({ A: "Craig" });
+    say(3, "B", "Thirty is fine, thirty kits is what the grant covers anyway.");
+    expect(bus.speakerNames()).toEqual({ A: "Craig", B: "EJ" });
+    // A third voice gets nothing: the queue is empty, and nobody guesses.
+    say(4, "C", "Sorry I'm late.");
+    expect(bus.speakerNames()).toEqual({ A: "Craig", B: "EJ" });
+    expect(renames).toEqual([["A", "Craig"], ["B", "EJ"]]);
+    await sessions.stop();
+  });
+
+  it("prefers a voice's own introduction over a name waiting for it", async () => {
+    const bus = new EventBus(quiet);
+    const { writer } = recordingWriter();
+    let emit: ((record: AsrFrameRecord) => void) | undefined;
+    const sessions = new SessionManager({
+      bus, apiKey: "test-key", logger: quiet, createStore: () => writer,
+      createModel: () => null,
+      createAsrClient: ({ onFrame }) => { emit = onFrame; return new FakeAsrClient(onFrame); },
+    });
+    sessions.start({ kind: "mic" });
+    const say = (id: number, label: string, text: string): void => {
+      for (const frame of [
+        { type: "speechStart", turnId: id, audioProcessedMs: id * 1000 },
+        { type: "speaker", label, audioProcessedMs: id * 1000 + 100 },
+        { type: "speechEnd", turnId: id, audioProcessedMs: id * 1000 + 200 },
+        { type: "speechComplete", turnId: id, audioProcessedMs: id * 1000 + 200, transcript: text },
+      ]) emit?.({ atMs: frame.audioProcessedMs, session: 0, frame });
+    };
+    say(1, "A", "I'm Craig. I'm EJ.");
+    say(2, "B", "I'm Dana, I do the mechanic slot.");
+    expect(bus.speakerNames()).toEqual({ A: "Craig", B: "Dana" });
+    await sessions.stop();
+  });
+
   it("sends a name to the bus and to the session folder", async () => {
     const bus = new EventBus(quiet);
     const { renames, writer } = recordingWriter();

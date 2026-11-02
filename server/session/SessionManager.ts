@@ -96,7 +96,7 @@ import { classifyStillCurrent } from "../question/stillCurrent.js";
 import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { Greeting } from "./Greeting.js";
-import { introducedName } from "./speakerIntroductions.js";
+import { introducedNames } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 import { SessionDigest, asksForWrapUp } from "./digest.js";
 import { WrapUp } from "./WrapUp.js";
@@ -905,6 +905,10 @@ export class SessionManager {
     wrapUp: WrapUp,
   ): SessionTranscription {
     const wake = this.wakeWatcher(info, loops, clock, store, wrapUp);
+    /** Labels that have had a final turn, so a new one can be told from a known one. */
+    const labelsMet = new Set<string>();
+    /** Names introduced inside somebody else's turn, waiting for the voice they belong to. */
+    const pendingIntroductions: string[] = [];
     const barge = new BargeIn({
       clock,
       speaking: () => voice?.playback?.().playing === true || this.bus.voiceState().speaking,
@@ -954,9 +958,18 @@ export class SessionManager {
         // Partials are dropped by all three of these; only final turns are
         // saved, and only final turns can trigger a board update.
         store.writer?.appendTurn(turn);
-        if (turn.final && turn.speaker !== null && !turn.speakerMappingUncertain && this.current?.info.id === info.id && this.bus.speakerNames()[turn.speaker] === undefined) {
-          const name = introducedName(turn.text);
-          if (name !== null) this.renameSpeaker(turn.speaker, name);
+        if (turn.final && turn.speaker !== null && !turn.speakerMappingUncertain && this.current?.info.id === info.id && !isSottoTurn(turn)) {
+          // The service ends a turn on silence, not on a change of voice, so
+          // "I'm Craig. I'm EJ." can arrive as one turn under one label: the
+          // first name is this speaker's and the rest wait for the next label
+          // the session has not met — which is EJ, the moment she speaks alone.
+          const [own, ...others] = introducedNames(turn.text);
+          const unnamed = this.bus.speakerNames()[turn.speaker] === undefined;
+          const unmet = !labelsMet.has(turn.speaker);
+          labelsMet.add(turn.speaker);
+          if (own !== undefined && unnamed) this.renameSpeaker(turn.speaker, own);
+          else if (unmet && unnamed && pendingIntroductions.length > 0) this.renameSpeaker(turn.speaker, pendingIntroductions.shift() as string);
+          pendingIntroductions.push(...others);
         }
         // V2-009: who is in the room, and when the room is quiet enough to
         // ask. It skips Sotto's own lines itself.

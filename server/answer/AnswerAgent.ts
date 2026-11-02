@@ -670,10 +670,14 @@ export class AnswerAgent {
   /**
    * Whether this question gets a holding line (V2-008c).
    *
-   * Only a question that looks like a search leaves a gap worth filling —
-   * "what did we decide" is answered from the board in a second or two. There
-   * is no point writing one with no voice configured, since nothing would say
-   * it, and a `continue` after a barge-in is already mid-sentence.
+   * Every spoken question does. The line was once reserved for questions
+   * that search, on the assumption that "what did we decide" is answered
+   * from the board in a second or two — but a live status question
+   * ("where are we at") measured 9.8 s to its first sentence, after a
+   * "Mm-hm" and then silence, while the model read a full board and
+   * composed a long answer. There is no point writing one with no voice
+   * configured, since nothing would say it, and a `continue` after a
+   * barge-in is already mid-sentence.
    *
    * A briefing (V2-015) never gets here: its opening line is
    * {@link briefingOpener}, which costs no call because the findings are
@@ -682,7 +686,7 @@ export class AnswerAgent {
   private wantsFirstLine(queued: Queued): boolean {
     if (this.options.voice === undefined) return false;
     if (queued.asked.resume === true) return false;
-    return searchLikely(queued.answer.question);
+    return true;
   }
 
   /** The holding line for one question, or `""`. Never rejects. */
@@ -696,6 +700,7 @@ export class AnswerAgent {
           recentTurns(this.options.transcript()),
           this.options.speakers(),
           answer,
+          searchLikely(answer.question),
         ),
         signal,
       );
@@ -1163,12 +1168,19 @@ export function renderFirstLineRequest(
   turns: readonly TurnUpdate[],
   speakers: SpeakerNames,
   answer: Answer,
+  searching = true,
 ): string {
   return [
     ...contextBlocks(board, turns, speakers, answer),
-    "You are about to look that up, which will take a few seconds. Write the one or" +
-      " two sentences you say while you do, or an empty string if there is nothing" +
-      " worth saying without the facts. Do not answer the question.",
+    searching
+      ? "You are about to look that up, which will take a few seconds. Write the one or" +
+        " two sentences you say while you do, or an empty string if there is nothing" +
+        " worth saying without the facts. Do not answer the question."
+      : "That is a question about their own conversation: you are about to go back" +
+        " through the notes and the transcript, which will take a few seconds. Write the" +
+        " one or two sentences you say while you do — what you understand them to be" +
+        " asking, and that you are checking the notes — or an empty string if there is" +
+        " nothing worth saying. Do not answer the question.",
   ].join("\n\n");
 }
 

@@ -927,15 +927,20 @@ describe("AnswerAgent out loud (V2-005)", () => {
       expect(record?.continuationMs).toBe(FIRST_LINE_CONTEXT_WAIT_MS + 1_300);
     });
 
-    it("writes none at all for a question the conversation already answers", async () => {
+    it("writes one for a question the conversation already answers, and says it is checking the notes", async () => {
+      // The live checkpoint measured 9.8 s of silence after "Mm-hm" on
+      // "where are we at": the model reads a whole board before its first
+      // sentence, so a notes question gets a holding line too.
       const { h, voice } = spoken([streamed]);
       h.model.firstLines.push(async () => FIRST_LINE);
       h.agent.ask({ question: "what did we decide about pricing?", askedBy: "A", turnId: "0:2" });
       await h.clock.settle();
 
-      expect(h.model.firstLineCalls).toHaveLength(0);
-      expect(voice.utterances[1]?.said).toEqual([SAID]);
-      expect(h.records[0]?.firstLineMs).toBeNull();
+      expect(h.model.firstLineCalls).toHaveLength(1);
+      expect(h.model.firstLineCalls[0]?.user).toMatch(/go back through the notes/);
+      expect(h.model.firstLineCalls[0]?.user).not.toMatch(/look that up/);
+      expect(voice.utterances[1]?.said[0]).toBe(FIRST_LINE);
+      expect(h.records[0]?.firstLineMs).not.toBeNull();
     });
 
     it("is stopped by the same barge-in the answer is, and read back with it", async () => {
