@@ -108,7 +108,7 @@ export {
 } from "./artifacts.js";
 export type { Artifact, ShowHtmlArgs } from "./artifacts.js";
 export type { CandidateType, SuppressedCandidate } from "./candidates.js";
-export { statusChannels, statusStates } from "./events.js";
+export { MIC_AWAY_DETAIL, statusChannels, statusStates } from "./events.js";
 export type {
   BoardEvent,
   CardEvent,

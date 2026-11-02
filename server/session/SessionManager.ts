@@ -35,7 +35,7 @@ import {
 import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { CandidateLogLine, CandidateType } from "../../shared/candidates.js";
-import type { StatusState } from "../../shared/events.js";
+import { MIC_AWAY_DETAIL, type StatusState } from "../../shared/events.js";
 import type { FeedbackLogRecord, FeedbackVerdict } from "../../shared/feedback.js";
 import {
   limitsFor,
@@ -801,7 +801,14 @@ export class SessionManager {
     let mic: MicSource | undefined;
     let audio: AudioSource;
     if (source.kind === "mic") {
-      mic = new MicSource();
+      mic = new MicSource({ clock: this.liveClock });
+      // The socket dropping — a refresh, a laptop asleep — holds the session
+      // open for `MIC_GRACE_MS` and says so on the dot; it is a dot, not a
+      // session event, because the session is still running.
+      mic.onConnection = (connected) => {
+        if (this.current?.info.id !== info.id) return;
+        if (!connected) this.bus.setStatus("transcription", "connecting", MIC_AWAY_DETAIL);
+      };
       // The room as the server hears it goes to `audio.wav` (V3-011), so a
       // live session can be replayed, or kept as a take.
       audio = recordedSource(mic, (chunk) => store.writer?.appendAudio?.(chunk));
@@ -851,12 +858,12 @@ export class SessionManager {
         // stopped session keeps receiving frames while the API flushes,
         // though, and those must not light the dot again after the UI has
         // been told the session is over.
+        // And the API keeps reporting on audio already sent after the mic's
+        // socket has dropped, which must not overwrite the cue a reloading
+        // page needs in order to dial back in.
         if (this.current?.info.id === info.id) {
-          this.bus.setStatus(
-            "transcription",
-            "active",
-            `transcribing ${describeSource(info.source)}`,
-          );
+          if (mic?.waiting === true) this.bus.setStatus("transcription", "connecting", MIC_AWAY_DETAIL);
+          else this.bus.setStatus("transcription", "active", `transcribing ${describeSource(info.source)}`);
         }
         if (record.frame["type"] === "speechEnd" || record.frame["type"] === "speechComplete") store.writer?.appendTiming?.({ stage: `asr_${record.frame["type"]}`, atMs: this.liveClock.now(), turnId: `${record.session}:${record.frame["turnId"]}`, audioProcessedMs: record.frame["audioProcessedMs"], frameAtMs: record.atMs });
         assembler.accept(record);

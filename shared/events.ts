@@ -31,6 +31,13 @@ import type { VoiceState } from "./voice.js";
  *   rather than the state is what the dot reads out.
  */
 export const statusChannels = ["server", "transcription", "model", "judgment"] as const;
+
+/**
+ * The `transcription` dot's detail while a `mic` session's audio socket has
+ * dropped and the session is holding on for it. A page that loads and finds
+ * this takes it as its cue to dial the microphone back in.
+ */
+export const MIC_AWAY_DETAIL = "waiting for the microphone to come back";
 export type StatusChannel = (typeof statusChannels)[number];
 
 /**

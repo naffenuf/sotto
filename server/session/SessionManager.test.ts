@@ -1604,12 +1604,12 @@ describe("SessionManager, live audio", () => {
     });
 
     // What the socket delivers reaches the transcription client as chunks.
-    mic?.attach();
-    mic?.write(Buffer.alloc(AUDIO_CHUNK_BYTES * 2));
+    const handle = mic?.attach() ?? null;
+    handle?.write(Buffer.alloc(AUDIO_CHUNK_BYTES * 2));
     expect(client?.chunks).toBe(2);
 
-    // The browser going away ends the input, and with it the session.
-    mic?.endInput();
+    // The browser saying it is done ends the input, and with it the session.
+    handle?.end();
     await done;
     expect(client?.endReason).toBe("complete");
     expect(sessions.micInput()).toBeNull();

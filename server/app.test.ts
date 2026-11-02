@@ -603,11 +603,46 @@ describe("/ws/audio", () => {
       client.on("error", reject);
     });
     client.send(Buffer.alloc(AUDIO_CHUNK_BYTES, 3));
-    client.close();
+    // A clean close is the page saying it is done (`MicCapture.stop()`).
+    client.close(1000, "capture stopped");
 
     await waitFor(() => audio.endReason !== undefined, "the input to end");
     expect(audio.endReason).toBe("complete");
     expect(audio.chunks).toHaveLength(1);
+  });
+
+  it("holds the session open when the browser's socket drops, and takes the next one", async () => {
+    const { app: server, audio, sessions } = await buildTestApp();
+    const address = await server.listen({ host: "127.0.0.1", port: 0 });
+    await server.inject({
+      method: "POST",
+      url: "/api/session/start",
+      payload: { source: { kind: "mic" } },
+    });
+    const dial = async (): Promise<WebSocket> => {
+      const client = new WebSocket(`${address.replace("http", "ws")}/ws/audio`);
+      await new Promise((resolve, reject) => {
+        client.on("open", resolve);
+        client.on("error", reject);
+      });
+      return client;
+    };
+
+    const first = await dial();
+    first.send(Buffer.alloc(AUDIO_CHUNK_BYTES, 1));
+    await waitFor(() => audio.chunks.length === 1, "the first chunk to arrive");
+    // A refresh: the socket goes without a clean close.
+    first.terminate();
+    await waitFor(() => sessions.micInput()?.waiting === true, "the grace period to open");
+    expect(audio.endReason).toBeUndefined();
+
+    const second = await dial();
+    second.send(Buffer.alloc(AUDIO_CHUNK_BYTES, 2));
+    await waitFor(() => audio.chunks.length === 2, "the second socket's chunk to arrive");
+    expect(sessions.micInput()?.waiting).toBe(false);
+    expect(audio.endReason).toBeUndefined();
+    second.close(1000, "capture stopped");
+    await waitFor(() => audio.endReason !== undefined, "the input to end");
   });
 
   it("turns a socket away when no microphone session is running", async () => {

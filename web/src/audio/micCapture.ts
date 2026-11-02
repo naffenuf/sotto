@@ -88,25 +88,48 @@ export interface MicCaptureOptions {
   url?: string;
 }
 
+/** How long the page keeps redialling a dropped socket before giving up. */
+export const MIC_REDIAL_FOR_MS = 60_000;
+/** The first wait before redialling; it doubles, up to {@link MIC_REDIAL_MAX_WAIT_MS}. */
+export const MIC_REDIAL_WAIT_MS = 500;
+export const MIC_REDIAL_MAX_WAIT_MS = 4_000;
+
+/** The server turned this socket away for good; redialling would be refused again. */
+const WS_POLICY_VIOLATION = 1008;
+
 /**
  * A microphone streaming into the running session. Built by
  * {@link startMicCapture}; the only thing to do with one is {@link stop} it.
+ *
+ * The socket is the fragile part — a laptop going to sleep drops it while
+ * the microphone and the audio graph survive — so a close the page did not
+ * ask for is redialled, with the most recent second of audio kept to send
+ * when it comes back, for as long as the server's grace period lasts.
  */
 export class MicCapture {
   /** Chunks of {@link AUDIO_CHUNK_SAMPLES} samples sent so far. */
   chunksSent = 0;
+  /** Sockets dialled after the first, for the record. */
+  redials = 0;
 
   private readonly resampler: Resampler;
   private pending = new Int16Array(0);
   private stopped = false;
+  private socket: WebSocket;
+  private redialTimer: ReturnType<typeof setTimeout> | undefined;
+  private redialWait = MIC_REDIAL_WAIT_MS;
+  /** When the current outage began; `null` while the socket is up. */
+  private droppedAt: number | null = null;
 
   constructor(
     private readonly stream: MediaStream,
     private readonly context: AudioContext,
     private readonly nodes: AudioNode[],
-    private readonly socket: WebSocket,
+    private readonly url: string,
+    private readonly onError: ((message: string) => void) | undefined,
   ) {
     this.resampler = new Resampler(context.sampleRate);
+    this.socket = this.dial();
   }
 
   /** Takes one batch of mono samples from the worklet, at the context's rate. */
@@ -136,10 +159,50 @@ export class MicCapture {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    if (this.redialTimer !== undefined) clearTimeout(this.redialTimer);
     for (const node of this.nodes) node.disconnect();
     for (const track of this.stream.getTracks()) track.stop();
     if (this.socket.readyState <= WebSocket.OPEN) this.socket.close(1000, "capture stopped");
     void this.context.close().catch(() => undefined);
+  }
+
+  private dial(): WebSocket {
+    const socket = new WebSocket(this.url);
+    socket.binaryType = "arraybuffer";
+    socket.addEventListener("open", () => {
+      this.droppedAt = null;
+      this.redialWait = MIC_REDIAL_WAIT_MS;
+    });
+    socket.addEventListener("close", (event: CloseEvent) => this.onClose(socket, event));
+    return socket;
+  }
+
+  private onClose(socket: WebSocket, event: CloseEvent): void {
+    if (this.stopped || socket !== this.socket) return;
+    // The server turned the audio away — another page has the microphone, or
+    // the session is over — and would again. A close we asked for (1000) is
+    // only ever ours, from `stop()`, which returned above.
+    if (event.code === WS_POLICY_VIOLATION) {
+      this.stop();
+      this.onError?.(
+        `The microphone stream was closed by the server${event.reason === "" ? "" : `: ${event.reason}`}.`,
+      );
+      return;
+    }
+    const now = Date.now();
+    this.droppedAt ??= now;
+    if (now - this.droppedAt > MIC_REDIAL_FOR_MS) {
+      this.stop();
+      this.onError?.("The microphone stream dropped and could not be reconnected.");
+      return;
+    }
+    this.redialTimer = setTimeout(() => {
+      this.redialTimer = undefined;
+      if (this.stopped) return;
+      this.redials += 1;
+      this.socket = this.dial();
+    }, this.redialWait);
+    this.redialWait = Math.min(this.redialWait * 2, MIC_REDIAL_MAX_WAIT_MS);
   }
 }
 
@@ -170,20 +233,14 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
     silence.gain.value = 0;
     source.connect(worklet).connect(silence).connect(context.destination);
 
-    const socket = new WebSocket(options.url ?? micSocketUrl());
-    socket.binaryType = "arraybuffer";
-    const capture = new MicCapture(stream, context, [source, worklet, silence], socket);
-
+    const capture = new MicCapture(
+      stream,
+      context,
+      [source, worklet, silence],
+      options.url ?? micSocketUrl(),
+      options.onError,
+    );
     worklet.port.onmessage = (message: MessageEvent<Float32Array>) => capture.accept(message.data);
-    socket.addEventListener("close", (event: CloseEvent) => {
-      // A close we did not ask for means the server turned the audio away.
-      capture.stop();
-      if (event.code !== 1000) {
-        options.onError?.(
-          `The microphone stream was closed by the server${event.reason === "" ? "" : `: ${event.reason}`}.`,
-        );
-      }
-    });
     return capture;
   } catch (error) {
     for (const track of stream.getTracks()) track.stop();

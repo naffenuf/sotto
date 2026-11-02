@@ -62,5 +62,5 @@ cp .env.example .env    # then set MODEL_API_KEY to your Meta Model API key
 | `npm run e2e` | Streams five fixture WAVs at real-time pace through the whole loop against the real Meta APIs, the local Glimmer gate and a real ElevenLabs voice with the audio discarded, and asserts the result. Costs money; prints the estimate |
 | `npm run fixtures:check` | Validates the fixture scripts in `fixtures/scripts/` against their rendered audio and timings |
 | `npm run verify:ui` | Playwright check of the running UI; writes a screenshot. Needs `npm run dev` already up |
-| `npm run verify:mic` | Playwright check of the microphone, with Chromium's fake capture device: a refused permission and a live session. Needs `npm run dev` already up |
+| `npm run verify:mic` | Playwright check of the microphone, with Chromium's fake capture device: a refused permission, a live session, and a reload mid-session that the session has to survive. Needs `npm run dev` already up |
 | `npm run verify:answer` | Playwright check of the answer agent: replays `ask-search` and watches the answer card arrive. Calls the real model. Needs `npm run dev` already up |

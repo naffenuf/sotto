@@ -27,6 +27,7 @@ import { Speaker } from "./voice/Speaker.js";
 import { VoiceHub } from "./voice/VoiceHub.js";
 
 /** Close code for a socket that asked for something it may not have. */
+const WS_NORMAL_CLOSURE = 1000;
 const WS_POLICY_VIOLATION = 1008;
 
 export interface AppOptions {
@@ -271,19 +272,29 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       socket.close(WS_POLICY_VIOLATION, "start a microphone session first");
       return;
     }
-    if (!mic.attach()) {
+    // A holder that has gone quiet is replaced — a laptop that slept leaves a
+    // socket the server will not hear close for minutes — and told so.
+    const handle = mic.attach(() =>
+      socket.close(WS_POLICY_VIOLATION, "a newer microphone socket took over this session"),
+    );
+    if (handle === null) {
       socket.close(WS_POLICY_VIOLATION, "a microphone is already streaming into this session");
       return;
     }
     socket.on("message", (data: Buffer, isBinary: boolean) => {
       // Text on this socket is a bug in the client, not audio; ignore it
       // rather than feeding JSON to the transcription API as samples.
-      if (isBinary) mic.write(data);
+      if (isBinary) handle.write(data);
     });
-    // A socket that drops ends the input, which flushes the last words out of
-    // the API and ends the session. Stopping from the UI closes it the same way.
-    socket.on("close", () => mic.endInput());
-    socket.on("error", () => mic.endInput());
+    // The page closing the socket cleanly (`1000`, "capture stopped") means it
+    // is done: the input ends, which flushes the last words out of the API and
+    // ends the session. Any other close is a drop — a refresh, a sleeping
+    // laptop — and opens the grace period in which the page may dial again.
+    socket.on("close", (code: number) => {
+      if (code === WS_NORMAL_CLOSURE) handle.end();
+      else handle.detach();
+    });
+    socket.on("error", () => handle.detach());
   });
 
   // One socket per browser tab. Each one is caught up with the bus's

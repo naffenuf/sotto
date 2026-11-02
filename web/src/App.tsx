@@ -7,7 +7,7 @@ import type {
   StatusChannel,
   StatusUpdate,
 } from "../../shared/index.js";
-import { describeSource, emptyBoard } from "../../shared/index.js";
+import { MIC_AWAY_DETAIL, describeSource, emptyBoard } from "../../shared/index.js";
 import {
   ApiCallError,
   askSotto,
@@ -61,6 +61,11 @@ export function App() {
   /** What Sotto is holding and has not said (V3-017). */
   const hand = useRaisedHand(events.cards);
 
+  /** Set by Stop until the session is gone, so letting go of the mic is not read as losing it. */
+  const stopping = useRef(false);
+  /** The session this page last tried to rejoin, so a refusal is not retried every render. */
+  const rejoined = useRef<string | null>(null);
+
   const stopMic = useCallback(() => {
     mic.current?.stop();
     mic.current = null;
@@ -107,6 +112,7 @@ export function App() {
 
   const onStop = useCallback(() => {
     setBusy(true);
+    stopping.current = true;
     // Let go of the microphone first, so the light goes out on the click
     // rather than when the API has finished flushing.
     stopMic();
@@ -190,8 +196,31 @@ export function App() {
   // A session can also end on its own — the capture runs out, the stream
   // fails — and the microphone must not stay on when it does.
   useEffect(() => {
-    if (session === null) { stopMic(); refreshHistory(); }
+    if (session === null) { stopping.current = false; stopMic(); refreshHistory(); }
   }, [session, stopMic, refreshHistory]);
+
+  // A page that loads to find a `mic` session the server is holding open —
+  // its socket dropped on a refresh — dials the microphone back in. The
+  // server says so on the transcription dot, which is also what keeps a
+  // second tab from grabbing a microphone another page still holds.
+  const micAway = statuses.transcription.detail === MIC_AWAY_DETAIL;
+  useEffect(() => {
+    if (session === null || session.source.kind !== "mic" || !micAway) return;
+    if (mic.current !== null || busy || stopping.current || rejoined.current === session.id) return;
+    rejoined.current = session.id;
+    void (async () => {
+      try {
+        const stream = await requestMicrophone();
+        if (mic.current !== null || stopping.current) {
+          for (const track of stream.getTracks()) track.stop();
+          return;
+        }
+        mic.current = await startMicCapture({ stream, onError: setProblem });
+      } catch (error) {
+        setProblem(error instanceof Error ? error.message : String(error));
+      }
+    })();
+  }, [session, micAway, busy]);
 
   // And neither should navigating away.
   useEffect(() => stopMic, [stopMic]);

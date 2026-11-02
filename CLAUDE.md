@@ -1756,3 +1756,20 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   The column is `minmax(18rem, 32%)` for the demo. Playwright checks that used to click a
   "Transcript" tab for the *current* discussion no longer can; `verify-history-ui.mjs` toggles the
   fold instead. The tabs still exist for a previous discussion.
+
+- **A dropped audio socket is a grace period, not the end of the meeting.** Only a clean close
+  (`1000`, the page's own `MicCapture.stop()`) ends a mic session's input; any other close — a
+  refresh, a laptop asleep — makes `MicSource` hold the session for `MIC_GRACE_MS` (60 s) and
+  put `MIC_AWAY_DETAIL` on the transcription dot, which is the reloaded page's cue to dial the
+  microphone back in (and what keeps a second tab from grabbing a mic another page still
+  holds). Three things bit. The API keeps reporting on audio already sent for ~0.7 s after the
+  drop, and `onFrame` pushing `active` on each of those overwrote the cue before the page saw
+  it, so `onFrame` checks `mic.waiting` first. A sleeping laptop leaves the server a socket it
+  will not hear close for minutes, so `attach()` replaces a holder that has sent nothing for
+  `MIC_STALE_MS` (2 s) rather than turning the woken page away, and every socket gets a
+  `MicHandle` whose `write`/`detach`/`end` are no-ops once replaced — a late close from the old
+  socket must not end the new one's session. And a page that stays up (sleep, not refresh)
+  keeps its microphone and AudioContext and redials only the socket, with backoff, keeping the
+  last second of audio. Measured by `npm run verify:mic` under Chrome's *own* autoplay policy:
+  the reloaded page, with no click on it, rejoined and sent 6.4 s more audio into the same ASR
+  session — a `getUserMedia`-fed AudioContext starts without a gesture.
