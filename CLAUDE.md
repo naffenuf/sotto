@@ -1965,3 +1965,16 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `knowledge/` on this Mac. `fixtures/knowledge-demo/` is the fictional company (customers with
   renewal dates, a price sheet, notes, every file labelled fictional) that the integration test and
   the demo point `KNOWLEDGE_DIR` at.
+
+- **Sotto's pace is a voice setting, and the hello's budget is read against the voice.** The
+  voice changed to Matilda (`ELEVENLABS_VOICE_ID` in `.env`, read by `loadSottoVoiceId`; chosen
+  for how she sounds) on 2026-11-02, and she reads the hello at 3.05 words/second against River's
+  4.17 — 24.2 s against V3-012's "about 20 s". `DEFAULT_VOICE_SETTINGS` in `server/voice/Speaker.ts`
+  now carries `speed: SOTTO_SPEECH_SPEED` (1.1; ElevenLabs allows 0.7–1.2), which is barely audible
+  and brings the same 74 words to **21.5 s**. Two things follow. `synthesizeSpeech` takes an optional
+  `voiceSettings`, and `npm run hello:measure` passes Sotto's, so the measurement is of what the
+  room hears — fixtures still pass none, because `fixtures:check` compares captures against the
+  exact bytes on disk. And `SPOKEN_CHARS_PER_SECOND` (`shared/spoken.ts`), which the eval's overrun
+  estimate reads, is re-measured at 16.8 (was 19.6): change the voice or the speed and both that
+  constant and `scripts/measure-hello.ts`'s budget (22 s now, "about" read as two seconds either
+  way) need a fresh render.

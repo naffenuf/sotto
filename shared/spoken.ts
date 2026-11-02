@@ -245,11 +245,12 @@ export function asSpokenContribution(line: unknown): SpokenContributionRecord | 
  *
  * Measured, not guessed: `npm run hello:measure` renders
  * `server/prompts/hello.md` through the real ElevenLabs endpoint in Sotto's
- * own River voice, and the shipped hello is 361 characters of 18.4 seconds —
- * 19.6 characters a second, which is also 74 words at 4.0 words a second
- * (V3-012).
+ * own voice with its real `voice_settings`, and the shipped hello is 361
+ * characters of 21.5 seconds in Matilda at speed 1.1 — 16.8 characters a
+ * second, 74 words at 3.44 words a second. (River read the same text at
+ * 19.6; the voice changed on 2026-11-02.)
  */
-export const SPOKEN_CHARS_PER_SECOND = 19.6;
+export const SPOKEN_CHARS_PER_SECOND = 16.8;
 
 /**
  * Roughly how long a line takes to say, in milliseconds.

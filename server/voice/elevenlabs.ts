@@ -45,6 +45,12 @@ export interface SynthesizeRequest {
   modelId?: string | undefined;
   /** Makes a render repeatable, the way the old Chatterbox seed did. */
   seed?: number | undefined;
+  /**
+   * `voice_settings` for the render. Fixtures leave it out so their bytes
+   * stay what the captures were checked against; Sotto's own lines pass
+   * `DEFAULT_VOICE_SETTINGS` so a measurement is of what the room will hear.
+   */
+  voiceSettings?: Record<string, number | boolean> | undefined;
 }
 
 /** Just the part of `fetch` this module uses, so a unit test can stand in for it. */
@@ -100,6 +106,7 @@ export async function synthesizeSpeech(
       text: request.text,
       model_id: request.modelId ?? DEFAULT_TTS_MODEL,
       ...(request.seed === undefined ? {} : { seed: request.seed }),
+      ...(request.voiceSettings === undefined ? {} : { voice_settings: request.voiceSettings }),
     }),
   });
 

@@ -80,8 +80,9 @@ describe("spokenTurnId", () => {
 
 describe("estimateSpokenMs", () => {
   it("reads at the rate the hello was measured at", () => {
-    // 361 characters of hello took 18.4 s in Sotto's own voice (V3-012).
-    expect(estimateSpokenMs("x".repeat(361)) / 1000).toBeCloseTo(18.4, 1);
+    // 361 characters of hello take 21.5 s in Sotto's own voice, Matilda at speed 1.1
+    // (River, V3-012, read them in 18.4 s).
+    expect(estimateSpokenMs("x".repeat(361)) / 1000).toBeCloseTo(21.5, 1);
     expect(estimateSpokenMs("x".repeat(Math.round(SPOKEN_CHARS_PER_SECOND * 5)))).toBe(5_000);
   });
 

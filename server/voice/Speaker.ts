@@ -58,11 +58,20 @@ export const DEFAULT_SOTTO_VOICE_NAME = "River";
  */
 export const CHUNK_LENGTH_SCHEDULE = [50, 160, 250, 290];
 
-/** Calm delivery: steady rather than expressive, and no style exaggeration. */
+/**
+ * How much faster than the voice's own pace Sotto talks. ElevenLabs allows
+ * 0.7-1.2; Matilda reads a plain sentence at ~3.05 words/second against
+ * River's 4.17, and nobody wants a slow talker in a meeting. 1.1 is barely
+ * audible as a change and takes the hello from 24.2 s to within its budget.
+ */
+export const SOTTO_SPEECH_SPEED = 1.1;
+
+/** Calm delivery: steady rather than expressive, no style exaggeration, a touch brisk. */
 export const DEFAULT_VOICE_SETTINGS = {
   stability: 0.5,
   similarity_boost: 0.75,
   use_speaker_boost: true,
+  speed: SOTTO_SPEECH_SPEED,
 } as const;
 
 /** How long the upgrade may take before the socket is abandoned. */
