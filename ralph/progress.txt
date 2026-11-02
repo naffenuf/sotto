@@ -508,3 +508,41 @@ For the next iteration:
   `3229051`, `2d62f26`, `adf9db3`), all from the post-checkpoint UI list.
 - Not reached live: two yields, the read-backs, calling on the raised hand. Next live run.
 - Remaining stories: V3-014, V3-005, V3-007, V3-009 (stretch). Deadline 2026-11-04.
+
+[2026-11-01 21:05] V3-014 — completed — follow-ups without the wake word: a window after every
+answer, one Spark call per turn in it, and an eval gate on answering when nobody asked.
+
+What was built:
+- `server/answer/followUp.ts` + `server/prompts/followup.md`: one low-effort Spark call per turn,
+  told Sotto's last answer. Three kinds; only `to_sotto` does anything, and the schema insists it
+  carry a question (an unusable reply is treated as a failure, i.e. close).
+- `server/answer/FollowUpWindow.ts`: opens on `AnswerAgent.onFinished` (status `done`, after
+  `SpokenAnswer.done()`), closes on `to_room`, `closing`, unsure, a 6 s wall deadline,
+  `FOLLOWUP_TIMEOUT_MS` (20 s, **session** clock), a turn that names another speaker (no call),
+  and `FOLLOWUP_MAX_HUMAN_TURNS`.
+- `EventBus` keeps `named` and `inConversation` apart and publishes `listening = named ||
+  inConversation`; `WakeEvent.inConversation` drives `.stage__listening--conversation` and
+  `data-in-conversation` in the page. The bus snapshot's `wake` event now has two fields.
+- Eval: `FixtureScriptSchema.followUpLines`, `FixtureRunRecord.answers` (`AnswerRunRecord`),
+  `answersFrom` in the runner, `falseAnswers` in `scoreFixture`/`ScoreTotals`, the gate
+  "no answer to a turn that did not address Sotto" at zero, and a headline row.
+- Fixture `followups` (26 lines, 125.9 s) rendered, captured, `fixtures:check` green, in the eval
+  set, plus `npm run verify:followups`.
+
+Measured (`npm run verify:followups`, real `followups` replay at 1x with real Spark and real
+ElevenLabs, PASS): indicator up in its conversation style after the first answer; follow-up
+verdicts **3.75 s** and **2.53 s**, both `to_sotto`, both answered with no wake word; the window
+then closed on "Okay, EJ, what do you actually want to do here" as `named_person` in **0 ms** and
+the indicator went. Session folder `sessions/2026-11-01_2053-events-followups`.
+
+For the next iteration:
+- **No eval or e2e run was paid for.** `followups` is in the eval set and would add ~4 searched
+  answers to a full run; `npm run eval -- --fixtures followups` is the cheap way to exercise the
+  new gate end to end if it is ever wanted.
+- The two closing rules in the PRD overlap and the strict one won; the reasoning is in
+  `tasks/decisions.md` under "V3-014". `FOLLOWUP_MAX_HUMAN_TURNS` is a backstop for verdicts that
+  never land, not the ordinary path.
+- Three untracked files in `tasks/` (`checkpoint-speaking-lines.md`, `-runsheet.md`,
+  `post-checkpoint-ui.md`) and `fixtures/scripts/launch-workshop.json` are still not mine and are
+  left alone; `launch-workshop` is the only thing `npm run fixtures:check` complains about.
+- Remaining: V3-005 (offers), V3-007 (stall ideas), V3-009 (knowledge folder, stretch).
