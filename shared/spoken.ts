@@ -18,9 +18,10 @@
  *     on. So anything comparing a spoken line to the conversation — a pause,
  *     a planted moment's window, a human turn it ran over — reads the
  *     transcript, via {@link spokenTurnId}, and never `atMs`.
- *   - **`called_on` is not unprompted.** The room asked for it (V3-017), so it
- *     waits for no gap and spends nothing, and anything counting speech Sotto
- *     chose to make has to leave it out ({@link isUnpromptedKind}).
+ *   - **`called_on` and `ideas` are not unprompted.** The room asked for them
+ *     (V3-017, V3-007), so they wait for no gap and spend nothing, and
+ *     anything counting speech Sotto chose to make has to leave them out
+ *     ({@link isUnpromptedKind}).
  */
 
 import { sottoTurnId } from "./turns.js";
@@ -36,8 +37,8 @@ export const SPOKEN_CONTRIBUTION_STAGE = "spoken_contribution";
  * factual error at boldness `bold`. `readback` is V3-013's: the decision the
  * group has just settled, with the group's own unsettled question on it when
  * one fits. `offer` is V3-005's: a finding nobody asked for, mentioned as a
- * statement so that nobody owes it a reply. `called_on` is V3-017's and is
- * the odd one out — the room asked.
+ * statement so that nobody owes it a reply. `called_on` is V3-017's and
+ * `ideas` is V3-007's, and those two are the odd ones out — the room asked.
  */
 export const spokenContributionKinds = [
   "reserve",
@@ -47,19 +48,22 @@ export const spokenContributionKinds = [
   "readback",
   "offer",
   "called_on",
+  "ideas",
 ] as const;
 export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
 
 /**
  * Whether this kind of line is Sotto choosing to speak.
  *
- * Everything but `called_on`, which the room asked for: it is held to none of
- * the rules about speaking unasked and must not be counted among the
- * utterances the eval's false-speech gate is about (V3-010), exactly as a
- * research card is kept out of the delivery filters (V2-014).
+ * Everything but `called_on` and `ideas`, which the room asked for: they are
+ * held to none of the rules about speaking unasked and must not be counted
+ * among the utterances the eval's false-speech gate is about (V3-010),
+ * exactly as a research card is kept out of the delivery filters (V2-014).
+ * The `offer` that preceded a set of `ideas` (V3-007) is the unprompted half
+ * of that exchange, and is counted.
  */
 export function isUnpromptedKind(kind: SpokenContributionKind): boolean {
-  return kind !== "called_on";
+  return kind !== "called_on" && kind !== "ideas";
 }
 
 /**
@@ -146,8 +150,9 @@ export interface SpokenContributionRecord {
   /** What was settled, on a `readback`: "six gardens, Saturday". */
   decision?: string;
   /**
-   * The card being read out, on a `called_on` (V3-017), or the card an
-   * `offer` is about (V3-005) — absent when there was nothing raised to read.
+   * The card being read out, on a `called_on` (V3-017), the card an `offer`
+   * is about (V3-005) or the one a set of `ideas` goes up as (V3-007) —
+   * absent when there was nothing raised to read.
    */
   cardId?: string;
   /** The packet an `offer` is offering (V3-005). */

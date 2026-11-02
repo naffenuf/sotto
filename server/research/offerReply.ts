@@ -2,7 +2,8 @@
  * V3-005's reply classifier: Sotto offered something, and somebody answered.
  *
  * The offer is a statement ("There's a quick rundown on competitors on screen
- * if you want it"), so the reply is whatever the next person happens to say —
+ * if you want it", "I've got a few ideas on the name if they'd help" —
+ * V3-007), so the reply is whatever the next person happens to say —
  * "sure", "go on", "not now", or something about the conversation that has
  * nothing to do with the offer at all. Nothing lexical can tell the last two
  * apart reliably: "yeah, and the other thing is the deposit" is agreement
@@ -33,7 +34,7 @@ export type OfferReplyResult = z.infer<typeof OfferReplySchema>;
 export interface OfferedFinding {
   /** Two or three words naming the subject. */
   topic: string;
-  /** What the search found, as the card says it. */
+  /** What Sotto has: the packet's title, or what the ideas are about. */
   title: string;
   /** The sentence Sotto said out loud. */
   spokenText: string;
@@ -67,7 +68,7 @@ export async function classifyOfferReply(
     label: "offer-reply",
     system: loadPrompt(PROMPTS.offerReply),
     user:
-      `Sotto has looked up: ${input.offer.topic} — ${input.offer.title}` +
+      `What Sotto has in hand: ${input.offer.topic} — ${input.offer.title}` +
       `\n\nSotto just said, unprompted: ${input.offer.spokenText}` +
       `\n\nPrevious turns:\n${input.previous.map(named).join("\n") || "(none)"}` +
       `\n\nLATEST turn:\n${named(input.turn)}`,

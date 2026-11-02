@@ -88,7 +88,8 @@ import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
 import { classifyQuestion, type OpenQuestion } from "../question/question.js";
 import { QuestionWatcher } from "../question/QuestionWatcher.js";
-import { Reservations } from "../question/Reservations.js";
+import { Reservations, stallIdeasLine, stallOfferLine } from "../question/Reservations.js";
+import { isUnpromptedKind } from "../../shared/spoken.js";
 import { ReadBacks } from "../decision/ReadBacks.js";
 import { decisionNote } from "../decision/readback.js";
 import { StillCurrentWatcher } from "../question/StillCurrentWatcher.js";
@@ -97,11 +98,15 @@ import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { FollowUpWindow } from "../answer/FollowUpWindow.js";
 import { classifyFollowUp } from "../answer/followUp.js";
-import { OfferWindow } from "../research/OfferWindow.js";
+import { OfferWindow, type OfferSubject } from "../research/OfferWindow.js";
 import { classifyOfferReply } from "../research/offerReply.js";
 import { Greeting } from "./Greeting.js";
 import { introducedNames } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
+// V3-007: a group going round in circles is offered a few ideas, and nothing
+// is said or shown unless somebody takes the offer up.
+import { StallOffers, stallIdeasCard } from "../stall/StallOffers.js";
+import { writeStallIdeas } from "../stall/stallIdeas.js";
 import { SessionDigest, asksForWrapUp } from "./digest.js";
 import { WrapUp } from "./WrapUp.js";
 import { SessionTranscription } from "./SessionTranscription.js";
@@ -304,11 +309,17 @@ interface ModelLoops {
    */
   followUp: FollowUpWindow | null;
   /**
-   * The ten seconds after Sotto offers a finding (V3-005), or `null` with no
-   * model client — nothing gets researched without one, so nothing is
-   * offered.
+   * The ten seconds after Sotto offers a finding (V3-005) or a few ideas
+   * (V3-007), or `null` with no model client — nothing gets researched or
+   * thought up without one, so nothing is offered.
    */
   offers: OfferWindow | null;
+  /**
+   * The ideas for a group going round in circles (V3-007), or `null` with no
+   * model client. A `stall` candidate never goes to the interjection policy:
+   * what it starts is an offer, and ideas only if somebody says yes.
+   */
+  stalls: StallOffers | null;
   board: BoardUpdater | null;
   observer: Observer | null;
   verifier: Verifier | null;
@@ -443,8 +454,10 @@ interface RunningSession {
   questions: QuestionWatcher | null;
   /** V3-014: the follow-up window, closed with the session. */
   followUp: FollowUpWindow | null;
-  /** V3-005: the ten seconds after an offer, closed with the session. */
+  /** V3-005, V3-007: the ten seconds after an offer, closed with the session. */
   offers: OfferWindow | null;
+  /** V3-007: the ideas for a stuck group, stopped with the session. */
+  stalls: StallOffers | null;
   /** V3-015: the claims waiting for a gap, silenced with the session. */
   reservations: Reservations | null;
   /** V3-004: the cached "is the room still on this?", retired with the session. */
@@ -715,6 +728,7 @@ export class SessionManager {
     running.questions?.stop();
     running.followUp?.stop();
     running.offers?.stop();
+    running.stalls?.stop();
     running.greeting?.stop();
     running.wrapUp.stop();
     running.research?.stop();
@@ -1295,6 +1309,7 @@ export class SessionManager {
         questions: null,
         followUp: null,
         offers: null,
+        stalls: null,
         reservations: null,
         stillCurrent: null,
         readBacks: null,
@@ -1448,13 +1463,15 @@ export class SessionManager {
       model,
       logger: this.logger,
       onRecord: (record) => recordCandidate(record),
-      // Three destinations. A claim that looks wrong is checked against the
+      // Four destinations. A claim that looks wrong is checked against the
       // web before it can be said to anyone (US-013); a research hook leaves
       // the interjection path altogether for the research gate (V2-012) and
-      // is never said to the room at all; and everything else goes straight
-      // to the policy.
+      // is never said to the room at all; a stall leaves it too, for a few
+      // ideas that are *offered* rather than said (V3-007); and everything
+      // else goes straight to the policy.
       onCandidate: (candidate) => {
         if (candidate.type === "research_hook") { research.acceptHook(candidate); onTiming({ stage: "research_hook", atMs: clock.now(), candidateId: candidate.id, headline: candidate.headline }); }
+        else if (candidate.type === "stall") { stalls?.accept(candidate); }
         else if (candidate.type === "factual_error") { onTiming({ stage: "verification_start", atMs: clock.now(), candidateId: candidate.id }); verifier.verify(candidate); }
         else gate.accept(candidate);
       },
@@ -1516,6 +1533,10 @@ export class SessionManager {
     // agent it briefs from. Nothing can be offered before the first search
     // has come back, which is a gate and a search away.
     let offers: OfferWindow | undefined;
+    // V3-007: and the ideas for a group going round in circles, built below
+    // with the reservations that offer them. The observer's `stall` candidate
+    // is at least a board update away, so nothing reaches it before then.
+    let stalls: StallOffers | undefined;
     const researchCards = new ResearchCards({
       clock,
       pauseState,
@@ -1554,6 +1575,7 @@ export class SessionManager {
           askedAtMs: clock.now(),
         });
         reservations.offer({
+          offerId: packet.id,
           packetId: packet.id,
           ideaId: packet.ideaId,
           turnId: idea?.sourceTurnIds.at(-1) ?? "",
@@ -1616,14 +1638,13 @@ export class SessionManager {
       onSaying: () => steering.noteContribution(),
       onRecord: (record) => {
         onTiming({ ...record });
-        // V3-006: everything said here is unprompted, so a line the room
-        // actually heard opens the fifteen-second window an addressed "stop"
-        // is read inside, and a line a voice in the room cut off is the hint
-        // that two of, inside ten minutes, turn Sotto down. Everything but a
-        // card the room called for (V3-017), which is an answer to a direct
-        // question: neither its "stop" nor its yields are about how much
-        // Sotto says unasked.
-        if (record.kind !== "called_on") steering.observe(record);
+        // V3-006: everything said here unprompted opens the fifteen-second
+        // window an addressed "stop" is read inside, and a line a voice in the
+        // room cut off is the hint that two of, inside ten minutes, turn Sotto
+        // down. Not the two the room asked for — a card it called for
+        // (V3-017) and the ideas it said yes to (V3-007): neither their
+        // "stop" nor their yields are about how much Sotto says unasked.
+        if (isUnpromptedKind(record.kind)) steering.observe(record);
         // V3-004: once the answer has been said, shown or written off, nothing
         // more will be said about this question — so stop paying for a verdict
         // on every remaining final turn. A measured run that left the watcher
@@ -1658,11 +1679,32 @@ export class SessionManager {
         // nothing more will be said about this finding unasked.
         if (record.kind === "offer") {
           stillCurrent.forget(record.ideaId);
-          const packet = researchRunner.packets().find((one) => one.id === record.packetId);
-          if (record.spoken && record.yielded !== true && packet !== undefined) {
-            offers?.offered({ packet, topic: record.topic, spokenText: record.text });
+          if (record.spoken && record.yielded !== true) {
+            // V3-007: the same ten seconds, for the other thing that can be
+            // offered. Which one it was is in the record: a finding carries
+            // its packet, a set of ideas carries nothing but its own id.
+            const packet = researchRunner.packets().find((one) => one.id === record.packetId);
+            const ideas = stalls?.ideasFor(record.ideaId);
+            if (packet !== undefined) {
+              offers?.offered({
+                subject: { kind: "research", packet },
+                topic: record.topic,
+                title: packet.title,
+                spokenText: record.text,
+              });
+            } else if (ideas !== undefined) {
+              offers?.offered({
+                subject: { kind: "stall", ideas },
+                topic: record.topic,
+                title: `a few ideas on ${ideas.topic}`,
+                spokenText: record.text,
+              });
+            }
           }
         }
+        // V3-007: the ideas the room said yes to have been said, so the card
+        // beside them is on the stage and there is nothing left to offer.
+        if (record.kind === "ideas") stillCurrent.forget(record.ideaId);
         // V3-013: the two limits count what the room really heard, so the
         // read-backs are told what became of each line — and a decision
         // nothing more will be said about needs no further verdicts.
@@ -1880,6 +1922,42 @@ export class SessionManager {
         });
       },
     });
+    // V3-007: the ideas for a group going round in circles. The observer
+    // noticed the loop; this writes the ideas — one Spark call, no search,
+    // because the material is the group's own conversation — and hands them
+    // to the reservations to be *offered* in V3-005's statement form. At most
+    // one offer per ten minutes, and nothing is said or shown unless somebody
+    // takes it up.
+    stalls = new StallOffers({
+      clock,
+      // Real time: how long the ideas took is wall-clock work, and a
+      // `max`-speed replay's clock stands still inside a model call.
+      wallClock: this.wallClock,
+      write: (input) => writeStallIdeas(model, input),
+      board: () => board.board(),
+      // The room's own turns: Sotto's line (V2-008a) is in the transcript but
+      // it is not the group going round in circles.
+      turns: transcript,
+      offer: (ideas) => {
+        // Watched before it is offered, so the verdict the pause reads is
+        // already there (V3-004): a group that has moved on from what it was
+        // stuck on is not offered ideas about it.
+        stillCurrent.watch(ideas.id, {
+          question: ideas.stuckOn,
+          answer: ideas.ideas.join(" "),
+          askedAtMs: clock.now(),
+        });
+        return reservations.offer({
+          offerId: ideas.id,
+          ideaId: ideas.id,
+          turnId: ideas.turnId,
+          topic: ideas.topic,
+          text: stallOfferLine(ideas.topic),
+        });
+      },
+      onRecord: (record) => onTiming({ ...record }),
+      logger: this.logger,
+    });
     // V3-005: Sotto has offered something, so for the next ten seconds "go
     // on" needs no wake word. A yes is V2-015's spoken briefing, from that
     // one packet rather than from whichever ones the words happen to match.
@@ -1891,17 +1969,41 @@ export class SessionManager {
       classify: (input, signal) => classifyOfferReply(model, input, signal),
       speakers: () => this.bus.speakerNames(),
       onTiming,
-      onAccepted: (packet, asked) => {
+      onAccepted: (subject: OfferSubject, asked) => {
         if (this.current?.info.id !== info.id) return;
+        // The floor belongs to whoever just asked, exactly as it does for a
+        // question by name (US-017).
+        policy.wakePhraseDetected();
+        if (subject.kind === "stall") {
+          // V3-007: the ideas are already written, so the yes is answered
+          // with no model call at all — said under V3-017's rules (the room
+          // asked) and shown on a card at the same moment, which is the only
+          // moment ideas nobody asked for would ever be shown.
+          const ideas = subject.ideas;
+          const card = stallIdeasCard(ideas, clock.now());
+          this.logger.log(
+            `[offer] ${info.id} ${asked.turnId} asked to hear ${ideas.id}: ${ideas.topic}`,
+          );
+          store.writer?.appendTiming?.({
+            stage: "offer_accepted", atMs: clock.now(), turnId: asked.turnId, stallId: ideas.id,
+          });
+          if (this.last?.sessionId === info.id) this.bus.publishCard(card);
+          reservations.ideas({
+            stallId: ideas.id,
+            turnId: asked.turnId,
+            topic: ideas.topic,
+            text: stallIdeasLine(ideas.topic, ideas.ideas),
+            cardId: card.id,
+          });
+          return;
+        }
+        const packet = subject.packet;
         this.logger.log(
           `[offer] ${info.id} ${asked.turnId} took up ${packet.id}: ${packet.title}`,
         );
         store.writer?.appendTiming?.({
           stage: "offer_accepted", atMs: clock.now(), turnId: asked.turnId, packetId: packet.id,
         });
-        // The floor belongs to whoever just asked, exactly as it does for a
-        // question by name (US-017).
-        policy.wakePhraseDetected();
         answers.ask({
           question: `What did you find on ${asked.topic}?`,
           askedBy: asked.speaker,
@@ -1910,7 +2012,7 @@ export class SessionManager {
         });
       },
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, reservations, stillCurrent, readBacks, steering };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
   }
 
   /**
@@ -2265,6 +2367,7 @@ export class SessionManager {
     running.questions?.stop();
     running.followUp?.stop();
     running.offers?.stop();
+    running.stalls?.stop();
     running.greeting?.stop();
     running.research?.stop();
     running.reservations?.stop();
@@ -2360,6 +2463,9 @@ async function drainLoops(
   // from: every idea gets its gate verdict written down even though nothing
   // will be searched now. The planner does not take a final look (V2-012).
   await loops.research?.flush();
+  // V3-007: ideas being written when the talking stopped still get offered,
+  // and the offer is a line the reservations below are about to say.
+  await loops.stalls?.flush();
   // And the claims again: the last packet out of that flush may have had an
   // answer worth saying (V3-004), and whatever gets said belongs in the
   // transcript it was said into.

@@ -32,6 +32,8 @@ import {
   noAnswerLine,
   offerLine,
   reserveLine,
+  stallIdeasLine,
+  stallOfferLine,
   reserveUtteranceId,
   type SpokenContributionRecord,
 } from "./Reservations.js";
@@ -1597,6 +1599,7 @@ describe("Reservations: called on (V3-017)", () => {
 describe("Reservations: offering a finding (V3-005)", () => {
   /** A packet nobody asked for, as `ResearchCards` hands it over. */
   const found = {
+    offerId: "packet-1",
     packetId: "packet-1",
     ideaId: "idea-3",
     turnId: "0:11",
@@ -1680,7 +1683,7 @@ describe("Reservations: offering a finding (V3-005)", () => {
     run.speak();
     expect(run.reservations.offer(found)).toBe(true);
     expect(
-      run.reservations.offer({ ...found, packetId: "packet-2", ideaId: "idea-4" }),
+      run.reservations.offer({ ...found, offerId: "packet-2", packetId: "packet-2", ideaId: "idea-4" }),
     ).toBe(false);
     await run.tick();
 
@@ -1764,5 +1767,155 @@ describe("Reservations: offering a finding (V3-005)", () => {
 
     expect(voice.opened).toBe(0);
     expect(run.records[0]).toMatchObject({ kind: "offer", spoken: false, reason: "expired" });
+  });
+});
+
+describe("Reservations: offering ideas to a stuck group (V3-007)", () => {
+  /** The ideas, as `StallOffers` hands them over. */
+  const offered = {
+    offerId: "stall-1",
+    ideaId: "stall-1",
+    turnId: "0:15",
+    topic: "the name",
+    text: stallOfferLine("the name"),
+  };
+  const ideas = [
+    "Pick the one you'd mind least in five years",
+    "Swap the ending of the two syllables you both liked",
+  ];
+
+  it("offers the ideas as a statement, never a question", () => {
+    expect(stallOfferLine("the name")).toBe("I've got a few ideas on the name if they'd help.");
+    // No second article in front of a topic that already has one, and a
+    // proper noun needs none either (V3-015's `asObject`).
+    expect(stallOfferLine("venue shortlist")).toBe(
+      "I've got a few ideas on the venue shortlist if they'd help.",
+    );
+    expect(stallOfferLine("Thursday's slot")).toBe(
+      "I've got a few ideas on Thursday's slot if they'd help.",
+    );
+    expect(stallOfferLine("the name")).not.toMatch(/\?|[*#_[\]`]|https?:/);
+  });
+
+  it("counts the ideas off when there is more than one, and not when there is one", () => {
+    expect(stallIdeasLine("the name", [ideas[0] as string])).toBe(
+      "A few thoughts on the name. Pick the one you'd mind least in five years.",
+    );
+    expect(stallIdeasLine("the name", ideas)).toBe(
+      "A few thoughts on the name. First, pick the one you'd mind least in five years. " +
+        "Second, swap the ending of the two syllables you both liked.",
+    );
+    expect(stallIdeasLine("the name", [])).toBe("");
+  });
+
+  it("says at most three ideas, and at most twenty seconds of them", () => {
+    const four = [...ideas, "Ask the two users you already have", "Sleep on it until Thursday"];
+    const said = stallIdeasLine("the name", four);
+    expect(said).not.toContain("Sleep on it");
+    // Nineteen-point-six characters a second, Sotto's measured rate (V3-012).
+    const long = Array.from({ length: 3 }, () => "w".repeat(180));
+    expect(stallIdeasLine("the name", long).length / 19.6).toBeLessThanOrEqual(20);
+  });
+
+  it("is said at once when the room says yes: they stopped talking to ask", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    // Somebody is still mid-sentence, which an unprompted line would wait out.
+    run.speak();
+    run.reservations.ideas({
+      stallId: "stall-1",
+      turnId: "0:17",
+      topic: "the name",
+      text: stallIdeasLine("the name", ideas),
+      cardId: "notice-ideas-stall-1",
+    });
+    await run.tick();
+    voice.played();
+    await run.reservations.flush();
+
+    expect(voice.said).toEqual([stallIdeasLine("the name", ideas)]);
+    expect(run.records[0]).toMatchObject({
+      stage: "spoken_contribution",
+      kind: "ideas",
+      ideaId: "stall-1",
+      cardId: "notice-ideas-stall-1",
+      turnId: "0:17",
+      topic: "the name",
+      spoken: true,
+    });
+    // The offer charged the allowance; the ideas are that same contribution
+    // reaching the room's ears (V3-008's rule for a spoken correction).
+    expect(run.spend.spent).toBe(0);
+    // And they are Sotto's own line in the transcript (V2-008a).
+    expect(run.spoken.map((turn) => turn.text)).toEqual([
+      stallIdeasLine("the name", ideas),
+    ]);
+  });
+
+  it("is not silenced by a cautious session or an empty allowance: the room asked", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice, {
+      settings: { boldness: "cautious", frequency: "rare" },
+      verdict: "cooldown",
+    });
+    run.reservations.ideas({
+      stallId: "stall-1",
+      turnId: "0:17",
+      topic: "the name",
+      text: stallIdeasLine("the name", ideas),
+      cardId: "notice-ideas-stall-1",
+    });
+    await run.tick();
+    voice.played();
+    await run.reservations.flush();
+
+    expect(voice.said).toHaveLength(1);
+    expect(run.records[0]).toMatchObject({ kind: "ideas", spoken: true });
+  });
+
+  it("is not taken away by an ordinary voice, as the offer itself would be", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.ideas({
+      stallId: "stall-1",
+      turnId: "0:17",
+      topic: "the name",
+      text: stallIdeasLine("the name", ideas),
+      cardId: "notice-ideas-stall-1",
+    });
+    await run.tick();
+    run.reservations.yieldToHuman();
+    expect(voice.cancelled).toBe(0);
+
+    // Only the barge-in (V2-007) still stops it.
+    run.reservations.interrupt();
+    expect(voice.cancelled).toBe(1);
+  });
+
+  it("offers one set of ideas once, and the offer waits for a gap", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.speak();
+    expect(run.reservations.offer(offered)).toBe(true);
+    expect(run.reservations.offer(offered)).toBe(false);
+    await run.tick();
+    expect(voice.opened).toBe(0);
+
+    run.hush();
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+    voice.played();
+    await run.reservations.flush();
+
+    expect(voice.said).toEqual(["I've got a few ideas on the name if they'd help."]);
+    // It is Sotto asking for the floor, so it charges the allowance (V3-005).
+    expect(run.spend.spent).toBe(1);
+    expect(run.records[0]).toMatchObject({
+      kind: "offer",
+      ideaId: "stall-1",
+      spoken: true,
+    });
+    // Nothing of the finding kind: a set of ideas has no packet.
+    expect(run.records[0]?.packetId).toBeUndefined();
   });
 });

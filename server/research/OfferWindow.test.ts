@@ -13,6 +13,7 @@ import {
   OFFER_TIMEOUT_CALL_MS,
   OFFER_WINDOW_MS,
   OfferWindow,
+  offerSubjectId,
 } from "./OfferWindow.js";
 import type { OfferReplyResult } from "./offerReply.js";
 
@@ -36,8 +37,9 @@ const packet: ResearchPacket = {
 };
 
 const offered = {
-  packet,
+  subject: { kind: "research", packet } as const,
   topic: "competitor pricing",
+  title: packet.title,
   spokenText: "There's a quick rundown on competitor pricing on screen if you want it.",
 };
 
@@ -77,7 +79,7 @@ function windowFor(replies: readonly (OfferReplyResult | Error | "hold")[]): Har
     },
     speakers: () => ({ A: "Craig", B: "EJ" }),
     onAccepted: (taken, asker) =>
-      briefed.push({ packetId: taken.id, turnId: asker.turnId, topic: asker.topic }),
+      briefed.push({ packetId: offerSubjectId(taken), turnId: asker.turnId, topic: asker.topic }),
     onTiming: (record) => timing.push(record),
   });
   return { window, clock, asked, briefed, timing };
@@ -112,7 +114,7 @@ describe("OfferWindow", () => {
     expect(window.isOpen()).toBe(false);
     expect(timing.filter((one) => one["stage"] === "offer_reply")).toEqual([
       {
-        stage: "offer_reply", atMs: 43_000, packetId: "packet-1", turnId: "0:9",
+        stage: "offer_reply", atMs: 43_000, offer: "research", offerId: "packet-1", turnId: "0:9",
         kind: "yes", latencyMs: 0,
       },
     ]);
@@ -215,6 +217,41 @@ describe("OfferWindow", () => {
     expect(asked).toEqual([]);
     expect(briefed).toEqual([]);
     expect(window.isOpen()).toBe(true);
+  });
+
+  it("hands back a set of ideas as happily as a packet (V3-007)", async () => {
+    const { window, clock, briefed, timing, asked } = windowFor([yes]);
+    clock.advanceTo(70_000);
+    window.offered({
+      subject: {
+        kind: "stall",
+        ideas: {
+          id: "stall-1",
+          candidateId: "cand-4",
+          topic: "the name",
+          stuckOn: "Three names, all ruled out: what do we call it?",
+          ideas: ["Pick the one you'd mind least in five years"],
+          turnId: "0:15",
+          createdAtMs: 69_000,
+        },
+      },
+      topic: "the name",
+      title: "a few ideas on the name",
+      spokenText: "I've got a few ideas on the name if they'd help.",
+    });
+    clock.advanceTo(72_000);
+    window.acceptTurn(turn(" Go on then. Anything. ", "0:17", "B"));
+    await window.flush();
+
+    expect(briefed).toEqual([{ packetId: "stall-1", turnId: "0:17", topic: "the name" }]);
+    expect(timing.filter((one) => one["stage"] === "offer_reply")).toEqual([
+      {
+        stage: "offer_reply", atMs: 72_000, offer: "stall", offerId: "stall-1",
+        turnId: "0:17", kind: "yes", latencyMs: 0,
+      },
+    ]);
+    // The classifier is told what Sotto has in hand, whichever kind it is.
+    expect(asked).toEqual([" Go on then. Anything. "]);
   });
 
   it("abandons an open offer when the session stops", async () => {

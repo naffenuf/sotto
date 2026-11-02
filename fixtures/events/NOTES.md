@@ -294,3 +294,21 @@ Measured end to end on `ask-diagram` (`npm run verify:artifact`, one real answer
 model draws a 2.6–2.9 kB self-contained document with inline CSS and no external
 references, and the whole answer — wake phrase to a finished card with a frame on it —
 takes 25–40 s.
+
+## A turn with no words in it (V3-007, `stalled-naming`)
+
+The endpointer occasionally opens and closes a segment with nothing in it. In
+`stalled-naming` there are **25** `speechStart`/`speechEnd`/`speechComplete` triples for
+**24** scripted lines: the extra one runs from 28,140 ms to 28,220 ms — 80 ms, one audio
+chunk — between "Of course there is." and the line after it, and has **no `transcript`
+frame and no `speaker` frame** between its start and its end. So the capture has 24
+`speaker` frames for 25 turns, and the turn it belongs to would have come out of the
+assembler with an empty text and a `null` speaker.
+
+No other capture in `fixtures/events/` has one (198 turns before this fixture, all
+non-empty), so it is rare rather than routine — but it is the API's behaviour and not a
+render artifact, and an empty final turn would reach the transcript, the board's four-turn
+cadence and every classifier. `TurnAssembler.finalise` therefore **drops a turn that never
+carried a word** and counts it in `emptyTurns()`; a `speechComplete` that arrives empty
+*after* real partials still keeps the empty text, which is how every other capture has
+been read.

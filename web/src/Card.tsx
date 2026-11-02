@@ -48,14 +48,17 @@ const RESEARCHED = "Sotto looked this up…";
  * Whether this card's markdown *is* the card rather than an aside behind
  * "details ▾".
  *
- * A research card's key points (V2-014) and a wrap-up's summary (V2-018) are
- * both the thing somebody wanted to see: "Where we got to" with the summary
- * hidden is a card that says nothing. The hello and the name nudge are the
- * other way round — a headline, with the how-to tucked away.
+ * A research card's key points (V2-014), a wrap-up's summary (V2-018) and the
+ * ideas a stuck group asked to hear (V3-007) are all the thing somebody
+ * wanted to see: "Where we got to" with the summary hidden is a card that
+ * says nothing. The hello and the name nudge are the other way round — a
+ * headline, with the how-to tucked away.
  */
 function detailIsTheCard(card: StageCard): boolean {
   if (card.variant === "research") return true;
-  return card.id.startsWith(NOTICE_CARD_IDS.wrapUp);
+  return (
+    card.id.startsWith(NOTICE_CARD_IDS.wrapUp) || card.id.startsWith(NOTICE_CARD_IDS.ideas)
+  );
 }
 
 /**

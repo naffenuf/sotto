@@ -25,8 +25,9 @@
  *   it carries no feedback buttons.
  * - `notice`: Sotto talking about itself rather than about the conversation —
  *   the opening hello when the voice is muted, the one nudge for names
- *   (V2-009), a wrap-up nothing could say out loud (V2-018) and the note
- *   saying the room just turned it down or up (V3-006). Plain, unaccented, and carrying no feedback buttons: there is no
+ *   (V2-009), a wrap-up nothing could say out loud (V2-018), the note saying
+ *   the room just turned it down or up (V3-006) and the ideas a stuck group
+ *   asked to hear (V3-007). Plain, unaccented, and carrying no feedback buttons: there is no
  *   decision to speak here for the group to have an opinion about, which is
  *   also why the eval harness and the end-to-end checks never count one as a
  *   delivery.
@@ -57,6 +58,12 @@ export const NOTICE_CARD_IDS = {
    * again in one conversation and each note says what changed.
    */
   steering: "notice-steering",
+  /**
+   * "A few ideas on the name" — the ideas a group that was stuck asked to
+   * hear (V3-007), numbered by the set they belong to. It goes up only on a
+   * yes: ideas nobody asked for are what the offer exists to not do.
+   */
+  ideas: "notice-ideas",
 } as const;
 
 /**

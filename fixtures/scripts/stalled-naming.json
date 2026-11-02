@@ -1,0 +1,127 @@
+{
+  "lines": [
+    {
+      "speaker": "B",
+      "text": "Okay, last thing on the list. The name.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Right. The name.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "We said we'd land it this week, and we've been saying that for three weeks.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "What have we actually got? Meadow, Tilde, and the one you wince at.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Parcel. And I don't wince, I just can't say it out loud twice.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "A",
+      "text": "So, nothing.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "B",
+      "text": "Meadow's taken. There's a payments company called Meadow.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "Of course there is.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "And nobody can spell Tilde. We'd be spelling it out on every call forever.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "Which puts us back on Parcel, which you can't say out loud twice.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "B",
+      "text": "I don't know. I genuinely don't know what we call this thing.",
+      "pauseAfterMs": 1700
+    },
+    {
+      "speaker": "A",
+      "text": "Me neither. We go round this every week and land in exactly the same place.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "B",
+      "text": "Read me the three again.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Meadow, Tilde, Parcel.",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "B",
+      "text": "Meadow's gone, Tilde's unspellable, Parcel's unsayable. That's the whole list.",
+      "pauseAfterMs": 1900
+    },
+    {
+      "speaker": "A",
+      "text": "We're stuck. That's what this is.",
+      "pauseAfterMs": 2400
+    },
+    {
+      "speaker": "B",
+      "text": "Yeah. I've got nothing new.",
+      "pauseAfterMs": 2200
+    },
+    {
+      "speaker": "A",
+      "text": "Go on then. Anything.",
+      "pauseAfterMs": 2000
+    },
+    {
+      "speaker": "B",
+      "text": "Honestly, at this point I'd take a suggestion from the kettle.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "A",
+      "text": "Okay. Let's leave the name and come back to it Thursday with fresh heads.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "B",
+      "text": "Thursday. But we decide on Thursday, we don't do this again.",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "A",
+      "text": "Agreed. Thursday.",
+      "pauseAfterMs": 1200
+    },
+    {
+      "speaker": "B",
+      "text": "Right. Anything else on the list?",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "A",
+      "text": "No, that was the list. That's us.",
+      "pauseAfterMs": 1000
+    }
+  ],
+  "wakeQuestions": [],
+  "followUpLines": [],
+  "moments": []
+}

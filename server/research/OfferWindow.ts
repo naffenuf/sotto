@@ -1,12 +1,20 @@
 /**
- * V3-005: the ten seconds after Sotto offers something, in which "go on"
- * needs no wake word.
+ * V3-005, V3-007: the ten seconds after Sotto offers something, in which "go
+ * on" needs no wake word.
  *
  * {@link Reservations.offer} says the sentence — a statement, so that nobody
  * owes a reply — and this owns everything that happens next. The *next* final
- * turn from anybody is read by {@link OfferReplyClassifier}: a `yes` becomes
- * V2-015's spoken briefing from that packet, and everything else lets the
- * offer lapse with the card still on the stage.
+ * turn from anybody is read by {@link OfferReplyClassifier}: a `yes` hands
+ * what was offered back to whoever offered it, and everything else lets the
+ * offer lapse.
+ *
+ * Two things can be offered, and the window does not care which. A finished
+ * search (V3-005) is accepted by briefing the room from that packet
+ * (V2-015), and its card is on the stage either way; a few ideas for a group
+ * going round in circles (V3-007) are accepted by saying them, and nothing
+ * about them is shown unless somebody says yes. So the open offer carries an
+ * opaque {@link OfferSubject} and the classifier is told only what the room
+ * heard.
  *
  * Four rules, and three of them are about saying nothing:
  *
@@ -18,8 +26,10 @@
  *     point of making it a statement.
  *   - a turn that says Sotto's name is left to the address path (V2-008),
  *     which owes it an answer whatever it is, and the window closes without
- *     a call — "Sotto, go ahead" reaches the raised hand (V3-017), where that
- *     packet's own card is waiting to be read out.
+ *     a call — "Sotto, go ahead" reaches the raised hand (V3-017), where a
+ *     finished search's own card is waiting to be read out. A set of ideas
+ *     has no card until somebody says yes (V3-007), so that route loses
+ *     them; the observer notices the loop again on its next look.
  *   - an unreadable verdict, a failed call and a timed-out call all close it.
  *
  * The clock is the session's, like the follow-up window's: ten seconds is a
@@ -27,6 +37,7 @@
  * seconds a room would.
  */
 import type { ResearchPacket } from "../../shared/research.js";
+import type { StallIdeas } from "../../shared/stall.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import type { SpeakerNames } from "../../shared/events.js";
 import { systemClock, type Clock } from "../clock.js";
@@ -44,6 +55,22 @@ export const OFFER_WINDOW_MS = 10_000;
 /** A slow classifier must not hold the window open; the verdict is then none. */
 export const OFFER_TIMEOUT_CALL_MS = 6_000;
 
+/**
+ * What is being offered: a finished search (V3-005) or a few ideas for a
+ * group that is stuck (V3-007).
+ *
+ * A union rather than two windows, because "at most one open offer at a time"
+ * is a rule about the room's attention and not about what the offer is of.
+ */
+export type OfferSubject =
+  | { kind: "research"; packet: ResearchPacket }
+  | { kind: "stall"; ideas: StallIdeas };
+
+/** What the log calls the thing offered, so a reader can find it again. */
+export function offerSubjectId(subject: OfferSubject): string {
+  return subject.kind === "research" ? subject.packet.id : subject.ideas.id;
+}
+
 /** What became of one offer, as `timing.jsonl` records it. */
 export type OfferOutcome =
   | OfferReplyKind
@@ -58,9 +85,9 @@ export interface OfferWindowOptions {
   wallClock?: Clock;
   classify: OfferReplyClassifier;
   speakers: () => SpeakerNames;
-  /** A yes: brief the room from this packet, exactly as V2-015 does. */
+  /** A yes: hand what was offered back to whoever offered it. */
   onAccepted: (
-    packet: ResearchPacket,
+    subject: OfferSubject,
     asked: { turnId: string; speaker: string | null; topic: string },
   ) => void;
   onTiming: (record: Record<string, unknown>) => void;
@@ -68,8 +95,10 @@ export interface OfferWindowOptions {
 
 /** One open offer. */
 interface Open {
-  packet: ResearchPacket;
+  subject: OfferSubject;
   topic: string;
+  /** What was offered, as the classifier is told about it. */
+  title: string;
   /** The sentence the room heard, which is the classifier's context. */
   spokenText: string;
   /** Session clock when it was said, for the log. */
@@ -98,13 +127,20 @@ export class OfferWindow {
   }
 
   /** Sotto has just said the offer out loud: the room has ten seconds. */
-  offered(input: { packet: ResearchPacket; topic: string; spokenText: string }): void {
+  offered(input: {
+    subject: OfferSubject;
+    topic: string;
+    /** What was offered, in a few words, for the classifier's context. */
+    title: string;
+    spokenText: string;
+  }): void {
     if (this.stopped) return;
     this.open?.cancel();
     const saidAtMs = this.options.clock.now();
     this.open = {
-      packet: input.packet,
+      subject: input.subject,
       topic: input.topic,
+      title: input.title,
       spokenText: input.spokenText,
       saidAtMs,
       cancel: this.options.clock.setTimeout(() => this.close("timeout"), OFFER_WINDOW_MS),
@@ -113,8 +149,8 @@ export class OfferWindow {
       stage: "offer_window",
       event: "opened",
       atMs: saidAtMs,
-      packetId: input.packet.id,
-      ideaId: input.packet.ideaId,
+      offer: input.subject.kind,
+      offerId: offerSubjectId(input.subject),
       topic: input.topic,
     });
   }
@@ -155,7 +191,8 @@ export class OfferWindow {
       this.options.onTiming({
         stage: "offer_reply",
         atMs: this.options.clock.now(),
-        packetId: open.packet.id,
+        offer: open.subject.kind,
+        offerId: offerSubjectId(open.subject),
         turnId: turn.turnId,
         kind: "addressed",
         latencyMs: 0,
@@ -194,7 +231,8 @@ export class OfferWindow {
     this.options.onTiming({
       stage: "offer_reply",
       atMs: this.options.clock.now(),
-      packetId: open.packet.id,
+      offer: open.subject.kind,
+      offerId: offerSubjectId(open.subject),
       turnId: turn.turnId,
       kind,
       latencyMs: this.wall.now() - started,
@@ -204,7 +242,7 @@ export class OfferWindow {
     // followed it, and the card carries on saying what Sotto has.
     this.close(kind);
     if (kind !== "yes") return;
-    this.options.onAccepted(open.packet, {
+    this.options.onAccepted(open.subject, {
       turnId: turn.turnId,
       speaker: turn.speaker,
       topic: open.topic,
@@ -237,7 +275,7 @@ export class OfferWindow {
               speakers: this.options.speakers(),
               offer: {
                 topic: open.topic,
-                title: open.packet.title,
+                title: open.title,
                 spokenText: open.spokenText,
               },
             },
@@ -263,8 +301,8 @@ export class OfferWindow {
       stage: "offer_window",
       event: "closed",
       atMs: this.options.clock.now(),
-      packetId: open.packet.id,
-      ideaId: open.packet.ideaId,
+      offer: open.subject.kind,
+      offerId: offerSubjectId(open.subject),
       outcome,
       openMs: Math.max(0, this.options.clock.now() - open.saidAtMs),
     });

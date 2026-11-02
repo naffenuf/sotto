@@ -8,7 +8,8 @@
  * saying something is expensive, so every candidate is written down with its
  * scores (`candidates.jsonl`) and only a few of them ever reach the stage —
  * and a `research_hook` is not for the stage at all, but for the research
- * gate (V2-012).
+ * gate (V2-012), nor is a `stall`, which becomes an offer of a few ideas
+ * (V3-007).
  *
  * The limits in the PRD — ninety characters of headline, sixty words of
  * detail, twenty of "why now" — are asked for in the prompt and in the
@@ -21,7 +22,7 @@ import type { Citation, EvidenceQuote } from "./cards.js";
 import type { Decision, DecisionReason, PolicyDecision } from "./policy.js";
 
 /**
- * The six things the observer looks for.
+ * The seven things the observer looks for.
  *
  * - `contradiction`: what was just said cannot hold together with something
  *   the group already settled or stated.
@@ -38,6 +39,12 @@ import type { Decision, DecisionReason, PolicyDecision } from "./policy.js";
  *   asked for out loud, or a number nobody in the room can back up. The one
  *   type that never reaches the interjection policy: a hook is an *idea for
  *   the research gate* (V2-012), not something to say to anybody.
+ * - `stall`: the group is going round in circles on one question, or has said
+ *   out loud that it is stuck. The second type that never reaches the policy
+ *   (V3-007): what it starts is a few ideas, *offered* as a statement and
+ *   said only if somebody takes the offer up, because unasked-for ideas in a
+ *   room that is merely thinking are the interruption this whole loop exists
+ *   to avoid.
  */
 export const candidateTypes = [
   "contradiction",
@@ -46,6 +53,7 @@ export const candidateTypes = [
   "dropped_thread",
   "unanswered_question",
   "research_hook",
+  "stall",
 ] as const;
 export type CandidateType = (typeof candidateTypes)[number];
 
@@ -488,7 +496,9 @@ export const observerCandidatesJsonSchema = {
               "unanswered_question: a direct question nobody answered before the " +
               "conversation moved on. " +
               "research_hook: outside information would clearly help, and a web " +
-              "search could find it.",
+              "search could find it. " +
+              "stall: the same question has come round three or more times with no " +
+              "progress, or somebody has said the group is stuck.",
             enum: [...candidateTypes],
           },
           headline: {
@@ -498,7 +508,9 @@ export const observerCandidatesJsonSchema = {
               "For contradiction, untested_assumption and dropped_thread: a specific " +
               "question about what the group just said, never a verdict or a label. " +
               "For factual_error: the correction itself. For unanswered_question and " +
-              "research_hook: the question, in the group's own words where there is one.",
+              "research_hook: the question, in the group's own words where there is one. " +
+              "For stall: what the group is stuck on, in their own words — never an " +
+              "idea of your own, which is not yours to propose here.",
           },
           detail: {
             type: "string",

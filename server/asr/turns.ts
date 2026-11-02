@@ -102,6 +102,8 @@ export class TurnAssembler {
 
   private silenceSinceMs: number;
   private malformed = 0;
+  /** Turns the endpointer opened and closed without a word in them. */
+  private empty = 0;
 
   constructor(options: TurnAssemblerOptions = {}) {
     this.clock = options.clock ?? systemClock;
@@ -143,6 +145,17 @@ export class TurnAssembler {
   /** How many frames were dropped because they didn't match their shape. */
   malformedFrames(): number {
     return this.malformed;
+  }
+
+  /**
+   * Turns the endpointer opened and closed with no word in them, which are
+   * dropped rather than published (see {@link TurnAssembler.finalise}).
+   *
+   * Not a malformed frame — every frame was the right shape — so it has a
+   * counter of its own, for a capture check that wants to know.
+   */
+  emptyTurns(): number {
+    return this.empty;
   }
 
   /**
@@ -290,6 +303,7 @@ export class TurnAssembler {
       return null;
     }
     // `speechComplete` is the only text frame tied to a turnId, so it wins.
+    const hadWords = turn.text.trim() !== "";
     turn.text = normalizeWakeSpelling(text);
     if (turn.endMs === null) {
       turn.endMs = atMs;
@@ -297,6 +311,20 @@ export class TurnAssembler {
       if (this.unclosed.length === 0) this.silenceSinceMs = atMs - ENDPOINTER_HANGOVER_MS;
     }
     this.live.delete(turnId);
+    // A turn with no words in it is not a turn. The endpointer occasionally
+    // opens and closes a segment of 80 ms with no `transcript` and no
+    // `speaker` frame between them (measured once in the `stalled-naming`
+    // capture, at 28.1 s), and publishing that as a final turn would put an
+    // empty row in the transcript, count towards the board's four-turn
+    // cadence and reach every classifier. Only a turn that never carried a
+    // word is dropped: a `speechComplete` that arrives empty *after* real
+    // partials keeps the empty text, which is the behaviour every other
+    // capture has been read with.
+    if (!hadWords && turn.text.trim() === "") {
+      this.empty += 1;
+      this.logger.warn(`[turns] dropping ${turnId}: it never carried a word`);
+      return null;
+    }
     const final = snapshot(turn, true);
     this.finals.push(final);
     this.onUpdate?.(final);

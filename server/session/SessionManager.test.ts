@@ -3797,7 +3797,7 @@ describe("SessionManager, offering a finding (V3-005)", () => {
     expect(windows.filter((record) => record["event"] === "opened")).toHaveLength(1);
     const replies = timing.filter((record) => record["stage"] === "offer_reply");
     expect(replies).toHaveLength(1);
-    expect(replies[0]).toMatchObject({ kind: "yes", packetId: "packet-1" });
+    expect(replies[0]).toMatchObject({ kind: "yes", offer: "research", offerId: "packet-1" });
     expect(windows.at(-1)).toMatchObject({ event: "closed", outcome: "yes" });
 
     // And the yes became V2-015's briefing from that packet, with nobody
@@ -3811,5 +3811,201 @@ describe("SessionManager, offering a finding (V3-005)", () => {
     expect(briefing).toHaveLength(1);
     expect(briefing[0]).toMatchObject({ packetIds: ["packet-1"] });
     expect(voice.utterances.join(" ")).toContain("forty to sixty pounds a head");
+  }, 60_000);
+});
+
+describe("SessionManager, offering ideas to a stuck group (V3-007)", () => {
+  function timingWriter(timing: Record<string, unknown>[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: () => {},
+      appendTiming: (record: Record<string, unknown>) => timing.push(record),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  /** A voice that keeps every utterance, so a replay can be read back. */
+  class StallVoice implements VoiceOut {
+    private count = 0;
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const spoken = (): string => parts.join(" ");
+      return Promise.resolve({
+        id: `v${(this.count += 1)}`,
+        append: (text) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      });
+    }
+  }
+
+  /**
+   * One `stall` candidate, on the first look only, then ideas for it and a
+   * yes to the offer they are mentioned in.
+   */
+  class StallingModel implements ModelClient {
+    readonly labels: string[] = [];
+    /** Every stall request, so the brief can be checked. */
+    readonly asked: string[] = [];
+    private looks = 0;
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "research-planner") return { ideas: [] };
+      if (call.label === "question") return { kind: "none", question: "", topic: "" };
+      if (call.label === "address") return { kind: "mention", question: "" };
+      if (call.label === "still-current") {
+        return { verdict: "current", agrees: false, why: "still on the name" };
+      }
+      // V3-005's window, which V3-007's offer opens too.
+      if (call.label === "offer-reply") return { kind: "yes" };
+      if (call.label === "stall") {
+        this.asked.push(call.user);
+        return {
+          topic: "the name",
+          ideas: [
+            "Pick the one you would mind least in five years",
+            "Swap the ending of the two syllables you both liked",
+          ],
+        };
+      }
+      if (call.label === "observer") {
+        this.looks += 1;
+        if (this.looks > 1) return { candidates: [] };
+        return {
+          candidates: [
+            {
+              type: "stall",
+              headline: "Three names, all ruled out: what do we call it?",
+              detail: "Meadow is taken, Tilde is unspellable, Parcel is unsayable.",
+              whyNow: "they have just said they are stuck",
+              evidenceTurnIds: ["0:0"],
+              relatedBoardItemIds: [],
+              scores: { relevance: 0.9, novelty: 0.8, importance: 0.7, confidence: 0.8 },
+            },
+          ],
+        };
+      }
+      return { candidates: [] };
+    }
+
+    // Nothing in this conversation searches: a stall is answered out of the
+    // group's own words, which is the whole point of writing it locally.
+    async grounded(): Promise<never> {
+      throw new Error("a stall needs no search");
+    }
+
+    async prose(): Promise<never> {
+      throw new Error("a stall needs no answer");
+    }
+  }
+
+  async function run(): Promise<{
+    model: StallingModel;
+    voice: StallVoice;
+    timing: Record<string, unknown>[];
+    cards: StageCard[];
+  }> {
+    const bus = new EventBus(quiet);
+    const model = new StallingModel();
+    const voice = new StallVoice();
+    const timing: Record<string, unknown>[] = [];
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => timingWriter(timing),
+      createModel: () => model,
+      createVoice: () => voice,
+      replaySpeed: "max",
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-contradiction" });
+    await ended;
+    return { model, voice, timing, cards };
+  }
+
+  it("offers the ideas, and says them only once somebody has said yes", async () => {
+    const { model, voice, timing, cards } = await run();
+
+    // The stall left the interjection path: no gate, no verifier, no policy
+    // decision was ever made about it (V2-011's rule for a research hook).
+    const stalls = timing.filter((record) => record["stage"] === "stall");
+    expect(stalls).toHaveLength(1);
+    expect(stalls[0]).toMatchObject({ outcome: "offered", stallId: "stall-1", topic: "the name" });
+    expect(model.labels).not.toContain("gate");
+    expect(model.labels).not.toContain("verify");
+    // The ideas were written against what the group had already ruled out.
+    expect(model.asked[0]).toContain("Meadow is taken");
+
+    // The offer is V3-005's statement, in V3-007's words, and was heard.
+    const offers = timing.filter(
+      (record) => record["stage"] === "spoken_contribution" && record["kind"] === "offer",
+    );
+    expect(offers).toHaveLength(1);
+    expect(offers[0]).toMatchObject({ ideaId: "stall-1", spoken: true, yielded: false });
+    expect(offers[0]?.["text"]).toBe("I've got a few ideas on the name if they'd help.");
+    expect(offers[0]?.["packetId"]).toBeUndefined();
+
+    // Nothing was shown before the yes: ideas nobody asked for are exactly
+    // what the offer form exists to avoid.
+    const said = timing.filter(
+      (record) => record["stage"] === "spoken_contribution" && record["kind"] === "ideas",
+    );
+    expect(said).toHaveLength(1);
+    expect(said[0]).toMatchObject({
+      ideaId: "stall-1",
+      cardId: "notice-ideas-stall-1",
+      spoken: true,
+    });
+    expect(said[0]?.["text"]).toContain("A few thoughts on the name.");
+    expect(voice.utterances).toContain(said[0]?.["text"]);
+    expect(voice.utterances.join(" ")).toContain("mind least in five years");
+
+    // And the card went up with the sentence, not before it.
+    const card = cards.find((one) => one.id === "notice-ideas-stall-1");
+    expect(card).toMatchObject({ variant: "notice", state: "ready" });
+    expect(card?.headline).toBe("A few ideas on the name");
+    const accepted = timing.filter((record) => record["stage"] === "offer_accepted");
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]).toMatchObject({ stallId: "stall-1" });
+    // The yes costs no model call of its own: the ideas were already written.
+    expect(model.labels.filter((label) => label === "stall")).toHaveLength(1);
+    expect(model.labels).not.toContain("answer");
   }, 60_000);
 });

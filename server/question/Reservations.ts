@@ -64,7 +64,13 @@ import { isSottoTurn, sottoTurn, type PauseState, type TurnUpdate } from "../../
 // which "go on" needs no wake word.
 import { RESEARCH_NO_ANSWER, type ResearchIdea, type ResearchPacket } from "../../shared/research.js";
 import type { PolicySettings } from "../../shared/policy.js";
+// V3-007's `ideas` is the sixth kind: a few suggestions for a group going
+// round in circles, offered first (`stallOfferLine`) and said only when
+// somebody says yes (`stallIdeasLine`). `server/stall/StallOffers.ts` is what
+// writes them.
+import { MAX_STALL_IDEAS, STALL_SPEECH_BUDGET_MS } from "../../shared/stall.js";
 import {
+  estimateSpokenMs,
   spokenUtteranceId as utteranceIdFor,
   type ReserveSkipReason,
   type SpokenContributionKind,
@@ -542,27 +548,37 @@ export class Reservations {
    * queued, so the caller knows whether to expect a window.
    */
   offer(input: {
-    /** The packet being offered, which is offered exactly once. */
-    packetId: string;
+    /**
+     * What is being offered, which is offered exactly once: a packet id
+     * (V3-005) or a set of ideas (V3-007).
+     */
+    offerId: string;
     ideaId: string;
     /** The turn the idea came out of, for the log. */
     turnId: string;
     /** Two or three words naming the subject, which the sentence is built from. */
     topic: string;
-    /** The card that went up with it. */
-    cardId: string;
+    /** The card that went up with it, where one has. */
+    cardId?: string;
+    /**
+     * The sentence, when it is not the research offer's (V3-007's ideas are
+     * offered in the same shape and different words).
+     */
+    text?: string;
+    /** The packet being offered, absent for a set of ideas (V3-007). */
+    packetId?: string;
   }): boolean {
-    if (this.stopped || this.offers.has(input.packetId)) return false;
-    this.offers.add(input.packetId);
+    if (this.stopped || this.offers.has(input.offerId)) return false;
+    this.offers.add(input.offerId);
     const nowMs = this.clock.now();
     const line: Pending = {
       kind: "offer",
       ideaId: input.ideaId,
-      packetId: input.packetId,
-      cardId: input.cardId,
+      ...(input.packetId === undefined ? {} : { packetId: input.packetId }),
+      ...(input.cardId === undefined ? {} : { cardId: input.cardId }),
       turnId: input.turnId,
       topic: input.topic,
-      text: offerLine(input.topic),
+      text: input.text ?? offerLine(input.topic),
       askedAtMs: nowMs,
       sinceMs: nowMs,
       pauseMs: SPEAK_PAUSE_MS,
@@ -636,6 +652,50 @@ export class Reservations {
     this.review();
   }
 
+  /**
+   * Somebody took the offer of ideas up (PRD V3-007): say them.
+   *
+   * The words are already written — the ideas were composed before the offer
+   * was made, which is what makes "I've got a few ideas" true when it is said
+   * and the yes answerable with no model call — so this is a card the room
+   * asked for, under {@link calledOn}'s rules rather than the rules for
+   * speaking unasked: no gap to wait for, no setting that can silence it,
+   * nothing charged (the offer spent the contribution), and no yielding to an
+   * ordinary voice. The card goes up at the same moment, and only now: ideas
+   * nobody asked for are what the offer form exists to avoid.
+   */
+  ideas(input: {
+    /** The set of ideas, which is what the transcript row is derived from. */
+    stallId: string;
+    /** The turn they said yes in. */
+    turnId: string;
+    /** What they are stuck on, for the log. */
+    topic: string;
+    /** The sentence, from {@link stallIdeasLine}. */
+    text: string;
+    /** The card the ideas go up as. */
+    cardId: string;
+  }): void {
+    if (this.stopped || input.text.trim() === "") return;
+    const nowMs = this.clock.now();
+    this.waiting.unshift({
+      kind: "ideas",
+      ideaId: input.stallId,
+      turnId: input.turnId,
+      topic: input.topic,
+      text: input.text,
+      cardId: input.cardId,
+      askedAtMs: nowMs,
+      sinceMs: nowMs,
+      pauseMs: 0,
+      expiry: null,
+      turnsWaited: 0,
+      yields: 0,
+      asked: true,
+    });
+    this.review();
+  }
+
   /** One line about one question, waiting from now, with nothing yet decided. */
   private line(
     ideaId: string,
@@ -685,7 +745,9 @@ export class Reservations {
     // delivered as (V3-008), and a closing line is the end of a claim. A card
     // the room called for (V3-017) is not Sotto choosing to speak at all.
     if (line.kind === "no_answer" || line.kind === "correction") return false;
-    if (line.kind === "called_on") return false;
+    // V3-007: the offer charged the allowance, and the ideas are that same
+    // contribution reaching the room's ears — and the room asked for them.
+    if (line.kind === "called_on" || line.kind === "ideas") return false;
     return !this.spent.has(line.ideaId);
   }
 
@@ -1186,6 +1248,69 @@ export function reserveLine(topic: string): string {
 export function offerLine(topic: string): string {
   const subject = topic.replace(/\s+/g, " ").trim().replace(/[.?!,;:]+$/, "");
   return `There's a quick rundown on ${subject === "" ? "that" : subject} on screen if you want it.`;
+}
+
+/**
+ * "I've got a few ideas on the name if they'd help." — the offer of ideas to
+ * a group going round in circles (V3-007).
+ *
+ * V3-005's shape in different words: a statement, so nobody owes an answer,
+ * and the ideas themselves stay unsaid until somebody says yes. "If they'd
+ * help" is the whole of the politeness — it hands the group the judgement
+ * about whether an outsider's ideas are wanted here, which is the one thing
+ * no classifier can decide for them.
+ */
+export function stallOfferLine(topic: string): string {
+  return `I've got a few ideas on ${asObject(topic)} if they'd help.`;
+}
+
+/**
+ * "A few thoughts on the name. First, … Second, … Third, …" — the ideas, once
+ * somebody has said yes (V3-007).
+ *
+ * At most {@link MAX_STALL_IDEAS}, and at most {@link STALL_SPEECH_BUDGET_MS}
+ * of speech: whole ideas are dropped off the end rather than one being cut
+ * mid-sentence, because half an idea is worse than two ideas. The ordinals are
+ * what makes a list audible — read as three sentences in a row, three ideas
+ * sound like one rambling one.
+ */
+export function stallIdeasLine(topic: string, ideas: readonly string[]): string {
+  const lead = `A few thoughts on ${asObject(topic)}.`;
+  const sentences = ideas
+    .slice(0, MAX_STALL_IDEAS)
+    .map((idea) => idea.replace(/\s+/g, " ").trim())
+    .filter((idea) => idea !== "")
+    .map((idea) => (/[.?!]$/.test(idea) ? idea : `${idea}.`));
+  if (sentences.length === 0) return "";
+  // One idea needs no counting off, and the ordinals are what make two or
+  // three audible as a list rather than as one rambling sentence.
+  if (sentences.length === 1) return `${lead} ${sentences[0] ?? ""}`;
+  const said: string[] = [];
+  for (const sentence of sentences) {
+    const next = `${STALL_ORDINALS[said.length] ?? "Also"}, ${lowerFirst(sentence)}`;
+    if (
+      said.length > 0 &&
+      estimateSpokenMs([lead, ...said, next].join(" ")) > STALL_SPEECH_BUDGET_MS
+    ) {
+      break;
+    }
+    said.push(next);
+  }
+  if (said.length === 1) return `${lead} ${sentences[0] ?? ""}`;
+  return [lead, ...said].join(" ");
+}
+
+/** What a spoken list is counted off with, which is what makes it audible. */
+const STALL_ORDINALS = ["First", "Second", "Third"];
+
+/** "Take the two syllables…" after "First, ", which reads as one sentence. */
+function lowerFirst(text: string): string {
+  const first = text.slice(0, 1);
+  // A name or an acronym keeps its capital; an ordinary sentence does not.
+  if (first !== first.toLowerCase() && text.slice(1, 2) === text.slice(1, 2).toLowerCase()) {
+    return `${first.toLowerCase()}${text.slice(1)}`;
+  }
+  return text;
 }
 
 /** "Nothing solid on the drive time, sorry." — the loop, closed. */
