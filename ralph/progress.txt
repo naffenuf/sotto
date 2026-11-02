@@ -497,3 +497,14 @@ For the next iteration:
   completion tokens, 1,998 of them reasoning) and fell back to `none`. One in forty, as V3-002
   measured; worth watching if it gets commoner.
 - `fixtures/scripts/launch-workshop.json` is still untracked and still not mine. Left alone.
+
+## 2026-11-01 — V3-011 checkpoint passed (human session, not a loop iteration)
+- Live run `sessions/2026-11-01_1928-mic` (Craig + EJ, 6:10, normal/normal): three unprompted
+  contributions, all welcome, none false. Record: `tasks/checkpoint-speaking.md`. RESULT: PASS.
+- Four problems found and fixed outside the loop: self-echo on function words (`d0e5f75`),
+  "So to"/"Sado" never heard as the name + transcript now always spells it Sotto (`d0e5f75`),
+  holding line for notes questions (`1fa618a`), second introduced name → next new voice (`1fa618a`).
+  Plus an audio-socket grace period, transcript runs, the stacked sidebar and search (`8cdd909`,
+  `3229051`, `2d62f26`, `adf9db3`), all from the post-checkpoint UI list.
+- Not reached live: two yields, the read-backs, calling on the raised hand. Next live run.
+- Remaining stories: V3-014, V3-005, V3-007, V3-009 (stretch). Deadline 2026-11-04.

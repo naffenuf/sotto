@@ -216,8 +216,8 @@
         "On FAIL: fix the listed problems in this iteration, commit, rename the file to tasks/checkpoint-speaking-fail-<n>.md (so the loop stops again for a retest), and leave passes false with notes. On PASS: set passes true and summarize"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": "Before this session a human must read and mark up tasks/shadow-2026-10-30_0919-mic.md (normal/normal) and tasks/shadow-2026-10-30_2141-mic.md (often/bold), written by V3-016: replace each _(welcome / not / wrong)_ with one of those words. `npm run shadow -- --list` names the other mic sessions if another is wanted.",
+      "passes": true,
+      "notes": "Run 2026-11-01 (sessions/2026-11-01_1928-mic, two people, 6:10, normal/normal): three unprompted contributions, all welcome, none false; both not-nows stopped an answer and the second stepped the frequency to rare; rhetorical and self-answered questions stayed silent. Four problems found and fixed the same evening (d0e5f75, 1fa618a): a human line swallowed as self-echo on function words, 'So to'/'Sado' never matched as the name (plus every address now rewritten to Sotto in the transcript), 13 s of silence on a notes question (holding line now for every spoken question), and two back-to-back introductions in one turn (second name now goes to the next new voice). Not reached live: two yields, the read-backs, calling on the raised hand; each is covered offline. The capacity contradiction was downgraded to a glow by the 180 s cooldown a spoken answer had started. Record: tasks/checkpoint-speaking.md. RESULT: PASS.",
       "checkpoint": "tasks/checkpoint-speaking.md"
     },
     {
