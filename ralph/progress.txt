@@ -680,3 +680,37 @@ Re-verified at commit time, nothing changed in the code:
 - The four untracked checkpoint files are still untracked and out of the commit.
 
 Remaining: V3-009 (knowledge folder, stretch).
+
+[2026-11-01 22:25] V3-009 — completed — the knowledge folder: a folder of the group's own files,
+`search_knowledge` beside `web_search`, and the one correction spoken at boldness `normal`.
+
+Checks: `npm run typecheck` clean; `npm test` 98 files / 1684 tests pass; `npm run build` passes
+(the new prompt lands in `dist/server/server/prompts/`); `npm run fixtures:check` shows only the
+three pre-existing `launch-workshop` problems (untracked V3-011 script, no WAV, no capture).
+`npm run test:integration -- server/knowledge/knowledge.integration.test.ts`: **6/6 in 17.3 s**,
+two real Spark calls —
+- the renewal question ("When does Harborview Clinic's contract renew?") came back in **7.8 s**
+  citing `file:customers.csv`, title "Harborview Clinic renews March 1, 2027", spoken answer
+  "Harborview Clinic renews March first, twenty twenty-seven." A spoken line **spells the year
+  out**, so an assertion on `2027` alone fails — that cost one re-run.
+- the "$49 a seat" claim was settled by `notes.md` with **no web search at all** and said at
+  boldness `normal` as "From notes.md: the notes have Pro at $40 a seat a month on the list price
+  sheet."
+
+What the next iteration should know:
+- `.gitignore` needs `/knowledge/`, anchored. A bare `knowledge/` also hides `server/knowledge/`,
+  which is how the first commit nearly went out without the module in it.
+- `Verifier.check` must **not** `await` on the no-folder path: an `await` between `verify()` and
+  the grounded call puts a microtask in the way, and three existing tests that resolve a held
+  reply synchronously after `verify()` time out. Hence `this.knowledge === null ? null : await …`.
+- `createKnowledge` defaults to none everywhere but `server/app.ts`, so `npm run eval`,
+  `npm run e2e` and `npm run shadow` are unchanged and no replay depends on what is in
+  `knowledge/` on this Mac. If a demo wants the folder in a replay, pass it in the script.
+- No eval or e2e run was paid for in this iteration; nothing in it changes a replay's behaviour
+  without a folder present.
+- V3-011's checkpoint ran before this story existed, so the file-backed correction is **not yet
+  exercised live**. `tasks/checkpoint-speaking.md` has a `## File-backed corrections (V3-009)`
+  section saying so and naming the two records a re-run reads it off
+  (`timing.jsonl`'s `fromFile`, `candidates.jsonl`'s `verification.file`).
+
+Every story in ralph/prd.json now passes.

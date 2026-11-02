@@ -1915,3 +1915,53 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   cadence and every classifier — but a `speechComplete` that arrives empty *after* real partials
   still keeps the empty text, which is how every earlier capture was read. Written up in
   `fixtures/events/NOTES.md`.
+
+- **The knowledge folder is read, not indexed, and `null` is its empty state.** V3-009's
+  `KnowledgeIndex.load(dir)` reads every `.md`/`.txt`/`.csv` whole at session start and searches
+  by matching the query's **content words** against each line — no embeddings, which the PRD
+  allows and which is also right for a few kilobytes. Two rules do the work a bare `includes`
+  would not: a **`.csv` row carries its header** (`Harborview Clinic,Pro,2027-03-01` means nothing
+  without `customer,plan,renews_on`), and the query is stripped of filler and question words
+  first, so "when does the Harborview contract renew?" does not match every line with "the" on it.
+  `load` returns `null` for a folder that is missing *or* empty, because that is the one value
+  every caller already branches on. `KNOWLEDGE_DIR` is git-ignored as **`/knowledge/`** — anchored,
+  because a bare `knowledge/` also hides `server/knowledge/`.
+- **A file is a source with no URL, resolved exactly as a page is.** `knowledgeCitation(file)` is
+  `{ url: "file:customers.csv", title: "file: customers.csv" }`, and only a file **this search
+  really read** may be cited: `resolveKnowledgeCitation` takes every spelling the model uses
+  (`customers.csv`, `knowledge/customers.csv`, `file: Customers.CSV`) and rejects anything with a
+  scheme, because it runs *before* US-013's URL resolution and `https://x.com/prices.csv` is a
+  page. `Card.tsx` renders a file source as text rather than a link — there is nothing to open.
+  `search_knowledge`, `web_search` and `show_html` all go in one `grounded` call, as V2-013 found.
+- **The group's own records are checked before the web, and that is the whole of why one correction
+  is speakable at `normal`.** `Verifier` searches the folder with the **room's own words** (never
+  the headline — US-013's lesson) and only makes a call when lines come back; the call is
+  *ungrounded* (`prompts/verify-knowledge.md`, 4k tokens). Anything but `wrong` — plus a `wrong`
+  naming no file it was shown, plus a call that failed — falls through to the web check, so losing
+  the knowledge half never costs the web half. A `wrong` sets `CandidateVerification.file`, which
+  is the only thing that tells the two kinds of correction apart downstream, and
+  `spokenCorrectionAllowed` adds exactly **one** cell to V3-008's table:
+  `normal/factual_error/interject`. `cautious` is still silent; a web-verified error still needs
+  `bold`. Measured on real Spark: the renewal question answered in **7.8 s** citing
+  `file:customers.csv`, and the "$49 a seat" claim settled by `notes.md` with **no web search**,
+  said as "From notes.md: the notes have Pro at $40 a seat a month on the list price sheet."
+- **A spoken answer spells numbers out, so assert on both forms.** The same packet whose title was
+  "Harborview Clinic renews March 1, 2027" had a `spokenAnswer` of "…March first, twenty
+  twenty-seven" — correct for a line written to be *heard* (V3-003's prompt asks for exactly
+  that), and a test matching `/2027/` on it fails. Same family as the "name the record, not the
+  file" wart: asked for the file's own phrasing the model writes the file name into the sentence
+  ("notes.md has Pro at $40"), so `fileCorrectionLine` uses such a sentence as the whole line
+  rather than prefixing `From notes.md:` on top of it.
+- **An `await` before a model call changes what a test is testing.** `Verifier.check` must not
+  `await` the knowledge half on the no-folder path: an `await` between `verify()` and the grounded
+  call puts a microtask in the way, and the three existing tests that resolve a `model.held()`
+  reply *synchronously* after `verify()` returns then time out at 15 s each. Hence
+  `this.knowledge === null ? null : await this.checkFiles(candidate)`. The same family as
+  `instantWallClock` and "tracked work always beats a pause timer": the shape of the fake decides
+  which branch the test is on.
+- **`createKnowledge` defaults to none, like `createVoice` and `createGlimmer`.** Only
+  `server/app.ts` loads the folder, so `npm test` reads nothing off the disk and a replay's result
+  — `npm run eval`, `npm run e2e`, `npm run shadow` — never depends on what happens to be in
+  `knowledge/` on this Mac. `fixtures/knowledge-demo/` is the fictional company (customers with
+  renewal dates, a price sheet, notes, every file labelled fictional) that the integration test and
+  the demo point `KNOWLEDGE_DIR` at.
