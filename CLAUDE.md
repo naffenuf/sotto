@@ -1848,3 +1848,34 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   **"glass higher"** — so "And how much of that would just be the glass higher?" is a follow-up
   only in context, which is exactly what no lexical rule can tell. A fake classifier in a wiring
   test has to match on "glass", not on the script's words.
+
+- **An offer is the cheapest unprompted line, because the only new thing in it is a sentence.**
+  V3-005's `offer` is a sixth `SpokenContributionKind` said by `Reservations` under V3-004's rules
+  (`SPEAK_PAUSE_MS`, the cached still-current verdict, any human voice cancels it) and it is
+  queued from exactly one place: `ResearchCards.onOffer`, which fires from `show()` only. That one
+  call site *is* the PRD's "a packet from the planner or a `research_hook`, not an open question" —
+  the other three card paths are a question's thinking card being filled in (V3-003, where V3-004
+  speaks the answer instead), a card the room asked for (V2-015, already being read out) and the
+  drain's flush (nobody left to offer it to). Two rules differ from the answer's and both are about
+  what the sentence costs: it **charges** the frequency's allowance, because Sotto is asking for
+  the floor to say something nobody asked about, and it is **never retried** — being talked over an
+  offer is the reply to it, and a retry would charge twice for one finding. The words are written
+  locally (`offerLine`), with no article in front of the topic, because "a quick rundown on
+  competitors" is how somebody says it and `asObject`'s "the" reads wrong in that frame.
+- **The ten seconds after an offer are a window, and the gate is one turn.**
+  `server/research/OfferWindow.ts` reads the **next** final turn only, through one low-effort Spark
+  call: a yes two turns later is a fresh question, which the address path already answers. `yes` →
+  `answers.ask({ briefOn: [packet.id] })`, the new optional field that makes V2-015's briefing
+  exact rather than hoping `packetsForBriefing`'s stems land on the right packet. Everything else
+  closes it with nothing said — `no`, `unrelated`, a turn that says Sotto's name (the address
+  path's, no call, and "Sotto, go ahead" reaches the raised hand anyway), an unreadable verdict, a
+  6 s call deadline and 10 s of quiet. Measured on real Spark: **8/8 in 18.3 s**, including the
+  three replies that open with "yeah"/"right" and are agreement with a colleague — which is the
+  whole argument against a lexical rule here.
+- **"At most one open offer" outlives the sentence, so the gate is injected.** `Reservations`
+  refuses a second offer while one is waiting or being said, and asks `canOffer()` for the rest —
+  the window owns that clock. A refusal is a `spoken_contribution` line with the new `offer_open`
+  reason rather than silence, so the log says why a packet was the card alone. And "its outcome" is
+  deliberately a *second* line (`offer_window` closed, with `outcome`): a record is written once,
+  because `asSpokenContribution` readers — the eval's false-speech gate, `npm run e2e`, the shadow
+  report — count utterances off it.

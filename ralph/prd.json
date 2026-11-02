@@ -254,8 +254,8 @@
         "Typecheck passes"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Offers are a sixth spoken kind. Two things the next iteration should know. (1) An offer is unprompted speech, so npm run eval's false-speech gate (V3-010, tolerance 0) would count one made during brainstorm / no-wake / rhetorical-questions as a false utterance; no eval run was paid for here, so check that before reading a gate failure as a regression \u2014 the fix, if it is one, is a PRD question (an offer is not a planted moment) and never the scoring code. (2) 'Logged ... with its outcome' is two lines of timing.jsonl, not one: the spoken_contribution (kind offer) says whether it was said and why not, and the offer_window closed line carries the outcome, which arrives up to ten seconds later. A record is written once so asSpokenContribution readers cannot double-count."
     },
     {
       "id": "V3-007",

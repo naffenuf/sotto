@@ -546,3 +546,51 @@ For the next iteration:
   `post-checkpoint-ui.md`) and `fixtures/scripts/launch-workshop.json` are still not mine and are
   left alone; `launch-workshop` is the only thing `npm run fixtures:check` complains about.
 - Remaining: V3-005 (offers), V3-007 (stall ideas), V3-009 (knowledge folder, stretch).
+
+[2026-11-01 21:20] V3-005 — completed — offers: a finding nobody asked for is mentioned once as a
+statement, and "go on" in the next ten seconds brings the briefing with no wake word.
+
+What was built:
+- `Reservations.offer()` — a sixth `SpokenContributionKind` (`offer`). `offerLine(topic)` writes
+  "There's a quick rundown on <topic> on screen if you want it." locally (no model call, no
+  article in front of the topic: the PRD's own wording). V3-004's rules: `SPEAK_PAUSE_MS`, the
+  cached still-current verdict, any human voice cancels it; `OFFER_STALE_MS`/`_TURNS` fuse. It
+  **charges** the frequency's allowance (Sotto is asking for the floor) and is **never retried** —
+  being talked over an offer is the reply to it, and a retry would charge twice for one finding.
+  One at a time: a second while one waits, is being said, or is still open (`canOffer`) is written
+  down as the new `offer_open` skip reason and stays a card.
+- `ResearchCards.onOffer(packet, cardId)` fires **only** from `show()` and not at session end, so
+  the three other card paths are untouched by construction: a question's thinking card is filled
+  in (V3-003, and V3-004 speaks the answer), a card the room asked for is already being read out
+  (V2-015), and a packet the drain pushed out has no room left to offer it to.
+- `server/research/OfferWindow.ts` + `offerReply.ts` + `prompts/offer-reply.md`: one low-effort
+  Spark call on the **next** final turn only. `yes` → `answers.ask({ briefOn: [packet.id] })`,
+  which is V2-015's briefing from that packet (new optional `AskedQuestion.briefOn`, so the match
+  is exact rather than hoping `packetsForBriefing`'s stems land on it). `no`, `unrelated`, a turn
+  that says Sotto's name (left to the address path, no call), an unreadable verdict, a 6 s call
+  deadline and `OFFER_WINDOW_MS` (10 s) of quiet all close it with nothing said.
+- Wiring in `SessionManager.modelLoops`: the still-current watch starts when the offer is queued,
+  the window opens off the `spoken_contribution` record (not for a yielded line), and
+  `drainLoops` flushes `offers` before `answers` so a last yes still gets briefed.
+
+Measured: the reply classifier is **8/8 on real Spark in 18.3 s** (~2.3 s a call), including the
+three hard cases that open with "yeah"/"right" and are agreement with a colleague rather than with
+Sotto (`npm run test:integration -- server/research/offerReply.integration.test.ts`). Offline:
+`OfferWindow.test.ts` (10), the offer block of `Reservations.test.ts` (12), the routing block of
+`ResearchCards.test.ts` (4), and a whole-pipeline `moment-contradiction` replay in
+`SessionManager.test.ts` that offers one hook's packet, hears a yes and briefs from it.
+
+For the next iteration:
+- **No eval or e2e run was paid for.** An offer is unprompted speech, so V3-010's false-speech
+  gate (tolerance 0 on `brainstorm`/`no-wake`/`rhetorical-questions`) would count one as a false
+  utterance if the planner happens to produce a packet there. Check `research.jsonl` and the
+  `spoken_contribution` lines before reading that as a regression; it is a PRD question (an offer
+  is not about a planted moment), never the scoring code.
+- A declined offer may *also* step the frequency down: "not now" inside V3-006's 15-second
+  steering window is a `quieter` command, and an offer opens that window. That looks right — it is
+  the PRD's own example phrase — but it means one "not now" can both decline and turn Sotto down.
+- The raised hand is deliberately **not** lowered when a briefing follows an accepted offer: the
+  equivalent V2-015 path does not either, and V3-017 only lowers on `called_on`, a spoken
+  correction and V3-004's answer. Worth revisiting if the hand count reads high in a live run.
+- Remaining: V3-007 (stall ideas, needs a `stall` candidate type and a fixture with a planted
+  stall), V3-009 (knowledge folder, stretch).
