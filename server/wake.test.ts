@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_WAKE_SPELLINGS, detect, questionAfterName } from "./wake.js";
+import { DEFAULT_WAKE_SPELLINGS, detect, detectsAddress, normalizeWakeSpelling, questionAfterName } from "./wake.js";
 
 /**
  * Sentences that are Sotto being addressed, with the question each should
@@ -98,7 +98,7 @@ describe("detect", () => {
   });
 
   it("defaults to the spellings the transcription model produces", () => {
-    expect(DEFAULT_WAKE_SPELLINGS).toEqual(["sotto", "soto", "sato", "sota"]);
+    expect(DEFAULT_WAKE_SPELLINGS).toEqual(["sotto", "soto", "sato", "sota", "sado", "sana"]);
   });
 });
 
@@ -130,5 +130,49 @@ describe("reading the question off the name, loosely", () => {
   it("is empty when there is no name, and when nothing follows it", () => {
     expect(questionAfterName("what do rivals charge")).toBe("");
     expect(questionAfterName(" Sotto, ")).toBe("");
+  });
+});
+
+/**
+ * The checkpoint session (`2026-11-01_1928-mic`): "Sotto, where are we at"
+ * came back as two words and "Sotto, wrap us up" as `Sado`, and neither was
+ * heard. The transcript should also read `Sotto` wherever the name was used
+ * as an address, whatever the API spelled.
+ */
+describe("the name heard as two words, and the transcript's spelling of it", () => {
+  it("folds a sentence-initial 'so to' into the name", () => {
+    expect(detect(" So to where where are we at at this point? ")).toEqual({
+      triggered: true,
+      question: "where where are we at at this point?",
+    });
+    expect(detect("Okay so to, what did we decide?").triggered).toBe(true);
+    expect(detectsAddress(" So to where are we at ")).toBe(true);
+    // Mid-sentence it is two ordinary words.
+    expect(detect("That's the plan, so to speak, what next?").triggered).toBe(false);
+    expect(detectsAddress("we agreed, so to speak")).toBe(false);
+  });
+
+  it("accepts the spellings the checkpoint produced", () => {
+    expect(detect("Sado, wrap us up").triggered).toBe(true);
+    expect(detect("Sana, what time is it?").triggered).toBe(true);
+  });
+
+  it("rewrites an address to Sotto and leaves everything else as said", () => {
+    expect(normalizeWakeSpelling(" Soto? Where are we at at this point? ")).toBe(" Sotto? Where are we at at this point? ");
+    expect(normalizeWakeSpelling("Sado, wrap us up.")).toBe("Sotto, wrap us up.");
+    expect(normalizeWakeSpelling(" So to where where are we at ")).toBe(" Sotto where where are we at ");
+    expect(normalizeWakeSpelling("hey Sato remind us what we decided")).toBe("hey Sotto remind us what we decided");
+    expect(normalizeWakeSpelling("Soto not now. Did you hear back?")).toBe("Sotto not now. Did you hear back?");
+    // Not addresses: a restaurant, a report of an earlier answer, sotto voce,
+    // and "so to speak", which has no question after it.
+    for (const text of [
+      "we should go to Soto's after this",
+      "I asked Soto earlier and it said the venue holds forty",
+      "Exactly. Sotto voce, if you want to be fancy about it.",
+      "So to speak, that is the whole plan.",
+      "Can you stop Sana?",
+    ]) {
+      expect(normalizeWakeSpelling(text), text).toBe(text);
+    }
   });
 });

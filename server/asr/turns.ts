@@ -25,6 +25,7 @@
 import { asAsrEvent, type AsrEvent, type AsrFrameRecord } from "../../shared/asr.js";
 import type { PauseState, TurnUpdate } from "../../shared/turns.js";
 import { systemClock, type Clock } from "../clock.js";
+import { normalizeWakeSpelling } from "../wake.js";
 
 type Logger = Pick<Console, "warn">;
 
@@ -216,7 +217,7 @@ export class TurnAssembler {
     const turn = this.currentTurn("transcript");
     if (turn === null) return null;
     // Partials are cumulative: each one is the whole turn so far.
-    turn.text = text;
+    turn.text = normalizeWakeSpelling(text);
     return this.emit(turn, false);
   }
 
@@ -289,7 +290,7 @@ export class TurnAssembler {
       return null;
     }
     // `speechComplete` is the only text frame tied to a turnId, so it wins.
-    turn.text = text;
+    turn.text = normalizeWakeSpelling(text);
     if (turn.endMs === null) {
       turn.endMs = atMs;
       this.forget(turnId);

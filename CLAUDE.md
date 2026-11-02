@@ -1773,3 +1773,23 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   last second of audio. Measured by `npm run verify:mic` under Chrome's *own* autoplay policy:
   the reloaded page, with no click on it, rejoined and sent 6.4 s more audio into the same ASR
   session — a `getUserMedia`-fed AudioContext starts without a gesture.
+
+- **The echo filter must count words that mean something, and enough of them.** The checkpoint
+  session (`sessions/2026-11-01_1928-mic`) swallowed "Oh wait, and the kit list has to go on the
+  page?" — said by a person over Sotto's status answer — as self-echo, because 8 of its 12 tokens
+  ("and the has to on the page", plus "kits") are in any long answer. `selfEcho.ts` now scores
+  `contentTokens` (minus `ECHO_FUNCTION_WORDS`) and also requires `SELF_ECHO_MIN_MATCHES` (3, or
+  all of a shorter fragment) to match outright: "kit list page" is 2 of 3 and no longer an echo. A
+  misheard three-word echo can now leak into the transcript as a human line, which is the better
+  failure.
+- **The name is normalised where turn text enters the pipeline, and only where it is an address.**
+  The same session heard "Sotto, where are we at" as `" So to where where are we at "` and "Sotto,
+  wrap us up" as `Sado`, and nothing matched either. `DEFAULT_WAKE_SPELLINGS` gained `sado` and
+  `sana`, `words()` in `server/wake.ts` folds a sentence-initial (or post-"hey") `so to` into one
+  word at the pair's offsets, and `normalizeWakeSpelling` — called by `TurnAssembler` on every
+  partial and final — rewrites a spelling in an address position to `Sotto`, so the transcript,
+  the board and every watcher read the same word. The two-word form is rewritten only where
+  `detect` would trigger (a separator or wh-word follows), because the `no-wake` capture says
+  "so to speak" eighteen times; `Soto's`, "I asked Soto earlier" and `sotto voce` are not
+  addresses and are left as said. Tests that build turns through the real assembler now see
+  `Sotto` (`BargeIn.test.ts`'s "Soto stop" did).

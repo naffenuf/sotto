@@ -32,6 +32,22 @@ describe("self-echo token overlap", () => {
     expect(isSelfEcho("hello", [])).toBe(false);
   });
 
+  it("does not let function words match a long answer", () => {
+    // The checkpoint session: a room member's line said over Sotto's status
+    // answer, which shares only "and the has to on the page" with it.
+    const answer =
+      "Here's where you're at on the launch workshop. You're three weeks out and you've decided " +
+      "on the Makerspace. It has a hard cap of thirty people, the grant covers thirty kits, and " +
+      "Saturday is two hundred dollars flat. The plan is to start at eleven and feed people, and " +
+      "you want the Bend crowd there. For tickets you're talking about opening fifty at five " +
+      "dollars each, with the page going up tonight and invites Friday, and you expect twenty " +
+      "alone from Bend. The open tension is fifty tickets for a thirty cap room, with the idea " +
+      "that no shows make the oversell fine and a five dollar ticket";
+    expect(isSelfEcho(" Oh wait and the kits list has to go on the page? ", [answer])).toBe(false);
+    // The same answer, heard back in part, still matches.
+    expect(isSelfEcho("the grant covers thirty kits and Saturday is two hundred dollars flat", [answer])).toBe(true);
+  });
+
   it("does not pool unrelated utterances into a match", () => {
     expect(isSelfEcho("one two three four five", ["one two", "three four"])).toBe(false);
   });

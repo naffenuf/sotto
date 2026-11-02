@@ -34,7 +34,17 @@
  * `sota` never has, and is here because it is the obvious fourth way to hear
  * the word.
  */
-export const DEFAULT_WAKE_SPELLINGS: readonly string[] = ["sotto", "soto", "sato", "sota"];
+export const DEFAULT_WAKE_SPELLINGS: readonly string[] = ["sotto", "soto", "sato", "sota", "sado", "sana"];
+
+/**
+ * The name heard as two words. The checkpoint session (`2026-11-01_1928-mic`)
+ * transcribed "Sotto, where are we at" as `" So to where where are we at "`,
+ * and nothing matched; the repeat ten seconds later came back `Soto?` and did.
+ * {@link words} folds the pair into one word when it opens a sentence or
+ * follows an {@link ADDRESS_WORDS} word — "so to recap" at the start of a turn
+ * is caught too, and left to the classifier, which is the real gate (V2-008).
+ */
+const TWO_WORD_SPELLING: readonly [string, string] = ["so", "to"];
 
 /** Words that may introduce the wake word: "hey Sotto", "okay Sotto, …". */
 export const ADDRESS_WORDS: readonly string[] = ["hey", "okay", "ok"];
@@ -141,6 +151,35 @@ export function detect(text: string, options: WakeOptions = {}): WakeMatch {
   return NOT_TRIGGERED;
 }
 
+/**
+ * The name as the transcript should show it, whatever the API heard.
+ *
+ * A spelling in an address position — opening a sentence or following
+ * "hey"/"okay", not a possessive, not `sotto voce` — is rewritten to `Sotto`;
+ * the two-word form is rewritten only where {@link detect} would trigger on
+ * it (a separator or a question word follows), so "So to speak" survives.
+ * Everything else in the text, spacing and punctuation included, is kept.
+ * `Soto's Restaurant` and "I asked Soto earlier" are left alone: they are
+ * not addresses, and the transcript should say what was said.
+ */
+export function normalizeWakeSpelling(text: string, options: WakeOptions = {}): string {
+  const spellings = options.spellings ?? DEFAULT_WAKE_SPELLINGS;
+  const all = words(text);
+  let out = "";
+  let from = 0;
+  for (const [index, word] of all.entries()) {
+    if (!spellings.includes(word.lower)) continue;
+    if (!isAddressed(text, word, all[index - 1])) continue;
+    const rest = text.slice(word.end);
+    if (/^['’]s\b/i.test(rest)) continue;
+    if (BLOCKED_FOLLOWING_WORDS.includes(words(rest)[0]?.lower ?? "")) continue;
+    if (word.folded === true && questionAfter(text, word.end) === null) continue;
+    out += text.slice(from, word.start) + "Sotto";
+    from = word.end;
+  }
+  return out + text.slice(from);
+}
+
 interface Word {
   /** The word lower-cased, with no surrounding punctuation. */
   lower: string;
@@ -148,19 +187,38 @@ interface Word {
   start: number;
   /** Index one past its last character. */
   end: number;
+  /** True for the two-word spelling folded into one. */
+  folded?: true;
 }
 
-/** Every run of letters in `text`, in order, with where it sits. */
+/**
+ * Every run of letters in `text`, in order, with where it sits — with the
+ * {@link TWO_WORD_SPELLING} of the name folded into one word where it could
+ * be an address, so every reader sees `soto` at the pair's offsets.
+ */
 function words(text: string): Word[] {
   const found: Word[] = [];
   const pattern = /\p{L}+/gu;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
-    found.push({
+    const word = {
       lower: match[0].toLowerCase(),
       start: match.index,
       end: match.index + match[0].length,
-    });
+    };
+    const previous = found[found.length - 1];
+    if (
+      previous !== undefined &&
+      previous.lower === TWO_WORD_SPELLING[0] &&
+      word.lower === TWO_WORD_SPELLING[1] &&
+      text.slice(previous.end, word.start).trim() === "" &&
+      (startsSentence(text, previous.start) ||
+        ADDRESS_WORDS.includes(found[found.length - 2]?.lower ?? ""))
+    ) {
+      found[found.length - 1] = { lower: "soto", start: previous.start, end: word.end, folded: true };
+      continue;
+    }
+    found.push(word);
   }
   return found;
 }

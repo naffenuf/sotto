@@ -155,7 +155,7 @@ describe("barge-in at the transcription boundary", () => {
     const t = setup(false, true);
     t.start(1, "Soto stop");
     t.end(1, "Soto stop");
-    expect(t.commands.map((asked) => asked.question)).toEqual(["Soto stop"]);
+    expect(t.commands.map((asked) => asked.question)).toEqual(["Sotto stop"]);
   });
 
   it.each([
