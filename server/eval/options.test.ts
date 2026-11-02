@@ -46,6 +46,17 @@ describe("evalFixtures", () => {
     ]);
   });
 
+  it("takes followups, whose gate is about not answering (V3-014)", () => {
+    expect(isEvalFixture("followups")).toBe(true);
+    expect(evalFixtures([...captured, "followups"])).toEqual([
+      "brainstorm",
+      "no-wake",
+      "followups",
+      "moment-contradiction",
+      "moment-mixed",
+    ]);
+  });
+
   it("leaves out the wake-phrase fixtures, which US-017 measures instead", () => {
     expect(isEvalFixture("ask-search")).toBe(false);
     expect(isEvalFixture("ask-diagram")).toBe(false);

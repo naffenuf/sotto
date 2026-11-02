@@ -1811,3 +1811,40 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   (`labelsMet`) unless that turn introduces itself. A third voice with an empty queue gets
   nothing: nobody is guessed. It is a patch for the introduction beat; nothing on this side can
   split a turn by voice, and across 198 captured turns plus this session the API never has.
+
+- **The follow-up window is a classifier plus three ways to close it, and closing is the default.**
+  V3-014's `server/answer/FollowUpWindow.ts` opens on `AnswerAgent.onFinished` — an answer with
+  `status: "done"`, after `SpokenAnswer.done()`, which is where "after Sotto finishes speaking"
+  lands — and reads every final human turn through `server/answer/followUp.ts`
+  (`prompts/followup.md`, low-effort Spark, told Sotto's last answer). Only `to_sotto` does
+  anything; `to_room`, `closing`, a reply that fails the schema, a failed call and a 6 s timeout all
+  **close** it, and so do `FOLLOWUP_TIMEOUT_MS` (20 s, on the **session** clock — the window is a
+  length of conversation) and a turn that names somebody else, which costs no call at all. The
+  "one call per turn" the PRD asks for came free from the routing that already existed: a turn
+  saying the name is the address path's and the window ignores it, while an unnamed one is skipped
+  by `QuestionWatcher`'s `inFollowUpWindow` (the option V3-002 left for exactly this) and
+  classified here instead. `FOLLOWUP_MAX_HUMAN_TURNS` can only fire for turns with no verdict yet,
+  because verdicts are serialized and the first non-follow-up closes the window on its own — that
+  overlap is written up in `tasks/decisions.md`.
+- **One indicator, two reasons, and the bus keeps them apart.** `WakeEvent` gained
+  `inConversation`, and `EventBus` holds `named` and `inConversation` separately while publishing
+  `listening = named || inConversation` — otherwise somebody saying "Sotto" during an open window
+  puts the name indicator up and then takes the *window's* indicator down with it when the turn
+  goes final. The event is deduped on what a browser would see rather than on the two reasons, so
+  the name going by inside a window is not an event at all. The web side shows the same words in
+  `.stage__listening--conversation` with `data-in-conversation`, which is what
+  `npm run verify:followups` reads.
+- **"Did Sotto answer something nobody asked it?" is a structural eval gate.**
+  `FixtureScriptSchema` gained `followUpLines` (lines that carry on talking to Sotto with no wake
+  word), so the lines Sotto may answer are `wakeQuestions` ∪ `followUpLines`; `answersFrom` in
+  `server/eval/runner.ts` resolves each `answers.jsonl` record's turn against them through
+  `turnsForLine`'s ±1,500 ms and `scoreFixture` counts the rest as `falseAnswers`, gated at zero.
+  No judge call: the script already says who each line was for. A shadow run (V3-016) has no
+  script, so every answer there is taken as addressed rather than failing the gate.
+- **The `followups` capture is the argument for the classifier.** 26 lines, 125.9 s, Craig and EJ
+  (both introduced in the first two lines, so the named-person rule has real names to work with):
+  a question by name at line 3, two follow-ups with no name, the pair turning to each other by
+  name at line 6, and a fresh question by name at line 18. The ASR heard "glass hire" as
+  **"glass higher"** — so "And how much of that would just be the glass higher?" is a follow-up
+  only in context, which is exactly what no lexical rule can tell. A fake classifier in a wiring
+  test has to match on "glass", not on the script's words.

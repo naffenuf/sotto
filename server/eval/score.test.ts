@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AnswerRunRecord,
   DeliveryRecord,
   EvalRunRecord,
   FixtureRunRecord,
@@ -897,6 +898,53 @@ describe("scoreFixture, speech", () => {
       atMs: 104_000,
       questionToReserveMs: 2_400,
     });
+  });
+});
+
+describe("scoreSettings, answers asked for (V3-014)", () => {
+  function answer(overrides: Partial<AnswerRunRecord> = {}): AnswerRunRecord {
+    return {
+      answerId: "ans-1",
+      turnId: "0:3",
+      question: "What should drinks cost a head?",
+      addressed: true,
+      atMs: 20_000,
+      ...overrides,
+    };
+  }
+
+  function gated(runs: FixtureRunRecord[]) {
+    return scoreSettings({ frequency: "normal", boldness: "normal" }, runs, true);
+  }
+
+  it("passes when every answer was asked for", () => {
+    const group = gated([
+      run({
+        fixture: "followups",
+        answers: [answer(), answer({ answerId: "ans-2", turnId: "0:4" })],
+      }),
+    ]);
+    expect(group.totals.answers).toBe(2);
+    expect(group.totals.falseAnswers).toBe(0);
+    expect(gate(group, "no answer to a turn").status).toBe("pass");
+  });
+
+  it("fails on an answer to a turn that never addressed Sotto", () => {
+    const group = gated([
+      run({
+        fixture: "followups",
+        answers: [answer(), answer({ answerId: "ans-2", turnId: "0:6", addressed: false })],
+      }),
+    ]);
+    expect(group.totals.falseAnswers).toBe(1);
+    expect(group.fixtures[0]?.falseAnswers).toBe(1);
+    expect(gate(group, "no answer to a turn").status).toBe("fail");
+  });
+
+  it("passes a run recorded before V3-014, which has no answers at all", () => {
+    const group = gated([run({ fixture: "brainstorm" })]);
+    expect(group.totals.answers).toBe(0);
+    expect(gate(group, "no answer to a turn").status).toBe("pass");
   });
 });
 

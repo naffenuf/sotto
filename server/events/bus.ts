@@ -69,8 +69,12 @@ export class EventBus {
   private board: BoardEvent = initialBoard();
   /** The cards put on the stage this session, oldest first (US-015). */
   private cards: StageCard[] = [];
-  /** True while a partial turn is addressing Sotto by name (US-017). */
+  /** True while the indicator is up, for either reason (US-017, V3-014). */
   private listening = false;
+  /** True while somebody is addressing Sotto by name (US-017). */
+  private named = false;
+  /** True while the follow-up window is open, so no wake word is needed (V3-014). */
+  private inConversation = false;
   /** What the policy has held back this session, best first (V3-016). */
   private suppressed: SuppressedCandidate[] = [];
   /** Server-wide, not per session: the next session inherits what is set. */
@@ -92,14 +96,19 @@ export class EventBus {
     if (event.type === "board") this.board = event;
     if (event.type === "card") this.rememberCard(event.card);
     if (event.type === "settings") this.settings = event.settings;
-    if (event.type === "wake") this.listening = event.listening;
+    if (event.type === "wake") {
+      this.listening = event.listening;
+      this.inConversation = event.inConversation === true;
+    }
     if (event.type === "suppressed") this.suppressed = event.suppressed;
     if (event.type === "voice") this.voice = event.voice;
     if (event.type === "session") {
       this.session = event.session;
       // Nobody is mid-question across the end of a session, whatever the
-      // last partial said.
+      // last partial said, and no conversation carries across one either.
       this.listening = false;
+      this.named = false;
+      this.inConversation = false;
       // Diarization labels belong to one session, so the names do too; a
       // listener clears its own on the same event.
       this.speakers = {};
@@ -158,8 +167,36 @@ export class EventBus {
    * change, and this makes that a property of the bus rather than a promise.
    */
   setListening(listening: boolean): void {
-    if (listening === this.listening) return;
-    this.publish({ type: "wake", listening });
+    this.wake(listening, this.inConversation);
+  }
+
+  /**
+   * Publishes whether the room may carry on talking to Sotto without the wake
+   * word (V3-014).
+   *
+   * Independent of {@link setListening}: somebody saying the name during an
+   * open window puts the name indicator up and takes it down again, and must
+   * not take the window's own indicator with it.
+   */
+  setInConversation(inConversation: boolean): void {
+    this.wake(this.named, inConversation);
+  }
+
+  /**
+   * One `wake` event for both reasons the indicator is up, skipping it when
+   * nothing changed — the watchers only call on a change, and this makes that
+   * a property of the bus rather than a promise. `listening` is true for
+   * either, so a reader that only wants "is Sotto paying attention" reads one
+   * field.
+   */
+  private wake(named: boolean, inConversation: boolean): void {
+    this.named = named;
+    const listening = named || inConversation;
+    // Deduped on what a browser would see rather than on the two reasons
+    // behind it: the name going by while the window is open changes nothing
+    // on the screen, so it is not an event.
+    if (listening === this.listening && inConversation === this.inConversation) return;
+    this.publish({ type: "wake", listening, inConversation });
   }
 
   /**
@@ -201,7 +238,7 @@ export class EventBus {
       { type: "speakers", speakers: this.speakers },
       this.board,
       { type: "settings", settings: this.settings },
-      { type: "wake", listening: this.listening },
+      { type: "wake", listening: this.listening, inConversation: this.inConversation },
       { type: "voice", voice: this.voice },
       { type: "suppressed", suppressed: [...this.suppressed] },
       // One event per card, in the order they went up, rather than a second
@@ -231,9 +268,14 @@ export class EventBus {
     return this.settings;
   }
 
-  /** True while somebody is addressing Sotto by name. */
+  /** True while the listening indicator is up, for either reason. */
   listeningState(): boolean {
     return this.listening;
+  }
+
+  /** True while the follow-up window is open (V3-014). */
+  inConversationState(): boolean {
+    return this.inConversation;
   }
 
   /** What the policy has held back this session, best first (V3-016). */

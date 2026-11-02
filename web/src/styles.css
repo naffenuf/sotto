@@ -424,6 +424,17 @@ body {
   font-size: 0.9375rem;
 }
 
+/* V3-014: the same indicator, in its own style, while the follow-up window
+   is open — Sotto is listening because it just answered, not because somebody
+   said its name, and the room should be able to tell those apart at a glance. */
+.stage__listening--conversation {
+  color: var(--ok);
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+  border-radius: 999px;
+  padding: 0.125rem 0.625rem;
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+
 .stage__listening-dots {
   display: inline-flex;
   align-items: center;

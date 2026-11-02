@@ -22,7 +22,9 @@ import type {
   DecisionLogRecord,
   GateMode,
 } from "../../shared/candidates.js";
+import type { AnswerLogRecord } from "../../shared/answers.js";
 import type {
+  AnswerRunRecord,
   DeliveryRecord,
   FixtureRunRecord,
   GateCallRecord,
@@ -53,7 +55,7 @@ import type {
 import { SessionManager } from "../session/SessionManager.js";
 import { SESSION_FILES, SessionStore } from "../session/SessionStore.js";
 import { transcriptOnlyVoice } from "../voice/voiceOut.js";
-import { loadScript, resolveMoments } from "./moments.js";
+import { loadScript, loadTiming, resolveMoments, turnsForLine } from "./moments.js";
 import { isUnpromptedSpeech, spokenRecords } from "./spoken.js";
 import { pauseAt, turnIntervals } from "./pause.js";
 import type { Judge, JudgeCard } from "./judge.js";
@@ -118,6 +120,8 @@ export interface ReplayResult {
   spokenLog: SpokenContributionRecord[];
   /** The policy's own decision, by candidate id, for the ones it delivered. */
   delivered: Map<string, DecisionLogRecord>;
+  /** `answers.jsonl`, parsed: every answer the replay gave (V3-014). */
+  answerLog: AnswerLogRecord[];
 }
 
 /**
@@ -191,6 +195,7 @@ export async function replayFixture(options: ReplayOptions): Promise<ReplayResul
     researchLog: readResearchLog(sessionDir),
     spokenLog: readSpokenLog(sessionDir),
     delivered: deliveredDecisions(log),
+    answerLog: readAnswerLog(sessionDir),
   };
 }
 
@@ -214,6 +219,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
     gateCalls: [],
     deliveries: [],
     spoken: [],
+    answers: [],
     moments: [],
     matches: [],
   } satisfies Omit<FixtureRunRecord, "elapsedMs">;
@@ -231,6 +237,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
   const deliveries = deliveriesFrom(replay);
   const research = researchFrom(replay);
   const spoken = spokenFrom(replay);
+  const answers = answersFrom(options.fixture, replay, finals);
   const moments = resolveMoments(options.fixture, finals);
   const matches = await judgeAll(options, deliveries, research.cards, spoken, moments);
 
@@ -246,6 +253,7 @@ export async function runFixture(options: RunFixtureOptions): Promise<FixtureRun
     deliveries,
     research,
     spoken,
+    answers,
     moments,
     matches,
     elapsedMs: Date.now() - startedAt,
@@ -328,6 +336,52 @@ export function spokenFrom(replay: ReplayResult): SpokenRecord[] {
 }
 
 /**
+ * Every answer the replay gave, with whether the script asked for it (V3-014).
+ *
+ * The lines the script addresses to Sotto are its `wakeQuestions` and its
+ * `followUpLines`; the turns those lines produced are found the same way a
+ * moment's are ({@link turnsForLine}, with its slack each side), because the
+ * endpointer never lines a turn up with its script exactly. An answer to any
+ * other turn is Sotto answering a question that was not for it, which is the
+ * one thing the follow-up window must never do.
+ */
+export function answersFrom(
+  fixture: string,
+  replay: ReplayResult,
+  finals: readonly TurnUpdate[],
+): AnswerRunRecord[] {
+  let addressed: Set<string>;
+  try {
+    const script = loadScript(fixture);
+    const timing = loadTiming(fixture);
+    const lines = [...script.wakeQuestions.map((wake) => wake.line), ...script.followUpLines];
+    addressed = new Set(
+      lines.flatMap((line) => turnsForLine(line, timing, finals).map((turn) => turn.turnId)),
+    );
+  } catch {
+    // A shadow run (V3-016) has no script; nothing can be said about whether
+    // its answers were asked for, so every one is taken as addressed.
+    addressed = new Set();
+    return replay.answerLog.map((answer) => ({
+      answerId: answer.id,
+      turnId: answer.turnId,
+      question: answer.question,
+      addressed: true,
+      atMs: answer.createdAtMs,
+    }));
+  }
+  return replay.answerLog.map((answer) => ({
+    answerId: answer.id,
+    turnId: answer.turnId,
+    question: answer.question,
+    // A typed question (US-019) was asked by somebody at a keyboard, so it is
+    // addressed by definition; a replay never has one.
+    addressed: answer.turnId === null || addressed.has(answer.turnId),
+    atMs: answer.createdAtMs,
+  }));
+}
+
+/**
  * One research card as the judge reads it.
  *
  * The same three fields an interjection offers — what it said, what it said
@@ -401,6 +455,14 @@ export function readSpokenLog(sessionDir: string | null): SpokenContributionReco
     const record = asSpokenContribution(line);
     return record === null ? [] : [record];
   });
+}
+
+/**
+ * `answers.jsonl`, parsed (V3-014). Empty for a conversation nobody asked
+ * anything in.
+ */
+export function readAnswerLog(sessionDir: string | null): AnswerLogRecord[] {
+  return readJsonlLog<AnswerLogRecord>(sessionDir, SESSION_FILES.answers);
 }
 
 /** `research.jsonl`, parsed (V2-019). Empty for a session that searched nothing. */

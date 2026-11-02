@@ -38,6 +38,7 @@
     "verify:judgment": "node scripts/verify-judgment.mjs",
     "verify:research": "node scripts/verify-research.mjs",
     "verify:speak": "node scripts/verify-speak.mjs",
+    "verify:followups": "node scripts/verify-followups.mjs",
     "verify:briefing": "node scripts/verify-briefing.mjs",
     "verify:digest": "node scripts/verify-digest.mjs",
     "verify:hand": "node scripts/verify-hand.mjs"

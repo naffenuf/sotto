@@ -29,6 +29,7 @@
  * rather than a catch.
  */
 import type {
+  AnswerRunRecord,
   DeliveryRecord,
   EvalRunRecord,
   FixtureRunRecord,
@@ -277,6 +278,13 @@ export interface FixtureScore {
   researchMissed: number;
   /** Every unprompted line, said or not (V3-010). */
   spoken: SpokenScore[];
+  /**
+   * Every answer this replay gave (V3-014), and whether the script asked for
+   * it. Empty on a run recorded before V3-014.
+   */
+  answers: AnswerRunRecord[];
+  /** Answers to a turn that did not address Sotto. Gated at zero. */
+  falseAnswers: number;
   /** Moments that expected Sotto to say something, and what happened. */
   speakCaught: number;
   /** Got a card instead of a sentence, which is the common near miss. */
@@ -344,6 +352,9 @@ export interface ScoreTotals {
   spokenOverrunMeasured: number;
   /** Lines the room asked for (V3-017): reported, never gated. */
   calledOn: number;
+  /** Answers given, and how many to a turn that never addressed Sotto (V3-014). */
+  answers: number;
+  falseAnswers: number;
   /** Lines that were decided against, which is most of them. */
   spokenSkipped: number;
   /** Research-ready cards shown, and how many of them in a pause. */
@@ -729,10 +740,14 @@ export function scoreFixture(run: FixtureRunRecord): FixtureScore {
   const unmatchedAt = (level: DeliveredLevel): number =>
     deliveries.filter((one) => one.unmatched && one.level === level).length;
 
+  const answers = run.answers ?? [];
   return {
     fixture: run.fixture,
     settings: settingsOf(run),
     moments,
+    answers,
+    // V3-014: the whole risk of answering without a wake word, in one number.
+    falseAnswers: answers.filter((one) => !one.addressed).length,
     deliveries,
     researchCards,
     research,
@@ -792,6 +807,8 @@ function totalsOf(fixtures: readonly FixtureScore[]): ScoreTotals {
     spokenOverHuman: 0,
     spokenOverrunMeasured: 0,
     calledOn: 0,
+    answers: 0,
+    falseAnswers: 0,
     spokenSkipped: 0,
     researchCards: 0,
     researchCardsInPause: 0,
@@ -847,6 +864,8 @@ function totalsOf(fixtures: readonly FixtureScore[]): ScoreTotals {
         if (line.overTurnId !== null) totals.spokenOverHuman += 1;
       }
     }
+    totals.answers += fixture.answers.length;
+    totals.falseAnswers += fixture.falseAnswers;
     totals.deliveries += fixture.deliveries.length;
     totals.deliveriesInPause += fixture.deliveriesInPause;
     totals.falseInterjects += fixture.falseInterjects;
@@ -964,6 +983,15 @@ function gatesFor(
       totals.spokenOverrunMeasured === 0
         ? `not measurable: ${totals.spokenLines} line(s) heard, none in real time`
         : `${totals.spokenOverHuman} of ${totals.spokenOverrunMeasured} measurable line(s)`,
+      false,
+    ),
+    // V3-014: the follow-up window lets a question be answered with no wake
+    // word, so "every answer was asked for" is the gate that keeps it honest.
+    // Structural, not judged: the script says which lines address Sotto.
+    gate(
+      "no answer to a turn that did not address Sotto",
+      totals.falseAnswers === 0,
+      `${totals.falseAnswers} of ${totals.answers} answer(s)`,
       false,
     ),
     gate(

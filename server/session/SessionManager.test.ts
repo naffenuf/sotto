@@ -1106,6 +1106,136 @@ describe("SessionManager, answers", () => {
   });
 });
 
+/** A writer that keeps nothing, so a test can override only what it reads. */
+const nullWriter = {
+  dir: "/tmp/not-a-real-folder",
+  appendEvent: () => {},
+  appendTurn: () => {},
+  renameSpeaker: () => {},
+  setSettings: () => {},
+  writeBoard: () => {},
+  appendCandidate: () => {},
+  appendFeedback: () => {},
+  appendAnswer: () => {},
+  appendResearch: () => {},
+  writePacket: () => {},
+  writeDigest: () => {},
+  appendTiming: () => {},
+  writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+  end: () => {},
+} satisfies SessionWriter;
+
+describe("SessionManager, follow-ups without the wake word (V3-014)", () => {
+  /**
+   * The `followups` capture is the whole path twice over: a question by name,
+   * two follow-ups with no name, the pair going back to talking to each other
+   * by name, and a fresh question by name later on.
+   */
+  class FollowUpModel implements ModelClient {
+    readonly labels: string[] = [];
+    /** Every turn the follow-up classifier was asked about, in order. */
+    readonly followUps: string[] = [];
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "address") {
+        return { kind: "request", question: "what should drinks cost a head?" };
+      }
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "question") {
+        return { kind: "none", question: "", topic: "", closing: false, decision: "" };
+      }
+      if (call.label === "followup") {
+        this.followUps.push(call.user);
+        const latest = call.user.slice(call.user.lastIndexOf("LATEST turn:"));
+        // The capture heard "glass hire" as "glass higher", which is exactly
+        // the sort of thing the real classifier reads through and a lexical
+        // rule cannot.
+        return /glass|getting that from/i.test(latest)
+          ? { kind: "to_sotto", question: "What is the glass hire alone?" }
+          : { kind: "to_room", question: "" };
+      }
+      return { candidates: [] };
+    }
+
+    async grounded(): Promise<never> {
+      throw new Error("an answer is prose, not JSON");
+    }
+
+    async prose(): Promise<ProseReply> {
+      return {
+        text: "Say this:\nAbout fifteen pounds a head.\n\nShow this:\nAbout £15 a head\n\n- Venue quotes",
+        citations: [],
+        searchedUrls: [],
+        searched: false,
+        functionCalls: 0,
+      };
+    }
+  }
+
+  it("answers two follow-ups with no wake word, and closes when the pair resume", async () => {
+    const bus = new EventBus(quiet);
+    const model = new FollowUpModel();
+    const answers: AnswerLogRecord[] = [];
+    const timing: Record<string, unknown>[] = [];
+    const wake: boolean[] = [];
+    const conversation: boolean[] = [];
+    bus.subscribe((event) => {
+      if (event.type !== "wake") return;
+      wake.push(event.listening);
+      conversation.push(event.inConversation === true);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => ({
+        ...nullWriter,
+        appendAnswer: (record: AnswerLogRecord) => answers.push(record),
+        appendTiming: (record: Record<string, unknown>) => timing.push(record),
+      }),
+      createModel: () => model,
+      replaySpeed: "max",
+      // Real time, as the address test explains: the classifiers' deadlines
+      // run on the wall clock, and a `max` replay spends no wall time pacing.
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "followups" });
+    await ended;
+
+    // Two questions by name, two follow-ups with no name: four answers.
+    const asked = answers.map((record) => record.question);
+    expect(asked).toHaveLength(4);
+    expect(timing.filter((one) => one["stage"] === "followup_question")).toHaveLength(2);
+    const verdicts = timing.filter((one) => one["stage"] === "followup");
+    expect(verdicts.filter((one) => one["kind"] === "to_sotto")).toHaveLength(2);
+
+    // The window opens after every answer, and the "Okay, EJ, …" turn closes
+    // it on the name alone — no call, because the room has already decided.
+    const windows = timing.filter((one) => one["stage"] === "followup_window");
+    expect(windows.filter((one) => one["event"] === "opened")).toHaveLength(4);
+    const named = verdicts.find((one) => one["named"] === "EJ");
+    expect(named).toMatchObject({ kind: "to_room", named: "EJ" });
+    expect(windows).toContainEqual(expect.objectContaining({
+      event: "closed", reason: "named_person",
+    }));
+    // And "That's roughly what I assumed" closes the second one.
+    expect(windows.map((one) => one["reason"])).toContain("to_room");
+
+    // The indicator said so: up with `inConversation`, and down again.
+    expect(conversation).toContain(true);
+    expect(wake.at(-1)).toBe(false);
+  });
+});
+
 describe("SessionManager, Sotto's speech in the transcript (V2-008a)", () => {
   /**
    * A voice that remembers rather than speaks. Enough of {@link VoiceOut} for
@@ -1152,6 +1282,9 @@ describe("SessionManager, Sotto's speech in the transcript (V2-008a)", () => {
         this.boardCalls.push(call.user);
         return { operations: [{ op: "set_summary", text: "Pricing a note app." }] };
       }
+      // V3-014: the follow-up window reads every turn after the answer, and
+      // this conversation goes back to its own business.
+      if (call.label === "followup") return { kind: "to_room", question: "" };
       this.observerCalls.push(call.user);
       return { candidates: [] };
     }

@@ -79,6 +79,12 @@ export interface SessionEventsState {
    */
   listening: boolean;
   /**
+   * True while the follow-up window is open (V3-014): Sotto has just
+   * answered, so the room can carry on without the name. The indicator shows
+   * the same words in its own "in conversation" style.
+   */
+  inConversation: boolean;
+  /**
    * The settings as the server holds them (V2-017's two). The header's
    * selector shows this rather than its own last click, so two tabs agree.
    */
@@ -114,6 +120,7 @@ const initial: SessionEventsState = {
   cards: [],
   turnCount: 0,
   listening: false,
+  inConversation: false,
   settings: defaultSettings(),
   suppressed: [],
 };
@@ -180,7 +187,7 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
       // and nobody is mid-question across either boundary — which is also what
       // takes the indicator down if a session ends while a turn is still open.
       return event.session === null
-        ? { ...state, session: null, listening: false }
+        ? { ...state, session: null, listening: false, inConversation: false }
         : {
             ...state,
             session: event.session,
@@ -193,6 +200,7 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
             cards: [],
             turnCount: 0,
             listening: false,
+            inConversation: false,
             // Held-back candidates belong to one conversation, as the bus
             // has it: a session starting clears them, one ending leaves the
             // tray up to read.
@@ -201,7 +209,11 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
     case "speakers":
       return { ...state, speakers: event.speakers };
     case "wake":
-      return { ...state, listening: event.listening };
+      return {
+        ...state,
+        listening: event.listening,
+        inConversation: event.inConversation === true,
+      };
     case "settings":
       return { ...state, settings: event.settings };
     case "turn":

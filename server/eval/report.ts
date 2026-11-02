@@ -261,6 +261,16 @@ export function headlines(group: SettingsScore): Headline[] {
       value: describeSpeech(totals),
     },
     {
+      // V3-014: every answer given, and how many to a turn the script never
+      // addressed to Sotto. The gate is zero.
+      label: "answers asked for",
+      value:
+        totals.answers === 0
+          ? "nobody asked Sotto anything"
+          : `${fraction(totals.answers - totals.falseAnswers, totals.answers)}` +
+            ` — ${totals.falseAnswers} answered when not addressed`,
+    },
+    {
       label: "interject precision",
       value: fraction(totals.trueInterjects, totals.interjects),
     },

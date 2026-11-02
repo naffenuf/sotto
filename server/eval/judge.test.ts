@@ -50,6 +50,7 @@ const script: FixtureScript = {
     { speaker: "B", text: "Moving on.", pauseAfterMs: 400 },
   ],
   wakeQuestions: [],
+  followUpLines: [],
   moments: [moment],
 };
 

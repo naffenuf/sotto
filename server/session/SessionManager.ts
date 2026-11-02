@@ -95,6 +95,8 @@ import { StillCurrentWatcher } from "../question/StillCurrentWatcher.js";
 import { classifyStillCurrent } from "../question/stillCurrent.js";
 import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
+import { FollowUpWindow } from "../answer/FollowUpWindow.js";
+import { classifyFollowUp } from "../answer/followUp.js";
 import { Greeting } from "./Greeting.js";
 import { introducedNames } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
@@ -293,6 +295,12 @@ interface ModelLoops {
    * observer looks once per board update.
    */
   questions: QuestionWatcher | null;
+  /**
+   * The few seconds after an answer in which the room needs no wake word
+   * (V3-014), or `null` with no model client — there is nothing to follow up
+   * on without one.
+   */
+  followUp: FollowUpWindow | null;
   board: BoardUpdater | null;
   observer: Observer | null;
   verifier: Verifier | null;
@@ -425,6 +433,8 @@ interface RunningSession {
   address?: AddressWatcher;
   /** V3-002: the per-turn question classifier, retired with the session. */
   questions: QuestionWatcher | null;
+  /** V3-014: the follow-up window, closed with the session. */
+  followUp: FollowUpWindow | null;
   /** V3-015: the claims waiting for a gap, silenced with the session. */
   reservations: Reservations | null;
   /** V3-004: the cached "is the room still on this?", retired with the session. */
@@ -693,6 +703,7 @@ export class SessionManager {
     running.stopRequested = true;
     running.address?.stop();
     running.questions?.stop();
+    running.followUp?.stop();
     running.greeting?.stop();
     running.wrapUp.stop();
     running.research?.stop();
@@ -944,6 +955,7 @@ export class SessionManager {
       onEvent: (record) => store.writer?.appendEvent(record),
       onEcho: (turn) => {
         wake.ignoreTurn(turn.turnId);
+        loops.followUp?.ignoreTurn(turn.turnId);
         if (barge.owns(turn.turnId)) this.bus.setListening(false);
         store.writer?.appendTiming?.({ stage: "self_echo", atMs: clock.now(), ...turn });
         // The last echo can close after playback ended. Re-read the pause
@@ -1007,12 +1019,20 @@ export class SessionManager {
           // question (V3-002) without being a question themselves.
           loops.questions?.ignoreTurn(turn.turnId);
           loops.questions?.remember(turn);
+          // V3-014: the same for the follow-up window. A barge-in's own
+          // `new_question` is already on its way to the answer agent, which
+          // is what "a barge-in new_question counts as to_sotto" comes to.
+          loops.followUp?.ignoreTurn(turn.turnId);
+          loops.followUp?.remember(turn);
         } else {
           wake.acceptTurn(turn);
           // V3-002: and whether the room just wondered something aloud. A
           // turn that says Sotto's name is skipped in there, because the
           // address path above already owes it an answer.
           loops.questions?.acceptTurn(turn);
+          // V3-014: and whether the room is carrying on talking to Sotto
+          // after it answered, which needs no wake word at all.
+          loops.followUp?.acceptTurn(turn);
         }
       },
     });
@@ -1254,6 +1274,7 @@ export class SessionManager {
         researchRunner: null,
         researchCards: null,
         questions: null,
+        followUp: null,
         reservations: null,
         stillCurrent: null,
         readBacks: null,
@@ -1674,6 +1695,10 @@ export class SessionManager {
       // that packet rather than searched for again.
       packets: () => researchRunner.packets(),
     });
+    // V3-014: built below, but referenced from the answer agent's
+    // `onFinished` — which cannot run before both exist, since the first
+    // answer is at least a model call away.
+    let followUp: FollowUpWindow | undefined;
     // Its own queue, on purpose: an answer must not wait behind a board
     // update, and the group must not wait for the board loop to let go of the
     // model (US-018).
@@ -1712,6 +1737,18 @@ export class SessionManager {
         store.writer?.appendAnswer(record);
         store.digest.answer(record);
       },
+      // V3-014: Sotto has answered, so for the next few seconds the room can
+      // carry on without saying the name. Only while this session still owns
+      // the stage — an answer typed after Stop (US-019) has no room to listen
+      // to.
+      onFinished: (answer) => {
+        if (this.current?.info.id !== info.id) return;
+        followUp?.answered({
+          question: answer.question,
+          headline: answer.headline,
+          spokenText: answer.spokenText,
+        });
+      },
       // Generated HTML goes into this session's folder and is served back
       // from it (US-020), so the numbering is per session and so is the URL.
       onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
@@ -1736,13 +1773,49 @@ export class SessionManager {
       classify: (input, signal) => classifyQuestion(model, input, signal),
       speakers: () => this.bus.speakerNames(),
       onTiming,
+      // V3-014: inside the follow-up window the room is talking *to* Sotto,
+      // so the turn is the address path's and this one says nothing about it.
+      inFollowUpWindow: () => followUp?.isOpen() === true,
       onOpenQuestion: (question) =>
         this.noticeQuestion(info, store, question, research, researchCards, reservations),
       // V3-013: the same call tells us when the group settled something, so
       // the read-back arrives with the turn rather than with the board.
       onDecisionClosing: (closing) => readBacks.closing(closing),
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, reservations, stillCurrent, readBacks, steering };
+    // V3-014: the window itself. It is built last because it is the only
+    // thing here that needs the answer agent, and it needs nothing else.
+    followUp = new FollowUpWindow({
+      clock,
+      // Real time for the latency the room would have felt, as every other
+      // classifier does: a `max` replay's clock stands still inside a call.
+      wallClock: this.wallClock,
+      classify: (input, signal) => classifyFollowUp(model, input, signal),
+      speakers: () => this.bus.speakerNames(),
+      onTiming,
+      onInConversation: (open) => {
+        if (this.current?.info.id !== info.id) return;
+        this.bus.setInConversation(open);
+      },
+      // Answered exactly as a question asked by name is, which is also what
+      // keeps the floor: the policy holds its own contributions while an
+      // answer is being written (US-014).
+      onFollowUp: (trigger) => {
+        if (this.current?.info.id !== info.id) return;
+        store.writer?.appendTiming?.({
+          stage: "followup_question", atMs: clock.now(), turnId: trigger.turnId,
+        });
+        policy.wakePhraseDetected();
+        this.logger.log(
+          `[followup] ${info.id} ${trigger.turnId} followed up: ${trigger.question}`,
+        );
+        answers.ask({
+          question: trigger.question,
+          askedBy: trigger.speaker,
+          turnId: trigger.turnId,
+        });
+      },
+    });
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, followUp, reservations, stillCurrent, readBacks, steering };
   }
 
   /**
@@ -2095,6 +2168,7 @@ export class SessionManager {
     running.policy?.stop();
     running.address?.stop();
     running.questions?.stop();
+    running.followUp?.stop();
     running.greeting?.stop();
     running.research?.stop();
     running.reservations?.stop();
@@ -2194,6 +2268,9 @@ async function drainLoops(
   // answer worth saying (V3-004), and whatever gets said belongs in the
   // transcript it was said into.
   await loops.reservations?.flush();
+  // A follow-up said in the last seconds still needs its verdict, and the
+  // verdict is what puts the answer in the queue below (V3-014).
+  await loops.followUp?.flush();
   // An answer asked in the last seconds of a conversation is still owed to
   // whoever asked for it, and the policy must not be left thinking one is
   // still being written.

@@ -325,11 +325,18 @@ export function App() {
                   </button>
                 </div>
               )}
-              {/* Somebody has said Sotto's name and is still asking (US-017).
-                  It sits above the cards because the answer lands there. */}
+              {/* Somebody has said Sotto's name and is still asking (US-017),
+                  or Sotto has just answered and the room can carry on without
+                  the name (V3-014). It sits above the cards because the answer
+                  lands there. */}
               {events.listening && (
-                <p className="stage__listening" data-testid="wake-listening" role="status">
-                  Sotto is listening
+                <p
+                  className={`stage__listening${events.inConversation ? " stage__listening--conversation" : ""}`}
+                  data-testid="wake-listening"
+                  data-in-conversation={events.inConversation ? "true" : "false"}
+                  role="status"
+                >
+                  {events.inConversation ? "Sotto is listening — carry on" : "Sotto is listening"}
                   <span className="stage__listening-dots" aria-hidden="true">
                     <span className="card__dot" />
                     <span className="card__dot" />

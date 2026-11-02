@@ -211,6 +211,18 @@ export interface AnswerAgentOptions {
   /** Records the finished answer in `answers.jsonl`, once (US-008). */
   onRecord: (record: AnswerLogRecord) => void;
   /**
+   * Sotto has finished answering (V3-014), so the room may follow up without
+   * saying the name again.
+   *
+   * Called once per answer that reached the room, after the speech is over —
+   * which is where "after Sotto finishes speaking an answer" lands, since
+   * {@link SpokenAnswer.done} is awaited before this. An answer that *failed*
+   * never gets here: there is nothing to follow up on, and leaving Sotto
+   * listening after a failure would answer the room's next sentence with the
+   * same error.
+   */
+  onFinished?: (answer: Answer, asked: AskedQuestion) => void;
+  /**
    * Saves one piece of generated HTML and says where it can be read (US-020).
    *
    * `null` means it could not be saved — a session with no folder has nowhere
@@ -807,6 +819,7 @@ export class AnswerAgent {
     this.finished += 1;
     this.push(answer);
     this.options.onRecord({ kind: "answer", ...answer, turnId: asked.turnId });
+    if (answer.status === "done") this.options.onFinished?.(answer, asked);
   }
 
   private push(answer: Answer): void {

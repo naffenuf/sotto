@@ -14,7 +14,9 @@ import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { PAUSE_MS } from "../interject/policy.js";
 import { SESSION_FILES } from "../session/SessionStore.js";
+import { loadTiming } from "./moments.js";
 import {
+  answersFrom,
   asJudgeCard,
   deliveredDecisions,
   deliveriesFrom,
@@ -200,6 +202,7 @@ describe("deliveriesFrom", () => {
       researchLog: [],
       spokenLog: [],
       delivered: new Map(),
+      answerLog: [],
       ...partial,
     };
   }
@@ -380,6 +383,7 @@ describe("readResearchLog and researchFrom", () => {
       researchLog: lines,
       spokenLog: [],
       delivered: new Map(),
+      answerLog: [],
     };
   }
 
@@ -582,11 +586,91 @@ describe("readSpokenLog", () => {
       researchLog: [],
       spokenLog: [claim],
       delivered: new Map(),
+      answerLog: [],
     };
     const [one] = spokenFrom(replay);
     expect(one?.id).toBe("spoken-0");
     expect(one?.atStreamMs).toBe(7_000);
     // The room was still mid-turn at 7s, so Sotto spoke into it.
     expect(one?.inPause).toBe(false);
+  });
+});
+
+/**
+ * V3-014: whether the script asked for each answer, read off the one fixture
+ * built for it. `followups` addresses Sotto by name on lines 3 and 18 and
+ * carries on without the name on lines 4 and 5; every other line is somebody
+ * talking to somebody else.
+ */
+describe("answersFrom", () => {
+  const timing = loadTiming("followups");
+  /** One final turn per scripted line, named after its index. */
+  const finals: TurnUpdate[] = timing.lines.map((line) => ({
+    turnId: `0:${line.index}`,
+    speaker: line.speaker,
+    text: `line ${line.index}`,
+    final: true,
+    startMs: line.startMs,
+    endMs: line.endMs,
+    speakerMappingUncertain: false,
+  }));
+
+  function answered(turnId: string | null): ReturnType<typeof answersFrom>[number] | undefined {
+    const replay = {
+      turns: finals,
+      sottoTurns: [],
+      cards: [],
+      sessionDir: null,
+      durationMs: 126_000,
+      candidates: 0,
+      decisions: 0,
+      gateCalls: [],
+      researchLog: [],
+      spokenLog: [],
+      delivered: new Map(),
+      answerLog: [
+        {
+          kind: "answer" as const,
+          id: "ans-1",
+          question: "what should drinks cost?",
+          askedBy: "A",
+          headline: "about £15 a head",
+          detailMd: "",
+          citations: [],
+          artifacts: [],
+          status: "done" as const,
+          createdAtMs: 20_000,
+          latencyMs: 1_000,
+          spokenText: "",
+          ackMs: null,
+          firstAudioMs: null,
+          firstLineMs: null,
+          continuationMs: null,
+          packetIds: [],
+          usedPacketIds: [],
+          turnId,
+        },
+      ],
+    } satisfies ReplayResult;
+    return answersFrom("followups", replay, finals)[0];
+  }
+
+  it("counts an answer to a line that says Sotto's name as asked for", () => {
+    expect(answered("0:3")?.addressed).toBe(true);
+    expect(answered("0:18")?.addressed).toBe(true);
+  });
+
+  it("counts an answer to a scripted follow-up as asked for", () => {
+    expect(answered("0:4")?.addressed).toBe(true);
+    expect(answered("0:5")?.addressed).toBe(true);
+  });
+
+  it("counts an answer to the turn the pair addressed to each other as false", () => {
+    expect(answered("0:6")?.addressed).toBe(false);
+    expect(answered("0:12")?.addressed).toBe(false);
+  });
+
+  it("takes a typed question as addressed, since somebody typed it", () => {
+    expect(answered(null)?.addressed).toBe(true);
   });
 });

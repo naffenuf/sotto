@@ -29,8 +29,27 @@ describe("FixtureScriptSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.wakeQuestions).toEqual([]);
+      expect(result.data.followUpLines).toEqual([]);
       expect(result.data.moments).toHaveLength(1);
     }
+  });
+
+  // V3-014: the lines Sotto may answer are the wake questions plus these, so
+  // one that does not exist would quietly widen what the eval allows.
+  it("rejects a follow-up line that does not exist", () => {
+    const result = FixtureScriptSchema.safeParse({ lines, followUpLines: [1, 9] });
+    expect(messages(result)).toContainEqual(expect.stringContaining("line 9 does not exist"));
+  });
+
+  it("rejects a follow-up line that already says Sotto's name", () => {
+    const result = FixtureScriptSchema.safeParse({
+      lines,
+      wakeQuestions: [{ line: 2, question: "what now?" }],
+      followUpLines: [2],
+    });
+    expect(messages(result)).toContainEqual(
+      expect.stringContaining("already addresses Sotto by name"),
+    );
   });
 
   it("rejects line indexes that do not exist", () => {

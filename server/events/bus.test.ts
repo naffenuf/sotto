@@ -39,7 +39,7 @@ describe("EventBus", () => {
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
       { type: "settings", settings: { frequency: "normal", boldness: "normal", voiceMuted: false } },
-      { type: "wake", listening: false },
+      { type: "wake", listening: false, inConversation: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
       // V3-016: the "almost said" tray's list, empty until the policy has
       // decided against something.
@@ -135,7 +135,7 @@ describe("EventBus", () => {
       { type: "speakers", speakers: {} },
       { type: "board", board: emptyBoard(), changedIds: [], updatedAtMs: 0 },
       { type: "settings", settings: { frequency: "normal", boldness: "normal", voiceMuted: false } },
-      { type: "wake", listening: false },
+      { type: "wake", listening: false, inConversation: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
       { type: "suppressed", suppressed: [] },
     ]);
@@ -196,14 +196,43 @@ describe("EventBus", () => {
 
     bus.setListening(true);
     bus.setListening(true);
-    expect(seen).toEqual([{ type: "wake", listening: true }]);
+    expect(seen).toEqual([{ type: "wake", listening: true, inConversation: false }]);
     expect(bus.listeningState()).toBe(true);
-    expect(bus.snapshot()).toContainEqual({ type: "wake", listening: true });
+    expect(bus.snapshot()).toContainEqual({ type: "wake", listening: true, inConversation: false });
 
     // Nobody is mid-question across the end of a session.
     bus.setSession(null);
     expect(bus.listeningState()).toBe(false);
-    expect(bus.snapshot()).toContainEqual({ type: "wake", listening: false });
+    expect(bus.snapshot()).toContainEqual({ type: "wake", listening: false, inConversation: false });
+  });
+
+  // V3-014: two independent reasons for one indicator. Somebody saying the
+  // name while the follow-up window is open must not take the window's own
+  // style down with it when they stop.
+  it("keeps the follow-up window and the wake word apart on one wake event", () => {
+    const bus = new EventBus();
+    bus.setSession(session);
+    const seen = collect(bus);
+
+    bus.setInConversation(true);
+    bus.setListening(true);
+    bus.setListening(false);
+    expect(seen).toEqual([
+      { type: "wake", listening: true, inConversation: true },
+    ]);
+    expect(bus.listeningState()).toBe(true);
+    expect(bus.inConversationState()).toBe(true);
+
+    bus.setInConversation(false);
+    expect(seen.at(-1)).toEqual({ type: "wake", listening: false, inConversation: false });
+    expect(bus.inConversationState()).toBe(false);
+
+    bus.setInConversation(true);
+    bus.setSession(null);
+    expect(bus.inConversationState()).toBe(false);
+    expect(bus.snapshot()).toContainEqual({
+      type: "wake", listening: false, inConversation: false,
+    });
   });
 
   it("remembers the cards on the stage, one snapshot event each", () => {

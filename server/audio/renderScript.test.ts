@@ -20,7 +20,7 @@ function silence(ms: number): Buffer {
 }
 
 function script(...lines: FixtureScript["lines"]): FixtureScript {
-  return { lines, wakeQuestions: [], moments: [] };
+  return { lines, wakeQuestions: [], followUpLines: [], moments: [] };
 }
 
 /** Samples in a WAV's data chunk. */

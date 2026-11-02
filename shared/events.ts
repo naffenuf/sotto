@@ -133,10 +133,18 @@ export interface CardEvent {
  * is when the question itself is handed to the answer agent (US-018). A turn
  * that stops matching as the speaker says more takes it down again, so
  * "sotto voce" raises it for no longer than it takes to hear the next word.
+ *
+ * V3-014 adds the second way it goes up: for a few seconds after Sotto has
+ * answered, the room can carry on without the name, and the indicator says so
+ * in its own style. `listening` is true for either, so anything that only
+ * wants to know whether Sotto is paying attention reads one field;
+ * `inConversation` is what makes the two look different.
  */
 export interface WakeEvent {
   type: "wake";
   listening: boolean;
+  /** V3-014: the follow-up window is open, so no wake word is needed. */
+  inConversation?: boolean;
 }
 
 /**

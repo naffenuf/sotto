@@ -77,6 +77,16 @@ export const FixtureScriptSchema = z
   .object({
     lines: z.array(FixtureLineSchema).min(1),
     wakeQuestions: z.array(WakeQuestionSchema).default([]),
+    /**
+     * Lines that carry on talking to Sotto with no wake word (V3-014).
+     *
+     * Only meaningful inside a follow-up window — a line here is a question
+     * for Sotto said right after it answered, which is the whole point of
+     * that story. Together with {@link WakeQuestionSchema} these are the
+     * lines Sotto is *allowed* to answer: the eval counts an answer to any
+     * other line as a false answer.
+     */
+    followUpLines: z.array(lineIndex).default([]),
     moments: z.array(PlantedMomentSchema).default([]),
   })
   .superRefine((script, ctx) => {
@@ -89,6 +99,23 @@ export const FixtureScriptSchema = z
           code: "custom",
           path: ["wakeQuestions", i, "line"],
           message: `line ${wake.line} does not exist (last line is ${lastLine})`,
+        });
+      }
+    });
+
+    const wakeLines = new Set(script.wakeQuestions.map((wake) => wake.line));
+    script.followUpLines.forEach((line, i) => {
+      if (!inRange(line)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["followUpLines", i],
+          message: `line ${line} does not exist (last line is ${lastLine})`,
+        });
+      } else if (wakeLines.has(line)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["followUpLines", i],
+          message: `line ${line} already addresses Sotto by name`,
         });
       }
     });

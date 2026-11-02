@@ -1,0 +1,36 @@
+{
+  "lines": [
+    { "speaker": "A", "text": "I'm Craig, and it's launch night we're sorting out.", "pauseAfterMs": 900 },
+    { "speaker": "B", "text": "I'm EJ. The venue's booked, so that leaves drinks, food and the music.", "pauseAfterMs": 1000 },
+    { "speaker": "A", "text": "And we said the whole evening stays under a thousand, all in.", "pauseAfterMs": 1300 },
+    { "speaker": "B", "text": "Sotto, what's a reasonable per-head budget for drinks at an evening launch party in London?", "pauseAfterMs": 2000 },
+    { "speaker": "A", "text": "And how much of that would just be the glass hire?", "pauseAfterMs": 2000 },
+    { "speaker": "B", "text": "Where are you getting that from?", "pauseAfterMs": 2000 },
+    { "speaker": "A", "text": "Okay EJ, what do you actually want to do here, a cash bar or a float behind it?", "pauseAfterMs": 1400 },
+    { "speaker": "B", "text": "A float, capped. A cash bar makes the whole thing feel like a conference.", "pauseAfterMs": 1100 },
+    { "speaker": "A", "text": "Three hundred behind the bar then, and when it's gone it's gone.", "pauseAfterMs": 1300 },
+    { "speaker": "B", "text": "That works. Food next. Something cold that can sit out all evening.", "pauseAfterMs": 1000 },
+    { "speaker": "A", "text": "Nothing that needs a kitchen. The place has one sink and no oven.", "pauseAfterMs": 1100 },
+    { "speaker": "B", "text": "So platters. Bread, cheese, something green so it isn't all beige.", "pauseAfterMs": 1000 },
+    { "speaker": "A", "text": "And one hot thing at eight, or people complain.", "pauseAfterMs": 1000 },
+    { "speaker": "B", "text": "We'd need a plug for that, and there isn't one near the back wall.", "pauseAfterMs": 1100 },
+    { "speaker": "A", "text": "There's one by the fire door. Dodgy, but it exists.", "pauseAfterMs": 1200 },
+    { "speaker": "B", "text": "Noted. Music, then. A playlist, or do we pay somebody?", "pauseAfterMs": 1000 },
+    { "speaker": "A", "text": "A playlist. Nobody has ever remembered the DJ at a thing like this.", "pauseAfterMs": 1100 },
+    { "speaker": "B", "text": "Agreed. I'll put one together and we can argue about it later.", "pauseAfterMs": 1500 },
+    { "speaker": "A", "text": "Sotto, do we need a licence to play recorded music at a private launch event in the UK?", "pauseAfterMs": 2200 },
+    { "speaker": "B", "text": "That's roughly what I assumed. We'll sort it with the venue.", "pauseAfterMs": 1200 },
+    { "speaker": "A", "text": "They'll have one. Most places do.", "pauseAfterMs": 1100 },
+    { "speaker": "B", "text": "I'll ask them anyway, so it's in writing.", "pauseAfterMs": 1300 },
+    { "speaker": "A", "text": "Good. Invites, then. This week, or wait until the food is confirmed?", "pauseAfterMs": 1100 },
+    { "speaker": "B", "text": "This week. People book up, and the food won't change what night it is.", "pauseAfterMs": 1100 },
+    { "speaker": "A", "text": "True. I'll draft something tonight and send it round.", "pauseAfterMs": 1200 },
+    { "speaker": "B", "text": "Perfect. Drinks, food, music and invites. I think we're done.", "pauseAfterMs": 1500 }
+  ],
+  "wakeQuestions": [
+    { "line": 3, "question": "What is a reasonable per-head budget for drinks at an evening launch party in London?" },
+    { "line": 18, "question": "Do we need a licence to play recorded music at a private launch event in the UK?" }
+  ],
+  "followUpLines": [4, 5],
+  "moments": []
+}

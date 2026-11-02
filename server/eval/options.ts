@@ -33,7 +33,9 @@ export const V2_EVAL_FIXTURES = ["research-business-idea", "offsite-plan"] as co
  * moment — the positive control, so that "said nothing" and "noticed nothing"
  * are different results. `decision-closings` (V3-013) is the opposite: three
  * decisions settled out loud, two of them with something unsettled hanging
- * off them.
+ * off them. `followups` (V3-014) is the one whose gate is about *not*
+ * answering: a question by name, two follow-ups with no name, the pair going
+ * back to talking to each other by name, and a fresh question by name later.
  */
 export function isEvalFixture(name: string): boolean {
   return (
@@ -41,6 +43,7 @@ export function isEvalFixture(name: string): boolean {
     name === "no-wake" ||
     name === "rhetorical-questions" ||
     name === "decision-closings" ||
+    name === "followups" ||
     name.startsWith("moment-") ||
     (V2_EVAL_FIXTURES as readonly string[]).includes(name)
   );

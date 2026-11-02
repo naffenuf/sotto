@@ -405,3 +405,51 @@ place every candidate line is already written down, so the bus snapshot is
 **eleven** events plus one per card. Neither of the two real runs held anything
 back at the end — every candidate was either delivered or a duplicate — so the
 tray's own look is checked on `/dev/cards`.
+
+## V3-014: one call per turn in the follow-up window (2026-11-01)
+
+The PRD asks for the follow-up verdict to "share the V3-002 question
+classifier's call where a turn is question-shaped, and the V2-008 address
+classifier's otherwise". Read literally that means teaching two prompts and two
+schemas a third job; read as "do not pay twice", it is already satisfied by the
+routing that was in place, and that is how it is built:
+
+- a turn in the window that **says the name** is the address path's (V2-008),
+  which owes it an answer whatever kind of question it is, and the window makes
+  no call about it at all;
+- a turn in the window that **does not** is skipped by `QuestionWatcher`
+  (`inFollowUpWindow`, the option V3-002 left for this) and classified once by
+  `server/answer/followUp.ts` instead.
+
+So every turn in the window costs exactly one `reasoning_effort: "low"` Spark
+call, which is what the criterion is protecting, and the follow-up prompt can be
+written about one question — who is this turn for? — rather than bolted onto two
+prompts about other ones.
+
+**The two closing rules overlap, and the strict one wins.** "`to_room` or
+`closing` → the window closes" and "the window closes after 2 consecutive turns
+between humans" cannot both bite: the first turn between two humans already
+closes it. `FOLLOWUP_MAX_HUMAN_TURNS` is therefore the backstop for turns that
+have **no verdict yet** — verdicts are serialized, so two people talking faster
+than the classifier can answer would otherwise leave Sotto listening across
+them. Keeping the stricter rule is the "when unsure, close" principle the same
+story states.
+
+**A turn that names somebody else closes it with no model call.** The names are
+the ones the group gave its own voices (US-007); a bare diarization label is not
+a name anybody says out loud, and the speaker's own name does not count — "is
+that per head or Craig's whole budget?" said *by* Craig is still a follow-up.
+
+**The window opens on an answer that reached the room, spoken or on screen.**
+`AnswerAgent.onFinished` fires after `SpokenAnswer.done()`, which is where
+"after Sotto finishes speaking" lands; an answer whose `status` is `error` opens
+nothing, because leaving Sotto listening after a failure would answer the room's
+next sentence with the same error.
+
+**The eval gate is structural, never judged.** `followups` (26 lines, 125.9 s)
+marks the lines Sotto may answer — `wakeQuestions` 3 and 18, plus the new
+`followUpLines` 4 and 5 — and `answersFrom` resolves each answer's turn against
+them with `turnsForLine`'s slack. An answer to any other turn is a false answer
+and the gate is zero. The capture also shows why no lexical rule could do this
+job: "glass hire" came back as **"glass higher"**, and "And how much of that
+would just be the glass higher?" is a follow-up only in context.

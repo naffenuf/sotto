@@ -323,6 +323,27 @@ export interface GateCallRecord {
  */
 export type LegacyChattiness = "quiet" | "normal" | "active";
 
+/**
+ * One answer Sotto gave during a replay (V3-014).
+ *
+ * Here because of the follow-up window: a question needs no wake word for a
+ * few seconds after an answer, which is the highest false-positive risk in
+ * v3, so the eval has to be able to say whether every answer was *asked for*.
+ * `addressed` is resolved by the runner, which has the script and the turns —
+ * the lines the script addresses to Sotto are its `wakeQuestions` and its
+ * `followUpLines`, and an answer to any other turn is a false answer.
+ */
+export interface AnswerRunRecord {
+  answerId: string;
+  /** The turn it answered, or `null` for a typed question. */
+  turnId: string | null;
+  question: string;
+  /** Whether the script addresses that turn to Sotto, by name or as a follow-up. */
+  addressed: boolean;
+  /** Session clock when the answer was recorded. */
+  atMs: number;
+}
+
 /** One fixture replayed at one pair of settings. */
 export interface FixtureRunRecord {
   fixture: string;
@@ -356,6 +377,12 @@ export interface FixtureRunRecord {
    * first. Absent on runs recorded before it.
    */
   spoken?: SpokenRecord[];
+  /**
+   * Every answer the replay gave (V3-014), oldest first. Absent on runs
+   * recorded before it, and on a replay whose session folder could not be
+   * read back.
+   */
+  answers?: AnswerRunRecord[];
   moments: MomentRecord[];
   /** Every (delivery, moment) pair the judge looked at. */
   matches: JudgeMatchRecord[];

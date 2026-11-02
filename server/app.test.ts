@@ -725,7 +725,7 @@ describe("/ws/events", () => {
         settings: { frequency: "normal", boldness: "normal", voiceMuted: false },
       },
       // Nobody has said its name (US-017).
-      { type: "wake", listening: false },
+      { type: "wake", listening: false, inConversation: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
       // And it has held nothing back, because nothing has been noticed (V3-016).
       { type: "suppressed", suppressed: [] },
