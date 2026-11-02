@@ -594,3 +594,89 @@ For the next iteration:
   correction and V3-004's answer. Worth revisiting if the hand count reads high in a live run.
 - Remaining: V3-007 (stall ideas, needs a `stall` candidate type and a fixture with a planted
   stall), V3-009 (knowledge folder, stretch).
+
+[2026-11-01 21:55] V3-007 — completed — a stall is noticed by the observer, ideas are written
+by one Spark call, and they are offered in V3-005's shape; nothing is said or shown unless
+somebody says yes.
+
+Working tree note: four untracked files were already here from the V3-011 checkpoint
+(`fixtures/scripts/launch-workshop.json`, `tasks/checkpoint-speaking-lines.md`,
+`tasks/checkpoint-speaking-runsheet.md`, `tasks/post-checkpoint-ui.md`). They are unrelated
+to this story and are left untracked. One consequence: `npm run fixtures:check` reports
+**3 problems, all of them `launch-workshop`** (a script with no rendered WAV and no capture).
+Every other fixture, `stalled-naming` included, passes.
+
+What was built:
+- `stall` is the seventh `CandidateType` (`shared/candidates.ts`, the `type` and `headline`
+  descriptions in `observerCandidatesJsonSchema`) and the second that never reaches the
+  interjection policy. `server/prompts/observer.md` has its section with the PRD's four
+  negative examples — a pause, one person thinking aloud, a disagreement being worked
+  through ("ideas from outside land there as taking a side"), a hard question being chewed
+  on — and says in as many words that the observer never writes the ideas.
+- `shared/stall.ts` (shapes, `STALL_OFFER_COOLDOWN_MS` 10 min, `MAX_STALL_IDEAS` 3,
+  `STALL_SPEECH_BUDGET_MS` 20 s, the strict JSON Schema beside the zod schema),
+  `server/prompts/stall-ideas.md`, `server/stall/stallIdeas.ts` (the call, low reasoning
+  effort, no tools) and `server/stall/StallOffers.ts` (the three gates, the log line, the
+  `notice` card builder).
+- `Reservations.offer` now takes an `offerId` and an optional `text`/`packetId`, so a stall
+  is offered through V3-005's own plumbing; `stallOfferLine` and `stallIdeasLine` are beside
+  `offerLine`. The new `ideas` kind is said under V3-017's `called_on` rules (no gap, no
+  boldness, no budget, no yielding to an ordinary voice) and `isUnpromptedKind` /
+  `pauseThresholdFor` / `steering.observe` all exclude it.
+- `OfferWindow` holds an opaque `OfferSubject` (`research` | `stall`) and `onAccepted`
+  dispatches: a packet to the answer agent's briefing, a set of ideas to `Reservations.ideas`
+  plus the card. `offer-reply.md` and its user message were generalized ("what Sotto has in
+  hand"); the eight-case `offerReply.integration.test.ts` still passes on real Spark.
+- New fixture `stalled-naming` (24 lines, 95.9 s): a pair circling three product names,
+  ruling the same three out for the third time, then "We're stuck. That's what this is."
+  Rendered and captured; **not** an eval fixture (`isEvalFixture` does not match it), so
+  `npm run eval`'s set and its gates are unchanged.
+
+Measured (real Spark, `npm run test:integration -- server/stall/stall.integration.test.ts`,
+~5.6 min a run, two replays):
+- `stalled-naming` produced exactly one `stall` candidate (confidence 0.85–0.95) and one
+  ideas call of **7.4 s** / ~1,000 completion tokens, with three usable ideas both runs.
+- `brainstorm` produced **zero** stall candidates across ~24 observer runs, and no offer.
+- Run 1 said the offer out loud. Run 2 skipped it as `cooldown`: a `research_hook` earlier in
+  the same conversation had spent V2-017's allowance on its own offer. That is the designed
+  rationing (one allowance for everything Sotto does unasked), not a regression — the test
+  therefore asserts the offer was queued, recorded and phrased as a statement, and tolerates
+  the line being rationed away.
+- Neither run reached the `yes`: the turn after the offer was not read as taking it up. The
+  accept path (yes -> ideas said + card, no second model call) is covered end to end offline
+  in `SessionManager.test.ts` and in `OfferWindow.test.ts`.
+
+Also fixed, because the new capture exposed it: the ASR endpointer opened and closed an 80 ms
+segment with no `transcript` and no `speaker` frame in it (28.14 s of `stalled-naming`; 25
+triples for 24 lines). `TurnAssembler.finalise` now drops a turn that never carried a word
+and counts it in `emptyTurns()`. Written up in `fixtures/events/NOTES.md`.
+
+For the next iteration:
+- An offer is unprompted speech, so if the planner or a hook ever produces a stall offer in
+  `brainstorm` / `no-wake` / `rhetorical-questions`, V3-010's false-speech gate (tolerance 0)
+  would count the *offer* as a false utterance; the `ideas` that follow a yes are excluded by
+  `isUnpromptedKind`. Measured zero stalls on `brainstorm`; check `timing.jsonl`'s `stall`
+  lines before reading such a failure as a scoring bug.
+- No eval or e2e run was paid for in this iteration.
+- `stalled-naming` has no `moments` entry, deliberately: `momentTypes` has no `stall` and the
+  eval has no bucket for an offer, so adding one would be a PRD change (V3-010's shape).
+- Remaining: V3-009 (knowledge folder, stretch).
+
+[2026-11-01 22:05] V3-007 — completed — continued the cut-off iteration above: the working tree
+already held the whole story (the previous run died after writing its progress entry and before
+committing), so this one re-verified it and committed it as one commit.
+
+Re-verified at commit time, nothing changed in the code:
+- `npm run typecheck` clean; `npm test` 96 files / 1639 tests pass.
+- `npm run test:integration -- server/stall/stall.integration.test.ts`: 3/3 in **349 s**.
+  `stalled-naming` → one `stall` candidate (`cand-2`, "Meadow, Tilda, Parcel all ruled out:
+  what do we call this thing?"), ideas call **6.97 s**, three usable ideas on "the name", none
+  of them something the pair had ruled out. The offer line was skipped as `cooldown` again (the
+  same rationing run 2 hit), and the window opened and closed `unrelated`. `brainstorm` → 1
+  candidate, **0** stalls, no offer, nothing said.
+- `npm run fixtures:check`: 3 problems, all of them `launch-workshop` (untracked V3-011
+  checkpoint script with no WAV and no capture); every other fixture including `stalled-naming`
+  passes.
+- The four untracked checkpoint files are still untracked and out of the commit.
+
+Remaining: V3-009 (knowledge folder, stretch).

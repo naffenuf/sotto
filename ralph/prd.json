@@ -270,8 +270,8 @@
         "Typecheck passes"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Verified at commit time: npm run typecheck and npm test (96 files, 1639 tests) pass; server/stall/stall.integration.test.ts passes on real Spark in 349 s \u2014 stalled-naming gave one stall candidate and one 7.0 s ideas call with three usable ideas, brainstorm gave zero stalls and nothing said. The offer line itself was rationed away as cooldown in that run (an earlier research offer had spent V2-017's allowance), which is the designed rationing; the yes path is covered offline in SessionManager.test.ts and OfferWindow.test.ts. npm run fixtures:check reports 3 problems, all of them the untracked launch-workshop checkpoint script; stalled-naming passes."
     },
     {
       "id": "V3-009",

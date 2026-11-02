@@ -1879,3 +1879,39 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   deliberately a *second* line (`offer_window` closed, with `outcome`): a record is written once,
   because `asSpokenContribution` readers — the eval's false-speech gate, `npm run e2e`, the shadow
   report — count utterances off it.
+
+- **A stall is noticed, not solved, and the ideas are a second call.** V3-007's `stall` is the
+  seventh `CandidateType` and the second that never reaches the interjection policy (V2-011 was
+  the first): `SessionManager`'s `onCandidate` routes it to `server/stall/StallOffers.ts`, which
+  writes up to three ideas with one low-effort Spark call (`prompts/stall-ideas.md`, no tools —
+  the material is the group's own options and constraints) and hands them to
+  `Reservations.offer` in V3-005's statement form. The split is load-bearing in the prompts as
+  much as in the code: `observer.md`'s stall section says "you do not write the ideas here and
+  you never will", because the one thing the observer must not start doing is brainstorming, and
+  the candidate's `detail` is *what has already been ruled out* — which is what the ideas prompt
+  leads with, since handing a group back the option it spent three turns rejecting is the one
+  failure that makes the whole feature worthless. Measured on real Spark: the ideas call is
+  **7.4 s** and `stalled-naming` produced three usable ideas on the first look that noticed the
+  loop; `brainstorm` produced **zero** stall candidates across 24 observer runs.
+- **The ideas are written before the offer, which is what makes the yes free.** "I've got a few
+  ideas on the name if they'd help" is true when it is said, and the `yes` that follows costs no
+  model call at all — the same trick V3-017's raised hand plays by carrying its sentence around
+  with it. So `OfferWindow` now holds an opaque `OfferSubject` (`{kind:"research",packet}` |
+  `{kind:"stall",ideas}`) and `onAccepted` dispatches: a packet is briefed by the answer agent
+  (V2-015), a set of ideas is said by `Reservations` as the new `ideas` kind. `isUnpromptedKind`
+  excludes `ideas` beside `called_on` — the room asked — and `pauseThresholdFor` gives it 0, so
+  the eval's false-speech gate and its pause gate both leave it alone. Two rules carry the
+  politeness: the **offer** charges V2-017's allowance and the ideas charge nothing (one
+  contribution, spent where the floor was asked for), and the **card goes up only on the yes**,
+  because ideas nobody asked for are exactly what the statement form exists to avoid.
+  `STALL_OFFER_COOLDOWN_MS` (10 min) sits *in front of* the model call, and one set at a time:
+  a stuck group stays stuck for several turns, so the observer will notice the same loop again.
+- **A turn with no words in it is not a turn.** The `stalled-naming` capture has 25
+  `speechStart`/`speechEnd`/`speechComplete` triples for 24 lines: the extra one is 80 ms long
+  with no `transcript` and no `speaker` frame in it (28.14 s, between two ordinary lines), which
+  is why that capture has 24 `speaker` frames for 25 turns. No other capture has one in 198
+  turns. `TurnAssembler.finalise` now drops a turn that never carried a word (counted in
+  `emptyTurns()`), because an empty final turn reaches the transcript, the board's four-turn
+  cadence and every classifier — but a `speechComplete` that arrives empty *after* real partials
+  still keeps the empty text, which is how every earlier capture was read. Written up in
+  `fixtures/events/NOTES.md`.
