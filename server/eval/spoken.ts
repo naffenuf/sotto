@@ -37,10 +37,10 @@ import { pauseAt, turnIntervals, type TurnInterval } from "./pause.js";
  *
  * Each kind is measured against the threshold it really waits for
  * (`server/question/Reservations.ts`): a claim and its closing line take the
- * policy's own gap, an answer, a correction and a read-back take V3-004's
- * shorter one, and a card the room called for waits for no silence at all —
- * they stopped talking to ask — so all that is asked of it is that nobody was
- * mid-sentence.
+ * policy's own gap, an answer, a correction, a read-back and an offer take
+ * V3-004's shorter one, and a card the room called for waits for no silence
+ * at all — they stopped talking to ask — so all that is asked of it is that
+ * nobody was mid-sentence.
  */
 export function pauseThresholdFor(kind: SpokenContributionKind): number {
   if (kind === "called_on") return 0;

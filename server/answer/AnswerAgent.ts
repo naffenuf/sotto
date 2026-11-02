@@ -171,6 +171,15 @@ export interface AskedQuestion {
   /** V2-007: continue resumes after heard text rather than repeating the original reply. */
   resume?: boolean;
   /**
+   * The packets this question is to be briefed from (V3-005), by packet id.
+   *
+   * V2-015 works out which research a *spoken* question is asking for from
+   * its words ({@link packetsForBriefing}); an offer the room took up asked
+   * about one particular finding, so it says which rather than hoping the
+   * match lands on it.
+   */
+  briefOn?: readonly string[];
+  /**
    * V2-008b: real time the question's `speechEnd` reached the server, so the
    * log can say what the room waited from the end of the question to the
    * first sound. Absent for a typed question and for a replay.
@@ -486,7 +495,12 @@ export class AnswerAgent {
     // question, and when the question is *asking* for it the packets it is
     // asking about also come forward on the stage, open, while Sotto talks.
     const packets = this.options.packets?.() ?? [];
-    const briefing = asked.resume === true ? [] : packetsForBriefing(answer.question, packets);
+    const briefing =
+      asked.resume === true
+        ? []
+        : asked.briefOn !== undefined
+          ? packets.filter((packet) => asked.briefOn?.includes(packet.id) === true)
+          : packetsForBriefing(answer.question, packets);
     if (briefing.length > 0) {
       this.logger.log(
         `[answer] ${answer.id} briefing from ${briefing.map((one) => one.id).join(", ")}`,

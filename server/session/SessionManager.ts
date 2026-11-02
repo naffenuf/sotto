@@ -97,6 +97,8 @@ import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { FollowUpWindow } from "../answer/FollowUpWindow.js";
 import { classifyFollowUp } from "../answer/followUp.js";
+import { OfferWindow } from "../research/OfferWindow.js";
+import { classifyOfferReply } from "../research/offerReply.js";
 import { Greeting } from "./Greeting.js";
 import { introducedNames } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
@@ -301,6 +303,12 @@ interface ModelLoops {
    * on without one.
    */
   followUp: FollowUpWindow | null;
+  /**
+   * The ten seconds after Sotto offers a finding (V3-005), or `null` with no
+   * model client — nothing gets researched without one, so nothing is
+   * offered.
+   */
+  offers: OfferWindow | null;
   board: BoardUpdater | null;
   observer: Observer | null;
   verifier: Verifier | null;
@@ -435,6 +443,8 @@ interface RunningSession {
   questions: QuestionWatcher | null;
   /** V3-014: the follow-up window, closed with the session. */
   followUp: FollowUpWindow | null;
+  /** V3-005: the ten seconds after an offer, closed with the session. */
+  offers: OfferWindow | null;
   /** V3-015: the claims waiting for a gap, silenced with the session. */
   reservations: Reservations | null;
   /** V3-004: the cached "is the room still on this?", retired with the session. */
@@ -704,6 +714,7 @@ export class SessionManager {
     running.address?.stop();
     running.questions?.stop();
     running.followUp?.stop();
+    running.offers?.stop();
     running.greeting?.stop();
     running.wrapUp.stop();
     running.research?.stop();
@@ -956,6 +967,7 @@ export class SessionManager {
       onEcho: (turn) => {
         wake.ignoreTurn(turn.turnId);
         loops.followUp?.ignoreTurn(turn.turnId);
+        loops.offers?.ignoreTurn(turn.turnId);
         if (barge.owns(turn.turnId)) this.bus.setListening(false);
         store.writer?.appendTiming?.({ stage: "self_echo", atMs: clock.now(), ...turn });
         // The last echo can close after playback ended. Re-read the pause
@@ -1024,6 +1036,10 @@ export class SessionManager {
           // is what "a barge-in new_question counts as to_sotto" comes to.
           loops.followUp?.ignoreTurn(turn.turnId);
           loops.followUp?.remember(turn);
+          // V3-005: side talk is context for a reply to an offer without
+          // being one.
+          loops.offers?.ignoreTurn(turn.turnId);
+          loops.offers?.remember(turn);
         } else {
           wake.acceptTurn(turn);
           // V3-002: and whether the room just wondered something aloud. A
@@ -1033,6 +1049,9 @@ export class SessionManager {
           // V3-014: and whether the room is carrying on talking to Sotto
           // after it answered, which needs no wake word at all.
           loops.followUp?.acceptTurn(turn);
+          // V3-005: and, for ten seconds after an offer, whether this turn
+          // took it up.
+          loops.offers?.acceptTurn(turn);
         }
       },
     });
@@ -1275,6 +1294,7 @@ export class SessionManager {
         researchCards: null,
         questions: null,
         followUp: null,
+        offers: null,
         reservations: null,
         stillCurrent: null,
         readBacks: null,
@@ -1492,6 +1512,10 @@ export class SessionManager {
      * (V3-003).
      */
     const researchCardByIdea = new Map<string, string>();
+    // V3-005: the ten seconds after an offer, built below with the answer
+    // agent it briefs from. Nothing can be offered before the first search
+    // has come back, which is a gate and a search away.
+    let offers: OfferWindow | undefined;
     const researchCards = new ResearchCards({
       clock,
       pauseState,
@@ -1510,6 +1534,32 @@ export class SessionManager {
         if (packet !== null) researchCardByIdea.set(packet.ideaId, card.id);
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
         onTiming({ stage: "research_publish", atMs: clock.now(), packetId: packet?.id ?? null, cardId: card.id, state: card.state, published: this.last?.sessionId === info.id });
+      },
+      // V3-005: a finding nobody asked for is also *mentioned*, once, as a
+      // statement, at the moment its card goes up — the planner's ideas and
+      // the observer's hooks, which is everything that reaches this callback:
+      // a question somebody wondered aloud fills in its own thinking card
+      // and gets V3-004's spoken answer instead.
+      onOffer: (packet, cardId) => {
+        if (reservations.questionFor(packet.ideaId) !== null) return;
+        const idea = research.ideas().find((one) => one.id === packet.ideaId);
+        const topic = idea?.topic.trim() ?? "";
+        const spoken = packet.spokenAnswer?.trim() ?? "";
+        // Watched before it is offered, so the verdict the pause reads is
+        // already there (V3-004): a finding about something the room has left
+        // behind is the card alone.
+        stillCurrent.watch(packet.ideaId, {
+          question: idea?.question ?? packet.title,
+          answer: spoken === "" ? packet.teaser : spoken,
+          askedAtMs: clock.now(),
+        });
+        reservations.offer({
+          packetId: packet.id,
+          ideaId: packet.ideaId,
+          turnId: idea?.sourceTurnIds.at(-1) ?? "",
+          topic: topic === "" ? packet.title : topic,
+          cardId,
+        });
       },
     });
     // V3-015: "I'll check the drive time", said at the first gap after the
@@ -1555,6 +1605,10 @@ export class SessionManager {
       // over the `const` below and is only ever called once a question has
       // been noticed, which is long after this returns.
       answering: () => (answers.pending() ?? 0) > 0,
+      // V3-005: at most one open offer at a time, and "open" outlives the
+      // sentence — the ten seconds in which the room may say "go on" are part
+      // of the same offer.
+      canOffer: () => offers?.isOpen() !== true,
       onSpoken: (turn) => this.recordSottoSpeech(info, store, null, turn),
       // V3-006: the words have just been handed to the voice, so "during an
       // unprompted contribution" is inside the window too, not only the
@@ -1596,6 +1650,17 @@ export class SessionManager {
           stillCurrent.forget(record.ideaId);
           if (!record.spoken) {
             this.raiseHand(info, deliveries, hand, clock.now(), record.ideaId);
+          }
+        }
+        // V3-005: the offer was made out loud, so the room has ten seconds to
+        // take it up without saying the name. A line a voice in the room cut
+        // off is its own answer to it, so no window opens — and either way
+        // nothing more will be said about this finding unasked.
+        if (record.kind === "offer") {
+          stillCurrent.forget(record.ideaId);
+          const packet = researchRunner.packets().find((one) => one.id === record.packetId);
+          if (record.spoken && record.yielded !== true && packet !== undefined) {
+            offers?.offered({ packet, topic: record.topic, spokenText: record.text });
           }
         }
         // V3-013: the two limits count what the room really heard, so the
@@ -1815,7 +1880,37 @@ export class SessionManager {
         });
       },
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, followUp, reservations, stillCurrent, readBacks, steering };
+    // V3-005: Sotto has offered something, so for the next ten seconds "go
+    // on" needs no wake word. A yes is V2-015's spoken briefing, from that
+    // one packet rather than from whichever ones the words happen to match.
+    offers = new OfferWindow({
+      clock,
+      // Real time for the latency the room would have felt, as every other
+      // classifier does: a `max` replay's clock stands still inside a call.
+      wallClock: this.wallClock,
+      classify: (input, signal) => classifyOfferReply(model, input, signal),
+      speakers: () => this.bus.speakerNames(),
+      onTiming,
+      onAccepted: (packet, asked) => {
+        if (this.current?.info.id !== info.id) return;
+        this.logger.log(
+          `[offer] ${info.id} ${asked.turnId} took up ${packet.id}: ${packet.title}`,
+        );
+        store.writer?.appendTiming?.({
+          stage: "offer_accepted", atMs: clock.now(), turnId: asked.turnId, packetId: packet.id,
+        });
+        // The floor belongs to whoever just asked, exactly as it does for a
+        // question by name (US-017).
+        policy.wakePhraseDetected();
+        answers.ask({
+          question: `What did you find on ${asked.topic}?`,
+          askedBy: asked.speaker,
+          turnId: asked.turnId,
+          briefOn: [packet.id],
+        });
+      },
+    });
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, reservations, stillCurrent, readBacks, steering };
   }
 
   /**
@@ -2169,6 +2264,7 @@ export class SessionManager {
     running.address?.stop();
     running.questions?.stop();
     running.followUp?.stop();
+    running.offers?.stop();
     running.greeting?.stop();
     running.research?.stop();
     running.reservations?.stop();
@@ -2271,6 +2367,9 @@ async function drainLoops(
   // A follow-up said in the last seconds still needs its verdict, and the
   // verdict is what puts the answer in the queue below (V3-014).
   await loops.followUp?.flush();
+  // V3-005: and so does a "go on" said to an offer in the last seconds; the
+  // yes becomes the briefing the answer agent is about to write.
+  await loops.offers?.flush();
   // An answer asked in the last seconds of a conversation is still owed to
   // whoever asked for it, and the policy must not be left thinking one is
   // still being written.

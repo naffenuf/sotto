@@ -63,6 +63,16 @@ export interface ResearchCardsOptions {
   onDeliver: (card: StageCard, packet: ResearchPacket | null) => void;
   /** One `card` or `pending` line in `research.jsonl`. */
   onRecord: (record: ResearchCardRecord | ResearchPendingRecord) => void;
+  /**
+   * This card went up unasked, so the finding behind it may be *offered*
+   * aloud (V3-005).
+   *
+   * Only from {@link ResearchCards.show} — a question's card is filled in
+   * (V3-003) and an answer to it is spoken instead, a card the room asked for
+   * is already being read out (V2-015), and a packet the session's end pushed
+   * out has no room left to offer it to.
+   */
+  onOffer?: (packet: ResearchPacket, cardId: string) => void;
   logger?: Logger;
   /**
    * What the session's frequency setting allows (V2-017). Defaults to the
@@ -115,7 +125,7 @@ export class ResearchCards {
   private cancelTimer: (() => void) | undefined;
   private stopped = false;
 
-  constructor(options: ResearchCardsOptions) {
+  constructor(private readonly options: ResearchCardsOptions) {
     this.clock = options.clock;
     this.pauseState = options.pauseState;
     this.onDeliver = options.onDeliver;
@@ -443,6 +453,10 @@ export class ResearchCards {
         `${atSessionEnd ? " (the conversation had ended)" : ""}: ${packet.title}`,
     );
     this.onDeliver(card, packet);
+    // V3-005: and said, once, as a statement — at the same moment the card
+    // appears, which is what makes the two one contribution. Not after the
+    // conversation has ended: there is nobody left to want it.
+    if (!atSessionEnd) this.options.onOffer?.(packet, card.id);
   }
 
   /**

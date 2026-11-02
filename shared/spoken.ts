@@ -1,6 +1,6 @@
 /**
  * Everything Sotto says out loud that was not an answer to a wake question
- * (PRD V3-015, V3-004, V3-008, V3-013, V3-017), as it is written down.
+ * (PRD V3-015, V3-004, V3-008, V3-013, V3-005, V3-017), as it is written down.
  *
  * `server/question/Reservations.ts` is what says these lines; this is the
  * shape of the `spoken_contribution` record it appends to `timing.jsonl`, and
@@ -35,7 +35,9 @@ export const SPOKEN_CONTRIBUTION_STAGE = "spoken_contribution";
  * (V3-015, V3-004). `correction` is V3-008's one exception: a verified
  * factual error at boldness `bold`. `readback` is V3-013's: the decision the
  * group has just settled, with the group's own unsettled question on it when
- * one fits. `called_on` is V3-017's and is the odd one out — the room asked.
+ * one fits. `offer` is V3-005's: a finding nobody asked for, mentioned as a
+ * statement so that nobody owes it a reply. `called_on` is V3-017's and is
+ * the odd one out — the room asked.
  */
 export const spokenContributionKinds = [
   "reserve",
@@ -43,6 +45,7 @@ export const spokenContributionKinds = [
   "answer",
   "correction",
   "readback",
+  "offer",
   "called_on",
 ] as const;
 export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
@@ -67,6 +70,8 @@ export function isUnpromptedKind(kind: SpokenContributionKind): boolean {
  * - `no_gap`: nobody stopped talking inside the claim's five-second window.
  * - `frequency`: a bare read-back (V3-013), which only a session set to
  *   contribute `often` says out loud.
+ * - `offer_open`: another offer is already waiting or still open (V3-005):
+ *   at most one at a time, so this packet is the card alone.
  * - `unheard`: muted, or no page attached to play it.
  * - `moved_on`: the room is somewhere else now.
  * - `answered`: somebody present answered the question and the search agrees.
@@ -82,6 +87,7 @@ export const reserveSkipReasons = [
   "budget",
   "no_gap",
   "frequency",
+  "offer_open",
   "unheard",
   "moved_on",
   "answered",
@@ -140,10 +146,12 @@ export interface SpokenContributionRecord {
   /** What was settled, on a `readback`: "six gardens, Saturday". */
   decision?: string;
   /**
-   * The card being read out, on a `called_on` (V3-017), or absent when there
-   * was nothing raised to read.
+   * The card being read out, on a `called_on` (V3-017), or the card an
+   * `offer` is about (V3-005) — absent when there was nothing raised to read.
    */
   cardId?: string;
+  /** The packet an `offer` is offering (V3-005). */
+  packetId?: string;
   /** The turn the question was heard in, or the one a correction rests on. */
   turnId: string;
   /** Three to five words naming it; a correction's is its headline. */

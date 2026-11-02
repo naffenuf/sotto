@@ -3604,3 +3604,212 @@ describe("SessionManager: raising a hand and being called on (V3-017)", () => {
     expect(run.utterances).toEqual(["Nothing right now."]);
   }, 60_000);
 });
+
+/**
+ * V3-005 through the whole pipeline: a finding nobody asked for is *offered*
+ * at the pause its card goes up in, and a "go on" in the next ten seconds
+ * becomes the spoken briefing from that packet — with no wake word anywhere.
+ */
+describe("SessionManager, offering a finding (V3-005)", () => {
+  function timingWriter(timing: Record<string, unknown>[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: () => {},
+      appendTiming: (record: Record<string, unknown>) => timing.push(record),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  /** A voice that keeps every utterance, so a replay can be read back. */
+  class OfferingVoice implements VoiceOut {
+    private count = 0;
+    readonly utterances: string[] = [];
+
+    begin(): Promise<VoiceUtterance | null> {
+      const parts: string[] = [];
+      const spoken = (): string => parts.join(" ");
+      return Promise.resolve({
+        id: `v${(this.count += 1)}`,
+        append: (text) => parts.push(text.trim()),
+        firstAudioMs: () => (parts.length === 0 ? null : 10),
+        cancel: () => {},
+        finish: () => {
+          this.utterances.push(spoken());
+          return Promise.resolve({
+            reason: "complete" as const,
+            text: spoken(),
+            spokenSoFar: spoken(),
+            firstAudioMs: parts.length === 0 ? null : 10,
+          });
+        },
+      });
+    }
+  }
+
+  /**
+   * One research hook, on the first look only, so the conversation produces
+   * exactly one packet — and a yes to the offer it is mentioned in.
+   */
+  class HookingModel implements ModelClient {
+    readonly labels: string[] = [];
+    /** Every question the answer agent was asked, for the briefing check. */
+    readonly asked: string[] = [];
+    private looks = 0;
+
+    async structured(call: StructuredCall): Promise<unknown> {
+      this.labels.push(call.label);
+      if (call.label === "board") return { operations: [] };
+      if (call.label === "research-planner") return { ideas: [] };
+      if (call.label === "research-gate") return { useful: 0.9, unknown: 0.9, answerable: 0.9 };
+      if (call.label === "still-current") {
+        return { verdict: "current", agrees: false, why: "still on the launch" };
+      }
+      if (call.label === "question") return { kind: "none", question: "", topic: "" };
+      if (call.label === "address") return { kind: "mention", question: "" };
+      // V3-005: the first thing anybody says after the offer takes it up.
+      if (call.label === "offer-reply") return { kind: "yes" };
+      if (call.label === "observer") {
+        this.looks += 1;
+        if (this.looks > 1) return { candidates: [] };
+        return {
+          candidates: [
+            {
+              type: "research_hook",
+              headline: "What do comparable launch venues charge per head?",
+              detail: "Nobody in the room knew.",
+              whyNow: "They are picking a venue",
+              evidenceTurnIds: ["0:0"],
+              relatedBoardItemIds: [],
+              scores: { relevance: 0.8, novelty: 0.8, importance: 0.7, confidence: 0.7 },
+            },
+          ],
+        };
+      }
+      return { candidates: [] };
+    }
+
+    async grounded(call: GroundedCall): Promise<GroundedReply> {
+      this.labels.push(call.label);
+      return {
+        value: {
+          title: "Comparable venues charge £40–60 a head",
+          teaser: "Three comparable rooms publish £40 to £60 a head including service.",
+          keyPoints: ["The cheapest is £40 a head", "Service is included in two of the three"],
+          spokenAnswer: "Comparable rooms are forty to sixty pounds a head.",
+          sources: [{ url: "https://example.com/venues", title: "Venue prices" }],
+        },
+        citations: [],
+        searchedUrls: ["https://example.com/venues"],
+        searched: true,
+        functionCalls: 0,
+      };
+    }
+
+    async prose(call: ProseCall): Promise<ProseReply> {
+      this.labels.push(call.label);
+      this.asked.push(call.user);
+      const text =
+        "Say this:\nComparable rooms are forty to sixty pounds a head.\n\n" +
+        "Show this:\nVenues charge £40-£60 a head\n\n- The cheapest is £40 a head";
+      call.onText?.({ itemId: "msg_1", text });
+      return {
+        text,
+        citations: [{ url: "https://example.com/venues", title: "Venue prices" }],
+        searchedUrls: ["https://example.com/venues"],
+        searched: false,
+        functionCalls: 0,
+      };
+    }
+  }
+
+  async function run(): Promise<{
+    model: HookingModel;
+    voice: OfferingVoice;
+    timing: Record<string, unknown>[];
+    cards: StageCard[];
+  }> {
+    const bus = new EventBus(quiet);
+    const model = new HookingModel();
+    const voice = new OfferingVoice();
+    const timing: Record<string, unknown>[] = [];
+    const cards: StageCard[] = [];
+    bus.subscribe((event) => {
+      if (event.type === "card") cards.push(event.card);
+    });
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => timingWriter(timing),
+      createModel: () => model,
+      createVoice: () => voice,
+      replaySpeed: "max",
+      // Every deadline in here is on the wall clock, and a `max` replay
+      // spends no wall time pacing, so the real one still finishes at once.
+      wallClock: systemClock,
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "moment-contradiction" });
+    await ended;
+    return { model, voice, timing, cards };
+  }
+
+  it("mentions the finding as a statement and briefs the room when it is taken up", async () => {
+    const { model, voice, timing, cards } = await run();
+
+    const offers = timing.filter(
+      (record) => record["stage"] === "spoken_contribution" && record["kind"] === "offer",
+    );
+    expect(offers).toHaveLength(1);
+    expect(offers[0]).toMatchObject({
+      kind: "offer",
+      packetId: "packet-1",
+      ideaId: "idea-1",
+      spoken: true,
+      yielded: false,
+    });
+    // A statement, never a question, and the room really heard it.
+    expect(offers[0]?.["text"]).toMatch(/^There's a quick rundown on .+ on screen if you want it\.$/);
+    expect(voice.utterances).toContain(offers[0]?.["text"]);
+    // The card went up with it (V2-014's own card, unchanged).
+    expect(cards.some((card) => card.id === "research-packet-1")).toBe(true);
+
+    // V3-005: the ten seconds afterwards, and the yes that came in them.
+    const windows = timing.filter((record) => record["stage"] === "offer_window");
+    expect(windows.filter((record) => record["event"] === "opened")).toHaveLength(1);
+    const replies = timing.filter((record) => record["stage"] === "offer_reply");
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({ kind: "yes", packetId: "packet-1" });
+    expect(windows.at(-1)).toMatchObject({ event: "closed", outcome: "yes" });
+
+    // And the yes became V2-015's briefing from that packet, with nobody
+    // having said Sotto's name.
+    const accepted = timing.filter((record) => record["stage"] === "offer_accepted");
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]).toMatchObject({ packetId: "packet-1" });
+    expect(model.labels.filter((label) => label === "answer")).toHaveLength(1);
+    expect(model.asked[0]).toContain("packet-1");
+    const briefing = timing.filter((record) => record["stage"] === "answer_briefing");
+    expect(briefing).toHaveLength(1);
+    expect(briefing[0]).toMatchObject({ packetIds: ["packet-1"] });
+    expect(voice.utterances.join(" ")).toContain("forty to sixty pounds a head");
+  }, 60_000);
+});

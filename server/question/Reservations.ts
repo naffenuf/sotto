@@ -1,5 +1,6 @@
 /**
- * Everything Sotto says that nobody asked for (PRD V3-015, V3-004, V3-008).
+ * Everything Sotto says that nobody asked for (PRD V3-015, V3-004, V3-008,
+ * V3-013, V3-005).
  *
  *     open_question -> search starts (V3-003)
  *                   -> first gap within 5 s -> "I'll check the drive time."
@@ -57,7 +58,10 @@ import { isSottoTurn, sottoTurn, type PauseState, type TurnUpdate } from "../../
 // The fourth kind of line is V3-008's: one correction, at boldness `bold`,
 // said under exactly the rules an answer is. See `correctionLine` and
 // `spokenCorrection` in `server/interject/corrections.ts` for which one and
-// in what words.
+// in what words. V3-005's `offer` is the fifth: a finding nobody asked for,
+// mentioned once as a *statement* — see `offerLine` and
+// `server/research/OfferWindow.ts`, which owns the ten seconds afterwards in
+// which "go on" needs no wake word.
 import { RESEARCH_NO_ANSWER, type ResearchIdea, type ResearchPacket } from "../../shared/research.js";
 import type { PolicySettings } from "../../shared/policy.js";
 import {
@@ -125,6 +129,20 @@ export const CALLED_ON_RECHECK_MS = 500;
  * it does not want to hear this, and the card is the only sign from there.
  */
 export const MAX_ANSWER_YIELDS = 2;
+
+/**
+ * How long an unasked-for finding is still worth offering (PRD V3-005).
+ *
+ * The answer's fuse, for the answer's reason: after a minute and a half, or
+ * six more turns, mentioning it is Sotto raising a subject rather than saying
+ * what it has. The card is already on the stage either way — an offer is only
+ * ever queued at the moment its card goes up — so nothing is lost but the
+ * sentence.
+ */
+export const OFFER_STALE_MS = ANSWER_STALE_MS;
+
+/** And the faster of the two, as the answer's is. */
+export const OFFER_STALE_TURNS = ANSWER_STALE_TURNS;
 
 /**
  * The kinds of unprompted line this module says, and why one went unsaid.
@@ -200,6 +218,15 @@ export interface ReservationsOptions {
    */
   onAnswered?: (ideaId: string, state: StillCurrentState) => void;
   /**
+   * Whether a new offer may be made at all (V3-005).
+   *
+   * At most one open offer at a time, and "open" outlives the sentence: the
+   * ten seconds in which the room may say "go on" without a wake word are
+   * part of the same offer. The window owns that clock, so this is injected —
+   * {@link Reservations} only knows about the offers it is still holding.
+   */
+  canOffer?: () => boolean;
+  /**
    * The room is hearing an unprompted line right now (V3-006).
    *
    * Called where the words reach the voice, which is what makes "during an
@@ -272,8 +299,10 @@ interface Pending {
    * asked.
    */
   asked?: boolean;
-  /** The card a `called_on` is reading out. */
+  /** The card a `called_on` is reading out, or the one an `offer` is about. */
   cardId?: string;
+  /** The packet an `offer` is offering (V3-005). */
+  packetId?: string;
 }
 
 export class Reservations {
@@ -300,6 +329,8 @@ export class Reservations {
   private readonly corrections = new Set<string>();
   /** Read-backs already queued, by decision id (V3-013). */
   private readonly readBacks = new Set<string>();
+  /** Packets already offered, by packet id (V3-005), so one is offered once. */
+  private readonly offers = new Set<string>();
   /** The utterance a human voice would cancel, while there is one. */
   private utterance: VoiceUtterance | undefined;
   /** The line being said, while one is: whether a voice may take it away. */
@@ -488,6 +519,81 @@ export class Reservations {
   }
 
   /**
+   * A search nobody asked for came back (PRD V3-005): mention it once, as a
+   * statement, at the same moment its card goes up.
+   *
+   * "There's a quick rundown on competitors on screen if you want it." — not
+   * a question, which is the whole of it: nobody owes an answer, and a group
+   * mid-thought can ignore it without being rude. The ten seconds afterwards,
+   * in which "go on" needs no wake word, belong to
+   * {@link server/research/OfferWindow}; this says the sentence and nothing
+   * else.
+   *
+   * Under V3-004's rules, like the answer and the correction:
+   * {@link SPEAK_PAUSE_MS} of corrected silence, the cached still-current
+   * verdict (a finding about something the room has left behind is the card
+   * alone), and any voice in the room cancels it. Unlike the answer it is
+   * **not** retried — being talked over an offer is the answer to it — and it
+   * does charge the frequency's allowance, because Sotto is asking for the
+   * floor to say something nobody asked about.
+   *
+   * At most one offer at a time: a second while one is waiting or still open
+   * is written down as `offer_open` and stays a card. Returns whether it was
+   * queued, so the caller knows whether to expect a window.
+   */
+  offer(input: {
+    /** The packet being offered, which is offered exactly once. */
+    packetId: string;
+    ideaId: string;
+    /** The turn the idea came out of, for the log. */
+    turnId: string;
+    /** Two or three words naming the subject, which the sentence is built from. */
+    topic: string;
+    /** The card that went up with it. */
+    cardId: string;
+  }): boolean {
+    if (this.stopped || this.offers.has(input.packetId)) return false;
+    this.offers.add(input.packetId);
+    const nowMs = this.clock.now();
+    const line: Pending = {
+      kind: "offer",
+      ideaId: input.ideaId,
+      packetId: input.packetId,
+      cardId: input.cardId,
+      turnId: input.turnId,
+      topic: input.topic,
+      text: offerLine(input.topic),
+      askedAtMs: nowMs,
+      sinceMs: nowMs,
+      pauseMs: SPEAK_PAUSE_MS,
+      expiry: {
+        afterMs: OFFER_STALE_MS,
+        afterTurns: OFFER_STALE_TURNS,
+        reason: "expired",
+      },
+      turnsWaited: 0,
+      yields: 0,
+    };
+    if (!this.offerable()) {
+      this.skip(line, "offer_open");
+      return false;
+    }
+    this.waiting.push(line);
+    this.review();
+    return true;
+  }
+
+  /**
+   * Whether a new offer may be made (V3-005): nothing else is being offered
+   * here, and the window from the last one has closed.
+   */
+  private offerable(): boolean {
+    if (this.waiting.some((line) => line.kind === "offer")) return false;
+    if (this.opening && this.saying?.kind === "offer") return false;
+    return this.options.canOffer?.() !== false;
+  }
+
+  /**
    * The room called on Sotto to say what it is holding (PRD V3-017).
    *
    * `line` is already written — {@link calledOnCardLine} read it off the card
@@ -564,8 +670,9 @@ export class Reservations {
    */
   private charges(line: Pending): boolean {
     // A claim asks for the floor, and so does a read-back nobody asked for
-    // (V3-013): both are Sotto choosing to speak.
-    if (line.kind === "reserve") return true;
+    // (V3-013) and an offer of something nobody asked about (V3-005): all of
+    // them are Sotto choosing to speak.
+    if (line.kind === "reserve" || line.kind === "offer") return true;
     if (line.kind === "readback") {
       // Unless the question on it is one the room can already see: the card
       // spent the contribution when the policy delivered it, and this is that
@@ -904,7 +1011,9 @@ export class Reservations {
     // Cut off by a voice in the room, with a try left: the answer is still
     // the answer, so it waits for another pause (V3-004). Twice is the room
     // saying it does not want to hear this, and the card is then the only
-    // sign.
+    // sign. Deliberately not an offer (V3-005): being talked over an offer
+    // *is* the reply to it, and a second one would charge the allowance
+    // twice for one finding.
     const retried =
       line.kind === "answer" || line.kind === "correction" || line.kind === "readback";
     const retrying = yielded && retried && yields < MAX_ANSWER_YIELDS;
@@ -919,6 +1028,7 @@ export class Reservations {
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
       ...(line.cardId === undefined ? {} : { cardId: line.cardId }),
+      ...(line.packetId === undefined ? {} : { packetId: line.packetId }),
       ...(line.kind === "readback" ? readBackFields(line) : {}),
       ...(line.kind === "answer"
         ? {
@@ -976,6 +1086,7 @@ export class Reservations {
       text: line.text,
       ...(line.kind === "correction" ? { candidateId: line.ideaId } : {}),
       ...(line.cardId === undefined ? {} : { cardId: line.cardId }),
+      ...(line.packetId === undefined ? {} : { packetId: line.packetId }),
       ...(line.kind === "readback" ? readBackFields(line) : {}),
       ...(line.kind === "answer" || line.kind === "correction" || line.kind === "readback"
         ? { pauseWaitMs: nowMs - line.sinceMs }
@@ -1060,6 +1171,21 @@ export function answerLine(topic: string, spokenAnswer: string): string {
 /** "I'll check the drive time." — the claim, from the classifier's topic. */
 export function reserveLine(topic: string): string {
   return `I'll check ${asObject(topic)}.`;
+}
+
+/**
+ * "There's a quick rundown on competitors on screen if you want it." — the
+ * offer (V3-005).
+ *
+ * A statement, never a question: a question puts the room on the spot, and
+ * this is a thing Sotto has in hand rather than something it wants. No
+ * article in front of the subject either — "a rundown on competitors" is how
+ * somebody would say it, and the topic is already two or three words naming
+ * exactly this.
+ */
+export function offerLine(topic: string): string {
+  const subject = topic.replace(/\s+/g, " ").trim().replace(/[.?!,;:]+$/, "");
+  return `There's a quick rundown on ${subject === "" ? "that" : subject} on screen if you want it.`;
 }
 
 /** "Nothing solid on the drive time, sorry." — the loop, closed. */

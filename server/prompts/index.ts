@@ -42,6 +42,8 @@ export const PROMPTS = {
   question: "question",
   /** Whether the room is still talking to Sotto after it answered (V3-014). */
   followUp: "followup",
+  /** What the room made of an offer Sotto volunteered (V3-005). */
+  offerReply: "offer-reply",
   /** Whether the room is still waiting for an answer Sotto went and found (V3-004). */
   stillCurrent: "still-current",
   /** Deciding whether a delivered card raises a planted moment (US-016). */

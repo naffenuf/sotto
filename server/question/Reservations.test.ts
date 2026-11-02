@@ -25,10 +25,12 @@ import { READBACK_EXPIRY_MS } from "../decision/readback.js";
 import {
   ANSWER_STALE_MS,
   ANSWER_STALE_TURNS,
+  OFFER_STALE_TURNS,
   RESERVE_WINDOW_MS,
   Reservations,
   answerLine,
   noAnswerLine,
+  offerLine,
   reserveLine,
   reserveUtteranceId,
   type SpokenContributionRecord,
@@ -120,6 +122,8 @@ function setup(
     answering?: () => boolean;
     stillCurrent?: (ideaId: string) => StillCurrentState | undefined;
     onAnswered?: (ideaId: string, state: StillCurrentState) => void;
+    /** V3-005: whether the ten seconds after the last offer have closed. */
+    canOffer?: () => boolean;
     streamOffsetMs?: number;
   } = {},
 ): Harness {
@@ -160,6 +164,7 @@ function setup(
     ...(options.answering === undefined ? {} : { answering: options.answering }),
     ...(options.stillCurrent === undefined ? {} : { stillCurrent: options.stillCurrent }),
     ...(options.onAnswered === undefined ? {} : { onAnswered: options.onAnswered }),
+    ...(options.canOffer === undefined ? {} : { canOffer: options.canOffer }),
     logger: quiet,
   });
   return {
@@ -1586,5 +1591,178 @@ describe("Reservations: called on (V3-017)", () => {
     expect(voice.said).toEqual(["Nothing right now."]);
     expect(run.records[0]).toMatchObject({ kind: "called_on", spoken: true });
     expect(run.records[0]?.cardId).toBeUndefined();
+  });
+});
+
+describe("Reservations: offering a finding (V3-005)", () => {
+  /** A packet nobody asked for, as `ResearchCards` hands it over. */
+  const found = {
+    packetId: "packet-1",
+    ideaId: "idea-3",
+    turnId: "0:11",
+    topic: "competitor pricing",
+    cardId: "research-packet-1",
+  };
+  const line = "There's a quick rundown on competitor pricing on screen if you want it.";
+
+  it("writes the offer as a statement, never a question", () => {
+    expect(offerLine("competitor pricing")).toBe(line);
+    expect(offerLine("  the drive time?  ")).toBe(
+      "There's a quick rundown on the drive time on screen if you want it.",
+    );
+    expect(offerLine("")).toBe("There's a quick rundown on that on screen if you want it.");
+    expect(offerLine("competitor pricing")).not.toMatch(/\?|[*#_[\]`]|https?:/);
+  });
+
+  it("is said at a real pause, and waits while somebody is talking", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.speak();
+    expect(run.reservations.offer(found)).toBe(true);
+    await run.tick();
+    expect(voice.opened).toBe(0);
+
+    run.hush();
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+    expect(voice.said).toEqual([line]);
+  });
+
+  it("charges the frequency's allowance: it is Sotto asking for the floor", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.offer(found);
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+    voice.played();
+    await run.reservations.flush();
+
+    expect(run.spend.spent).toBe(1);
+    expect(run.records[0]).toMatchObject({
+      stage: "spoken_contribution",
+      kind: "offer",
+      ideaId: "idea-3",
+      packetId: "packet-1",
+      cardId: "research-packet-1",
+      turnId: "0:11",
+      topic: "competitor pricing",
+      spoken: true,
+      yielded: false,
+      text: line,
+    });
+    // And it is Sotto's line in the transcript, like every other (V2-008a).
+    expect(run.spoken.map((turn) => turn.text)).toEqual([line]);
+    // The room is hearing something nobody asked for (V3-006).
+    expect(run.sayings()).toBe(1);
+  });
+
+  it("is the card alone while another offer is still open", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice, { canOffer: () => false });
+    expect(run.reservations.offer(found)).toBe(false);
+    await run.tick();
+
+    expect(voice.opened).toBe(0);
+    expect(run.reservations.waitingCount()).toBe(0);
+    expect(run.records).toHaveLength(1);
+    expect(run.records[0]).toMatchObject({
+      kind: "offer",
+      packetId: "packet-1",
+      spoken: false,
+      reason: "offer_open",
+    });
+  });
+
+  it("is the card alone for a second finding while the first waits for a gap", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    // Nobody has stopped talking, so the first offer is still waiting.
+    run.speak();
+    expect(run.reservations.offer(found)).toBe(true);
+    expect(
+      run.reservations.offer({ ...found, packetId: "packet-2", ideaId: "idea-4" }),
+    ).toBe(false);
+    await run.tick();
+
+    expect(run.records.map((record) => record.reason)).toEqual(["offer_open"]);
+    expect(run.reservations.waitingCount()).toBe(1);
+
+    run.hush();
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+    // Only the first one is ever said out loud.
+    expect(voice.said).toEqual([line]);
+  });
+
+  it("offers one packet once, however many times its card is pushed", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.offer(found);
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+    voice.played();
+    await run.reservations.flush();
+    expect(run.reservations.offer(found)).toBe(false);
+    await run.tick();
+
+    expect(voice.said).toEqual([line]);
+    expect(run.records).toHaveLength(1);
+  });
+
+  it("is the card alone when the room has moved on", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice, { stillCurrent: () => movedOn });
+    run.reservations.offer(found);
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+
+    expect(voice.opened).toBe(0);
+    expect(run.records[0]).toMatchObject({
+      kind: "offer",
+      spoken: false,
+      reason: "moved_on",
+    });
+    expect(run.spend.spent).toBe(0);
+  });
+
+  it("is the card alone at boldness cautious", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice, { settings: { boldness: "cautious" } });
+    run.reservations.offer(found);
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+
+    expect(voice.opened).toBe(0);
+    expect(run.records[0]).toMatchObject({ kind: "offer", reason: "boldness" });
+  });
+
+  it("yields to a voice in the room and is never offered again", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.reservations.offer(found);
+    run.clock.advanceBy(SPEAK_PAUSE_MS);
+    await run.tick();
+    run.reservations.yieldToHuman();
+    await run.reservations.flush();
+
+    expect(voice.cancelled).toBe(1);
+    // One record, and no retry: being talked over an offer is the reply to it.
+    expect(run.records).toHaveLength(1);
+    expect(run.records[0]).toMatchObject({ kind: "offer", spoken: true, yielded: true });
+    expect(run.reservations.waitingCount()).toBe(0);
+  });
+
+  it("gives up after six more turns without a gap", async () => {
+    const voice = new FakeVoice();
+    const run = setup(voice);
+    run.speak();
+    run.reservations.offer(found);
+    for (let index = 0; index < OFFER_STALE_TURNS; index += 1) {
+      run.reservations.acceptTurn(final(`0:${20 + index}`));
+    }
+    await run.tick();
+
+    expect(voice.opened).toBe(0);
+    expect(run.records[0]).toMatchObject({ kind: "offer", spoken: false, reason: "expired" });
   });
 });

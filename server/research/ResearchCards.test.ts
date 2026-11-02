@@ -472,3 +472,58 @@ describe("the card a question puts up (V3-003)", () => {
     expect(h.delivered).toHaveLength(0);
   });
 });
+
+describe("offering a finding nobody asked for (V3-005)", () => {
+  const idea: ResearchIdea = {
+    id: "idea-1",
+    topic: "the drive time",
+    question: "How long is the drive from the city to the farmhouse venue?",
+    why: "Craig wondered this aloud and nobody in the room knew.",
+    sourceTurnIds: ["0:12"],
+    askedAtMs: 4_000,
+  };
+
+  /** Every packet whose card came with an offer, and the card it came with. */
+  function offering(): { offered: { id: string; cardId: string }[]; h: Harness } {
+    const offered: { id: string; cardId: string }[] = [];
+    const h = harness({ onOffer: (one, cardId) => offered.push({ id: one.id, cardId }) });
+    return { offered, h };
+  }
+
+  it("offers the card the pause let through", () => {
+    const { offered, h } = offering();
+    h.cards.accept(packet());
+    h.hush();
+    h.clock.advanceBy(PAUSE_MS);
+    h.cards.acceptTurn(snapshot);
+
+    expect(h.delivered).toHaveLength(1);
+    expect(offered).toEqual([{ id: "packet-1", cardId: "research-packet-1" }]);
+  });
+
+  it("does not offer a question's own card: V3-004 speaks the answer instead", () => {
+    const { offered, h } = offering();
+    h.cards.pending(idea);
+    h.cards.accept(packet());
+
+    expect(h.delivered).toHaveLength(2);
+    expect(offered).toEqual([]);
+  });
+
+  it("does not offer a card the room asked for: it is already being read out", () => {
+    const { offered, h } = offering();
+    h.cards.bringForward([packet()]);
+
+    expect(h.delivered).toHaveLength(1);
+    expect(offered).toEqual([]);
+  });
+
+  it("does not offer what the end of the session pushed out", () => {
+    const { offered, h } = offering();
+    h.cards.accept(packet());
+    h.cards.flush();
+
+    expect(h.delivered).toHaveLength(1);
+    expect(offered).toEqual([]);
+  });
+});
