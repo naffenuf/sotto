@@ -20,6 +20,14 @@ import { classifyQuestion, questionKinds, type QuestionInput, type QuestionKind,
 export const GATE_CONFIDENCE = 0.65;
 /** A yes-probability this high on "settles a decision" sends the turn to Spark for the words. */
 export const GATE_CLOSING = 0.6;
+/**
+ * Above this, Jev's `open_question` starts the search *before* Spark has
+ * written the clean question: the room's own words are a good enough query,
+ * and Spark's six to fourteen seconds on a slow day were the single largest
+ * wait between "we need the bus schedules" and an answer. A wasted search is
+ * about five cents; Spark's verdict confirms or drops it.
+ */
+export const SPECULATE_CONFIDENCE = 0.9;
 
 /** What Jev is told each kind means — the prompt's own definitions, shortened. */
 export const QUESTION_CRITERIA: Record<QuestionKind, string> = {
@@ -46,6 +54,13 @@ export interface GateVerdict {
 export interface GateOptions {
   /** Every Jev verdict, for `timing.jsonl` (`question_gate`). */
   onGate?: (verdict: GateVerdict & { turnId: string; sparked: boolean }) => void;
+  /**
+   * Jev is sure this is a lookup: start it now, with the words as heard.
+   * Spark's verdict follows through {@link onSpeculationSettled}.
+   */
+  onSpeculate?: (input: QuestionInput, verdict: GateVerdict) => void;
+  /** Spark agreed (`true`) — its clean question arrives the usual way — or did not. */
+  onSpeculationSettled?: (turnId: string, confirmed: boolean) => void;
   wallClock: Clock;
 }
 
@@ -118,7 +133,23 @@ export function gatedClassifyQuestion(
     if (verdict === null) return classifyQuestion(model, input, signal);
     const sparked = needsSpark(verdict);
     options.onGate?.({ ...verdict, turnId: input.turn.turnId, sparked });
-    if (sparked) return classifyQuestion(model, input, signal);
+    const speculate =
+      verdict.kind === "open_question" && verdict.confidence >= SPECULATE_CONFIDENCE &&
+      options.onSpeculate !== undefined;
+    if (speculate) options.onSpeculate?.(input, verdict);
+    if (sparked) {
+      if (!speculate) return classifyQuestion(model, input, signal);
+      let result: unknown;
+      try {
+        result = await classifyQuestion(model, input, signal);
+      } catch (error) {
+        options.onSpeculationSettled?.(input.turn.turnId, false);
+        throw error;
+      }
+      const confirmed = (result as { kind?: unknown } | null)?.kind === "open_question";
+      options.onSpeculationSettled?.(input.turn.turnId, confirmed);
+      return result;
+    }
     const result: QuestionResult = { kind: verdict.kind, question: "", topic: "", closing: false, decision: "" };
     return result;
   };

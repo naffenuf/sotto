@@ -531,6 +531,26 @@ describe("ResearchManager: the fast path from a question (V3-003)", () => {
     expect(started).toEqual(["idea-1", "idea-3"]);
   });
 
+  it("takes Spark's clean question and topic onto an idea started on the room's words", async () => {
+    const { manager, started } = harness({ jobs: "held" });
+    const result = manager.acceptQuestion({
+      turnId: "0:3", question: "and I need the bus schedules from New York to Philadelphia, a few companies",
+      topic: "", askedBy: "Craig", askedAtMs: 1_000,
+    });
+    expect(result?.outcome).toBe("accepted");
+    expect(started).toEqual([result?.idea.id]);
+    const idea = manager.confirmIdea(result!.idea.id, {
+      question: "Which buses run from New York to Philadelphia on Sunday?",
+      topic: "the Sunday buses from New York to Philadelphia",
+    });
+    expect(idea).toMatchObject({
+      id: result?.idea.id,
+      question: "Which buses run from New York to Philadelphia on Sunday?",
+      topic: "the Sunday buses from New York to Philadelphia",
+    });
+    expect(manager.confirmIdea("idea-99", { question: "q", topic: "t" })).toBeNull();
+  });
+
   it("answers a repeated question from the packet the first one found", async () => {
     const packet: ResearchPacket = {
       id: "packet-1",

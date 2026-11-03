@@ -2156,3 +2156,15 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `answer` and `no_answer`: the checkpoint had an answer the room asked for consume the allowance
   a contradiction then needed. What bounds the room's own questions now is the covered verdict,
   the deadline and one line at a time; V2-017's budget is for what Sotto says unasked.
+- **A confident lookup starts its search before Spark has written the question.** The design
+  review's point 3. When Jev's `open_question` is at `SPECULATE_CONFIDENCE` (0.9) or better,
+  `gatedClassifyQuestion` calls `onSpeculate` *before* awaiting Spark, and `SessionManager` starts
+  the research on the turn's own words — card and claim withheld — remembering the idea in
+  `speculated` by turn id. Spark's verdict then arrives the usual way: `onOpenQuestion` for a
+  speculated turn calls `ResearchManager.confirmIdea` (Spark's clean question and topic replace
+  the room's words on the idea; the running search keeps the query it was given), puts the pending
+  card up, claims it out loud, and lets through a packet that landed first (`held`).
+  `onSpeculationSettled(false)` — Spark read it as something else, or failed — marks it dropped:
+  a packet that comes back to it is logged `research_dropped` and never becomes a card, and a
+  failed search raises no error card either. Nothing is shown or said on Jev's word alone. The
+  gain is Spark's whole latency (2–14 s) off every looked-up answer; a wasted search is ~$0.05.

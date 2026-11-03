@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { SimulatedClock } from "../clock.js";
 import type { JevLike, JevRequest, JevResponse } from "../model/JevClient.js";
 import type { ModelClient } from "../model/client.js";
-import { gatedClassifyQuestion, needsSpark, renderGateState } from "./gate.js";
+import { SPECULATE_CONFIDENCE, gatedClassifyQuestion, needsSpark, renderGateState } from "./gate.js";
 import type { QuestionInput } from "./question.js";
 
 function input(text: string, previous: string[] = []): QuestionInput {
@@ -92,5 +92,54 @@ describe("gatedClassifyQuestion", () => {
     expect(jev.requests[0]?.state).toBe(renderGateState(input("and cheapest", ["we need the bus schedules"])));
     expect(jev.requests[0]?.state).toContain("Craig: we need the bus schedules");
     expect(jev.requests[0]?.state.endsWith("Latest turn:\nCraig: and cheapest")).toBe(true);
+  });
+});
+
+describe("speculation: a confident lookup starts before Spark is asked", () => {
+  function sparkSaying(kind: string): ModelClient & { calls: number } {
+    const model = {
+      calls: 0,
+      structured: async () => {
+        model.calls += 1;
+        return { kind, question: kind === "open_question" ? "Which buses run on Sunday?" : "", topic: kind === "open_question" ? "the Sunday buses" : "", closing: false, decision: "" };
+      },
+      grounded: async () => { throw new Error("no"); },
+      prose: async () => { throw new Error("no"); },
+    };
+    return model;
+  }
+
+  it("fires onSpeculate first, then settles confirmed when Spark agrees", async () => {
+    const events: string[] = [];
+    const classify = gatedClassifyQuestion(jevSaying("open_question", SPECULATE_CONFIDENCE), sparkSaying("open_question"), {
+      wallClock: new SimulatedClock(0),
+      onSpeculate: (input) => events.push(`speculate:${input.turn.turnId}`),
+      onSpeculationSettled: (turnId, confirmed) => events.push(`settled:${turnId}:${confirmed}`),
+    });
+    const result = await classify(input("we need the bus schedules"));
+    expect(events).toEqual(["speculate:0:9", "settled:0:9:true"]);
+    expect(result).toMatchObject({ kind: "open_question", topic: "the Sunday buses" });
+  });
+
+  it("settles unconfirmed when Spark reads it as something else, or fails", async () => {
+    const events: string[] = [];
+    const options = {
+      wallClock: new SimulatedClock(0),
+      onSpeculate: () => events.push("speculate"),
+      onSpeculationSettled: (_turnId: string, confirmed: boolean) => events.push(`settled:${confirmed}`),
+    };
+    await gatedClassifyQuestion(jevSaying("open_question", 0.95), sparkSaying("to_group"), options)(input("who's bringing the projector"));
+    const broken: ModelClient = { structured: async () => { throw new Error("down"); }, grounded: async () => { throw new Error("no"); }, prose: async () => { throw new Error("no"); } };
+    await expect(gatedClassifyQuestion(jevSaying("open_question", 0.95), broken, options)(input("x"))).rejects.toThrow();
+    expect(events).toEqual(["speculate", "settled:false", "speculate", "settled:false"]);
+  });
+
+  it("does not speculate below the bar, or when nobody is listening for it", async () => {
+    const events: string[] = [];
+    await gatedClassifyQuestion(jevSaying("open_question", 0.8), sparkSaying("open_question"), {
+      wallClock: new SimulatedClock(0),
+      onSpeculate: () => events.push("speculate"),
+    })(input("maybe the schedules?"));
+    expect(events).toEqual([]);
   });
 });

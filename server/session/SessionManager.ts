@@ -47,8 +47,7 @@ import {
 import {
   RESEARCH_CONFIRMED_NOTE,
   RESEARCH_DISAGREES_NOTE,
-  type ResearchLogLine,
-} from "../../shared/research.js";
+  type ResearchLogLine, type ResearchPacket } from "../../shared/research.js";
 import type { SessionInfo, SessionSettings, SessionSource } from "../../shared/session.js";
 import { defaultSettings, describeSource, sourceSlug } from "../../shared/session.js";
 import { isSottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
@@ -1896,30 +1895,54 @@ export class SessionManager {
         // closes the loop out loud — but only to a room that heard Sotto
         // claim the question in the first place.
         if (record.outcome !== "ready") {
+          const guess = [...speculated.values()].find((one) => one.ideaId === record.ideaId);
+          if (guess !== undefined && guess.confirmed !== true) return;
           researchCards.failed(record.ideaId);
           reservations.noAnswer(record.ideaId);
         }
       },
       onPacket: (packet, markdown) => {
         store.writer?.writePacket(packet.id, packet, markdown);
-        // The one place a packet becomes something the room can see.
-        researchCards.accept(packet);
-        // V3-004: and, for a question the room wondered aloud, something it
-        // can hear. The still-current check starts here rather than at the
-        // pause, so that by the time a pause arrives the verdict is cached.
-        const asked = reservations.questionFor(packet.ideaId);
-        const spoken = packet.spokenAnswer?.trim() ?? "";
-        if (asked !== null && spoken !== "") {
-          stillCurrent.watch(packet.ideaId, {
-            question: asked.question,
-            answer: spoken,
-            askedAtMs: asked.askedAtMs,
-          });
+        // A search started on Jev's word alone (the speculative fast path)
+        // whose packet lands before Spark has agreed it was a question: held
+        // until it does, and dropped if it does not.
+        const guess = [...speculated.values()].find((one) => one.ideaId === packet.ideaId);
+        if (guess !== undefined && guess.confirmed === null) {
+          guess.held = packet;
+          return;
         }
-        reservations.answer(packet);
+        if (guess?.confirmed === false) {
+          onTiming({ stage: "research_dropped", atMs: clock.now(), ideaId: packet.ideaId, packetId: packet.id, why: "not_a_question" });
+          return;
+        }
+        packetReady(packet);
       },
       onArtifact: ({ title, html }) => this.saveArtifact(info, store, title, html),
     });
+    /** A finished packet reaching the room: the card, the still-current check, the spoken answer. */
+    const packetReady = (packet: ResearchPacket): void => {
+      // The one place a packet becomes something the room can see.
+      researchCards.accept(packet);
+      // V3-004: and, for a question the room wondered aloud, something it
+      // can hear. The still-current check starts here rather than at the
+      // pause, so that by the time a pause arrives the verdict is cached.
+      const asked = reservations.questionFor(packet.ideaId);
+      const spoken = packet.spokenAnswer?.trim() ?? "";
+      if (asked !== null && spoken !== "") {
+        stillCurrent.watch(packet.ideaId, {
+          question: asked.question,
+          answer: spoken,
+          askedAtMs: asked.askedAtMs,
+        });
+      }
+      reservations.answer(packet);
+    };
+    /**
+     * Searches started on Jev's word alone, by the turn that started them
+     * (the speculative fast path): what Spark then said, and a packet held
+     * for its verdict.
+     */
+    const speculated = new Map<string, { ideaId: string; confirmed: boolean | null; held?: ResearchPacket | undefined }>();
     // The background half (V2-012): hooks and the planner's own ideas, gated
     // by whichever model judgment runs on, and started a few at a time. It
     // reads the board the same way the observer does and waits for nothing —
@@ -2023,14 +2046,68 @@ export class SessionManager {
       classify: gatedClassifyQuestion(jev, model, {
         wallClock: this.wallClock,
         onGate: (verdict) => onTiming({ stage: "question_gate", atMs: clock.now(), ...verdict }),
+        // Jev is sure: the search starts on the room's own words, now. Spark
+        // confirms it (`noticeQuestion` below, with the clean question) or
+        // drops it. Nothing is shown or said until it does.
+        onSpeculate: (input, verdict) => {
+          if (this.current?.info.id !== info.id) return;
+          const turn = input.turn;
+          const started = research.acceptQuestion({
+            turnId: turn.turnId,
+            question: turn.text,
+            topic: "",
+            askedBy: turn.speaker === null ? null : (this.bus.speakerNames()[turn.speaker] ?? turn.speaker),
+            askedAtMs: clock.now(),
+          });
+          onTiming({
+            stage: "question_speculated", atMs: clock.now(), turnId: turn.turnId,
+            confidence: verdict.confidence, outcome: started?.outcome ?? "stopped",
+            ideaId: started?.idea.id ?? null,
+          });
+          if (started?.outcome === "accepted") {
+            speculated.set(turn.turnId, { ideaId: started.idea.id, confirmed: null });
+          }
+        },
+        onSpeculationSettled: (turnId, confirmed) => {
+          const guess = speculated.get(turnId);
+          if (guess === undefined || confirmed) return;
+          // Spark read it as something else: the search, if still running,
+          // comes back to nobody.
+          guess.confirmed = false;
+          guess.held = undefined;
+          onTiming({ stage: "question_speculation_dropped", atMs: clock.now(), turnId, ideaId: guess.ideaId });
+        },
       }),
       speakers: () => this.bus.speakerNames(),
       onTiming,
       // V3-014: inside the follow-up window the room is talking *to* Sotto,
       // so the turn is the address path's and this one says nothing about it.
       inFollowUpWindow: () => followUp?.isOpen() === true,
-      onOpenQuestion: (question) =>
-        this.noticeQuestion(info, store, question, research, researchCards, reservations),
+      onOpenQuestion: (question) => {
+        const guess = speculated.get(question.turnId);
+        if (guess === undefined || guess.confirmed !== null) {
+          this.noticeQuestion(info, store, question, research, researchCards, reservations);
+          return;
+        }
+        // The search is already running on the room's words; Spark's clean
+        // question and topic replace them on the card and in the claim, and a
+        // packet that got here first is let through.
+        guess.confirmed = true;
+        const idea = research.confirmIdea(guess.ideaId, question);
+        onTiming({
+          stage: "open_question", atMs: question.askedAtMs, turnId: question.turnId,
+          topic: question.topic, question: question.question, askedBy: question.askedBy,
+          outcome: "confirmed", ideaId: guess.ideaId,
+        });
+        if (idea === null) return;
+        researchCards.pending(idea);
+        reservations.claim(idea, question);
+        const held = guess.held;
+        if (held !== undefined) {
+          guess.held = undefined;
+          packetReady({ ...held, title: held.title });
+        }
+      },
       // V3-013: the same call tells us when the group settled something, so
       // the read-back arrives with the turn rather than with the board.
       onDecisionClosing: (closing) => readBacks.closing(closing),

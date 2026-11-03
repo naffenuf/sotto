@@ -257,6 +257,23 @@ export class ResearchManager {
       : { outcome: "reused", idea, duplicateOf, packet };
   }
 
+  /**
+   * Spark's clean question and topic for an idea that was started on the
+   * room's own words (the speculative fast path). The search already running
+   * keeps the words it was given; what changes is what the card, the claim
+   * and the packet say the question was. `null` for an idea this manager
+   * does not have.
+   */
+  confirmIdea(ideaId: string, asked: { question: string; topic: string }): ResearchIdea | null {
+    const idea = this.allIdeas.find((one) => one.id === ideaId);
+    if (idea === undefined) return null;
+    const refined = questionIdea({ ...asked, turnId: "", askedBy: null, askedAtMs: 0 });
+    idea.question = refined.question;
+    idea.topic = refined.topic;
+    this.logger.log(`[research] ${idea.id} confirmed: ${idea.topic}: ${idea.question}`);
+    return idea;
+  }
+
   /** Waits for the planner, the gate queue and every job in flight. */
   async flush(): Promise<void> {
     await this.planner.flush();
