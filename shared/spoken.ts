@@ -280,3 +280,29 @@ export function spokenTurnId(record: SpokenContributionRecord): string {
   const attempt = Math.max(0, (record.yields ?? 0) - (record.yielded === true ? 1 : 0));
   return sottoTurnId(spokenUtteranceId(record.kind, record.ideaId, attempt));
 }
+
+/**
+ * The last defence against the voice reading punctuation out loud. The
+ * prompts ask for prose with no symbols; this catches what still gets
+ * through — ElevenLabs says "tilde" for `~`, "slash" for `/` and "Saint" for
+ * `St.` (a live run, 2026-11-03). Only the unambiguous ones: a dollar sign in
+ * front of a number, a tilde or an approx sign before one, a slash or a range
+ * dash between words or numbers, and the few abbreviations an address holds.
+ */
+export function cleanForSpeech(text: string): string {
+  return text
+    .replace(/[~≈]\s*(?=\$?\d)/gu, "about ")
+    .replace(/\$(\d(?:[\d,]*\d)?(?:\.\d+)?)(?:\s*(million|billion|k)\b)?/giu, (_, n: string, scale?: string) =>
+      `${n} ${scale === undefined ? "dollars" : scale === "k" ? "thousand dollars" : `${scale} dollars`}`)
+    .replace(/(\d)\s*[–—-]\s*(?=\d)/gu, "$1 to ")
+    .replace(/(\w)\s*\/\s*(?=\w)/gu, "$1 or ")
+    .replace(/\b(\d+)\s*(?:a\.?m\.?)\b/giu, "$1 a m")
+    .replace(/\b(\d+)\s*(?:p\.?m\.?)\b/giu, "$1 p m")
+    .replace(/\b([A-Z][a-z]+)\s+St\.?(?=[\s,.;:!?]|$)/gu, "$1 Street")
+    .replace(/\bSt\.(?=\s+[A-Z])/gu, "Saint")
+    .replace(/\b([A-Z][a-z]+)\s+Ave\.?(?=[\s,.;:!?]|$)/gu, "$1 Avenue")
+    .replace(/\b([A-Z][a-z]+)\s+Rd\.?(?=[\s,.;:!?]|$)/gu, "$1 Road")
+    .replace(/\b([A-Z][a-z]+)\s+Blvd\.?(?=[\s,.;:!?]|$)/gu, "$1 Boulevard")
+    .replace(/[*_`#>|]+/gu, "")
+    .replace(/\s{2,}/gu, " ");
+}

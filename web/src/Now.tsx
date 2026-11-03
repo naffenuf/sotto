@@ -44,14 +44,7 @@ export function Now({ state, session, turnCount, live, speakers, onStopVoice }: 
       {state.kind === "working" && <Working card={state.card} />}
       {state.kind === "waiting" && <Waiting line={state.line} behind={state.behind} />}
       {state.kind === "listening" && (
-        <Listening
-          named={state.named}
-          inConversation={state.inConversation}
-          session={session}
-          turnCount={turnCount}
-          live={live}
-          speakers={speakers}
-        />
+        <Listening session={session} turnCount={turnCount} live={live} speakers={speakers} />
       )}
     </div>
   );
@@ -148,42 +141,22 @@ function Waiting({ line, behind }: { line: WaitingLine; behind: number }) {
 }
 
 function Listening({
-  named,
-  inConversation,
   session,
   turnCount,
   live,
   speakers,
 }: {
-  named: boolean;
-  inConversation: boolean;
   session: SessionInfo | null;
   turnCount: number;
   live: TurnUpdate | null;
   speakers: SpeakerNames;
 }) {
-  const addressed = named || inConversation;
   return (
     <div>
-      {addressed ? (
-        // Somebody has said Sotto's name and is still asking (US-017), or
-        // Sotto has just answered and the room can carry on without the name
-        // (V3-014). The checks read the same test id they always did.
-        <p
-          className={`now__state now__state--addressed${inConversation ? " now__state--conversation" : ""}`}
-          data-testid="wake-listening"
-          data-in-conversation={inConversation ? "true" : "false"}
-          role="status"
-        >
-          <Pulse />
-          {inConversation ? "Sotto is listening — carry on" : "Sotto is listening"}
-        </p>
-      ) : (
-        <p className="now__state">
-          <Pulse />
-          {session === null ? "Not listening" : "Listening"}
-        </p>
-      )}
+      <p className="now__state">
+        <Pulse />
+        {session === null ? "Not listening" : "Listening"}
+      </p>
       {live !== null && session !== null && (
         <p className="now__live" data-testid="now-live">
           <span className="now__live-speaker">{speakerText(live.speaker, speakers)}</span> {live.text}
@@ -212,4 +185,26 @@ export function wordBoundary(text: string, at: number): number {
   if (text[at] === " ") return at;
   const space = text.lastIndexOf(" ", at);
   return space === -1 ? 0 : space;
+}
+
+/**
+ * "Sotto is listening", pinned to the top of the stage (US-017, V3-014).
+ *
+ * Its own strip rather than a state of Now, so a lookup or a line waiting
+ * for a gap stays visible underneath while somebody is still asking — and so
+ * it sits in one fixed place the room learns to glance at. The checks read
+ * the same test id they always did.
+ */
+export function Attention({ inConversation }: { inConversation: boolean }) {
+  return (
+    <p
+      className={`attention${inConversation ? " attention--conversation" : ""}`}
+      data-testid="wake-listening"
+      data-in-conversation={inConversation ? "true" : "false"}
+      role="status"
+    >
+      <Pulse />
+      {inConversation ? "Sotto is listening — carry on, no name needed" : "Sotto is listening"}
+    </p>
+  );
 }

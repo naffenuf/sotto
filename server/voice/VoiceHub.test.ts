@@ -169,9 +169,11 @@ describe("an utterance fed a sentence at a time (V2-005)", () => {
     expect(utterance).not.toBeNull();
     utterance!.append("Let me check.");
     utterance!.append("They charge $12 a seat.");
-    expect(t.said).toEqual(["Let me check.", "They charge $12 a seat."]);
+    // Cleaned for the voice on the way through (`cleanForSpeech`): a dollar
+    // sign would be read out as one.
+    expect(t.said).toEqual(["Let me check.", "They charge 12 dollars a seat."]);
     // The stage shows the answer as it is spoken, not only once it is over.
-    expect(t.bus.voiceState().text).toBe("Let me check. They charge $12 a seat.");
+    expect(t.bus.voiceState().text).toBe("Let me check. They charge 12 dollars a seat.");
     expect(utterance!.firstAudioMs()).toBe(299);
 
     const spoken = utterance!.finish();

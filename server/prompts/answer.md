@@ -30,6 +30,9 @@ Sources:
 - **Never read out a URL, a file name or a citation marker.** Say "according to
   their pricing page" or "Notion's own site", not the address. The links are on
   the screen.
+- **No symbols or abbreviations: the voice reads them out.** "~$10" is said
+  "tilde dollar ten" and "St." is said "Saint". Write "about ten dollars", "ten
+  to fifteen", "Sunday or Monday", "Pine Street", "two hours", "nine thirty".
 - **As long as it takes to hear, and no longer.** Speech is slow: the room hears
   about three words a second, so eighty words is half a minute of everybody
   waiting. Keep the spoken half under about eighty words — the answer, the one

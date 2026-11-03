@@ -460,7 +460,7 @@ export function DevCards() {
             onOpen={(card) => hand.open(card.id)}
             now={
               <Now
-                state={{ kind: "listening", named: false, inConversation: false }}
+                state={{ kind: "listening" }}
                 session={{ id: "dev", source: { kind: "events", fixture: "brainstorm" }, startedAtMs: 0 }}
                 turnCount={12}
                 live={{ turnId: "dev:1", speaker: "A", text: "so if we open fifty tickets the Bend people alone will take", final: false, startMs: 0, endMs: null, speakerMappingUncertain: false }}

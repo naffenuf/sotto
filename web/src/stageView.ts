@@ -134,23 +134,20 @@ export function nextTrayDueAt(cards: readonly StageCardView[], now: number): num
  *     first of the queue is the next one out.
  *   - `listening`: everything else, which is most of a meeting.
  *
- * Somebody addressing Sotto by name is `listening` too — `named` says so —
- * because the question is still being asked and nothing has been decided.
- * It outranks `working` and `waiting`: the person talking to Sotto is the
- * thing on the room's mind, and the answer card, when it comes, lands below.
+ * Somebody addressing Sotto by name is not a state of Now: the "Sotto is
+ * listening" strip is pinned to the top of the stage by itself, so a lookup
+ * or a waiting line stays visible underneath while the question is asked.
  */
 export type NowState =
   | { kind: "speaking"; text: string; heardChars: number; playing: boolean }
   | { kind: "working"; card: StageCard }
   | { kind: "waiting"; line: WaitingLine; behind: number }
-  | { kind: "listening"; named: boolean; inConversation: boolean };
+  | { kind: "listening" };
 
 export function nowState(input: {
   voice: VoiceState;
   cards: readonly StageCard[];
   waiting: readonly WaitingLine[];
-  listening: boolean;
-  inConversation: boolean;
 }): NowState {
   if (input.voice.speaking) {
     return {
@@ -160,16 +157,13 @@ export function nowState(input: {
       playing: input.voice.playing,
     };
   }
-  if (input.listening) {
-    return { kind: "listening", named: !input.inConversation, inConversation: input.inConversation };
-  }
   // The newest card on its way: an answer being written outranks a lookup
   // started earlier, because it is the one somebody is waiting on.
   const working = [...input.cards].reverse().find((card) => card.state === "thinking");
   if (working !== undefined) return { kind: "working", card: working };
   const line = input.waiting[0];
   if (line !== undefined) return { kind: "waiting", line, behind: input.waiting.length - 1 };
-  return { kind: "listening", named: false, inConversation: false };
+  return { kind: "listening" };
 }
 
 /**

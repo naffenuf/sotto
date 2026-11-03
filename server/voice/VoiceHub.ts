@@ -16,6 +16,7 @@
  * playing, not when ElevenLabs has finished sending: synthesis runs faster
  * than real time, so "done generating" can be seconds before "done talking".
  */
+import { cleanForSpeech } from "../../shared/spoken.js";
 import type WebSocket from "ws";
 import {
   VoiceClientFrameSchema,
@@ -171,7 +172,10 @@ export class VoiceHub implements VoiceOut {
     let said = "";
     return {
       id,
-      append: (text: string): void => {
+      append: (raw: string): void => {
+        // The one place every spoken word passes: whatever the prompts let
+        // through, the voice must not read a tilde or a slash aloud.
+        const text = cleanForSpeech(raw);
         if (this.active !== id || text.trim() === "") return;
         speaker.append(text);
         said = said === "" ? text.trim() : `${said} ${text.trim()}`;

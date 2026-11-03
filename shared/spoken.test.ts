@@ -15,8 +15,7 @@ import {
   spokenContributionKinds,
   spokenTurnId,
   spokenUtteranceId,
-  type SpokenContributionRecord,
-} from "./spoken.js";
+  type SpokenContributionRecord, cleanForSpeech } from "./spoken.js";
 import { sottoTurnId } from "./turns.js";
 
 const line: SpokenContributionRecord = {
@@ -88,5 +87,22 @@ describe("estimateSpokenMs", () => {
 
   it("is zero for nothing", () => {
     expect(estimateSpokenMs("   ")).toBe(0);
+  });
+});
+
+describe("cleanForSpeech", () => {
+  it("says the symbols the voice would otherwise read out", () => {
+    expect(cleanForSpeech("PhillyBus is cheapest at ~$10, about 2-3 hours")).toBe(
+      "PhillyBus is cheapest at about 10 dollars, about 2 to 3 hours",
+    );
+    expect(cleanForSpeech("Sunday/Monday departures from Pine St.")).toBe("Sunday or Monday departures from Pine Street");
+    expect(cleanForSpeech("buses at 9 AM and 10:30 pm")).toBe("buses at 9 a m and 10:30 p m");
+    expect(cleanForSpeech("St. Louis to Washington Ave, $1.2 million")).toBe("Saint Louis to Washington Avenue, 1.2 million dollars");
+    expect(cleanForSpeech("They charge $12 a seat.")).toBe("They charge 12 dollars a seat.");
+  });
+
+  it("leaves ordinary prose alone", () => {
+    const line = "Buses run nearly every hour; the ride is about two hours in traffic.";
+    expect(cleanForSpeech(line)).toBe(line);
   });
 });

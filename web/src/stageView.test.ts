@@ -187,10 +187,10 @@ describe("raisedCards", () => {
 });
 
 describe("nowState", () => {
-  const quiet = { voice: silentVoice(), cards: [], waiting: [], listening: false, inConversation: false };
+  const quiet = { voice: silentVoice(), cards: [], waiting: [] };
 
   it("is listening when nothing is happening", () => {
-    expect(nowState(quiet)).toEqual({ kind: "listening", named: false, inConversation: false });
+    expect(nowState(quiet)).toEqual({ kind: "listening" });
   });
 
   it("is speaking while an utterance is open, with what has been said so far", () => {
@@ -220,24 +220,10 @@ describe("nowState", () => {
     expect(nowState({ ...quiet, waiting })).toEqual({ kind: "waiting", line: waiting[0], behind: 1 });
   });
 
-  it("puts somebody addressing Sotto ahead of a lookup", () => {
-    const cards = [{ ...card("card-ans-1", "answer", NOW), state: "thinking" as const }];
-    expect(nowState({ ...quiet, cards, listening: true })).toEqual({
-      kind: "listening",
-      named: true,
-      inConversation: false,
-    });
-    expect(nowState({ ...quiet, listening: true, inConversation: true })).toEqual({
-      kind: "listening",
-      named: false,
-      inConversation: true,
-    });
-  });
-
   it("speaking outranks everything", () => {
     const voice = { speaking: true, playing: false, utteranceId: "voice-1", text: "" };
     const waiting = [{ kind: "answer", text: "x", sinceMs: 1 }];
-    expect(nowState({ ...quiet, voice, waiting, listening: true }).kind).toBe("speaking");
+    expect(nowState({ ...quiet, voice, waiting }).kind).toBe("speaking");
   });
 });
 

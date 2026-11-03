@@ -97,7 +97,7 @@ import { StillCurrentWatcher } from "../question/StillCurrentWatcher.js";
 import { classifyStillCurrent } from "../question/stillCurrent.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { FollowUpWindow } from "../answer/FollowUpWindow.js";
-import { classifyFollowUp } from "../answer/followUp.js";
+import { gatedClassifyFollowUp } from "../answer/followUpFast.js";
 import { gatedClassifyAddress } from "../answer/addressFast.js";
 import { gatedClassifyQuestion } from "../question/gate.js";
 import type { JevLike } from "../model/JevClient.js";
@@ -2013,7 +2013,10 @@ export class SessionManager {
       // Real time for the latency the room would have felt, as every other
       // classifier does: a `max` replay's clock stands still inside a call.
       wallClock: this.wallClock,
-      classify: (input, signal) => classifyFollowUp(model, input, signal),
+      classify: gatedClassifyFollowUp(jev, model, {
+        wallClock: this.wallClock,
+        onGate: (verdict) => onTiming({ stage: "followup_gate", atMs: clock.now(), ...verdict }),
+      }),
       speakers: () => this.bus.speakerNames(),
       onTiming,
       onInConversation: (open) => {

@@ -2090,3 +2090,19 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   is "ask Spark". Measured on the bus turns: three needs → `open_question` at 0.83–0.96, "lock
   that in" → `decision` with closing 0.94, the rhetorical one → `rhetorical` 0.82, and "Can you
   help that with us?" → 0.51, which is exactly the one Spark should settle.
+- **Three things from the solo run (`2026-11-03_1515-mic`).** (1) The follow-up "And how much is
+  the ticket roughly?" waited 6 s for Spark, hit `FOLLOWUP_TIMEOUT_CALL_MS` and was closed as
+  `unsure`: `server/answer/followUpFast.ts` (`gatedClassifyFollowUp`) puts Jev in front, with
+  Sotto's own question and answer in the state; a confident `to_sotto` is asked **as said** (the
+  answer agent reads the transcript anyway), and the bar is 0.8 — "The hotel is 200 a night…",
+  said to the room, came back `to_sotto` at 0.74, and answering a line meant for a person is the
+  worse failure. Measured: the dropped follow-up at 1.00 in 709 ms. (2) The voice reads symbols
+  aloud — `~` is "tilde", `/` is "slash", `St.` is "Saint" — so `answer.md` and
+  `research-packet.md` ask for none, and `cleanForSpeech` in `shared/spoken.ts` runs on every
+  word at `VoiceHub`'s `append` as the last defence (`$12` → "12 dollars", `2-3` → "2 to 3",
+  `Pine St.` → "Pine Street", `9 AM` → "9 a m"). (3) "Sotto is listening" is no longer a state of
+  Now: `Attention` in `web/src/Now.tsx` is a strip pinned (`position: sticky`) to the top of the
+  stage, so a lookup or a waiting line stays visible underneath; `nowState` no longer takes
+  `listening`. And "Sotto, go ahead" 6 s after a budget line gets "Nothing right now" because the
+  observer looks only after a notes update — every four turns or 45 s — which the solo run sheet
+  now says.

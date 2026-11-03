@@ -42,7 +42,9 @@ companies, I should find the cheapest one." — **pause 3 s** —
 
 **You:** "And how much is a ticket, roughly?"
 
-> *Now shows "Sotto is listening — carry on". It answers without the name.*
+> *The green "Sotto is listening — carry on" strip is pinned at the top of the
+> stage after an answer. It answers without the name (Jev decides in under a
+> second now).*
 
 ## 4. The raised hand (1:50)
 
@@ -50,9 +52,11 @@ companies, I should find the cheapest one." — **pause 3 s** —
 under three hundred dollars. The dinner's at Giorgio's on Pine, that's about
 eighty for two." — **pause 3 s** —
 
-> *Within about 15–20 s a line appears in Holding: a "Noticed" about the budget
-> (200 + 80 is already 280 before a single bus ticket). Nothing is said out loud at
-> the default settings.*
+> *The observer only looks after the notes update, which is every four turns or
+> 45 seconds — so say two or three more ordinary lines ("The dinner's at eight.",
+> "We'd get back Monday evening.") and wait for a "Noticed" line about the budget
+> to appear in Holding (200 + 80 is already 280 before a single bus ticket). Up
+> to a minute. Nothing is said out loud at the default settings.*
 
 **You:** "Sotto, go ahead."
 

@@ -32,6 +32,8 @@ export interface StageProps {
   almostSaid?: readonly SuppressedCandidate[];
   /** The Now zone, already rendered: what Sotto is doing this second. */
   now?: ReactNode;
+  /** Pinned to the top of the stage while somebody is talking to Sotto. */
+  attention?: ReactNode;
   /** What Sotto is holding and has not said (V3-017), newest first. */
   held?: readonly StageCardView[];
   /** The cards the reader opened, which are read in full where they land. */
@@ -61,6 +63,7 @@ export function Stage({
   cards,
   almostSaid = [],
   now: nowZone,
+  attention,
   held = [],
   opened,
   inNow,
@@ -80,6 +83,11 @@ export function Stage({
   return (
     <section className="stage-area">
       <main className="stage" data-testid="stage">
+        {attention !== undefined && attention !== null && (
+          <div className="stage__attention" data-testid="stage-attention">
+            {attention}
+          </div>
+        )}
         {banner}
         {nowZone !== undefined && (
           <div className="zone zone--now" data-testid="zone-now">

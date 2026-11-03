@@ -30,7 +30,7 @@ import { useStoredFlag } from "./useStoredFlag.js";
 import { Backstage } from "./Backstage.js";
 import { SessionControls } from "./SessionControls.js";
 import type { HistoryDetail, HistoryEntry } from "../../shared/history.js";
-import { Now } from "./Now.js";
+import { Attention, Now } from "./Now.js";
 import { useRaisedHand } from "./RaisedHand.js";
 import { Stage } from "./Stage.js";
 import { liveTurn, nowState, spokenMark } from "./stageView.js";
@@ -63,13 +63,7 @@ export function App() {
   /** What Sotto is holding and has not said (V3-017). */
   const hand = useRaisedHand(events.cards);
   /** What Sotto is doing this second: the stage's Now zone. */
-  const now = nowState({
-    voice: events.voice,
-    cards: events.cards,
-    waiting: events.waiting,
-    listening: events.listening,
-    inConversation: events.inConversation,
-  });
+  const now = nowState({ voice: events.voice, cards: events.cards, waiting: events.waiting });
 
   /** Set by Stop until the session is gone, so letting go of the mic is not read as losing it. */
   const stopping = useRef(false);
@@ -322,6 +316,7 @@ export function App() {
           onFeedback={onFeedback}
           onOpen={(card) => hand.open(card.id)}
           footer={<AskBox onAsk={onAsk} />}
+          attention={events.listening ? <Attention inConversation={events.inConversation} /> : null}
           now={
             <Now
               state={now}
