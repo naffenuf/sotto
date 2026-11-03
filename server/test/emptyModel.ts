@@ -16,6 +16,8 @@ export const emptyModel: ModelClient = {
     if (call.label === "research-planner") return { ideas: [] };
     // V3-002: nothing the room wondered aloud, which is most turns.
     if (call.label === "question") return { kind: "none", question: "", topic: "" };
+    // Post-V3-011: nobody read off the first turns, so the patterns' names stand.
+    if (call.label === "introductions") return { speakers: [] };
     return { candidates: [] };
   },
   grounded: async () => {

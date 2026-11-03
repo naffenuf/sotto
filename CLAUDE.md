@@ -2046,3 +2046,17 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   deliberate. (5) "And I'm EJ" was heard as "AJ" and "No, that was EJ" went nowhere:
   `correctedName` reads a correction off the front of a turn and `SessionManager` applies it to
   the label that last introduced itself, within `NAME_CORRECTION_MS` (20 s), never to the speaker.
+- **Who is in the room is read twice: by a pattern at once, and by the model once.**
+  `speakerIntroductions.ts` still names a label the instant it says "I'm Craig", because that is
+  free and the name moment is short. `server/session/IntroductionReader.ts` then makes **one**
+  low-effort Spark call (`prompts/introductions.md`) once the introductions have settled —
+  `INTRO_SETTLE_MS` (30 s) after the first human turn or `INTRO_SETTLE_TURNS` (6), whichever first
+  — with every turn so far and the names already given, and applies only what changed. After
+  that it calls again only for a turn `aboutAName` (a correction shape, "name" in the first eight
+  words, or somebody's current name), at most once per `INTRO_MIN_GAP_MS` (8 s). Measured on real
+  Spark with the misheard "AJ": "No, that was EJ", "It's E, J, not A, J" and "Sorry, EJ, with an
+  E" all came back `EJ`, in 5.8–7.1 s; a turn naming nobody came back blank in 2.3 s. The model
+  never sees Sotto's lines, and a name it gives that is a label, the wake word or four-plus words
+  is dropped. Built in `SessionManager.assembler` beside the patterns and stopped with the
+  address watcher; `emptyModel` answers it with no speakers, so `npm test` applies the patterns'
+  names only.

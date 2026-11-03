@@ -103,6 +103,7 @@ import { OfferWindow, type OfferSubject } from "../research/OfferWindow.js";
 import { classifyOfferReply } from "../research/offerReply.js";
 import { Greeting } from "./Greeting.js";
 import { correctedName, introducedNames } from "./speakerIntroductions.js";
+import { IntroductionReader } from "./IntroductionReader.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 // V3-007: a group going round in circles is offered a few ideas, and nothing
 // is said or shown unless somebody takes the offer up.
@@ -313,6 +314,8 @@ interface ModelLoops {
   judgment: JudgmentRouter;
   /** Retired with the session so late classifications cannot restart speech. */
   address?: AddressWatcher;
+  /** Who each voice is, read once by the model after the introductions settle. */
+  introductions?: IntroductionReader;
   /**
    * The answer agent's way back to the address path (V3-017): a `continue`
    * with nothing to continue is the room calling on the hand again. Filled in
@@ -475,6 +478,8 @@ export type AskOutcome = "asked" | "no-session" | "no-model";
 interface RunningSession {
   /** V2-008: final-turn addressing has its own bounded asynchronous work. */
   address?: AddressWatcher;
+  /** Who each voice is, read by the model once the introductions settle. */
+  introductions?: IntroductionReader;
   /** V3-002: the per-turn question classifier, retired with the session. */
   questions: QuestionWatcher | null;
   /** V3-014: the follow-up window, closed with the session. */
@@ -753,6 +758,7 @@ export class SessionManager {
     if (running === undefined) return false;
     running.stopRequested = true;
     running.address?.stop();
+    running.introductions?.stop();
     running.questions?.stop();
     running.followUp?.stop();
     running.offers?.stop();
@@ -969,6 +975,24 @@ export class SessionManager {
     wrapUp: WrapUp,
   ): SessionTranscription {
     const wake = this.wakeWatcher(info, loops, clock, store, wrapUp);
+    // Who is here, read by the model once the introductions have settled —
+    // the patterns below name people the instant they say "I'm Craig", and
+    // this is what reads "No, that was EJ" and "it's E, J" (post-V3-011).
+    const introductions =
+      loops.modelClient === null
+        ? undefined
+        : new IntroductionReader({
+            clock,
+            wallClock: this.wallClock,
+            model: loops.modelClient,
+            speakers: () => this.bus.speakerNames(),
+            rename: (label, name) => {
+              if (this.current?.info.id === info.id) this.renameSpeaker(label, name);
+            },
+            onTiming: (event) => store.writer?.appendTiming?.(event),
+            logger: this.logger,
+          });
+    if (introductions !== undefined) loops.introductions = introductions;
     /** Labels that have had a final turn, so a new one can be told from a known one. */
     const labelsMet = new Set<string>();
     /** Names introduced inside somebody else's turn, waiting for the voice they belong to. */
@@ -1052,6 +1076,7 @@ export class SessionManager {
             lastIntroduced = { label: turn.speaker, atMs: clock.now() };
           }
           pendingIntroductions.push(...others);
+          introductions?.acceptTurn(turn);
         }
         // V2-009: who is in the room, and when the room is quiet enough to
         // ask. It skips Sotto's own lines itself.
@@ -2436,6 +2461,7 @@ export class SessionManager {
     running.gate?.stop();
     running.policy?.stop();
     running.address?.stop();
+    running.introductions?.stop();
     running.questions?.stop();
     running.followUp?.stop();
     running.offers?.stop();

@@ -44,6 +44,8 @@ export const PROMPTS = {
   question: "question",
   /** Whether the room is still talking to Sotto after it answered (V3-014). */
   followUp: "followup",
+  /** Who each voice is, read off the first turns and any corrections (post-V3-011). */
+  introductions: "introductions",
   /** What the room made of an offer Sotto volunteered (V3-005). */
   offerReply: "offer-reply",
   /** A few ideas for a group going round in circles (V3-007). */
