@@ -11,6 +11,7 @@ import type { SessionInfo, SpeakerNames, StageCard, TurnUpdate, WaitingLine } fr
 import { SOTTO_SPEAKER, describeSource } from "../../shared/index.js";
 import { KIND_LABEL } from "./Card.js";
 import type { NowState } from "./stageView.js";
+import type { AttentionMode } from "./useAttention.js";
 
 export interface NowProps {
   state: NowState;
@@ -195,7 +196,15 @@ export function wordBoundary(text: string, at: number): number {
  * it sits in one fixed place the room learns to glance at. The checks read
  * the same test id they always did.
  */
-export function Attention({ inConversation }: { inConversation: boolean }) {
+export function Attention({ mode }: { mode: AttentionMode }) {
+  if (mode === "stopped") {
+    return (
+      <p className="attention attention--stopped" data-testid="wake-stopped" role="status">
+        Sotto is no longer listening — say its name to ask
+      </p>
+    );
+  }
+  const inConversation = mode === "conversation";
   return (
     <p
       className={`attention${inConversation ? " attention--conversation" : ""}`}

@@ -174,20 +174,23 @@ describe("FollowUpWindow", () => {
     expect(followUps).toHaveLength(1);
   });
 
-  it("closes when the classifier cannot be read, because unsure means close", async () => {
-    const { window, followUps, timing } = windowFor([new Error("no verdict")]);
+  it("does not answer a turn whose verdict cannot be read, and keeps listening", async () => {
+    const { window, followUps, timing } = windowFor([new Error("no verdict"), toSotto]);
     window.answered(answer);
     window.acceptTurn(turn(" And on Sunday? ", "0:5", "B"));
     await window.flush();
     expect(followUps).toEqual([]);
-    expect(window.isOpen()).toBe(false);
-    expect(closeReason(timing)).toBe("unsure");
+    // Unsure is not a reason to stop listening: the next turn gets its own verdict.
+    expect(window.isOpen()).toBe(true);
     expect(timing.filter((one) => one["stage"] === "followup")).toEqual([
       { stage: "followup", atMs: 0, turnId: "0:5", kind: "unsure", latencyMs: 0, fallback: true },
     ]);
+    window.acceptTurn(turn(" And how much is the ticket? ", "0:6", "B"));
+    await window.flush();
+    expect(followUps).toHaveLength(1);
   });
 
-  it("closes when the classifier times out on the wall clock", async () => {
+  it("gives up on a classification on the wall clock, without closing", async () => {
     const wall = new SimulatedClock(0);
     const { window, followUps, timing } = windowFor(["hold"], { wall });
     window.answered(answer);
@@ -196,7 +199,8 @@ describe("FollowUpWindow", () => {
     wall.advanceBy(FOLLOWUP_TIMEOUT_CALL_MS);
     await window.flush();
     expect(followUps).toEqual([]);
-    expect(closeReason(timing)).toBe("unsure");
+    expect(window.isOpen()).toBe(true);
+    expect(timing.filter((one) => one["stage"] === "followup").at(-1)).toMatchObject({ kind: "unsure", fallback: true });
   });
 
   it("closes once more turns go by than the backstop allows, before paying for a call", async () => {

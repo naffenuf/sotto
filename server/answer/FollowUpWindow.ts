@@ -247,9 +247,12 @@ export class FollowUpWindow {
       ...(result === null ? { fallback: true } : {}),
     });
     if (result === null) {
-      // When unsure, close: a verdict nobody could read is not permission to
-      // answer a question that may have been meant for a person.
-      this.close("unsure");
+      // A verdict nobody could read — a failed call, a 6 s timeout on a slow
+      // API — is not permission to answer a line that may have been meant
+      // for a person, so this turn is not answered. But it is not a reason to
+      // stop listening either (the room lost "And how much is the ticket?"
+      // to exactly this on `2026-11-03_1515-mic`): the window stays open and
+      // the next turn gets its own verdict, until the inactivity timer runs.
       return;
     }
     if (result.kind !== "to_sotto") {

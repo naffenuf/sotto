@@ -1472,6 +1472,19 @@ body {
   border-color: color-mix(in srgb, var(--ok) 40%, transparent);
 }
 
+.attention--stopped {
+  --now: var(--ink-dim);
+  color: var(--ink-dim);
+  font-weight: 500;
+  background: #f1ede5;
+  border-color: #d5cec2;
+  animation: attention-in 0.3s ease-out both, attention-out 0.6s ease-in 3.4s both;
+}
+
+@keyframes attention-out {
+  to { opacity: 0; transform: translateY(-0.5rem); }
+}
+
 @keyframes attention-in {
   from { opacity: 0; transform: translateY(-0.5rem); }
   to { opacity: 1; transform: none; }
