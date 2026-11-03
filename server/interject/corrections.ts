@@ -39,6 +39,7 @@
  * the card it was delivered as already spent one interject, and this is that
  * same contribution reaching the room's ears rather than a second one.
  */
+import { isMcpCitation } from "../../shared/mcp.js";
 import type { CandidateType } from "../../shared/candidates.js";
 import type { Boldness, DeliveredLevel } from "../../shared/policy.js";
 import type { Interjection } from "./InterjectionPolicy.js";
@@ -118,7 +119,9 @@ export function spokenCorrectionAllowed(input: SpokenCorrectionInput): boolean {
  */
 export function fileCorrectionLine(file: string, correction: string): string {
   const text = correction.replace(/\s+/g, " ").trim();
-  const name = file.trim();
+  // A tool source (post-V3-011) is `mcp:crm/lookup_customer`; the room knows
+  // the system by the server's name, and a slash is not a thing one says.
+  const name = isMcpCitation(file) ? mcpServerOf(file) : file.trim();
   if (text === "" || name === "") return "";
   const said = /[.?!]$/.test(text) ? text : `${text}.`;
   // Measured against the real model: asked for the file's own phrasing it
@@ -179,4 +182,11 @@ export function correctedClaim(interjection: Interjection): string {
   const candidate = interjection.candidate;
   const quote = candidate.evidence[0]?.quote.trim() ?? "";
   return quote === "" ? candidate.headline : quote;
+}
+
+/** `the crm` from `mcp:crm/lookup_customer`: the system, as the room would name it. */
+function mcpServerOf(file: string): string {
+  const key = file.trim().slice(file.trim().indexOf(":") + 1).trim();
+  const server = key.slice(0, key.indexOf("/") < 0 ? key.length : key.indexOf("/")).trim();
+  return server === "" ? "" : `the ${server.replace(/[_-]+/g, " ")}`;
 }

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "crm": {
+      "command": "npx",
+      "args": ["tsx", "scripts/mcp-demo-server.ts"],
+      "env": { "CUSTOMERS_CSV": "fixtures/knowledge-demo/customers.csv" }
+    }
+  }
+}

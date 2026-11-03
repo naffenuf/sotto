@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { config as loadDotenv } from "dotenv";
 import { DEFAULT_KNOWLEDGE_DIR } from "../shared/knowledge.js";
+import { McpConfigFileSchema, expandEnvReferences, type McpServerConfig } from "../shared/mcp.js";
 import { DEFAULT_SOTTO_VOICE_ID } from "./voice/Speaker.js";
 
 /** Server-side configuration. The model API key never leaves this process. */
@@ -104,4 +106,85 @@ export function loadSottoVoiceId(env: NodeJS.ProcessEnv = process.env): string {
 export function loadKnowledgeDir(env: NodeJS.ProcessEnv = process.env): string {
   loadDotenv({ quiet: true });
   return (env.KNOWLEDGE_DIR ?? "").trim() || DEFAULT_KNOWLEDGE_DIR;
+}
+
+/** The default config file, read when `MCP_SERVERS` is unset. Optional. */
+export const DEFAULT_MCP_CONFIG_PATH = "mcp.json";
+
+/**
+ * Which MCP servers this Sotto is a client of (post-V3-011), or an empty list.
+ *
+ * `MCP_SERVERS` is either a path to a JSON file or the JSON itself (anything
+ * that starts with `{`). The file is `{ "mcpServers": { "<name>": … } }` —
+ * the shape Claude Desktop and the editors write — where each server is
+ * `command`/`args`/`env` (stdio) or `url`/`headers` (Streamable HTTP). A
+ * `${NAME}` in a header or env value expands from Sotto's own environment,
+ * which is how a token stays in `.env` while `mcp.json` can be committed.
+ *
+ * Like the knowledge folder, this is optional and never an error: a missing
+ * file is an empty list, which is what every session without company tools
+ * gets. A file that *is* there but does not parse is reported through
+ * `logger.warn` and also read as empty, because a typo in `mcp.json` must not
+ * stop a meeting from starting. Secrets are expanded here and nowhere else;
+ * nothing in the returned list is ever logged.
+ */
+export function loadMcpConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  options: { logger?: Pick<Console, "warn">; readFile?: (path: string) => string } = {},
+): McpServerConfig[] {
+  loadDotenv({ quiet: true });
+  const logger = options.logger ?? console;
+  const read = options.readFile ?? ((path: string): string => readFileSync(path, "utf8"));
+  const setting = (env.MCP_SERVERS ?? "").trim();
+  let text: string;
+  let where: string;
+  if (setting.startsWith("{")) {
+    text = setting;
+    where = "MCP_SERVERS";
+  } else {
+    where = setting === "" ? DEFAULT_MCP_CONFIG_PATH : setting;
+    try {
+      text = read(where);
+    } catch (error) {
+      // The default file not being there is the ordinary case; a named one
+      // not being there is worth a line.
+      if (setting !== "") logger.warn(`[mcp] ${where} could not be read: ${message(error)}`);
+      return [];
+    }
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    logger.warn(`[mcp] ${where} is not JSON (${message(error)}); no company tools this session`);
+    return [];
+  }
+  const config = McpConfigFileSchema.safeParse(parsed);
+  if (!config.success) {
+    logger.warn(
+      `[mcp] ${where} is not an MCP config: ${config.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`,
+    );
+    return [];
+  }
+  const expand = (values: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(
+      Object.entries(values).map(([key, value]) => [key, expandEnvReferences(value, env)]),
+    );
+  return Object.entries(config.data.mcpServers).map(([name, spec]): McpServerConfig => {
+    if ("url" in spec) {
+      return { name, transport: "http", url: spec.url, headers: expand(spec.headers) };
+    }
+    return {
+      name,
+      transport: "stdio",
+      command: spec.command,
+      args: spec.args,
+      env: expand(spec.env),
+      ...(spec.cwd === undefined ? {} : { cwd: spec.cwd }),
+    };
+  });
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

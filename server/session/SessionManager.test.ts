@@ -37,6 +37,7 @@ import type {
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
 import { emptyModel } from "../test/emptyModel.js";
+import { fakeMcpClient } from "../test/fakeMcp.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import type { Boldness, Frequency } from "../../shared/policy.js";
@@ -4031,4 +4032,105 @@ describe("SessionManager, offering ideas to a stuck group (V3-007)", () => {
     expect(model.labels.filter((label) => label === "stall")).toHaveLength(1);
     expect(model.labels).not.toContain("answer");
   }, 60_000);
+});
+
+describe("the company tools over MCP (post-V3-011)", () => {
+  function writerCapturing(timing: Record<string, unknown>[], mcp: unknown[]): SessionWriter {
+    return {
+      dir: "/tmp/not-a-real-folder",
+      appendEvent: () => {},
+      appendTurn: () => {},
+      renameSpeaker: () => {},
+      setSettings: () => {},
+      setMcp: (record: unknown) => mcp.push(record),
+      writeBoard: () => {},
+      appendCandidate: () => {},
+      appendFeedback: () => {},
+      appendAnswer: () => {},
+      appendResearch: () => {},
+      writePacket: () => {},
+      writeDigest: () => {},
+      appendTiming: (event: Record<string, unknown>) => timing.push(event),
+      writeArtifact: (fileName: string) => `artifacts/${fileName}`,
+      end: () => {},
+    } satisfies SessionWriter;
+  }
+
+  it("connects at session start, records what it listed, and closes when the next session starts", async () => {
+    const bus = new EventBus(quiet);
+    const timing: Record<string, unknown>[] = [];
+    const mcpRecords: unknown[] = [];
+    const client = fakeMcpClient();
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writerCapturing(timing, mcpRecords),
+      createModel: () => emptyModel,
+      createMcp: () => client,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    await ended;
+
+    const connected = timing.filter((event) => event.stage === "mcp_connected");
+    expect(connected).toHaveLength(1);
+    expect(connected[0]?.servers).toEqual([
+      expect.objectContaining({ name: "crm", transport: "stdio", ok: true, tools: 1, toolNames: ["lookup_customer"] }),
+    ]);
+    // The same record in `session.json`.
+    expect(mcpRecords).toHaveLength(1);
+    expect(client.status()?.servers[0]?.ok).toBe(true);
+    // Still open after Stop — a question typed now is about this conversation
+    // (US-019) — and closed when the next session supersedes it.
+    expect(client.functionTools(new Set(), "x").map((tool) => tool.name)).toEqual(["crm__lookup_customer"]);
+    const next = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    await next;
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(client.functionTools(new Set(), "x")).toEqual([]);
+  });
+
+  it("costs nothing when nothing is configured", async () => {
+    const bus = new EventBus(quiet);
+    const timing: Record<string, unknown>[] = [];
+    const mcpRecords: unknown[] = [];
+    const sessions = new SessionManager({
+      bus,
+      apiKey: "test-key",
+      logger: quiet,
+      createStore: () => writerCapturing(timing, mcpRecords),
+      createModel: () => emptyModel,
+      replaySpeed: "max",
+      wallClock: instantWallClock(),
+    });
+    const ended = new Promise<void>((resolve) => {
+      const off = bus.subscribe((event) => {
+        if (event.type === "session" && event.session === null) {
+          off();
+          resolve();
+        }
+      });
+    });
+    sessions.start({ kind: "events", fixture: "ask-search" });
+    await ended;
+    expect(timing.filter((event) => String(event.stage).startsWith("mcp_"))).toEqual([]);
+    expect(mcpRecords).toEqual([]);
+  });
 });

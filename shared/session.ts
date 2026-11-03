@@ -7,6 +7,7 @@
  * they only differ in where the frames come from: live transcription of audio
  * (`wav`, `mic`) or a capture replayed at 1x (`events`, US-006).
  */
+import type { McpConnectedRecord } from "./mcp.js";
 import { z } from "zod";
 import type { SpeakerNames } from "./events.js";
 import {
@@ -165,4 +166,9 @@ export interface SessionRecord {
    */
   asrSessions: string[];
   settings: SessionSettings;
+  /**
+   * Which MCP servers connected and what they listed (post-V3-011). Absent
+   * for every session without `mcp.json`, so the file is unchanged for them.
+   */
+  mcp?: McpConnectedRecord;
 }

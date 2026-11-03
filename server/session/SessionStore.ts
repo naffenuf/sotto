@@ -37,6 +37,7 @@ import {
   type SessionRecord,
   type SessionSettings,
 } from "../../shared/session.js";
+import type { McpConnectedRecord } from "../../shared/mcp.js";
 import { PACKET_ID_PATTERN, packetFileName } from "../../shared/research.js";
 import { continuesRun, type RunEdge } from "../../shared/transcript.js";
 import { SOTTO_SPEAKER, isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
@@ -96,6 +97,8 @@ export interface SessionWriter {
   renameSpeaker(label: string, name: string | null): void;
   /** Replaces the saved settings: what the policy is set to (V2-017). */
   setSettings(settings: SessionSettings): void;
+  /** Records which MCP servers connected and what they listed (post-V3-011). */
+  setMcp?(record: McpConnectedRecord): void;
   /** Writes the board as JSON and as markdown (US-009). */
   writeBoard(board: unknown, markdown: string): void;
   /** Appends an observer candidate with its scores and decision (US-012-US-014). */
@@ -300,6 +303,11 @@ export class SessionStore implements SessionWriter {
 
   setSettings(settings: SessionSettings): void {
     this.record.settings = settings;
+    this.writeSession();
+  }
+
+  setMcp(record: McpConnectedRecord): void {
+    this.record.mcp = record;
     this.writeSession();
   }
 

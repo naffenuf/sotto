@@ -13,6 +13,8 @@ import {
 import { SEARCH_KNOWLEDGE_TOOL } from "../../shared/knowledge.js";
 import { SimulatedClock } from "../clock.js";
 import { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
+import type { McpClient } from "../mcp/McpClient.js";
+import { fakeMcpClient } from "../test/fakeMcp.js";
 import {
   ModelCallError,
   type GroundedCall,
@@ -94,7 +96,7 @@ interface Harness {
 
 function harness(
   replies: Reply[],
-  options: { artifacts?: "none" | "fails"; knowledge?: string } = {},
+  options: { artifacts?: "none" | "fails"; knowledge?: string; mcp?: McpClient } = {},
 ): Harness {
   const clock = new SimulatedClock(60_000);
   const wallClock = new SimulatedClock(1_000);
@@ -125,6 +127,7 @@ function harness(
     ...(options.knowledge === undefined
       ? {}
       : { knowledge: KnowledgeIndex.load(options.knowledge, { logger: quiet }) }),
+    ...(options.mcp === undefined ? {} : { mcp: options.mcp }),
   });
   return { runner, model, records, written, saved, clock, wallClock };
 }
@@ -503,5 +506,69 @@ describe("ResearchRunner and the knowledge folder", () => {
       { knowledge: dir },
     );
     expect(await runner.run(renewal())).not.toBeNull();
+  });
+});
+
+describe("ResearchRunner and the company tools (post-V3-011)", () => {
+  const renewal = (): ResearchIdea =>
+    idea({
+      id: "idea-11",
+      topic: "Harborview renewal",
+      question: "When does the Harborview Clinic contract renew?",
+    });
+
+  it("declares every listed tool as <server>__<tool>, between the files and show_html", async () => {
+    const mcp = fakeMcpClient();
+    const { runner, model } = harness([() => Promise.resolve(reply({ value: packetReply() }))], { mcp });
+    await runner.run(renewal());
+    const tools = (model.calls[0] as GroundedCall).functions ?? [];
+    expect(tools.map((tool) => tool.name)).toEqual(["crm__lookup_customer", SHOW_HTML_TOOL]);
+    expect(tools[0]?.description).toContain("`mcp:crm/lookup_customer`");
+    await mcp.close();
+  });
+
+  it("cites a tool the search really called, as `mcp:<server>/<tool>`", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const mcp = fakeMcpClient(calls);
+    const { runner, records } = harness(
+      [
+        async (call) => {
+          const tool = call.functions?.find((one) => one.name === "crm__lookup_customer");
+          const result = await tool?.run({ name: "Harborview" });
+          expect(result).toContain("renews 2027-03-01");
+          return reply({
+            value: packetReply({
+              title: "Harborview Clinic renews on 1 March 2027",
+              sources: [{ url: "mcp:crm/lookup_customer", title: "crm: lookup_customer" }],
+            }),
+            searchedUrls: [],
+            searched: false,
+          });
+        },
+      ],
+      { mcp },
+    );
+    const packet = await runner.run(renewal());
+    expect(calls).toEqual([{ name: "Harborview" }]);
+    expect(packet?.sources).toEqual([{ url: "mcp:crm/lookup_customer", title: "crm: lookup_customer" }]);
+    expect(records[0]?.outcome).toBe("ready");
+    await mcp.close();
+  });
+
+  it("drops a tool the search never called, as it drops an unopened page", async () => {
+    const mcp = fakeMcpClient();
+    const { runner, records } = harness(
+      [
+        async () =>
+          reply({
+            value: packetReply({ sources: [{ url: "mcp:crm/lookup_customer", title: "crm" }] }),
+            searchedUrls: [],
+          }),
+      ],
+      { mcp },
+    );
+    expect(await runner.run(renewal())).toBeNull();
+    expect(records[0]?.outcome).toBe("unsourced");
+    await mcp.close();
   });
 });

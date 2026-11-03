@@ -109,6 +109,20 @@ describe("splitAnswer", () => {
     ]);
   });
 
+  it("reads a company tool as a source, with no page behind it (post-V3-011)", () => {
+    const text = [
+      "Harborview renews in March",
+      "",
+      "Sources:",
+      "- crm: lookup_customer - mcp:crm/lookup_customer",
+      "- Example - https://example.com/one",
+    ].join("\n");
+    expect(splitAnswer(text).sources).toEqual([
+      { title: "crm: lookup_customer", url: "mcp:crm/lookup_customer" },
+      { title: "Example", url: "https://example.com/one" },
+    ]);
+  });
+
   it("leaves the detail alone when the model lists no sources", () => {
     const answer = splitAnswer("Headline\n\nThe board already says this: we ship in March.");
     expect(answer.sources).toEqual([]);

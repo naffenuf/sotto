@@ -82,6 +82,7 @@ import { JudgmentRouter } from "../model/judgment.js";
 import { ResearchCards } from "../research/ResearchCards.js";
 import { ResearchManager } from "../research/ResearchManager.js";
 import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
+import type { McpClient } from "../mcp/McpClient.js";
 import { ResearchRunner } from "../research/ResearchRunner.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
@@ -178,6 +179,13 @@ export type VoiceFactory = () => VoiceOut | null;
 export type KnowledgeFactory = () => KnowledgeIndex | null;
 
 /**
+ * Builds the session's MCP client (post-V3-011), or returns `null` for a
+ * session with no company tools — which is every session without `mcp.json`,
+ * and what the unit tests do so `npm test` spawns and dials nothing.
+ */
+export type McpFactory = () => McpClient | null;
+
+/**
  * Builds the model client a session's board, observer and answers call, or
  * returns `null` to run a session with no model at all — which is what
  * happens without `MODEL_API_KEY`, and what the unit tests do so `npm test`
@@ -252,6 +260,13 @@ export interface SessionManagerOptions {
    * over {@link loadKnowledgeDir}.
    */
   createKnowledge?: KnowledgeFactory;
+  /**
+   * Connects to the company's MCP servers, once per session (post-V3-011).
+   * Defaults to none, so a SessionManager built without one offers the model
+   * no company tools and `npm test` connects to nothing; `server/app.ts`
+   * passes {@link mcpFromEnv}.
+   */
+  createMcp?: McpFactory;
   /** Clock for live sessions; a replay brings its own simulated one. */
   liveClock?: Clock;
   /** Real time that a `1x` replay paces itself against. */
@@ -361,6 +376,12 @@ interface ModelLoops {
   observer: Observer | null;
   verifier: Verifier | null;
   /**
+   * The company's tools over MCP (post-V3-011), or `null` when there are no
+   * servers configured or no model client to offer them to. Connected when
+   * the loops are built and closed when the session ends.
+   */
+  mcp: McpClient | null;
+  /**
    * The judgment gate in front of the policy (V2-016), or `null` when there
    * is no model client. Every candidate but a `research_hook` comes through
    * it, including one the verifier has just checked.
@@ -469,7 +490,8 @@ interface LastSession {
   clock: Clock;
   cards: Map<string, Delivered>;
   /** Its answer agent (US-018), which still takes typed questions (US-019). */
-  answers: AnswerAgent | null;
+  answers: AnswerAgent | null;  /** The company tools over MCP (post-V3-011), closed when the next session starts. */
+  mcp: McpClient | null;
 }
 
 /** What {@link SessionManager.recordFeedback} made of a click. */
@@ -516,6 +538,8 @@ interface RunningSession {
   observer: Observer | null;
   /** The fact check (US-013), or `null` when there is no model client. */
   verifier: Verifier | null;
+  /** The company's tools over MCP (post-V3-011), closed with the session. */
+  mcp: McpClient | null;
   /** The judgment gate the candidates come through (V2-016). */
   gate: CandidateGate | null;
   /** The interjection policy (US-014), or `null` when there is no model client. */
@@ -562,6 +586,7 @@ export class SessionManager {
   private readonly createJev: () => JevLike | null;
   private readonly createVoice: VoiceFactory;
   private readonly createKnowledge: KnowledgeFactory;
+  private readonly createMcp: McpFactory;
   private readonly liveClock: Clock;
   private readonly wallClock: Clock;
   private readonly replaySpeed: ReplaySpeed;
@@ -607,6 +632,8 @@ export class SessionManager {
     this.createVoice = options.createVoice ?? ((): VoiceOut | null => null);
     // Same default and the same reason: no folder means the web alone.
     this.createKnowledge = options.createKnowledge ?? ((): KnowledgeIndex | null => null);
+    // And the same again for the company tools: no servers means no tools.
+    this.createMcp = options.createMcp ?? ((): McpClient | null => null);
     // V2-006: playback can end after generation, with no new ASR frame to
     // re-check held cards. The bus has already folded the voice state here.
     this.bus.subscribe((event) => {
@@ -734,12 +761,16 @@ export class SessionManager {
     // the stage, since a session *starting* is what clears it, so there is
     // nothing left to say to the old answer agent either.
     this.last?.answers?.stop();
+    // And its company tools (post-V3-011): a stdio server is a child process,
+    // and the conversation it was connected for is over.
+    void this.last?.mcp?.close();
     this.last = {
       sessionId: info.id,
       store,
       clock: running.clock,
       cards: running.deliveries,
       answers: running.answers,
+      mcp: running.mcp,
     };
     // The session goes out before its statuses, so a listener always knows
     // which session a dot is talking about.
@@ -1412,6 +1443,7 @@ export class SessionManager {
         board: null,
         observer: null,
         verifier: null,
+        mcp: null,
         gate: null,
         policy: null,
         answers: null,
@@ -1572,10 +1604,28 @@ export class SessionManager {
     // ordinary case: then the verifier checks the web alone and the research
     // runner is handed no `search_knowledge` tool.
     const knowledge = this.createKnowledge();
+    // The company's own systems (post-V3-011), connected now and listed once:
+    // `null` for every session without `mcp.json`. The connection is tracked
+    // on the clock so a `max` replay waits for the listing rather than racing
+    // past it, and its outcome — every server, up or not — goes to
+    // `session.json` and `timing.jsonl`. A server that fails is a warning in
+    // the client's own log line, never an error here.
+    const mcp = this.createMcp();
+    if (mcp !== null) {
+      mcp.watchCalls((record) => onTiming({ stage: "mcp_call", atMs: clock.now(), ...record }));
+      void clock.track(
+        "mcp-connect",
+        mcp.connect().then((record) => {
+          store.writer?.setMcp?.(record);
+          onTiming({ stage: "mcp_connected", atMs: clock.now(), ...record });
+        }),
+      );
+    }
     const verifier = new Verifier({
       clock,
       model,
       knowledge,
+      mcp,
       logger: this.logger,
       onRecord: (record) => { recordCandidate(record); onTiming({ stage: "verification_complete", ...record }); },
       // A claim that really is wrong has the correction in its detail by now,
@@ -1885,6 +1935,7 @@ export class SessionManager {
       clock,
       model,
       knowledge,
+      mcp,
       wallClock: this.wallClock,
       logger: this.logger,
       onModelState,
@@ -1974,6 +2025,8 @@ export class SessionManager {
       clock,
       model,
       jev,
+      // The company's tools (post-V3-011), beside `show_html`.
+      mcp,
       logger: this.logger,
       onTiming,
       onCallOn: (turnId) => answerHooks.callOn?.(turnId),
@@ -2238,7 +2291,7 @@ export class SessionManager {
         });
       },
     });
-    return { modelClient: model, jev, judgment, board, observer, verifier, gate, policy, answers, answerHooks, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
+    return { modelClient: model, jev, judgment, board, observer, verifier, mcp, gate, policy, answers, answerHooks, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
   }
 
   /**
@@ -2602,6 +2655,9 @@ export class SessionManager {
     running.readBacks?.stop();
     running.wrapUp.stop();
     running.judgment.stop();
+    // Not `running.mcp` either (post-V3-011): the tools belong to the
+    // conversation the typed question is about, so they are closed when the
+    // next session supersedes this one, exactly as the answer agent is.
     // Not `running.answers`: a question typed after Stop is answered against
     // the conversation that just ended (US-019), so the agent is only
     // retired when the next session supersedes it.

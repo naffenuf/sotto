@@ -88,6 +88,8 @@ export type {
 export { NOTICE_CARD_IDS, cardStates, cardVariants } from "./cards.js";
 /** V3-009: a source that is one of the group's own files, not a page. */
 export { KNOWLEDGE_CITATION_PREFIX, isKnowledgeCitation } from "./knowledge.js";
+/** Post-V3-011: a source that is one of the company's tools over MCP, not a page. */
+export { MCP_CITATION_PREFIX, isMcpCitation } from "./mcp.js";
 export type {
   CardArtifact,
   CardState,

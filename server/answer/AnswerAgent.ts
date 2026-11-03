@@ -73,6 +73,8 @@ import { renderBoardMarkdown } from "../board/markdown.js";
 import { systemClock, type Clock } from "../clock.js";
 import { CARD_ID_PREFIX } from "../interject/delivery.js";
 import { searchedIndex, resolveCitation } from "../interject/Verifier.js";
+import { mcpCitation, resolveMcpCitation } from "../../shared/mcp.js";
+import type { McpClient } from "../mcp/McpClient.js";
 import { citationTitle, type FunctionTool, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
@@ -254,6 +256,14 @@ export interface AnswerAgentOptions {
    * Absent means `show_html` is not offered at all.
    */
   onArtifact?: (artifact: ShowHtmlArgs) => Artifact | null;
+  /**
+   * The company's own systems over MCP (post-V3-011), when the session has
+   * servers configured: every tool they list goes on the table beside
+   * `web_search` and `show_html`, and an answer may cite
+   * `mcp:crm/lookup_customer`. Absent means exactly the answer every session
+   * before it gave.
+   */
+  mcp?: McpClient | null;
   /**
    * The courtesy hook (US-014): true while an answer is being written, false
    * when the last one is done. Nothing is interjected in between.
@@ -555,6 +565,9 @@ export class AnswerAgent {
     // Filled in as the model draws (US-020), so a diagram can be on the stage
     // while the sentence under it is still being written.
     const artifacts: Artifact[] = [];
+    // The company tools this answer really called (post-V3-011), which is
+    // what decides whether an `mcp:` source may be shown.
+    const invoked = new Set<string>();
     // A late start is answered on the screen only (shared/answers.ts,
     // `Answer.late`): no acknowledgment, no holding line, no voice. The
     // question's `speechEnd` is the honest origin where there is one (a live
@@ -684,12 +697,16 @@ export class AnswerAgent {
       // Whether it got there in time, which is the one thing that decides
       // whether the continuation can know not to say it again.
       inContext = firstLineText !== "";
+      // The company tools are listed at session start; a question in the
+      // first seconds waits for the listing rather than answering without
+      // them. Nothing to wait for when no servers are configured.
+      if (this.options.mcp) await this.options.mcp.ready();
       const reply = await this.model.prose({
         label: ANSWER_TRACK_LABEL,
         system: loadPrompt(PROMPTS.answer),
         user: this.render(answer, asked.resume === true, firstLineText, packets, briefing),
         maxTokens: ANSWER_MAX_TOKENS,
-        functions: this.functions(answer, artifacts, () => pushedHeadline, aloud),
+        functions: this.functions(answer, artifacts, invoked, () => pushedHeadline, aloud),
         onText: ({ itemId, text }) => {
           // Narration, not the answer: see ANSWER_ITEM_PREFIX.
           if (!itemId.startsWith(ANSWER_ITEM_PREFIX)) return;
@@ -718,7 +735,7 @@ export class AnswerAgent {
       const text = halves.screen === "" ? screenFromSpoken(halves.spoken) : splitAnswer(halves.screen);
       const spoken = await speech?.done();
       this.recordVoiceLatency(answer, queued, spoken, inContext);
-      const citations = this.citations(answer, text, reply.citations, reply.searchedUrls, briefing);
+      const citations = this.citations(answer, text, reply.citations, reply.searchedUrls, briefing, invoked);
       const done: Answer = {
         ...answer,
         headline: text.headline,
@@ -872,12 +889,18 @@ export class AnswerAgent {
   private functions(
     answer: Answer,
     artifacts: Artifact[],
+    invoked: Set<string>,
     headline: () => string,
     spokenText: () => string,
   ): FunctionTool[] {
+    // The company's own systems first (post-V3-011): a CRM lookup, a ticket
+    // search, a wiki page, each its own function, routed back through the
+    // MCP client. An empty list for every session without servers.
+    const company = this.options.mcp?.functionTools(invoked, ANSWER_TRACK_LABEL) ?? [];
     const save = this.options.onArtifact;
-    if (save === undefined) return [];
+    if (save === undefined) return company;
     return [
+      ...company,
       {
         name: SHOW_HTML_TOOL,
         description: SHOW_HTML_DESCRIPTION,
@@ -1054,6 +1077,7 @@ export class AnswerAgent {
     annotated: readonly Citation[],
     searchedUrls: readonly string[],
     briefing: readonly ResearchPacket[],
+    invoked: ReadonlySet<string> = new Set(),
   ): Citation[] {
     const byUrl = new Map<string, Citation>();
     for (const citation of annotated) byUrl.set(citation.url, citation);
@@ -1063,6 +1087,15 @@ export class AnswerAgent {
     // was made, so they are admissible here exactly as this call's own are.
     const searched = searchedIndex([...searchedUrls, ...packetSourceUrls(briefing)]);
     for (const listed of text.sources) {
+      // One of the company's tools (post-V3-011), which has no URL: the test
+      // is whether this answer really called it.
+      const tool = resolveMcpCitation(listed.url, invoked);
+      if (tool !== undefined) {
+        const slash = tool.indexOf("/");
+        const citation = mcpCitation(tool.slice(0, slash), tool.slice(slash + 1));
+        if (!byUrl.has(citation.url)) byUrl.set(citation.url, citation);
+        continue;
+      }
       const url = resolveCitation(listed.url, searched);
       if (url === undefined) {
         this.logger.warn(`[answer] ${answer.id} cited a page it never opened: ${listed.url}`);

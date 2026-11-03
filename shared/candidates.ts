@@ -692,7 +692,8 @@ export const knowledgeVerificationJsonSchema = {
       type: "string",
       description:
         "The name of the one file the verdict rests on, exactly as it was given to you " +
-        "(\"prices.csv\"). Empty string when no file settles it.",
+        "(\"prices.csv\") — or, when a company tool settled it, that tool as \"mcp:<server>/<tool>\". " +
+        "Empty string when no file or tool settles it.",
     },
   },
   required: ["verdict", "correction", "file"],

@@ -67,6 +67,8 @@ import {
 import { systemClock, type Clock } from "../clock.js";
 import { resolveCitation, searchedIndex } from "../interject/Verifier.js";
 import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
+import { mcpCitation, resolveMcpCitation } from "../../shared/mcp.js";
+import type { McpClient } from "../mcp/McpClient.js";
 import { ModelCallError, type FunctionTool, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 
@@ -118,6 +120,13 @@ export interface ResearchRunnerOptions {
    * which is every session without a `knowledge/` folder.
    */
   knowledge?: KnowledgeIndex | null;
+  /**
+   * The company's own systems over MCP (post-V3-011), when the session has
+   * servers configured. Present means their tools go on the table beside
+   * `web_search`, and a packet may cite `mcp:crm/lookup_customer`; absent
+   * means exactly what every session before it had.
+   */
+  mcp?: McpClient | null;
 }
 
 export class ResearchRunner {
@@ -160,13 +169,15 @@ export class ResearchRunner {
     // The knowledge files this search actually read, which is what decides
     // whether a `file:` citation may be shown (V3-009).
     const read = new Set<string>();
+    // And the company tools this search actually called, for the same reason.
+    const invoked = new Set<string>();
     this.options.onModelState?.("connecting", `looking up ${idea.topic}`);
 
     let reply: PacketReply;
     let searched = false;
     let sources: Citation[];
     try {
-      const result = await this.request(id, idea, read, artifacts);
+      const result = await this.request(id, idea, read, invoked, artifacts);
       reply = result.reply;
       searched = result.searched;
       sources = result.sources;
@@ -243,9 +254,14 @@ export class ResearchRunner {
     id: string,
     idea: ResearchIdea,
     read: Set<string>,
+    invoked: Set<string>,
     artifacts: Artifact[],
   ): Promise<{ reply: PacketReply; sources: Citation[]; searched: boolean }> {
-    const functions = this.functions(id, read, artifacts);
+    // The company tools are listed once per session, at its start; a search
+    // in the first seconds waits for that rather than going out without them.
+    // Nothing to wait for when no servers are configured.
+    if (this.options.mcp) await this.options.mcp.ready();
+    const functions = this.functions(id, read, invoked, artifacts);
     const result = await this.model.grounded({
       label: RUNNER_TRACK_LABEL,
       system: loadPrompt(PROMPTS.researchPacket),
@@ -267,7 +283,7 @@ export class ResearchRunner {
     }
     return {
       reply: parsed.data,
-      sources: this.sources(id, parsed.data.sources, result.citations, result.searchedUrls, read),
+      sources: this.sources(id, parsed.data.sources, result.citations, result.searchedUrls, read, invoked),
       searched: result.searched,
     };
   }
@@ -288,6 +304,7 @@ export class ResearchRunner {
     annotated: readonly Citation[],
     searchedUrls: readonly string[],
     read: ReadonlySet<string>,
+    invoked: ReadonlySet<string> = new Set(),
   ): Citation[] {
     const byUrl = new Map<string, Citation>();
     for (const citation of annotated) byUrl.set(citation.url, citation);
@@ -305,6 +322,15 @@ export class ResearchRunner {
       const file = resolveKnowledgeCitation(named, read);
       if (file !== undefined) {
         const citation = knowledgeCitation(file);
+        if (!byUrl.has(citation.url)) byUrl.set(citation.url, citation);
+        continue;
+      }
+      // Or one of the company's tools (post-V3-011), by the same rule: only
+      // a tool this search really called.
+      const tool = resolveMcpCitation(named, invoked);
+      if (tool !== undefined) {
+        const slash = tool.indexOf("/");
+        const citation = mcpCitation(tool.slice(0, slash), tool.slice(slash + 1));
         if (!byUrl.has(citation.url)) byUrl.set(citation.url, citation);
         continue;
       }
@@ -329,8 +355,13 @@ export class ResearchRunner {
    * a packet in words is a far better outcome than no packet because a table
    * would not save or a file would not read.
    */
-  private functions(id: string, read: Set<string>, artifacts: Artifact[]) {
-    const tools = [...this.knowledgeTool(id, read), ...this.htmlTool(id, artifacts)];
+  private functions(id: string, read: Set<string>, invoked: Set<string>, artifacts: Artifact[]) {
+    const tools = [
+      ...this.knowledgeTool(id, read),
+      // The company's own systems (post-V3-011), each tool its own function.
+      ...(this.options.mcp?.functionTools(invoked, RUNNER_TRACK_LABEL) ?? []),
+      ...this.htmlTool(id, artifacts),
+    ];
     return tools.length === 0 ? undefined : tools;
   }
 

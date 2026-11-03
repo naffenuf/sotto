@@ -24,7 +24,8 @@ import { glimmerFromEnv } from "./model/GlimmerClient.js";
 import { jevFromEnv } from "./model/JevClient.js";
 import { listHistory, readHistory } from "./session/history.js";
 import { VoiceTestRequestSchema, type VoiceActionResponse } from "../shared/voice.js";
-import { loadElevenLabsApiKey, loadKnowledgeDir, loadSottoVoiceId } from "./config.js";
+import { loadElevenLabsApiKey, loadKnowledgeDir, loadMcpConfig, loadSottoVoiceId } from "./config.js";
+import { mcpFromEnv } from "./mcp/McpClient.js";
 import { Speaker } from "./voice/Speaker.js";
 import { VoiceHub } from "./voice/VoiceHub.js";
 
@@ -71,6 +72,11 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       // `.env` is read here for the same reason Glimmer's is — a test that
       // builds its own session manager reads nothing off the disk.
       createKnowledge: () => KnowledgeIndex.load(loadKnowledgeDir()),
+      // Post-V3-011: the company's own systems over MCP, connected at the
+      // start of every session and closed with it. `mcp.json` is read here
+      // for the same reason: a session manager built by a test never spawns
+      // a server or opens a connection.
+      createMcp: () => mcpFromEnv(() => loadMcpConfig()),
     });
 
   await app.register(websocket);

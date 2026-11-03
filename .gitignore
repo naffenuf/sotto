@@ -26,3 +26,7 @@ shadow/runs/
 # Anchored at the root on purpose: a bare `knowledge/` would also hide
 # `server/knowledge/`.
 /knowledge/
+
+# The group's MCP servers (post-V3-011). A real config names real systems and
+# may carry a command line nobody else should see; `docs/mcp.md` has examples.
+/mcp.json

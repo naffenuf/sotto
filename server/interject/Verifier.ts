@@ -44,6 +44,8 @@ import {
 } from "../../shared/knowledge.js";
 import type { Clock } from "../clock.js";
 import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
+import { mcpCitation, resolveMcpCitation } from "../../shared/mcp.js";
+import type { McpClient } from "../mcp/McpClient.js";
 import { ModelCallError, citationTitle, type ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 
@@ -87,6 +89,14 @@ export interface VerifierOptions {
    * Present means they are checked before the web.
    */
   knowledge?: KnowledgeIndex | null;
+  /**
+   * The company's own systems over MCP (post-V3-011). Present means the
+   * records half of a check can call them — a claim about one of their
+   * customers is settled by the CRM the way one about their prices is
+   * settled by the price sheet — and a correction that comes out of one is
+   * cited as `mcp:crm/lookup_customer` and spoken under V3-009's rule.
+   */
+  mcp?: McpClient | null;
   logger?: Logger;
 }
 
@@ -97,6 +107,7 @@ export class Verifier {
   private readonly onVerified: (candidate: Candidate) => void;
   private readonly onModelState: VerifierOptions["onModelState"];
   private readonly knowledge: KnowledgeIndex | null;
+  private readonly mcp: McpClient | null;
   private readonly logger: Logger;
 
   /** The checks in flight, so {@link flush} can wait for all of them. */
@@ -116,6 +127,7 @@ export class Verifier {
     this.onVerified = options.onVerified;
     this.onModelState = options.onModelState;
     this.knowledge = options.knowledge ?? null;
+    this.mcp = options.mcp ?? null;
     this.logger = options.logger ?? console;
   }
 
@@ -173,7 +185,8 @@ export class Verifier {
     // on the way to the web call would put a microtask between `verify()` and
     // the request, and the whole point of starting the check inside `verify`
     // is that it is under way by the time it returns.
-    const fromFiles = this.knowledge === null ? null : await this.checkFiles(candidate);
+    const fromFiles =
+      this.knowledge === null && this.mcp === null ? null : await this.checkFiles(candidate);
     if (fromFiles !== null) {
       this.finish(candidate, fromFiles);
       return;
@@ -249,20 +262,33 @@ export class Verifier {
    * the web half.
    */
   private async checkFiles(candidate: Candidate): Promise<CandidateVerification | null> {
-    const knowledge = this.knowledge;
-    if (knowledge === null) return null;
-    const snippets = knowledge.search(claimText(candidate));
-    // Nothing in the folder mentions any of it: no call, no cost.
-    if (snippets.length === 0) return null;
+    const snippets = this.knowledge === null ? [] : this.knowledge.search(claimText(candidate));
+    // The company tools (post-V3-011), listed at session start. A check in
+    // the first seconds waits for the listing; a session without servers
+    // waits for nothing.
+    if (this.mcp !== null) await this.mcp.ready();
+    const invoked = new Set<string>();
+    const tools = this.mcp === null ? [] : this.mcp.functionTools(invoked, KNOWLEDGE_TRACK_LABEL);
+    // Nothing in the folder mentions any of it and there is no system to
+    // ask: no call, no cost.
+    if (snippets.length === 0 && tools.length === 0) return null;
     try {
-      const reply = await this.model.structured({
+      const request = {
         label: KNOWLEDGE_TRACK_LABEL,
         system: loadPrompt(PROMPTS.verifyKnowledge),
-        user: renderKnowledgeVerificationRequest(candidate, snippets),
+        user: renderKnowledgeVerificationRequest(candidate, snippets, tools.length > 0),
         schemaName: KNOWLEDGE_VERIFICATION_SCHEMA_NAME,
         schema: knowledgeVerificationJsonSchema,
         maxTokens: KNOWLEDGE_VERIFY_MAX_TOKENS,
-      });
+      };
+      // With tools on the table the check is a tool loop — the grounded call
+      // with the web switched off, because this half is about the group's
+      // own records and a page from the web would answer the wrong
+      // question. Without them it is the one structured call V3-009 made.
+      const reply =
+        tools.length === 0
+          ? await this.model.structured(request)
+          : (await this.model.grounded({ ...request, functions: tools, webSearch: false })).value;
       const parsed = KnowledgeVerificationReplySchema.safeParse(reply);
       if (!parsed.success) {
         this.logger.warn(
@@ -280,20 +306,27 @@ export class Verifier {
         parsed.data.file,
         snippets.map((snippet) => snippet.file),
       );
-      // A correction nobody can trace to one of their own files is what the
+      // Or a tool the check really called (post-V3-011), which is the same
+      // kind of source: the group's own record, with no page to open.
+      const tool = file === undefined ? resolveMcpCitation(parsed.data.file, invoked) : undefined;
+      // A correction nobody can trace to one of their own records is what the
       // web check exists for, so it is not one of these.
-      if (file === undefined || parsed.data.correction === "") {
+      if ((file === undefined && tool === undefined) || parsed.data.correction === "") {
         this.logger.warn(
-          `[verify] ${candidate.id}: the file check said wrong without a usable file; checking the web`,
+          `[verify] ${candidate.id}: the file check said wrong without a usable file or tool; checking the web`,
         );
         return null;
       }
+      const citation =
+        file !== undefined
+          ? knowledgeCitation(file)
+          : mcpCitation(tool!.slice(0, tool!.indexOf("/")), tool!.slice(tool!.indexOf("/") + 1));
       return {
         verdict: "wrong",
         correction: parsed.data.correction,
-        citations: [knowledgeCitation(file)],
+        citations: [citation],
         searched: false,
-        file,
+        file: file ?? citation.url,
       };
     } catch (error) {
       // Not a failed check: the web half has not run yet.
@@ -478,6 +511,7 @@ export function renderVerificationRequest(candidate: Candidate): string {
 export function renderKnowledgeVerificationRequest(
   candidate: Candidate,
   snippets: readonly KnowledgeSnippet[],
+  tools = false,
 ): string {
   const blocks = ["## What was said"];
   if (candidate.evidence.length > 0) {
@@ -496,16 +530,32 @@ export function renderKnowledgeVerificationRequest(
     "This may be wrong. It is a reason to look, not a finding.",
     `${candidate.headline}\n\n${candidate.detail}`,
   );
+  if (snippets.length > 0) {
+    blocks.push(
+      "## The group's own files",
+      tools
+        ? "Every line here is from a file they keep. Their company tools are also available to you, and nothing else is."
+        : "Every line here is from a file they keep. Nothing else is available to you.",
+      snippets
+        .map((snippet) => `- **${snippet.file}** (line ${snippet.line}): ${snippet.text}`)
+        .join("\n"),
+    );
+  } else if (tools) {
+    // Post-V3-011: no file mentions it, so the only records on the table are
+    // the company's own systems, reached through the tools.
+    blocks.push(
+      "## The group's own records",
+      "None of their files mentions this. Their company tools are available to you — look the " +
+        "claim up in the system it would be recorded in, and call nothing if there is no such system.",
+    );
+  }
   blocks.push(
-    "## The group's own files",
-    "Every line here is from a file they keep. Nothing else is available to you.",
-    snippets
-      .map((snippet) => `- **${snippet.file}** (line ${snippet.line}): ${snippet.text}`)
-      .join("\n"),
-  );
-  blocks.push(
-    `Reply with the verdict, the file it rests on, and — only if the files say otherwise — ` +
-      `what the file says, in at most ${CORRECTION_MAX_WORDS} words.`,
+    tools
+      ? `Reply with the verdict, the file or tool it rests on (\`prices.csv\`, or ` +
+        `\`mcp:<server>/<tool>\` for a tool you called), and — only if their records say otherwise — ` +
+        `what the record says, in at most ${CORRECTION_MAX_WORDS} words.`
+      : `Reply with the verdict, the file it rests on, and — only if the files say otherwise — ` +
+        `what the file says, in at most ${CORRECTION_MAX_WORDS} words.`,
   );
   return blocks.join("\n\n");
 }

@@ -46,6 +46,7 @@
   "dependencies": {
     "@fastify/static": "^10.1.7",
     "@fastify/websocket": "^11.3.4",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "dotenv": "^17.2.3",
     "fastify": "^5.12.7",
     "openai": "^7.45.0",

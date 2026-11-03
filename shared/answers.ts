@@ -307,8 +307,14 @@ const SOURCES_INLINE = /^\s*(?:\*\*|__)?\s*sources?\b\s*:\s*(?:\*\*|__)?\s*(?=\S
 /** A markdown link, which is the other way the model names a page. */
 const MARKDOWN_LINK = /^\s*(?:[-*]\s*)?\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)\s*$/;
 
-/** Every URL in a line; the last one is the page, anything before it the title. */
-const URL_PATTERN = /https?:\/\/[^\s<>()[\]"']+/g;
+/**
+ * Every URL in a line; the last one is the page, anything before it the title.
+ *
+ * Post-V3-011: or a company tool, `mcp:crm/lookup_customer` — a source with
+ * no page, which the answer agent resolves against the tools it really called
+ * exactly as it resolves a URL against the pages it really opened.
+ */
+const URL_PATTERN = /https?:\/\/[^\s<>()[\]"']+|mcp:\s?[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+/g;
 
 /**
  * Splits one answer, whole or half-written.
@@ -379,7 +385,7 @@ function parseSource(line: string): ListedSource | null {
   const url = urls[urls.length - 1];
   if (url === undefined) return null;
   const title = plainText((line.slice(0, url.index) as string).replace(/[-–—:,|]\s*$/, ""));
-  return { title, url: url[0].replace(/[.,;)]+$/, "") };
+  return { title, url: url[0].replace(/\s+/g, "").replace(/[.,;)]+$/, "") };
 }
 
 /** One line, without the markdown a headline or a title can arrive wearing. */
@@ -387,7 +393,9 @@ function plainText(line: string): string {
   return line
     .replace(/^\s*#{1,6}\s*/, "")
     .replace(/^\s*[-*]\s+/, "")
-    .replace(/\*\*|__|[*_`]/g, "")
+    // Emphasis markers only: an underscore inside a word (`lookup_customer`,
+    // post-V3-011) is part of the word.
+    .replace(/\*\*|__|[*`]|(?<![A-Za-z0-9])_|_(?![A-Za-z0-9])/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -9,6 +9,7 @@ import {
 } from "../../shared/candidates.js";
 import { SimulatedClock } from "../clock.js";
 import { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
+import { fakeMcpClient } from "../test/fakeMcp.js";
 import type {
   GroundedCall,
   GroundedReply,
@@ -586,5 +587,102 @@ describe("the knowledge check in front of the web one", () => {
     expect(text.indexOf("## What was said")).toBeLessThan(text.indexOf("## The group's own files"));
     expect(text).toContain("**prices.csv** (line 2)");
     expect(text).not.toContain("web");
+  });
+});
+
+describe("the records check with company tools (post-V3-011)", () => {
+  /** The claim the CRM contradicts. */
+  function renewal(): Candidate {
+    return candidate({
+      id: "cand-12",
+      headline: "Harborview renews in March, not June",
+      evidence: [{ turnId: "0:9", speaker: "A", quote: "Harborview Clinic renews in June." }],
+    });
+  }
+
+  it("asks with the tools on the table and the web switched off, and cites the tool that settled it", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const mcp = fakeMcpClient(calls);
+    const harness_ = harness([
+      async () => reply({ value: verdict("right") }), // never reached
+    ]);
+    const records: VerificationLogRecord[] = [];
+    const verified: Candidate[] = [];
+    const grounded: GroundedCall[] = [];
+    const model: ModelClient = {
+      structured: async () => { throw new Error("with tools the records half is a tool loop"); },
+      prose: async () => { throw new Error("never"); },
+      grounded: async (call) => {
+        grounded.push(call);
+        const tool = call.functions?.find((one) => one.name === "crm__lookup_customer");
+        const result = await tool!.run({ name: "Harborview" });
+        expect(result).toContain("renews 2027-03-01");
+        return reply({
+          value: { verdict: "wrong", correction: "the CRM has Harborview renewing on the first of March", file: "mcp:crm/lookup_customer" },
+          searched: false,
+          searchedUrls: [],
+          functionCalls: 1,
+        });
+      },
+    };
+    const verifier = new Verifier({
+      clock: harness_.clock,
+      model,
+      mcp,
+      onRecord: (record) => records.push(record),
+      onVerified: (candidate) => verified.push(candidate),
+      logger: { log: () => {}, warn: () => {} },
+    });
+    verifier.verify(renewal());
+    await verifier.flush();
+
+    expect(grounded).toHaveLength(1);
+    expect(grounded[0]?.label).toBe(KNOWLEDGE_TRACK_LABEL);
+    expect(grounded[0]?.webSearch).toBe(false);
+    expect(grounded[0]?.user).toContain("Harborview Clinic renews in June.");
+    expect(grounded[0]?.user).toContain("company tools");
+    expect(calls).toEqual([{ name: "Harborview" }]);
+    expect(verified[0]?.verification?.file).toBe("mcp:crm/lookup_customer");
+    expect(verified[0]?.citations).toEqual([{ url: "mcp:crm/lookup_customer", title: "crm: lookup_customer" }]);
+    expect(records[0]?.outcome).toBe("verified");
+    await mcp.close();
+  });
+
+  it("falls through to the web when the tool was never called, and makes no records call without files or servers", async () => {
+    const mcp = fakeMcpClient();
+    const records: VerificationLogRecord[] = [];
+    const grounded: GroundedCall[] = [];
+    const model: ModelClient = {
+      structured: async () => { throw new Error("never"); },
+      prose: async () => { throw new Error("never"); },
+      grounded: async (call) => {
+        grounded.push(call);
+        // The records half says wrong but names a tool it never ran; the web half says right.
+        if (call.webSearch === false) {
+          return reply({ value: { verdict: "wrong", correction: "x", file: "mcp:crm/lookup_customer" }, searched: false });
+        }
+        return reply({ value: verdict("right") });
+      },
+    };
+    const verifier = new Verifier({
+      clock: new SimulatedClock(0),
+      model,
+      mcp,
+      onRecord: (record) => records.push(record),
+      onVerified: () => {},
+      logger: { log: () => {}, warn: () => {} },
+    });
+    verifier.verify(renewal());
+    await verifier.flush();
+    expect(grounded.map((call) => call.webSearch)).toEqual([false, undefined]);
+    expect(records[0]?.outcome).toBe("unverified");
+    await mcp.close();
+
+    // And without a folder or a server: straight to the web, one call.
+    const plain = harness([async () => reply({ value: verdict("right") })]);
+    plain.verifier.verify(renewal());
+    await plain.verifier.flush();
+    expect(plain.model.calls).toHaveLength(1);
+    expect(plain.model.calls[0]?.webSearch).toBeUndefined();
   });
 });

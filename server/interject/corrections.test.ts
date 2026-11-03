@@ -173,6 +173,14 @@ describe("spokenCorrection", () => {
     );
     expect(fileCorrectionLine("prices.csv", "  ")).toBe("");
     expect(fileCorrectionLine(" ", "it is $40")).toBe("");
+    // Post-V3-011: a company tool is named by its server, as the room would
+    // say it, never as `mcp:crm/lookup_customer` read out with a slash.
+    expect(fileCorrectionLine("mcp:crm/lookup_customer", "Harborview renews on the first of March")).toBe(
+      "From the crm: Harborview renews on the first of March.",
+    );
+    expect(fileCorrectionLine("mcp:ticket-tracker/search", "the ticket is still open")).toBe(
+      "From the ticket tracker: the ticket is still open.",
+    );
   });
 
   it("stays silent about a file-backed correction in a cautious session", () => {

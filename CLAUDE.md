@@ -2178,3 +2178,46 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   the board, the observer, the gates, the planner, the introductions read) stays at `low` or
   above, because that is where the thinking does the work. One afternoon's measurement on a
   healthy API: re-read `timing.jsonl`'s `latencyMs` after a few live runs before trusting it.
+- **Sotto is an MCP client, and the whole of it is one more `FunctionTool` list.** `mcp.json`
+  (`MCP_SERVERS` in `.env`: a path, or the JSON itself, in the `{ "mcpServers": { … } }` shape
+  Claude Desktop writes) names stdio and Streamable HTTP servers; `server/mcp/McpClient.ts`
+  connects to each at session start, lists its tools once, and hands the answer agent, the
+  research runner and the verifier's records half a `FunctionTool` per tool named
+  `<server>__<tool>` — the seam `search_knowledge` and `show_html` already go through, so the
+  three callers changed by one option (`mcp`, like `knowledge`) and one `invoked` set each.
+  `createMcp` on `SessionManager` defaults to none, exactly as `createKnowledge` does, so
+  `npm test` spawns and dials nothing; `server/app.ts` passes `mcpFromEnv(loadMcpConfig)`.
+  Measured on the demo stdio server (`scripts/mcp-demo-server.ts`, the fictional CRM over
+  `customers.csv`): connect + list **298 ms**, a call **0–4 ms**, and the real model called
+  `crm__lookup_customer` in its **first round** with 95 reasoning tokens and no web search —
+  19 s end to end through `POST /api/ask`, cited as `mcp:crm/lookup_customer`.
+- **A server's schema is declared strict only when it already is.** Strict function calling
+  rejects an optional property and every length/range keyword, and making an optional argument
+  required would send the server something it never asked for — so `strictParameters` in
+  `shared/mcp.ts` copies a schema that is *already* closed-and-all-required (adding
+  `additionalProperties: false`, which strict mode wants spelled out) and returns `null` for
+  anything else, which `FunctionTool.strict: false` then declares as the server wrote it.
+  `{}` is a tool with no arguments and is strict. A tool is never dropped over its schema.
+- **The tools outlive Stop, like the answer agent.** The first integration run answered "no
+  customer lookup tool is available" because the empty replay ended instantly, `finish()`
+  closed the client, and the typed question (US-019) was answered against a session whose tools
+  were gone. `McpClient.close()` now runs where `answers.stop()` does — when the **next** session
+  supersedes (`LastSession.mcp`) — so a question typed after Stop keeps the conversation's tools.
+- **The verifier's records half becomes a tool loop only when there are tools.** With MCP
+  configured it is `grounded` with the new `webSearch: false` (the web check runs separately,
+  after), the tools on the table and whatever file lines matched; without, it is the one
+  `structured` call V3-009 made, byte for byte. `KnowledgeVerificationReply.file` may now be
+  `mcp:<server>/<tool>`, resolved with `resolveMcpCitation` against the tools the check really
+  called, and `fileCorrectionLine` says "From the crm:" rather than reading a slash out loud.
+- **Three places a `mcp:` source could have been lost on the way to a card.** `splitAnswer`'s
+  `URL_PATTERN` only matched `https?://`, so a `Sources:` line naming a tool was dropped before
+  the answer agent saw it; `plainText` stripped every `_` as emphasis, turning `lookup_customer`
+  into `lookupcustomer` in a title; and `Card.tsx` would have rendered it as a link. Each is one
+  edit, and `shared/answers.test.ts` and `shared/mcp.test.ts` hold them.
+- **Secrets stay out of the log by construction, and a URL is a secret.** `loadMcpConfig` is the
+  only place `${NAME}` is expanded, the stdio child gets `PATH`/`HOME` and `env` rather than
+  Sotto's whole environment (which holds every key in `.env`), and every error message the
+  client writes passes through a redactor built from the config's header values, env values
+  *and URLs* — a token in a query string is still a token. `McpClient.test.ts` fails two
+  servers with secrets in both places and asserts `[redacted]` is all that reaches the log,
+  the record and `session.json`. `docs/mcp.md` is the user-facing half.

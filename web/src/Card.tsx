@@ -34,6 +34,7 @@ import {
   NOTICE_CARD_IDS,
   feedbackVerdicts,
   isKnowledgeCitation,
+  isMcpCitation,
   type CardArtifact,
   type FeedbackVerdict,
   type StageCard,
@@ -569,7 +570,7 @@ function Sources({ card }: { card: StageCard }) {
           </span>
           {/* V3-009: one of the group's own files has no page to open, so it
               is named rather than linked. */}
-          {isKnowledgeCitation(citation.url) ? (
+          {isKnowledgeCitation(citation.url) || isMcpCitation(citation.url) ? (
             <span className="card__source-file" data-testid="card-source-file">
               {citation.title === "" ? citation.url : citation.title}
             </span>

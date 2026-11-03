@@ -97,6 +97,13 @@ export interface GroundedCall extends StructuredCall {
    * whenever this is set, and a caller never sees a `function_call` item.
    */
   functions?: readonly FunctionTool[];
+  /**
+   * Whether `web_search` is on the table. Defaults to `true`, which is every
+   * caller before the MCP client (post-V3-011); the verifier's records half
+   * turns it off, because that check is about the group's own systems and a
+   * page from the web would answer the wrong question.
+   */
+  webSearch?: boolean;
 }
 
 /**
@@ -126,6 +133,13 @@ export interface FunctionTool {
    * whole answer.
    */
   run: (args: unknown) => string | Promise<string>;
+  /**
+   * Whether the arguments are declared under strict function calling.
+   * Defaults to `true`, which every tool Sotto writes itself satisfies; an
+   * MCP server's own schema (post-V3-011) may not, and is then declared as
+   * the server wrote it rather than dropped.
+   */
+  strict?: boolean;
 }
 
 /**
@@ -472,7 +486,9 @@ export class MuseClient implements ModelClient {
         input: [...input],
         max_output_tokens: call.maxTokens ?? DEFAULT_MAX_TOKENS,
         tools: [
-          { type: "web_search", search_context_size: call.searchContextSize ?? "medium" },
+          ...(call.webSearch === false
+            ? []
+            : [{ type: "web_search" as const, search_context_size: call.searchContextSize ?? "medium" }]),
           ...functionTools(tools),
         ],
         // Without this the search calls come back with the query and nothing
@@ -760,7 +776,7 @@ function functionTools(
     type: "function" as const,
     name: tool.name,
     description: tool.description,
-    strict: true,
+    strict: tool.strict ?? true,
     parameters: tool.parameters as Record<string, unknown>,
   }));
 }

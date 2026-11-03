@@ -15,6 +15,8 @@ import type { SpeechEndReason } from "../voice/Speaker.js";
 import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js";
 import { ACK_SEARCH } from "./ack.js";
 import type { ProseCall, ProseReply, ModelClient, StructuredCall } from "../model/client.js";
+import type { McpClient } from "../mcp/McpClient.js";
+import { fakeMcpClient } from "../test/fakeMcp.js";
 import { FIRST_LINE_LABEL } from "./firstLine.js";
 import {
   ANSWER_ITEM_PREFIX,
@@ -219,6 +221,8 @@ function harness(
     streamNow?: () => number;
     /** The research this session has done (V2-015). */
     packets?: ResearchPacket[];
+    /** The company's tools over MCP (post-V3-011). */
+    mcp?: McpClient;
   } = {},
 ): Harness {
   const clock = new SimulatedClock(0);
@@ -250,6 +254,7 @@ function harness(
     onRecord: (record) => records.push(record),
     onTiming: (event) => timing.push(event),
     ...(options.onArtifact === undefined ? {} : { onArtifact: options.onArtifact }),
+    ...(options.mcp === undefined ? {} : { mcp: options.mcp }),
     wallClock: wall,
     ...(options.streamNow === undefined ? {} : { streamNow: options.streamNow }),
     onSpoken: (turn) => spokenTurns.push(turn),
@@ -1666,5 +1671,85 @@ describe("AnswerAgent and show_html (US-020)", () => {
     const card = h.cards.at(-1)!;
     expect(card.state).toBe("error");
     expect(h.records[0]?.artifacts).toHaveLength(1);
+  });
+});
+
+describe("AnswerAgent and the company tools (post-V3-011)", () => {
+  it("offers every listed tool before show_html, and nothing extra without servers", async () => {
+    const without = harness([async (call) => {
+      expect(call.functions ?? []).toEqual([]);
+      return reply({ text: "An answer\n\nin words." });
+    }]);
+    without.agent.ask({ question: "when does Harborview renew?", askedBy: null, turnId: null });
+    await without.agent.flush();
+
+    const mcp = fakeMcpClient();
+    const with_ = harness(
+      [
+        async (call) => {
+          expect((call.functions ?? []).map((one) => one.name)).toEqual(["crm__lookup_customer"]);
+          expect(call.functions?.[0]?.strict).toBe(true);
+          return reply({ text: "An answer\n\nin words." });
+        },
+      ],
+      { mcp },
+    );
+    with_.agent.ask({ question: "when does Harborview renew?", askedBy: null, turnId: null });
+    await with_.agent.flush();
+    expect(with_.records[0]?.status).toBe("done");
+    await mcp.close();
+  });
+
+  it("cites a tool the answer really called, and drops one it did not", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const mcp = fakeMcpClient(calls);
+    const h = harness(
+      [
+        async (call) => {
+          const tool = (call.functions ?? []).find((one) => one.name === "crm__lookup_customer");
+          const result = await tool!.run({ name: "Harborview" });
+          expect(result).toContain("renews 2027-03-01");
+          return reply({
+            text:
+              "Harborview renews on 1 March 2027\n\nYour CRM has them on Pro, 45 seats.\n\nSources:\n" +
+              "- crm: lookup_customer - mcp:crm/lookup_customer\n" +
+              "- crm: delete_customer - mcp:crm/delete_customer\n" +
+              "- Example - https://example.com/never-opened",
+            searched: false,
+            functionCalls: 1,
+          });
+        },
+      ],
+      { mcp },
+    );
+    h.agent.ask({ question: "when does Harborview renew?", askedBy: null, turnId: null });
+    await h.agent.flush();
+    expect(calls).toEqual([{ name: "Harborview" }]);
+    const done = h.records[0]!;
+    expect(done.status).toBe("done");
+    expect(done.citations).toEqual([{ url: "mcp:crm/lookup_customer", title: "crm: lookup_customer" }]);
+    expect(h.warnings.filter((line) => /never opened/.test(line))).toHaveLength(2);
+    await mcp.close();
+  });
+
+  it("answers in words when the tool reports an error", async () => {
+    const mcp = fakeMcpClient();
+    const h = harness(
+      [
+        async (call) => {
+          const tool = (call.functions ?? [])[0]!;
+          const result = await tool.run({ name: "Nobody Inc" });
+          expect(result).toMatch(/reported an error/);
+          expect(result).toMatch(/answer in words instead/i);
+          return reply({ text: "I could not find them\n\nNo account by that name.", searched: false });
+        },
+      ],
+      { mcp },
+    );
+    h.agent.ask({ question: "who owns Nobody Inc?", askedBy: null, turnId: null });
+    await h.agent.flush();
+    expect(h.records[0]?.status).toBe("done");
+    expect(h.records[0]?.citations).toEqual([]);
+    await mcp.close();
   });
 });
