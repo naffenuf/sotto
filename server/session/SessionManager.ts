@@ -104,7 +104,7 @@ import type { JevLike } from "../model/JevClient.js";
 import { OfferWindow, type OfferSubject } from "../research/OfferWindow.js";
 import { classifyOfferReply } from "../research/offerReply.js";
 import { Greeting } from "./Greeting.js";
-import { correctedName, introducedNames } from "./speakerIntroductions.js";
+import { correctedName, introducedName, introducedNames } from "./speakerIntroductions.js";
 import { IntroductionReader } from "./IntroductionReader.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 // V3-007: a group going round in circles is offered a few ideas, and nothing
@@ -1067,6 +1067,18 @@ export class SessionManager {
         // Partials are dropped by all three of these; only final turns are
         // saved, and only final turns can trigger a board update.
         store.writer?.appendTurn(turn);
+        // A partial that already says "I'm Craig" names the speaker now rather
+        // than at the end of the turn: the first turn of a meeting can run
+        // for forty seconds (`2026-11-03_1534-mic`), and the room watched "A"
+        // the whole time. A partial has a speaker only after the API's
+        // `speaker` frame, which is why `turn.speaker` can be null here.
+        if (!turn.final && turn.speaker !== null && !turn.speakerMappingUncertain && this.current?.info.id === info.id && !isSottoTurn(turn)) {
+          const own = introducedName(turn.text);
+          if (own !== null && this.bus.speakerNames()[turn.speaker] === undefined) {
+            this.renameSpeaker(turn.speaker, own);
+            lastIntroduced = { label: turn.speaker, atMs: clock.now() };
+          }
+        }
         if (turn.final && turn.speaker !== null && !turn.speakerMappingUncertain && this.current?.info.id === info.id && !isSottoTurn(turn)) {
           // The service ends a turn on silence, not on a change of voice, so
           // "I'm Craig. I'm EJ." can arrive as one turn under one label: the

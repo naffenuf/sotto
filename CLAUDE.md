@@ -2132,3 +2132,11 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   going and what for, with no name and no restating the question: "Craig, you want the travel
   time for that New York to Philadelphia bus for your Sunday trip — let me pull the schedules"
   followed by "Craig, about two to three hours" read as two calls, because it was.
+- **A speaker is named off the first partial that introduces them.** The second solo run's
+  opening was one unbroken forty-second turn, and the pattern path only ran at the final, so
+  the room watched `A` the whole time (the model's read then said `Craig` at 1:05, correctly,
+  spelling and all). `SessionManager`'s `onUpdate` now runs `introducedName` on every partial
+  that has a speaker and names the label the moment "I'm Craig" is heard; the final still runs
+  the full `introducedNames` path for second names and corrections, and the model read is
+  unchanged. A partial has no speaker until the API's `speaker` frame, so a partial can carry
+  `speaker: null` — the test builds the frames by hand for that reason.

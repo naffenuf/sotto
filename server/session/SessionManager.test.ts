@@ -1870,6 +1870,33 @@ describe("SessionManager, speaker names", () => {
     await sessions.stop();
   });
 
+  it("names a speaker from the first partial that introduces them, before the turn ends", async () => {
+    const bus = new EventBus(quiet);
+    const { renames, writer } = recordingWriter();
+    let emit: ((record: AsrFrameRecord) => void) | undefined;
+    const sessions = new SessionManager({
+      bus, apiKey: "test-key", logger: quiet, createStore: () => writer,
+      createModel: () => null,
+      createAsrClient: ({ onFrame }) => { emit = onFrame; return new FakeAsrClient(onFrame); },
+    });
+    sessions.start({ kind: "mic" });
+    const frame = (value: Record<string, unknown>): void =>
+      emit?.({ atMs: value["audioProcessedMs"] as number, session: 0, frame: value });
+    frame({ type: "speechStart", turnId: 1, audioProcessedMs: 1000 });
+    frame({ type: "transcript", transcript: "Hi, I'm", final: false, audioProcessedMs: 1500 });
+    frame({ type: "speaker", label: "A", audioProcessedMs: 1600 });
+    // No name yet: the partial has not said one.
+    expect(bus.speakerNames()).toEqual({});
+    frame({ type: "transcript", transcript: "Hi, I'm Craig. Okay so we're planning", final: false, audioProcessedMs: 3000 });
+    // Named two seconds in, forty seconds before this turn will end.
+    expect(bus.speakerNames()).toEqual({ A: "Craig" });
+    frame({ type: "transcript", transcript: "Hi, I'm Craig. Okay so we're planning a trip to Philadelphia", final: false, audioProcessedMs: 6000 });
+    frame({ type: "speechEnd", turnId: 1, audioProcessedMs: 40000 });
+    frame({ type: "speechComplete", turnId: 1, audioProcessedMs: 40000, transcript: "Hi, I'm Craig. Okay so we're planning a trip to Philadelphia." });
+    expect(renames).toEqual([["A", "Craig"]]);
+    await sessions.stop();
+  });
+
   it("hands a second name introduced in one turn to the next voice the session meets", async () => {
     // The checkpoint session: "I'm Craig. I'm EJ. Okay, so…" arrived as one
     // turn under one label, because the service ends a turn on silence, not
