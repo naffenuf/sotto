@@ -742,15 +742,62 @@ body {
   padding: 1.25rem 1.5rem;
 }
 
-/* An interjection, and an opened glow, carry the accent on the left edge: a
-   raised hand, not an alarm. */
+/* Each kind of card has one colour, carried on the kind tag and the left
+   edge: an answer is blue (the room asked), something noticed is the accent
+   (a raised hand, not an alarm), a quiet note is the same hand lower,
+   research is green (something read), and a notice is grey (Sotto about
+   itself). */
+.card--answer { --kind: #3f5f86; }
+.card--interject { --kind: var(--accent); }
+.card--glow { --kind: #9a6a2e; }
+.card--research { --kind: #4d6b5a; }
+.card--notice { --kind: var(--ink-dim); }
+
 .card--interject,
-.card--glow[data-expanded="true"] {
-  border-left: 3px solid var(--accent);
+.card--glow[data-expanded="true"],
+.card--answer,
+.card--research[data-expanded="true"] {
+  border-left: 3px solid var(--kind);
 }
 
-.card--glow[data-expanded="true"] {
-  border-left-color: #9a6a2e;
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+}
+
+.card__kind {
+  display: inline-block;
+  flex: none;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--kind);
+  background: color-mix(in srgb, var(--kind) 11%, transparent);
+}
+
+.card__collapse {
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.125rem 0.375rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: none;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.card__collapse:hover,
+.card__collapse:focus-visible {
+  color: var(--ink);
+  background: #f1ede5;
 }
 
 /* A notice is Sotto talking about itself (V2-009): quieter than anything it
@@ -765,24 +812,6 @@ body {
   font-weight: 400;
   line-height: 1.55;
   color: var(--ink-dim);
-}
-
-.card__label {
-  margin: 0 0 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.card__label--button {
-  display: block;
-  font-family: inherit;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
 }
 
 .card__ask {
@@ -1099,13 +1128,16 @@ body {
   font-size: 0.9375rem;
   color: var(--ink-dim);
   padding: 0.625rem 1rem;
-  border-left: 3px solid #b79460;
+  border-left: 3px solid var(--kind);
   cursor: pointer;
 }
 
 .card--collapsed:hover {
   color: var(--ink);
-  border-left-color: var(--accent);
+}
+
+.card--collapsed .card__kind {
+  align-self: flex-start;
 }
 
 .card__glow-dot {
@@ -1137,19 +1169,6 @@ body {
    than something noticed. */
 .card--research.card--collapsed {
   align-items: flex-start;
-  border-left-color: #4d6b5a;
-}
-
-.card--research.card--collapsed:hover {
-  border-left-color: #377449;
-}
-
-.card--research[data-expanded="true"] {
-  border-left: 3px solid #4d6b5a;
-}
-
-.card--research .card__label {
-  color: #3d5a4a;
 }
 
 .card__research-mark {

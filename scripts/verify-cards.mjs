@@ -51,7 +51,7 @@ const cases = await page.evaluate(() =>
       error: (pick("card-error")?.textContent ?? "").trim(),
       question: (pick("card-question")?.textContent ?? "").trim(),
       asker: (pick("card-asker")?.textContent ?? "").trim(),
-      label: (pick("card-label") ?? pick("card-collapse"))?.textContent?.trim() ?? "",
+      label: pick("card-kind")?.textContent?.trim() ?? "",
       why: (pick("card-why")?.textContent ?? "").trim(),
       quotes: [...card.querySelectorAll('[data-testid="card-quote"]')].map((q) =>
         q.textContent.trim(),
@@ -123,7 +123,7 @@ const openedGlow = await page
     ),
     quotes: node.querySelectorAll('[data-testid="card-quote"]').length,
     height: Math.round(node.getBoundingClientRect().height),
-    collapse: node.querySelector('[data-testid="card-collapse"]')?.textContent.trim() ?? "",
+    collapse: node.querySelector('[data-testid="card-kind"]')?.textContent.trim() ?? "",
   }));
 
 // "details ▾" on the answer card opens the markdown: a paragraph, a list, a
@@ -269,7 +269,7 @@ const interject = byId["i-ready"];
 if (interject?.headlinePx !== ready?.headlinePx) {
   problems.push(`interject headline is ${interject?.headlinePx}px, answer is ${ready?.headlinePx}px`);
 }
-if (interject?.label !== "Sotto noticed…") {
+if (interject?.label !== "Noticed") {
   problems.push(`interject label reads ${JSON.stringify(interject?.label)}`);
 }
 if (parseFloat(interject?.borderLeft ?? "0") < 2) {
@@ -299,7 +299,7 @@ if (openedGlow.headlinePx < 28) {
   problems.push(`the opened glow's headline is ${openedGlow.headlinePx}px`);
 }
 if (openedGlow.height <= collapsedHeight) problems.push("the glow did not grow when opened");
-if (!openedGlow.collapse.startsWith("Sotto noticed")) {
+if (openedGlow.collapse !== "Quiet note") {
   problems.push(`the opened glow's label reads ${JSON.stringify(openedGlow.collapse)}`);
 }
 

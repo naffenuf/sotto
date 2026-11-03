@@ -71,13 +71,13 @@ try {
   await notice.waitFor({ timeout: 20_000 });
   const shown = await notice.evaluate((card) => ({
     headline: card.querySelector('[data-testid="card-headline"]')?.textContent?.trim() ?? "",
-    label: card.querySelector('[data-testid="card-label"]')?.textContent?.trim() ?? "",
+    label: card.querySelector('[data-testid="card-kind"]')?.textContent?.trim() ?? "",
     feedback: card.querySelectorAll('[data-testid="card-feedback"]').length,
     fontSize: getComputedStyle(card.querySelector('[data-testid="card-headline"]')).fontSize,
   }));
   await page.screenshot({ path: `${shotPrefix}-muted.png` });
   if (shown.headline !== HELLO) problems.push(`the card does not read hello.md: ${shown.headline}`);
-  if (shown.label !== "") problems.push(`the hello card is labeled "${shown.label}"`);
+  if (shown.label !== "From Sotto") problems.push(`the hello card is labeled "${shown.label}"`);
   if (shown.feedback !== 0) problems.push("the hello card offers feedback buttons");
   // Nothing was said, so nothing is written down.
   if ((await page.locator('[data-testid="turn"][data-sotto="true"]').count()) !== 0) {

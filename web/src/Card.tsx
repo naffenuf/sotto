@@ -29,6 +29,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "./MarkdownView.js";
+import type { CardVariant } from "../../shared/index.js";
 import {
   NOTICE_CARD_IDS,
   feedbackVerdicts,
@@ -38,11 +39,19 @@ import {
   type StageCard,
 } from "../../shared/index.js";
 
-/** The label above an interjection — Sotto raising its hand, quietly. */
-const NOTICED = "Sotto noticed…";
-
-/** The label above an opened research card (V2-014). */
-const RESEARCHED = "Sotto looked this up…";
+/**
+ * The small tag at the top of every card, closed or open: what kind of thing
+ * Sotto is putting in front of the room. One word each, coloured per kind in
+ * the stylesheet (`.card--<variant>` sets `--kind`), so a reader can tell an
+ * answer from an interjection from across a table without reading it.
+ */
+const KIND_LABEL: Record<CardVariant, string> = {
+  answer: "Answer",
+  interject: "Noticed",
+  glow: "Quiet note",
+  research: "Research",
+  notice: "From Sotto",
+};
 
 /**
  * Whether this card's markdown *is* the card rather than an aside behind
@@ -145,6 +154,7 @@ export function Card({
         }}
         title={research ? "Open what Sotto found" : "Open this quiet thought"}
       >
+        <Kind card={card} />
         <span className={research ? "card__research-mark" : "card__glow-dot"} aria-hidden="true">
           {research ? "⌕" : null}
         </span>
@@ -168,7 +178,24 @@ export function Card({
       data-state={card.state}
       data-expanded={isCollapsible(card.variant) ? "true" : undefined}
     >
-      <CardLabel card={card} onCollapse={() => setExpanded(false)} />
+      <div className="card__head">
+        <Kind card={card} />
+        {isCollapsible(card.variant) && (
+          // A card the reader opened keeps a way back, so the stage can go quiet again.
+          <button
+            type="button"
+            className="card__collapse"
+            data-testid="card-collapse"
+            aria-expanded
+            aria-label="Collapse"
+            title="Collapse"
+            onClick={() => setExpanded(false)}
+          >
+            ▴
+          </button>
+        )}
+      </div>
+      <Question card={card} />
       <Headline card={card} />
       <Note card={card} />
       <Teaser card={card} />
@@ -195,42 +222,27 @@ export function Card({
   );
 }
 
-/** The line above the headline: the question for an answer, the label otherwise. */
-function CardLabel({ card, onCollapse }: { card: StageCard; onCollapse: () => void }) {
-  // A `notice` is Sotto talking about itself (V2-009), so "Sotto noticed…"
-  // would be the wrong label and there is nothing else worth putting there.
-  if (card.variant === "notice") return null;
-  if (card.variant === "answer") {
-    if (card.question === undefined || card.question === "") return null;
-    return (
-      <p className="card__ask" data-testid="card-question">
-        <span className="card__question">{card.question}</span>
-        {card.askedBy !== undefined && card.askedBy !== "" && (
-          <span className="card__asker" data-testid="card-asker">
-            {card.askedBy}
-          </span>
-        )}
-      </p>
-    );
-  }
-  // A card the reader opened keeps a way back, so the stage can go quiet again.
-  if (isCollapsible(card.variant)) {
-    return (
-      <button
-        type="button"
-        className="card__label card__label--button"
-        data-testid="card-collapse"
-        aria-expanded
-        onClick={onCollapse}
-      >
-        {card.variant === "research" ? RESEARCHED : NOTICED}{" "}
-        <span aria-hidden="true">▴</span>
-      </button>
-    );
-  }
+/** The kind tag: "Answer", "Noticed", "Quiet note", "Research", "From Sotto". */
+function Kind({ card }: { card: StageCard }) {
   return (
-    <p className="card__label" data-testid="card-label">
-      {NOTICED}
+    <span className="card__kind" data-testid="card-kind">
+      {KIND_LABEL[card.variant]}
+    </span>
+  );
+}
+
+/** The question an answer is answering, with who asked it. */
+function Question({ card }: { card: StageCard }) {
+  if (card.variant !== "answer") return null;
+  if (card.question === undefined || card.question === "") return null;
+  return (
+    <p className="card__ask" data-testid="card-question">
+      <span className="card__question">{card.question}</span>
+      {card.askedBy !== undefined && card.askedBy !== "" && (
+        <span className="card__asker" data-testid="card-asker">
+          {card.askedBy}
+        </span>
+      )}
     </p>
   );
 }
