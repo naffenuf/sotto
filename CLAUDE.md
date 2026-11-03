@@ -1996,3 +1996,22 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   zone (`data-count`, `raised-hand-count`, rows `held-card`, `raised-hand-clear` for "seen").
   A held card opened from Holding mounts fresh in Said, so `opened` (exposed by
   `useRaisedHand`) is passed as `defaultExpanded` — otherwise a glow would land collapsed again.
+
+- **Sotto's own name, heard back, is the one echo the matcher must never miss.** Session
+  `2026-11-03_0915-mic` (a real trip-planning meeting) was wrecked by the hello's last sentence:
+  "If you want me, just say Sotto" came back as its own turn, `just say Soto`, and with the name
+  spelled differently it matched 2 of 3 content words — read as a person, its "Soto" barged in on
+  the hello that was saying it (so the room never heard "would you each say your name"), and
+  the command classifier then answered it as a question ("Got it, just say Sotto whenever you need
+  me"), which echoed and barged in again. `selfEcho.ts`'s `tokens()` now folds every
+  `DEFAULT_WAKE_SPELLINGS` entry to `sotto`. The known cost: "Sotto, not now" said *during the
+  hello* is textually the hello's own words and is treated as echo; over anything else it is a
+  person. Two more things from the same session: the command classifier had **no deadline** and
+  one call took 102 s on a slow API (`COMMAND_TIMEOUT_MS` 6 s now, with `fallbackCommand` — a
+  question-shaped turn becomes a new question, anything else is "stop"), and the address
+  classifier's lexical fallback read "Sotto did you look up any of the things we were talking
+  about" as a mention, because `detect` only knows wh-words; `detect(text, { looseQuestions:
+  true })` adds the auxiliaries (`did/do/does/can/could/would/will/have/has/may/might`, never
+  `is/are/should`) for the fallback only. Every Spark call in that session was slow — board
+  updates 16–44 s, both 6 s classifier deadlines hit — so when a live run goes quiet, read
+  `timing.jsonl`'s `latencyMs` and `fallback: true` before reading the prompts.

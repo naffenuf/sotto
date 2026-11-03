@@ -78,7 +78,7 @@ import { chooseAcknowledgment, searchLikely } from "./ack.js";
 import { writeFirstLine } from "./firstLine.js";
 import { splitSentences } from "./sentences.js";
 import { SpokenAnswer, type SpokenResult } from "./SpokenAnswer.js";
-import { classifyCommand } from "./command.js";
+import { COMMAND_TIMEOUT_MS, classifyCommand, fallbackCommand } from "./command.js";
 
 /** The label an answer is tracked under on the clock, and in the model logs. */
 export const ANSWER_TRACK_LABEL = "answer";
@@ -347,11 +347,31 @@ export class AnswerAgent {
     const version = ++this.commandVersion;
     this.commands = this.commands.then(async () => {
       try {
-        const command = await classifyCommand(this.model, asked.question);
+        // On the wall clock, with a lexical fallback: a replay's clock stands
+        // still inside a tracked call, and a slow API must not hold the
+        // room's next question for a minute (measured 102 s).
+        const controller = new AbortController();
+        const cancelTimeout = this.wallClock.setTimeout(() => controller.abort(), COMMAND_TIMEOUT_MS);
+        let fallback = false;
+        let command: ReturnType<typeof fallbackCommand>;
+        try {
+          command = await Promise.race([
+            classifyCommand(this.model, asked.question, controller.signal),
+            new Promise<never>((_, reject) => {
+              controller.signal.addEventListener("abort", () => reject(new Error("command timed out")));
+            }),
+          ]);
+        } catch (error) {
+          fallback = true;
+          this.logger.warn(`[voice] command fallback: ${message(error)}`);
+          command = fallbackCommand(asked.question);
+        } finally {
+          cancelTimeout();
+        }
         if (this.stopped || version !== this.commandVersion) return;
         this.options.onTiming?.({
           stage: "voice_command", atMs: this.clock.now(), turnId: asked.turnId,
-          command: command.command,
+          command: command.command, ...(fallback ? { fallback: true } : {}),
         });
         // V3-006: the two kinds that are about Sotto's behaviour rather than
         // about this answer, and a stop that may be about either.

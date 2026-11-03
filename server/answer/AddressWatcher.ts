@@ -311,7 +311,9 @@ export class AddressWatcher {
     let fallback = false;
     if (result === null) {
       fallback = true;
-      const match = detect(turn.text);
+      // Looser than the wake watcher's rule: a yes/no question of Sotto with
+      // the comma lost ("Sotto did you look up…") is still a request here.
+      const match = detect(turn.text, { looseQuestions: true });
       result = { kind: match.triggered ? "request" : "mention", question: match.question ?? "" };
       this.options.onTiming({
         stage: "address_fallback", atMs: this.options.clock.now(), turnId: turn.turnId,

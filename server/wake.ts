@@ -85,6 +85,19 @@ const QUESTION_OPENERS: ReadonlySet<string> = new Set([
   "which",
 ]);
 
+/**
+ * The auxiliaries that open a yes/no question *of* Sotto, for the lexical
+ * fallback only (V2-008's six-second classifier timeout). "Sotto, did you
+ * look up any of the things we were talking about" came back with no comma
+ * and was read as a mention when the classifier timed out
+ * (`2026-11-03_0915-mic`). Deliberately without "is"/"are"/"should": "Sotto is
+ * being too chatty" and "Sotto should stay quiet" are about Sotto, and those
+ * are what the `no-wake` fixture is made of.
+ */
+const LOOSE_QUESTION_OPENERS: ReadonlySet<string> = new Set([
+  "did", "do", "does", "can", "could", "would", "will", "have", "has", "may", "might",
+]);
+
 /** Punctuation that ends a sentence, so that what follows starts one. */
 const SENTENCE_ENDERS = new Set([".", "!", "?", "…", ";", ":", "\n", "\r"]);
 
@@ -95,6 +108,12 @@ const SEPARATORS = new Set([",", ":", ";", "-", "–", "—", "…"]);
 const OPENERS = new Set(['"', "'", "“", "‘", "(", "[", "«"]);
 
 export interface WakeOptions {
+  /**
+   * Also read an auxiliary after the name as opening a question ("Sotto did
+   * you…"). For the address classifier's lexical fallback only — the wake
+   * watcher's partials stay on the wh-words.
+   */
+  looseQuestions?: boolean;
   /** Accepted spellings, lower-case. Defaults to {@link DEFAULT_WAKE_SPELLINGS}. */
   spellings?: readonly string[];
 }
@@ -145,7 +164,7 @@ export function detect(text: string, options: WakeOptions = {}): WakeMatch {
   for (const [index, word] of all.entries()) {
     if (!spellings.includes(word.lower)) continue;
     if (!isAddressed(text, word, all[index - 1])) continue;
-    const question = questionAfter(text, word.end);
+    const question = questionAfter(text, word.end, options.looseQuestions === true);
     if (question !== null) return { triggered: true, question };
   }
   return NOT_TRIGGERED;
@@ -260,7 +279,7 @@ function startsSentence(text: string, index: number): boolean {
  * shaped like a question, and for a wake word with nothing after it at all —
  * which is every partial up to the moment the speaker says more.
  */
-function questionAfter(text: string, from: number): string | null {
+function questionAfter(text: string, from: number, loose = false): string | null {
   const rest = text.slice(from);
   if (/^['’]s\b/i.test(rest)) return null;
 
@@ -293,6 +312,9 @@ function questionAfter(text: string, from: number): string | null {
   // or it ends in a question mark.
   if (question.endsWith("?")) return question;
   if (first !== undefined && first.start === 0 && QUESTION_OPENERS.has(first.lower)) return question;
+  if (loose && first !== undefined && first.start === 0 && LOOSE_QUESTION_OPENERS.has(first.lower)) {
+    return question;
+  }
   return null;
 }
 

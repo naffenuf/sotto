@@ -614,6 +614,28 @@ describe("AnswerAgent out loud (V2-005)", () => {
     ]);
   });
 
+  it("answers a question-shaped turn itself when the command classifier fails", async () => {
+    // 2026-11-03_0915-mic: a slow API held one command for 102 s. The fake
+    // model throws on an unexpected structured call, which is the same path
+    // the deadline takes; the lexical fallback reads the yes/no question.
+    const { h, voice } = spoken([]);
+    const held = h.model.held();
+    h.agent.ask({ question: "What do rivals charge?", askedBy: "A", turnId: "0:1" });
+    await microtasks();
+    await h.agent.interrupt();
+    h.model.replies.push(async () => reply({ text: "Say this:\nBuses run hourly.\nShow this:\nHourly" }));
+    h.agent.command({ question: "Sotto did you look up the bus times", askedBy: "A", turnId: "0:2" });
+    held.answer(reply({ text: STREAM.at(-1) as string }));
+    await h.clock.settle();
+    expect(h.timing).toContainEqual(
+      expect.objectContaining({ stage: "voice_command", command: "new_question", fallback: true }),
+    );
+    expect(h.records.map((record) => record.question)).toEqual([
+      "What do rivals charge?", "did you look up the bus times",
+    ]);
+    expect(voice.utterances.length).toBeGreaterThanOrEqual(1);
+  });
+
   it.each(["quieter", "louder"])(
     "hands %s to the room's steering instead of answering it (V3-006)",
     async (command) => {

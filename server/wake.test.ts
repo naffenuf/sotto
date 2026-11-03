@@ -80,6 +80,18 @@ describe("detect", () => {
     }
   });
 
+  it("reads an auxiliary after the name only when asked to, for the fallback", () => {
+    const asked = "Sotto did you look up any of the things we were talking about";
+    expect(detect(asked).triggered).toBe(false);
+    expect(detect(asked, { looseQuestions: true })).toEqual({
+      triggered: true,
+      question: "did you look up any of the things we were talking about",
+    });
+    // Talking about Sotto is still not asking it, loose or not.
+    expect(detect("Sotto is being too chatty", { looseQuestions: true }).triggered).toBe(false);
+    expect(detect("Sotto should stay quiet", { looseQuestions: true }).triggered).toBe(false);
+  });
+
   it("takes the spellings it is given", () => {
     expect(detect("Jarvis, what time is it?").triggered).toBe(false);
     expect(detect("Jarvis, what time is it?", { spellings: ["jarvis"] })).toEqual({

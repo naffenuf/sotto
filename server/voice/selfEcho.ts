@@ -5,6 +5,8 @@
  * from matching an arbitrarily long turn.
  */
 
+import { DEFAULT_WAKE_SPELLINGS } from "../wake.js";
+
 /** The PRD's minimum fraction of captured tokens also present in speech. */
 export const SELF_ECHO_OVERLAP = 0.6;
 /**
@@ -42,9 +44,17 @@ export const ECHO_FUNCTION_WORDS: ReadonlySet<string> = new Set([
   "oh", "wait", "okay", "ok", "yeah", "yes", "no", "not", "just", "go", "get", "got",
 ]);
 
-/** Case and punctuation are ASR choices, not evidence of a different voice. */
+/**
+ * Case and punctuation are ASR choices, not evidence of a different voice —
+ * and so is the spelling of Sotto's own name. The hello ends "just say
+ * Sotto", which came back as `just say Soto` (session `2026-11-03_0915-mic`):
+ * with the name counted as a different word the fragment was two matches of
+ * three, read as a person, and its "Soto" barged in on the hello that said
+ * it. Every spelling the transcription produces is the same token here.
+ */
 function tokens(text: string): string[] {
-  return text.toLowerCase().replace(/[’']/gu, "").match(/[\p{L}\p{N}]+/gu) ?? [];
+  const all = text.toLowerCase().replace(/[’']/gu, "").match(/[\p{L}\p{N}]+/gu) ?? [];
+  return all.map((token) => (DEFAULT_WAKE_SPELLINGS.includes(token) ? "sotto" : token));
 }
 
 /** The tokens that carry meaning; all of them when there are none, so "I'm Sotto" still scores. */
