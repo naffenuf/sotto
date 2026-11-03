@@ -109,7 +109,7 @@ export async function writeFirstLine(
     user,
     schemaName: FIRST_LINE_LABEL,
     schema: firstLineJsonSchema,
-    reasoningEffort: "low",
+    reasoningEffort: "minimal",
     maxTokens: FIRST_LINE_MAX_TOKENS,
     ...(signal === undefined ? {} : { signal }),
   });

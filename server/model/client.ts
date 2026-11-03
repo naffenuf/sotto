@@ -62,7 +62,13 @@ export interface StructuredCall {
   /** Reasoning + output budget. Defaults to {@link DEFAULT_MAX_TOKENS}. */
   maxTokens?: number;
   /** V2-008: addressing should spend little time reasoning while the room waits. */
-  reasoningEffort?: "low" | "medium" | "high";
+  /**
+   * `minimal` is Spark's real floor (`none` is a 400): measured on the nine
+   * short classifications, same verdicts as `low` with 2–4x fewer thinking
+   * tokens and 1.7x the speed. Reserved for the Jev-gated calls and the
+   * holding line; anything that writes or scores stays at `low` or above.
+   */
+  reasoningEffort?: "minimal" | "low" | "medium" | "high";
   /** Cancels a timed-out classification instead of leaving an API request running. */
   signal?: AbortSignal;
 }

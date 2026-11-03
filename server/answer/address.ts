@@ -61,7 +61,7 @@ export async function classifyAddress(model: ModelClient, input: AddressInput, s
         question: { type: "string" },
       },
     },
-    reasoningEffort: "low",
+    reasoningEffort: "minimal",
     maxTokens: 2_000,
     ...(signal === undefined ? {} : { signal }),
   });

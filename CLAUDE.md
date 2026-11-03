@@ -2168,3 +2168,13 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   a packet that comes back to it is logged `research_dropped` and never becomes a card, and a
   failed search raises no error card either. Nothing is shown or said on Jev's word alone. The
   gain is Spark's whole latency (2–14 s) off every looked-up answer; a wasted search is ~$0.05.
+- **Spark's floor is `minimal`, not `none`, and the short calls run there now.** `reasoning_effort:
+  "none"` is a 400 on `muse-spark-1.3`; the error lists the real ladder, `minimal, low, medium,
+  high, xhigh, max`, and `minimal` had never been tried. Probed paired on the nine Jev-gated
+  prompts (question, address, follow-up, command, holding line): **identical verdicts on all
+  nine**, 114–410 thinking tokens against 400–1,040, and 1.7–3.9 s against 3.1–10.0 s — median
+  1.7x, the 10 s command call down to 3.9. So `question.ts`, `address.ts`, `followUp.ts`,
+  `command.ts` and `firstLine.ts` ask for `minimal`; everything that writes or scores (the answer,
+  the board, the observer, the gates, the planner, the introductions read) stays at `low` or
+  above, because that is where the thinking does the work. One afternoon's measurement on a
+  healthy API: re-read `timing.jsonl`'s `latencyMs` after a few live runs before trusting it.

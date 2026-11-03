@@ -50,6 +50,7 @@ export async function classifyCommand(model: ModelClient, text: string, signal?:
         question: { type: "string" },
       },
     },
+    reasoningEffort: "minimal",
     ...(signal === undefined ? {} : { signal }),
   });
   return CommandSchema.parse(value);

@@ -100,7 +100,7 @@ export async function classifyFollowUp(
         },
       },
     },
-    reasoningEffort: "low",
+    reasoningEffort: "minimal",
     maxTokens: 2_000,
     ...(signal === undefined ? {} : { signal }),
   });

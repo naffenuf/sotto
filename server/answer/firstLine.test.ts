@@ -40,7 +40,7 @@ it("asks for one cheap, untooled reply", async () => {
   );
   expect(calls[0]).toMatchObject({
     label: FIRST_LINE_LABEL,
-    reasoningEffort: "low",
+    reasoningEffort: "minimal",
     maxTokens: FIRST_LINE_MAX_TOKENS,
   });
   expect(calls[0]?.user).toContain("The group's board");

@@ -169,7 +169,7 @@ export async function classifyQuestion(
         },
       },
     },
-    reasoningEffort: "low",
+    reasoningEffort: "minimal",
     maxTokens: 4_000,
     ...(signal === undefined ? {} : { signal }),
   });
