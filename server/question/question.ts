@@ -169,7 +169,7 @@ export async function classifyQuestion(
       },
     },
     reasoningEffort: "low",
-    maxTokens: 2_000,
+    maxTokens: 4_000,
     ...(signal === undefined ? {} : { signal }),
   });
   return QuestionSchema.parse(value);

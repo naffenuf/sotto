@@ -87,7 +87,7 @@ import { ResearchRunner } from "../research/ResearchRunner.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { WakeWatcher, type WakeWatcherOptions } from "../wakeWatcher.js";
 import { AddressWatcher } from "../answer/AddressWatcher.js";
-import { classifyQuestion, type OpenQuestion } from "../question/question.js";
+import type { OpenQuestion } from "../question/question.js";
 import { QuestionWatcher } from "../question/QuestionWatcher.js";
 import { Reservations, stallIdeasLine, stallOfferLine } from "../question/Reservations.js";
 import { isUnpromptedKind } from "../../shared/spoken.js";
@@ -95,10 +95,12 @@ import { ReadBacks } from "../decision/ReadBacks.js";
 import { decisionNote } from "../decision/readback.js";
 import { StillCurrentWatcher } from "../question/StillCurrentWatcher.js";
 import { classifyStillCurrent } from "../question/stillCurrent.js";
-import { classifyAddress } from "../answer/address.js";
 import { BargeIn } from "../answer/BargeIn.js";
 import { FollowUpWindow } from "../answer/FollowUpWindow.js";
 import { classifyFollowUp } from "../answer/followUp.js";
+import { gatedClassifyAddress } from "../answer/addressFast.js";
+import { gatedClassifyQuestion } from "../question/gate.js";
+import type { JevLike } from "../model/JevClient.js";
 import { OfferWindow, type OfferSubject } from "../research/OfferWindow.js";
 import { classifyOfferReply } from "../research/offerReply.js";
 import { Greeting } from "./Greeting.js";
@@ -233,6 +235,12 @@ export interface SessionManagerOptions {
    */
   createGlimmer?: GlimmerClientFactory;
   /**
+   * Jev, the fast per-turn read in front of Spark (post-V3-011), or `null`
+   * for Spark alone. Defaults to none, so `npm test` dials nothing;
+   * `server/app.ts` supplies {@link jevFromEnv}.
+   */
+  createJev?: () => JevLike | null;
+  /**
    * The voice answers are spoken with (V2-005). Defaults to none, so a
    * SessionManager built without one answers on screen only; `server/app.ts`
    * passes the one {@link VoiceHub} the browser's `/ws/voice` is attached to.
@@ -307,6 +315,8 @@ export const NAME_CORRECTION_MS = 20_000;
 interface ModelLoops {
   /** Shared Spark client for final-turn addressing (V2-008). */
   modelClient: ModelClient | null;
+  /** The fast read in front of it, or `null` (post-V3-011). */
+  jev: JevLike | null;
   /**
    * Which model the session's judgment calls go to (V2-010). Built even when
    * there is no model client at all, so the dot tells the truth either way.
@@ -550,6 +560,7 @@ export class SessionManager {
   private readonly createStore: SessionStoreFactory;
   private readonly createModel: ModelClientFactory;
   private readonly createGlimmer: GlimmerClientFactory;
+  private readonly createJev: () => JevLike | null;
   private readonly createVoice: VoiceFactory;
   private readonly createKnowledge: KnowledgeFactory;
   private readonly liveClock: Clock;
@@ -593,6 +604,7 @@ export class SessionManager {
     // server as surely as it is off the network. `server/app.ts` passes
     // {@link glimmerFromEnv}.
     this.createGlimmer = options.createGlimmer ?? ((): GlimmerClient | null => null);
+    this.createJev = options.createJev ?? ((): JevLike | null => null);
     this.createVoice = options.createVoice ?? ((): VoiceOut | null => null);
     // Same default and the same reason: no folder means the web alone.
     this.createKnowledge = options.createKnowledge ?? ((): KnowledgeIndex | null => null);
@@ -1287,7 +1299,10 @@ export class SessionManager {
       ...effects,
       clock,
       wallClock: this.wallClock,
-      classify: (input, signal) => classifyAddress(model, input, signal),
+      classify: gatedClassifyAddress(loops.jev, model, {
+        wallClock: this.wallClock,
+        onGate: (verdict) => store.writer?.appendTiming?.({ stage: "address_gate", atMs: clock.now(), ...verdict }),
+      }),
       speakers: () => this.bus.speakerNames(),
       onTiming: (record) => store.writer?.appendTiming?.(record),
       // V3-017: how many things Sotto is holding, which is what lets a turn
@@ -1358,6 +1373,7 @@ export class SessionManager {
     voice: VoiceOut | null,
   ): ModelLoops {
     const model = this.createModel();
+    const jev = this.createJev();
     // Built either way: judgment is its own model (V2-010), and a session
     // with no Muse Spark key can still have Glimmer on this Mac.
     const judgment = this.judgmentRouter(info, model);
@@ -1371,6 +1387,7 @@ export class SessionManager {
       );
       return {
         modelClient: null,
+        jev: null,
         judgment,
         board: null,
         observer: null,
@@ -1974,7 +1991,10 @@ export class SessionManager {
       // seconds the room waited, and a `max` replay's clock stands still
       // inside a model call.
       wallClock: this.wallClock,
-      classify: (input, signal) => classifyQuestion(model, input, signal),
+      classify: gatedClassifyQuestion(jev, model, {
+        wallClock: this.wallClock,
+        onGate: (verdict) => onTiming({ stage: "question_gate", atMs: clock.now(), ...verdict }),
+      }),
       speakers: () => this.bus.speakerNames(),
       onTiming,
       // V3-014: inside the follow-up window the room is talking *to* Sotto,
@@ -2109,7 +2129,7 @@ export class SessionManager {
         });
       },
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, answerHooks, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
+    return { modelClient: model, jev, judgment, board, observer, verifier, gate, policy, answers, answerHooks, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
   }
 
   /**

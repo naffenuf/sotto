@@ -2072,3 +2072,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   get the invites out by Friday" came back `none`. The cost is one low-effort call per turn, a
   quarter of a cent each — a few dollars a meeting. The tests that counted calls per fixture now
   count turns.
+- **Jev reads every turn first; Spark writes every word.** `server/model/JevClient.ts` is TypeSafe's
+  System One model (`POST https://api.typesafe.ai/v1/systemone`, `{ model, state, questions }`,
+  each question a `choice` with `criteria` or a `noul`, answers under the caller's own ids;
+  `TYPESAFE_API_KEY`, `jevFromEnv()` null without it, `createJev` on `SessionManager` defaulting to
+  none so `npm test` dials nothing). It is non-generative — a pick, a yes-probability — and that is
+  the point: Spark reasons before it answers, 6–14 s on a slow afternoon and once its whole budget
+  with no answer, while Jev answered the same turns in **65–690 ms**. Two gates use it.
+  `server/question/gate.ts` (`gatedClassifyQuestion`): Jev picks the question kind and a
+  "settles a decision" probability for every final turn; Spark is asked only for an
+  `open_question` (it writes the question and the topic), a closing ≥ 0.6 (the decision's words)
+  or a confidence < 0.65 — a confident `none`/`rhetorical`/`to_group` costs no Spark call.
+  `server/answer/addressFast.ts` (`gatedClassifyAddress`): Jev picks request/call_on/name_only/
+  mention with the raised count in the state, a request's words are `questionAfterName`, and
+  Spark is asked under 0.7 or for a request with no words. Both record `question_gate` /
+  `address_gate` in `timing.jsonl` with `sparked`. `JEV_TIMEOUT_MS` is 2.5 s and every failure
+  is "ask Spark". Measured on the bus turns: three needs → `open_question` at 0.83–0.96, "lock
+  that in" → `decision` with closing 0.94, the rhetorical one → `rhetorical` 0.82, and "Can you
+  help that with us?" → 0.51, which is exactly the one Spark should settle.
