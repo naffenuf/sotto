@@ -216,6 +216,12 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
             waiting: [],
           };
     case "speakers":
+      // A server that has just started greets the page with no names and no
+      // session; the names this page already has belong to the transcript
+      // it is still showing, so an empty map with nothing running is not an
+      // update (the dev server restarts on every edit, and a page left open
+      // after a meeting went back to "A" and "no update yet").
+      if (Object.keys(event.speakers).length === 0 && state.session === null) return state;
       return { ...state, speakers: event.speakers };
     case "wake":
       return {
@@ -238,6 +244,10 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
     case "waiting":
       return { ...state, waiting: event.lines };
     case "board":
+      // Same rule for the notes: an empty board that has never been updated,
+      // from a server with nothing running, must not replace the notes of
+      // the meeting this page is still showing.
+      if (event.updatedAtMs === 0 && state.session === null && state.boardUpdatedAtMs !== 0) return state;
       return {
         ...state,
         board: event.board,
