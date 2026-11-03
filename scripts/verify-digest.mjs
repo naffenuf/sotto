@@ -109,10 +109,13 @@ try {
   await digest.waitFor({ timeout: 30_000 });
   const text = (await digest.textContent()) ?? "";
   await page.screenshot({ path: `${shotPrefix}.png` });
+  // Rendered markdown now: each section is a heading element, not a `## ` line.
+  const headings = await digest.locator("h4").allTextContents();
   for (const section of SECTIONS) {
-    if (!text.includes(`## ${section}`)) problems.push(`the digest has no ${section} section`);
+    if (!headings.some((heading) => heading.trim() === section)) problems.push(`the digest has no ${section} section`);
   }
-  if (text.startsWith("# Digest")) problems.push("the digest repeats its own title");
+  if (text.includes("## ")) problems.push("the digest shows raw markdown");
+  if (text.startsWith("Digest")) problems.push("the digest repeats its own title");
   if (!text.includes("Where we got to")) {
     problems.push("the digest does not record the wrap-up Sotto said");
   }

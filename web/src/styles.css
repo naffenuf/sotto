@@ -205,7 +205,12 @@ body {
 .history-item span { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: .83rem; line-height: 1.4; }
 .history-item time { display: block; color: var(--ink-dim); font-size: .7rem; margin-top: .25rem; }
 .backstage__digest { flex: 0 1 auto; min-height: 0; max-height: 45%; overflow-y: auto; border-bottom: 1px solid #d5cec2; padding-bottom: .75rem; }
-.backstage__digest pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: .8rem; color: var(--ink); padding: 0 1rem; margin: 0; }
+.backstage__digest-body { font-size: .8rem; color: var(--ink); padding: 0 1rem; overflow-wrap: anywhere; }
+.backstage__digest-body .md__h { margin: 1rem 0 .35rem; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-dim); }
+.backstage__digest-body h5.md__h { text-transform: none; letter-spacing: 0; font-size: .85rem; color: var(--ink); margin-top: .8rem; }
+.backstage__digest-body .md__p { margin: .35rem 0; }
+.backstage__digest-body .md__ul, .backstage__digest-body .md__ol { margin: .35rem 0; padding-left: 1.2rem; }
+.backstage__digest-body a { color: var(--accent); }
 .history-transcript { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .history-transcript pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: .8rem; color: var(--ink); padding: 0 1rem; }
 .history-contributions { flex: 0 1 25%; overflow-y: auto; border-top: 1px solid #e5e0d8; padding-bottom: .75rem; }

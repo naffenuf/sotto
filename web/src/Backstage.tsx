@@ -1,4 +1,5 @@
 import type { CandidateLogLine, DecisionLogRecord, VerificationLogRecord } from "../../shared/candidates.js";
+import { Markdown } from "./MarkdownView.js";
 
 function label(value: string): string { return value.replaceAll("_", " "); }
 
@@ -10,12 +11,11 @@ function withoutTitle(digest: string): string {
 export function Backstage({ log, digest }: { log: CandidateLogLine[]; digest: string }) {
   const candidates = log.filter((entry) => entry.kind === "candidate");
   return <>
-    {/* `digest.md` as the session wrote it (V2-018). Shown as the text it is:
-        it is seven sections of markdown, which the card renderer — built for
-        a sentence and a list — has no headings for. */}
+    {/* `digest.md` as the session wrote it (V2-018), rendered through the
+        same markdown the cards use: seven `##` sections, lists and links. */}
     {digest.trim() !== "" && <section className="backstage__digest" aria-label="Session digest">
       <h2 className="panel__title">Digest</h2>
-      <pre data-testid="digest">{withoutTitle(digest)}</pre>
+      <div className="backstage__digest-body" data-testid="digest"><Markdown source={withoutTitle(digest)} /></div>
     </section>}
     <section className="backstage" aria-label="Backstage candidates">
     <h2 className="panel__title">What Sotto considered</h2>
