@@ -2119,3 +2119,16 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   follow-up that was dropped the run before, and "Sotto, not now" came back as `So not now` again,
   which only the barge-in's yield caught; the name is still the only way "not now" reaches
   steering.
+- **A cut-off answer stays raised, the claim names what it checks, and the holding line is
+  twelve words.** Three things the second solo run asked for. `SessionManager` lowers a research
+  card's hand on an `answer` record only when `yielded !== true`, so "not now" and, later,
+  "Sotto, go ahead" reads the answer the room cut off. The claim's wording is the classifier's
+  `topic`, so `question.md` and the schema description now ask for four to ten words naming
+  exactly what is being checked ("the cheapest Sunday bus from New York to Philadelphia"), never a
+  bare label — the code stayed `reserveLine(topic)`, because turning a direct question into the
+  object of "I'll check" needs the inversion undone ("how long is the drive" → "how long the
+  drive is") and a model does that where a string function cannot. And `firstline.md` /
+  `FIRST_LINE_MAX_WORDS` (14) make the holding line one short sentence saying where Sotto is
+  going and what for, with no name and no restating the question: "Craig, you want the travel
+  time for that New York to Philadelphia bus for your Sunday trip — let me pull the schedules"
+  followed by "Craig, about two to three hours" read as two calls, because it was.

@@ -27,7 +27,7 @@ export const FIRST_LINE_LABEL = "first_line";
  * Words of holding line. Two sentences of speech — long enough to orient the
  * room, short enough that the searched answer is not kept waiting behind it.
  */
-export const FIRST_LINE_MAX_WORDS = 40;
+export const FIRST_LINE_MAX_WORDS = 14;
 
 /**
  * Reasoning + output budget. Generous against a measured 150–210 reasoning
@@ -86,7 +86,7 @@ const firstLineJsonSchema = {
     line: {
       type: "string",
       description:
-        "One or two spoken sentences, at most 40 words, orienting the room while you look" +
+        "One short spoken sentence, at most twelve words, saying where you are going and what for" +
         " the answer up. No figures, dates, prices, quotes or any claim that depends on the" +
         " search. Empty string if there is nothing worth saying.",
     },

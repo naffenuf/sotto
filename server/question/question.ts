@@ -149,8 +149,9 @@ export async function classifyQuestion(
         topic: {
           type: "string",
           description:
-            "For open_question: three to five words naming it, as in \"I'll check the drive " +
-            "time\". Empty for every other kind.",
+            "For open_question: four to ten words naming exactly what is being checked, as the " +
+            "object of \"I'll check …\" — \"the cheapest Sunday bus from New York to Philadelphia\", " +
+            "never a bare label like \"New York Philadelphia buses\". Empty for every other kind.",
         },
         closing: {
           type: "boolean",

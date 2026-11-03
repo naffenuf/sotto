@@ -1767,9 +1767,11 @@ export class SessionManager {
         if (record.kind === "answer" && record.retrying !== true) {
           stillCurrent.forget(record.ideaId);
         }
-        // V3-017: an answer the room heard is no longer something Sotto is
-        // holding, so its research card lowers its hand.
-        if (record.kind === "answer" && record.spoken) {
+        // V3-017: an answer the room heard *in full* is no longer something
+        // Sotto is holding, so its research card lowers its hand. One a
+        // voice cut off stays raised: "not now" then, later, "Sotto, go
+        // ahead" should get it (`2026-11-03_1534-mic`).
+        if (record.kind === "answer" && record.spoken && record.yielded !== true) {
           const cardId = researchCardByIdea.get(record.ideaId);
           if (cardId !== undefined) this.lowerHand(info, deliveries, hand, cardId);
         }

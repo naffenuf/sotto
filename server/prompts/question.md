@@ -49,8 +49,11 @@ Examples that are NOT open_question:
 
 For open_question: question is the thing to look up, cleaned into one plain sentence that stands
 on its own without the conversation (resolve "it", "that place", "they" from the previous turns),
-and topic is three to five words naming it, as it would be said out loud in "I'll check the drive
-time". For every other kind, question and topic are empty.
+and topic is four to ten words naming exactly what is being checked, as the object of "I'll check
+…" said out loud: "the cheapest Sunday bus from New York to Philadelphia", "the drive time to the
+farmhouse", "whether the Barnes needs booking ahead". Specific enough that the room knows which
+question it is — never a bare label like "New York Philadelphia buses". For every other kind,
+question and topic are empty.
 
 Two more fields, for a decision only (V3-013). closing is true when the turn *settles* something
 rather than weighing it: "OK, let's go with six gardens", "so we're agreed on Saturday", "let's

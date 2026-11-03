@@ -56,9 +56,9 @@ it("passes the abort signal on, so an answer that gets there first stops it", as
 });
 
 it("keeps whole sentences when the line runs long", () => {
-  const sentence = `${Array.from({ length: 20 }, (_, at) => `word${at}`).join(" ")}.`;
+  const sentence = `${Array.from({ length: 6 }, (_, at) => `word${at}`).join(" ")}.`;
   const { line } = FirstLineSchema.parse({ line: `${sentence} ${sentence} ${sentence}` });
-  // Two fit inside forty words; the third is dropped rather than half-said.
+  // Two fit inside the budget; the third is dropped rather than half-said.
   expect(line).toBe(`${sentence} ${sentence}`);
 });
 
