@@ -1312,11 +1312,11 @@ describe("screenFromSpoken", () => {
 });
 
 describe("recentTurns", () => {
-  it("keeps the last ten minutes of conversation and drops what came before", () => {
+  it("keeps the last hour of conversation and drops what came before", () => {
     const turns = [
       turn({ turnId: "0:1", startMs: 0, endMs: 2_000 }),
-      turn({ turnId: "0:2", startMs: 9 * 60_000, endMs: 9 * 60_000 + 2_000 }),
-      turn({ turnId: "0:3", startMs: 12 * 60_000, endMs: null }),
+      turn({ turnId: "0:2", startMs: 30 * 60_000, endMs: 30 * 60_000 + 2_000 }),
+      turn({ turnId: "0:3", startMs: 72 * 60_000, endMs: null }),
     ];
     expect(recentTurns(turns).map((one) => one.turnId)).toEqual(["0:2", "0:3"]);
     expect(recentTurns([])).toEqual([]);

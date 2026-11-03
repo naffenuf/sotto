@@ -84,11 +84,15 @@ import { classifyCommand } from "./command.js";
 export const ANSWER_TRACK_LABEL = "answer";
 
 /**
- * How much of the conversation an answer is given: the last ten minutes of
- * final turns, as the PRD asks. A question means what it means in the
- * conversation it was asked in, and ten minutes is where that conversation is.
+ * How much of the conversation an answer is given verbatim: the last hour of
+ * final turns. The PRD asked for ten minutes, but the notes are lossy (twelve
+ * words an item, no speaker, no numbers unless they were decided) and an hour
+ * of talk is only ~18k tokens — small beside the reasoning and search tokens a
+ * searched answer spends — so a question about something said at minute 40
+ * is answered from what was said rather than from what the notes kept. An
+ * hour is also the realtime API's session limit.
  */
-export const ANSWER_CONTEXT_MS = 10 * 60_000;
+export const ANSWER_CONTEXT_MS = 60 * 60_000;
 
 /**
  * Reasoning + search + output budget for one answer. The model reasons,

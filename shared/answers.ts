@@ -39,7 +39,7 @@ export const ASK_QUESTION_MAX_CHARS = 500;
  *
  * Nothing else goes over the wire. Who asked is {@link TYPED_ASKER} by
  * definition, and the context the question is answered in — the board, the
- * last ten minutes of transcript — is the server's, not the tab's.
+ * last hour of transcript — is the server's, not the tab's.
  */
 export const AskRequestSchema = z.object({
   question: z.string().trim().min(1).max(ASK_QUESTION_MAX_CHARS),
