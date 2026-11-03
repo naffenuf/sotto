@@ -24,3 +24,21 @@ export function introducedNames(text: string): string[] {
   }
   return names;
 }
+
+/**
+ * Somebody correcting the name the room just heard: "No, that was EJ",
+ * "It's EJ", "Her name is EJ". Anchored at the start of the turn, like an
+ * introduction, and only ever applied by the caller to the *previous*
+ * speaker — the one who just introduced themselves and was misheard
+ * (`2026-11-03_0945-mic` heard "And I'm EJ" as "And I'm AJ", and Craig's
+ * "No, that was EJ" went nowhere).
+ */
+export function correctedName(text: string): string | null {
+  const match = text.trim().match(
+    /^(?:[Nn]o[,.!]?\s+|[Aa]ctually[,.!]?\s+|[Ss]orry[,.!]?\s+)?(?:[Tt]hat(?:['’]s| was| is)|[Ii]t(?:['’]s| was| is)|[Ss]he(?:['’]s| is)|[Hh]e(?:['’]s| is)|[Hh]er name is|[Hh]is name is|[Tt]heir name is)\s+([\p{Lu}][\p{L}\p{M}'’\-]{0,39})(?=$|[,.!?]|\s+(?:not|and|by the way|okay|so)\b)/u,
+  );
+  if (!match) return null;
+  const name = match[1];
+  if (!name || /^(?:A|An|The|Not|Fine|Good|Okay|OK|Right|True|Correct|Wrong|It|Sotto|Me|Him|Her|Them|Us|Why|What|When|Where|How|All|Done|Enough|Great|Nice)$/i.test(name)) return null;
+  return name;
+}

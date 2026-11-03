@@ -102,7 +102,7 @@ import { classifyFollowUp } from "../answer/followUp.js";
 import { OfferWindow, type OfferSubject } from "../research/OfferWindow.js";
 import { classifyOfferReply } from "../research/offerReply.js";
 import { Greeting } from "./Greeting.js";
-import { introducedNames } from "./speakerIntroductions.js";
+import { correctedName, introducedNames } from "./speakerIntroductions.js";
 import { ARTIFACTS_DIR, SessionStore, type SessionWriter } from "./SessionStore.js";
 // V3-007: a group going round in circles is offered a few ideas, and nothing
 // is said or shown unless somebody takes the offer up.
@@ -299,6 +299,9 @@ interface StoreSlot {
   artifacts: number;
 }
 
+/** How long after an introduction somebody else may correct the name heard. */
+export const NAME_CORRECTION_MS = 20_000;
+
 /** The model-driven loops a session runs, or nulls when it has no model. */
 interface ModelLoops {
   /** Shared Spark client for final-turn addressing (V2-008). */
@@ -310,6 +313,12 @@ interface ModelLoops {
   judgment: JudgmentRouter;
   /** Retired with the session so late classifications cannot restart speech. */
   address?: AddressWatcher;
+  /**
+   * The answer agent's way back to the address path (V3-017): a `continue`
+   * with nothing to continue is the room calling on the hand again. Filled in
+   * once the address watcher exists.
+   */
+  answerHooks: { callOn?: (turnId: string | null) => void };
   /**
    * What the room wondered aloud (V3-002), or `null` with no model client.
    *
@@ -964,6 +973,8 @@ export class SessionManager {
     const labelsMet = new Set<string>();
     /** Names introduced inside somebody else's turn, waiting for the voice they belong to. */
     const pendingIntroductions: string[] = [];
+    /** The label last named off its own introduction, for a correction by somebody else. */
+    let lastIntroduced: { label: string; atMs: number } | null = null;
     const barge = new BargeIn({
       clock,
       speaking: () => voice?.playback?.().playing === true || this.bus.voiceState().speaking,
@@ -1020,12 +1031,26 @@ export class SessionManager {
           // "I'm Craig. I'm EJ." can arrive as one turn under one label: the
           // first name is this speaker's and the rest wait for the next label
           // the session has not met — which is EJ, the moment she speaks alone.
+          // "No, that was EJ" from somebody else, inside twenty seconds of an
+          // introduction the transcription may have misheard: the name goes
+          // to the person who introduced themselves, not to the speaker.
+          const fix = correctedName(turn.text);
+          if (fix !== null && lastIntroduced !== null && lastIntroduced.label !== turn.speaker && clock.now() - lastIntroduced.atMs < NAME_CORRECTION_MS) {
+            this.logger.log(`[speakers] ${info.id} ${lastIntroduced.label} corrected to ${fix} by ${turn.speaker}`);
+            this.renameSpeaker(lastIntroduced.label, fix);
+            lastIntroduced = null;
+          }
           const [own, ...others] = introducedNames(turn.text);
           const unnamed = this.bus.speakerNames()[turn.speaker] === undefined;
           const unmet = !labelsMet.has(turn.speaker);
           labelsMet.add(turn.speaker);
-          if (own !== undefined && unnamed) this.renameSpeaker(turn.speaker, own);
-          else if (unmet && unnamed && pendingIntroductions.length > 0) this.renameSpeaker(turn.speaker, pendingIntroductions.shift() as string);
+          if (own !== undefined && unnamed) {
+            this.renameSpeaker(turn.speaker, own);
+            lastIntroduced = { label: turn.speaker, atMs: clock.now() };
+          } else if (unmet && unnamed && pendingIntroductions.length > 0) {
+            this.renameSpeaker(turn.speaker, pendingIntroductions.shift() as string);
+            lastIntroduced = { label: turn.speaker, atMs: clock.now() };
+          }
           pendingIntroductions.push(...others);
         }
         // V2-009: who is in the room, and when the room is quiet enough to
@@ -1060,19 +1085,26 @@ export class SessionManager {
         if (suppressTriggers || barge.owns(turn.turnId)) {
           wake.ignoreTurn(turn.turnId);
           loops.address?.remember(turn);
-          // Side talk and anything the barge-in owns are context for the next
-          // question (V3-002) without being a question themselves.
-          loops.questions?.ignoreTurn(turn.turnId);
-          loops.questions?.remember(turn);
-          // V3-014: the same for the follow-up window. A barge-in's own
-          // `new_question` is already on its way to the answer agent, which
-          // is what "a barge-in new_question counts as to_sotto" comes to.
-          loops.followUp?.ignoreTurn(turn.turnId);
-          loops.followUp?.remember(turn);
-          // V3-005: side talk is context for a reply to an offer without
-          // being one.
-          loops.offers?.ignoreTurn(turn.turnId);
-          loops.offers?.remember(turn);
+          // Only a *final* is written off: a partial that overlapped the end
+          // of Sotto's answer is sticky-suppressed, while its final may not
+          // be (`OVERLAP_SIDE_TALK_MS`), and the three ignores below are
+          // permanent — one on a partial kept a ten-second question to Sotto
+          // out of the follow-up window (`2026-11-03_0945-mic`).
+          if (turn.final) {
+            // Side talk and anything the barge-in owns are context for the
+            // next question (V3-002) without being a question themselves.
+            loops.questions?.ignoreTurn(turn.turnId);
+            loops.questions?.remember(turn);
+            // V3-014: the same for the follow-up window. A barge-in's own
+            // `new_question` is already on its way to the answer agent, which
+            // is what "a barge-in new_question counts as to_sotto" comes to.
+            loops.followUp?.ignoreTurn(turn.turnId);
+            loops.followUp?.remember(turn);
+            // V3-005: side talk is context for a reply to an offer without
+            // being one.
+            loops.offers?.ignoreTurn(turn.turnId);
+            loops.offers?.remember(turn);
+          }
         } else {
           wake.acceptTurn(turn);
           // V3-002: and whether the room just wondered something aloud. A
@@ -1263,6 +1295,7 @@ export class SessionManager {
       },
     });
     loops.address = address;
+    loops.answerHooks.callOn = (turnId) => address.callOn(turnId);
     return address;
   }
 
@@ -1320,6 +1353,7 @@ export class SessionManager {
         gate: null,
         policy: null,
         answers: null,
+        answerHooks: {},
         deliveries: new Map(),
         hand,
         research: null,
@@ -1842,11 +1876,13 @@ export class SessionManager {
     // Its own queue, on purpose: an answer must not wait behind a board
     // update, and the group must not wait for the board loop to let go of the
     // model (US-018).
+    const answerHooks: ModelLoops["answerHooks"] = {};
     const answers = new AnswerAgent({
       clock,
       model,
       logger: this.logger,
       onTiming,
+      onCallOn: (turnId) => answerHooks.callOn?.(turnId),
       // Said out loud as well as shown (V2-005). A hub with no page attached,
       // or a muted session, turns every utterance into `null` on its own, so
       // there is nothing to check here.
@@ -2048,7 +2084,7 @@ export class SessionManager {
         });
       },
     });
-    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
+    return { modelClient: model, judgment, board, observer, verifier, gate, policy, answers, answerHooks, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
   }
 
   /**

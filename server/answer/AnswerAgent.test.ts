@@ -24,6 +24,7 @@ import {
   AnswerAgent,
   cardForAnswer,
   recentTurns,
+  sameQuestion,
   renderAnswerRequest,
   screenFromSpoken,
 } from "./AnswerAgent.js";
@@ -198,6 +199,8 @@ interface Harness {
   briefings: string[][];
   /** Every steering command the room gave, in order (V3-006). */
   steers: [command: string, turnId: string | null][];
+  /** Turns whose `continue` had nothing to continue (V3-017). */
+  callOns: (string | null)[];
 }
 
 function harness(
@@ -231,6 +234,7 @@ function harness(
   const timing: Record<string, unknown>[] = [];
   const briefings: string[][] = [];
   const steers: [string, string | null][] = [];
+  const callOns: (string | null)[] = [];
   const agent = new AnswerAgent({
     clock,
     model,
@@ -252,6 +256,7 @@ function harness(
     ...(options.voice === undefined ? {} : { voice: options.voice }),
     onThinking: (value) => thinking.push(value),
     onSteer: (command, turnId) => steers.push([command, turnId]),
+    onCallOn: (turnId) => callOns.push(turnId),
     onModelState: (state, detail) => states.push([state, detail]),
     logger: {
       log: () => {},
@@ -274,6 +279,7 @@ function harness(
     timing,
     briefings,
     steers,
+    callOns,
   };
 }
 
@@ -662,6 +668,8 @@ describe("AnswerAgent out loud (V2-005)", () => {
     h.model.commands.push({ command: "continue", question: "" });
     h.agent.command({ question: "Sotto go on", askedBy: "A", turnId: "0:1" });
     await h.clock.settle();
+    // Nothing to continue: the room is calling on the hand (V3-017).
+    expect(h.callOns).toEqual(["0:1"]);
     h.model.commands.push({ command: "invented" });
     h.agent.command({ question: "Sotto stop", askedBy: "A", turnId: "0:2" });
     await h.clock.settle();
@@ -886,7 +894,10 @@ describe("AnswerAgent out loud (V2-005)", () => {
     await h.agent.flush();
     expect(h.records[0]?.spokenText).toBe(fullCase.trim());
     expect(voice.utterances.at(-1)?.text()).toBe(fullCase.trim());
-    expect(h.model.calls[0]?.system).toContain("Do not substitute a summary");
+    // The prompt caps speech at about eighty words, except when the room
+    // asked for the full case — which it just did.
+    expect(h.model.calls[0]?.system).toContain("under about eighty words");
+    expect(h.model.calls[0]?.system).toContain("asked for a full case");
   });
 
   it("takes its headline from the first spoken sentence when no screen half arrives", async () => {
@@ -1418,6 +1429,42 @@ describe("renderAnswerRequest", () => {
   it("says so when nothing has been transcribed", () => {
     const request = renderAnswerRequest(emptyBoard(), [], {}, cardAnswer({}));
     expect(request).toContain("_nothing has been transcribed yet_");
+  });
+});
+
+describe("sameQuestion", () => {
+  it("reads a repeat with different words as the same question", () => {
+    expect(sameQuestion(
+      "is there anything else we should consider for our trip?",
+      "is there anything else we should think about for our trip?",
+    )).toBe(true);
+    expect(sameQuestion("can you look up those bus schedules?", "look up the bus schedules")).toBe(true);
+  });
+
+  it("keeps different questions apart", () => {
+    expect(sameQuestion("what time is the bus?", "what price is the hotel?")).toBe(false);
+    expect(sameQuestion("go ahead", "go on")).toBe(false);
+  });
+});
+
+describe("a question repeated while the first is in flight", () => {
+  it("is skipped, and a typed repeat is not", async () => {
+    const h = harness();
+    const first = h.model.held();
+    const second = h.model.held();
+    h.agent.ask({ question: "is there anything else we should consider for our trip?", askedBy: "A", turnId: "0:1" });
+    h.agent.ask({ question: "is there anything else we should think about for our trip?", askedBy: "A", turnId: "0:2" });
+    h.agent.ask({ question: "is there anything else we should think about for our trip?", askedBy: null, turnId: null });
+    expect(h.agent.pending()).toBe(2);
+    first.answer(reply({ text: "Return bus\n\nDetail" }));
+    await microtasks();
+    second.answer(reply({ text: "Return bus again\n\nDetail" }));
+    await h.clock.settle();
+    expect(h.timing).toContainEqual(expect.objectContaining({ stage: "answer_repeat", turnId: "0:2" }));
+    expect(h.records.map((record) => record.question)).toEqual([
+      "is there anything else we should consider for our trip?",
+      "is there anything else we should think about for our trip?",
+    ]);
   });
 });
 

@@ -2027,3 +2027,22 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   where `calledOnCardLine` reads an answer card's `spokenText` rather than its bullets. Typed
   questions and `continue` are never late. The lexical fallback's loose openers are
   `did/do/does/can/could/would` only: "Sotto has been quiet today" is a mention.
+- **Five things from the second trip-planning run (`2026-11-03_0945-mic`).** (1) A turn that
+  *began* in the last second of Sotto's answer and ran ten seconds past it was sticky-marked as
+  overlap, and the suppress branch's `ignoreTurn`s are permanent sets — so a real follow-up never
+  reached the follow-up window (`turns: 0` on close). `SessionTranscription` now decides a final's
+  `suppressTriggers` by `suppressesTriggers()`: playing now, or began during playback *and* shorter
+  than `OVERLAP_SIDE_TALK_MS` (3 s); partials keep the sticky flag for the wake indicator; and
+  `SessionManager` calls the three permanent ignores only on finals. (2) Speech was the slowness:
+  a 1,500-character spoken answer is 80 s at 16.8 chars/s, so `answer.md` caps the spoken half at
+  about eighty words unless a full case was asked for. (3) "Go ahead, Sotto" waited 5.5 s for a
+  classifier and the room said it again, which arrived as a barge-in on the card and became a
+  `continue` with nothing to continue: `isCallOnPhrase` (`withoutName` + `CALL_ON_PHRASE`,
+  "go ahead/go on/go for it" only, the name stripped) answers a `call_on` lexically while the hand
+  is up, with no early check, and `AnswerAgent.onCallOn` routes a stray `continue` back to the hand
+  through `ModelLoops.answerHooks`. (4) The same question asked twice seven seconds apart was
+  answered twice: `sameQuestion` (three quarters of the shorter's words in the longer, name
+  removed) skips a spoken repeat of a question in flight (`answer_repeat`); a typed repeat is
+  deliberate. (5) "And I'm EJ" was heard as "AJ" and "No, that was EJ" went nowhere:
+  `correctedName` reads a correction off the front of a turn and `SessionManager` applies it to
+  the label that last introduced itself, within `NAME_CORRECTION_MS` (20 s), never to the speaker.

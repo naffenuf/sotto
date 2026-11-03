@@ -38,6 +38,7 @@
  * the first sentence exists ({@link chooseAcknowledgment}), and a muted Sotto
  * skips all of it and behaves exactly as the core build did.
  */
+import { DEFAULT_WAKE_SPELLINGS } from "../wake.js";
 import {
   ANSWER_LATE_MS,
   SCREEN_HEADING_TEXT,
@@ -195,6 +196,11 @@ export interface AskedQuestion {
 export interface AnswerAgentOptions {
   /** The session's clock — simulated for a replay, real for a live session. */
   clock: Clock;
+  /**
+   * A `continue` with nothing to continue (V3-017): the room said "go on"
+   * over a card being read out, so it is calling on the hand again.
+   */
+  onCallOn?: (turnId: string | null) => void;
   model: ModelClient;
   /** The board as it stands, which is the question's context (US-009). */
   board: () => Board;
@@ -330,6 +336,8 @@ export class AnswerAgent {
   private commands: Promise<void> = Promise.resolve();
   /** A newer interruption supersedes a command still being classified. */
   private commandVersion = 0;
+  /** The question being answered, for {@link ask}'s repeat check. */
+  private runningQuestion: string | undefined;
 
   /** V2-007: yields the floor immediately, including during acknowledgment or socket opening. */
   interrupt(): Promise<number | null> {
@@ -389,7 +397,13 @@ export class AnswerAgent {
         if (this.running !== undefined) await this.running;
         if (this.stopped || version !== this.commandVersion) return;
         if (command.command === "continue") {
-          if (this.interrupted === undefined) return;
+          // "Sotto, go ahead" said over a card being read out (V3-017) is
+          // classified as `continue`, and there is no answer to continue: it
+          // is the room calling on the raised hand again.
+          if (this.interrupted === undefined) {
+            this.options.onCallOn?.(asked.turnId);
+            return;
+          }
           this.ask({ ...asked, question: "Continue from where you were cut off.", resume: true });
         } else {
           this.ask({ ...asked, question: command.question });
@@ -427,6 +441,22 @@ export class AnswerAgent {
     if (this.stopped) return;
     const question = asked.question.trim();
     if (question === "") return;
+    // The same question again while the first is still being answered: a
+    // room repeats itself when Sotto is slow ("Sotto, is there anything else
+    // we should consider?" … "Sotto, is there anything else we should think
+    // about?" seven seconds apart, `2026-11-03_0945-mic`), and answering
+    // twice is the worse outcome. A typed repeat is deliberate and goes in.
+    if (asked.turnId !== null && asked.resume !== true) {
+      const inFlight = [this.runningQuestion, ...this.queue.map((one) => one.answer.question)];
+      const same = inFlight.find((other) => other !== undefined && sameQuestion(question, other));
+      if (same !== undefined) {
+        this.logger.log(`[answer] skipping a repeat of a question in flight: ${question}`);
+        this.options.onTiming?.({
+          stage: "answer_repeat", atMs: this.clock.now(), turnId: asked.turnId, question, of: same,
+        });
+        return;
+      }
+    }
     this.asked += 1;
     const answer: Answer = {
       id: `ans-${this.asked}`,
@@ -481,10 +511,12 @@ export class AnswerAgent {
       return;
     }
     this.options.onModelState?.("connecting", `answering "${next.answer.question}"`);
+    this.runningQuestion = next.answer.question;
     // Registered on the clock before `ask` returns, so a `max`-speed replay
     // does not run past a question it has only just heard.
     const running = this.answer(next).finally(() => {
       this.running = undefined;
+      this.runningQuestion = undefined;
       this.pump();
     });
     this.running = running;
@@ -1295,4 +1327,24 @@ function stamp(offsetMs: number): string {
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Whether two spoken questions are the same question: three quarters of the
+ * shorter one's words are in the longer. "is there anything else we should
+ * consider for our trip" and "… think about for our trip" are one question;
+ * "what time is the bus" and "what price is the hotel" are not.
+ */
+export function sameQuestion(a: string, b: string): boolean {
+  const words = (text: string): Set<string> =>
+    new Set(
+      (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(
+        (word) => !DEFAULT_WAKE_SPELLINGS.includes(word),
+      ),
+    );
+  const [small, large] = [words(a), words(b)].sort((x, y) => x.size - y.size) as [Set<string>, Set<string>];
+  if (small.size < 3) return false;
+  let shared = 0;
+  for (const word of small) if (large.has(word)) shared += 1;
+  return shared / small.size >= 0.75;
 }

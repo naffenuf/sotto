@@ -456,6 +456,25 @@ describe("being called on (V3-017)", () => {
     }));
   });
 
+  it("reads 'go ahead' off the words while something is raised, with no call", async () => {
+    const t = setup(async () => ({ kind: "request", question: "should never be asked" }), 1);
+    t.watcher.acceptTurn(turn("Go ahead, Soto."));
+    await t.watcher.flush();
+    await t.clock.settle();
+    expect(t.calls).toEqual([]);
+    expect(t.calledOn).toEqual([{ turnId: "0:1", speaker: "A", question: "" }]);
+    expect(t.timing).toContainEqual(expect.objectContaining({ stage: "address", kind: "call_on", lexical: true }));
+    expect(t.questions).toEqual([]);
+  });
+
+  it("asks the classifier about 'go ahead' when nothing is raised", async () => {
+    const t = setup(async () => ({ kind: "mention", question: "" }), 0);
+    t.watcher.acceptTurn(turn("Sotto, go ahead"));
+    await t.watcher.flush();
+    expect(t.calls).toHaveLength(1);
+    expect(t.calledOn).toEqual([]);
+  });
+
   it("tells the classifier how many things Sotto is holding", async () => {
     const t = setup(async () => ({ kind: "call_on", question: "" }), 3);
     t.watcher.acceptTurn(turn("Soto anything"));

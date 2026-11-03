@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { introducedName, introducedNames } from "./speakerIntroductions.js";
+import { correctedName, introducedName, introducedNames } from "./speakerIntroductions.js";
 
 describe("self-introductions", () => {
   it.each([
@@ -26,5 +26,22 @@ describe("two introductions in one turn", () => {
   it("still refuses what a single introduction refuses", () => {
     expect(introducedNames("I'm Craig. I'm happy to help. Jordan said I'm Alex.")).toEqual(["Craig"]);
     expect(introducedNames("I'm planning a workshop.")).toEqual([]);
+  });
+});
+
+describe("a name corrected by somebody else", () => {
+  it("reads the correction off the front of the turn", () => {
+    expect(correctedName("No, that was EJ. Okay. So we're planning our trip")).toBe("EJ");
+    expect(correctedName("It's EJ, not AJ.")).toBe("EJ");
+    expect(correctedName("Her name is Priya")).toBe("Priya");
+    expect(correctedName("Actually that's Jordan")).toBe("Jordan");
+  });
+
+  it("does not read ordinary sentences as corrections", () => {
+    expect(correctedName("That was fine")).toBeNull();
+    expect(correctedName("It's Thursday then")).toBeNull();
+    expect(correctedName("No, that was the plan all along")).toBeNull();
+    expect(correctedName("She's right about the bus")).toBeNull();
+    expect(correctedName("I think that was EJ")).toBeNull();
   });
 });

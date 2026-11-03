@@ -37,6 +37,15 @@ export interface SessionTranscriptionOptions {
   onHuman?: (turn: TurnUpdate, record: AsrFrameRecord, duringPlayback: boolean) => void;
 }
 
+/**
+ * A turn that began while Sotto was talking is side talk only if it was
+ * short. One that starts in the last second of an answer and runs on for ten
+ * more ("Okay, can you tell us, do we need to book ahead for the Barnes
+ * Museum?", `2026-11-03_0945-mic`) is the room talking to Sotto, and marking
+ * it as overlap kept it from the follow-up window and the question watcher.
+ */
+export const OVERLAP_SIDE_TALK_MS = 3_000;
+
 /** Keeps echo out of every consumer, including answer context and raw captures. */
 export class SessionTranscription {
   private readonly assembler: TurnAssembler;
@@ -94,7 +103,7 @@ export class SessionTranscription {
       this.pending.delete(turn.turnId);
       if (!pending.selfEcho) {
         this.finals.push(turn);
-        this.options.onUpdate(turn, pending.duringPlayback);
+        this.options.onUpdate(turn, suppressesTriggers(turn, pending, playback));
       }
     } else if (!pending.held) {
       this.options.onUpdate(turn, pending.duringPlayback);
@@ -149,4 +158,17 @@ export class SessionTranscription {
     }
     if (count > 0) this.frames = this.frames.slice(count);
   }
+}
+
+/**
+ * Whether a final turn counts as said over Sotto: it ended while Sotto was
+ * still talking, or it began then and was over within
+ * {@link OVERLAP_SIDE_TALK_MS}. Partials keep the sticky flag, which is what
+ * keeps the wake indicator down while Sotto speaks.
+ */
+function suppressesTriggers(turn: TurnUpdate, pending: PendingTurn, playback: SpeechPlayback): boolean {
+  if (playback.playing) return true;
+  if (!pending.duringPlayback) return false;
+  const length = (turn.endMs ?? turn.startMs) - turn.startMs;
+  return length < OVERLAP_SIDE_TALK_MS;
 }

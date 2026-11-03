@@ -51,7 +51,7 @@
 import type { SpeakerNames } from "../../shared/events.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import { systemClock, type Clock } from "../clock.js";
-import { detect, detectsAddress, questionAfterName } from "../wake.js";
+import { DEFAULT_WAKE_SPELLINGS, detect, detectsAddress, questionAfterName } from "../wake.js";
 import type { WakeTrigger } from "../wakeWatcher.js";
 import { AddressSchema, type AddressClassifier } from "./address.js";
 
@@ -59,6 +59,33 @@ import { AddressSchema, type AddressClassifier } from "./address.js";
 export const ADDRESS_ARM_MS = 8_000;
 /** A slow classifier must not leave the room indefinitely waiting. */
 export const ADDRESS_TIMEOUT_MS = 6_000;
+
+/**
+ * What the room says to hear what Sotto is holding (V3-017), read off the
+ * words after the name: "Sotto, go ahead", "go on, Sotto". "What have you got" is left to the
+ * classifier: it is the start of many questions. Only consulted while something *is* raised; "go ahead" with the
+ * hand down is whatever the classifier says it is.
+ */
+export const CALL_ON_PHRASE = /^(?:(?:ok(?:ay)?|yes|yeah|sure|right)[,.]?\s+)?(?:go ahead|go on|go for it)[\s.?!]*$/i;
+
+/**
+ * The turn with Sotto's name taken out of it, for {@link CALL_ON_PHRASE}:
+ * "Go ahead, Sotto." and "Sotto, go ahead" are the same invitation, and
+ * `questionAfterName` reads the first as empty.
+ */
+export function withoutName(text: string): string {
+  return text
+    .replace(/[\p{L}\p{N}']+/gu, (word) => (DEFAULT_WAKE_SPELLINGS.includes(word.toLowerCase()) ? "" : word))
+    .replace(/\s+([,.:;!?])/gu, "$1")
+    .replace(/^[\s,.:;!?-]+|[\s,.:;!?-]+$/gu, "")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+}
+
+/** Whether this turn is the room calling on the hand, read off the words. */
+export function isCallOnPhrase(text: string): boolean {
+  return CALL_ON_PHRASE.test(withoutName(text));
+}
 /**
  * Words after the name that are enough to tell what the turn is doing.
  *
@@ -223,6 +250,9 @@ export class AddressWatcher {
     if (this.early.has(turn.turnId)) return;
     const text = turn.text.trim();
     if (text === "") return;
+    // "Sotto, go ahead" with something raised is read off the words at the
+    // final; an early check would be a model call for nothing.
+    if ((this.options.raised?.() ?? 0) > 0 && isCallOnPhrase(text)) return;
     if (wordsOf(questionAfterName(text)).length >= ADDRESS_EARLY_WORDS) {
       this.unwatch(turn.turnId);
       this.startEarly(turn);
@@ -257,6 +287,12 @@ export class AddressWatcher {
     // Tracked like the finals, so a max-speed replay waits for it rather than
     // running the conversation past a question it has only just heard.
     void this.options.clock.track("address", result);
+  }
+
+  /** The room called on the hand by another route (a `continue` over a card being read). */
+  callOn(turnId: string | null): void {
+    if (this.stopped) return;
+    this.options.onCallOn?.({ turnId: turnId ?? "", speaker: null, question: "" });
   }
 
   /** Forgets whatever is in flight for one turn: an echo, a command, or Stop. */
@@ -308,7 +344,22 @@ export class AddressWatcher {
     this.listeningTurns.add(turn.turnId);
     this.publishListening();
     const started = this.wall.now();
-    let result = await this.decide(turn, previous, started);
+    // V3-017: "Sotto, go ahead" while something is raised needs no model —
+    // the phrase is fixed and the five seconds a classification can take
+    // (measured 5.5 s on `2026-11-03_0945-mic`) is long enough for the room
+    // to say it again, which then arrives as a barge-in on the card.
+    let result: AddressResult | null =
+      (this.options.raised?.() ?? 0) > 0 && isCallOnPhrase(turn.text)
+        ? { kind: "call_on", question: "" }
+        : null;
+    const lexical = result !== null;
+    if (lexical) {
+      this.abandon(turn.turnId);
+      this.options.onTiming({
+        stage: "address_lexical", atMs: this.options.clock.now(), turnId: turn.turnId, kind: "call_on",
+      });
+    }
+    result ??= await this.decide(turn, previous, started);
     this.listeningTurns.delete(turn.turnId);
     if (this.stopped || this.ignored.has(turn.turnId)) return;
     let fallback = false;
@@ -327,7 +378,7 @@ export class AddressWatcher {
     }
     this.options.onTiming({
       stage: "address", atMs: this.options.clock.now(), turnId: turn.turnId,
-      kind: result.kind, latencyMs: this.wall.now() - started, fallback,
+      kind: result.kind, latencyMs: this.wall.now() - started, fallback, ...(lexical ? { lexical } : {}),
     });
     // A bare name read as a call on Sotto (V3-017) arms the speaker too: the
     // transcription cannot tell "Sotto?" from "Sotto" and the next few

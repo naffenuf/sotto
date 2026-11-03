@@ -7,7 +7,7 @@ import type { AsrFrameRecord } from "../../shared/asr.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import type { SpeechPlayback } from "../voice/selfEcho.js";
 import { SimulatedClock } from "../clock.js";
-import { SessionTranscription } from "./SessionTranscription.js";
+import { OVERLAP_SIDE_TALK_MS, SessionTranscription } from "./SessionTranscription.js";
 
 function setup() {
   const clock = new SimulatedClock(0);
@@ -131,6 +131,27 @@ describe("the session's echo boundary", () => {
     t.start(2, "Sotto, can you");
     t.playback({ playing: false, recent: [] });
     t.end(2, "Sotto, can you explain tomorrow's parking arrangements?");
+    expect(t.updates.at(-1)?.suppressed).toBe(true);
+  });
+
+  it("does not write off a long turn that only began as Sotto was finishing", () => {
+    // 2026-11-03_0945-mic: "Okay, can you tell us, do we need to book ahead for
+    // the Barnes Museum?" started in the last second of an answer and ran ten
+    // seconds past it; its final is the room talking to Sotto, not side talk.
+    const t = setup();
+    t.playback(speech);
+    t.start(1, "Okay can you");
+    t.playback({ playing: false, recent: [] });
+    t.clock.advanceBy(OVERLAP_SIDE_TALK_MS + 2_000);
+    t.end(1, "Okay, can you tell us, do we need to book ahead for the Barnes Museum?");
+    expect(t.updates.at(-1)?.suppressed).toBe(false);
+
+    // A short one over the end of the answer is still side talk.
+    t.playback(speech);
+    t.start(2, "yeah");
+    t.playback({ playing: false, recent: [] });
+    t.clock.advanceBy(500);
+    t.end(2, "yeah right");
     expect(t.updates.at(-1)?.suppressed).toBe(true);
   });
 
