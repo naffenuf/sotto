@@ -1,0 +1,159 @@
+{
+  "lines": [
+    {
+      "speaker": "B",
+      "text": "Okay, it's running.",
+      "pauseAfterMs": 10000
+    },
+    {
+      "speaker": "A",
+      "text": "Mm-hm.",
+      "pauseAfterMs": 9000
+    },
+    {
+      "speaker": "B",
+      "text": "Hi, I'm Craig.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "And I'm EJ.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "B",
+      "text": "Okay. So, we're three weeks out from the launch workshop. Today I want to settle the venue, the start time, and tickets.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Venue's easy. The makerspace said yes, and the grant covers the room. One thing, though: it caps at thirty people. Fire code, so that's a hard thirty, not a soft one.",
+      "pauseAfterMs": 1400
+    },
+    {
+      "speaker": "B",
+      "text": "Thirty's fine. Thirty kits is what the grant covers anyway.",
+      "pauseAfterMs": 900
+    },
+    {
+      "speaker": "A",
+      "text": "I want the Bend crowd to come, though. Half the mailing list is out there.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Is Bend really drivable for a Saturday morning? How long is the drive from Portland, actually?",
+      "pauseAfterMs": 1300
+    },
+    {
+      "speaker": "A",
+      "text": "Three hours? Four? I did it once in the snow and never again.",
+      "pauseAfterMs": 1900
+    },
+    {
+      "speaker": "B",
+      "text": "If it's over three, nobody's coming for a nine o'clock start.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Then start at eleven and feed them.",
+      "pauseAfterMs": 1700
+    },
+    {
+      "speaker": "B",
+      "text": "Eleven works. Lunch is more money, but fine.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "A",
+      "text": "So eleven, lunch, and we say so in the invite.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "B",
+      "text": "Next, the mechanic. Dana said three hundred for the afternoon, which is fine.",
+      "pauseAfterMs": 700
+    },
+    {
+      "speaker": "A",
+      "text": "Good. And tickets. I say we open fifty, the Bend people alone will take twenty.",
+      "pauseAfterMs": 800
+    },
+    {
+      "speaker": "B",
+      "text": "Fifty. Okay. Free, or five bucks?",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Five bucks. It cuts the no-shows in half.",
+      "pauseAfterMs": 1600
+    },
+    {
+      "speaker": "B",
+      "text": "Five it is. I'll set the page up tonight and send the invite Friday.",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "A",
+      "text": "Friday. And put the kit list on the page, so people know what they're building.",
+      "pauseAfterMs": 1700
+    },
+    {
+      "speaker": "B",
+      "text": "Will do. Which ticketing thing, though?",
+      "pauseAfterMs": 1000
+    },
+    {
+      "speaker": "A",
+      "text": "Sotto, what does Eventbrite charge per ticket on a five dollar event?",
+      "pauseAfterMs": 5500
+    },
+    {
+      "speaker": "B",
+      "text": "Sotto, hold on, we'll read it after.",
+      "pauseAfterMs": 1800
+    },
+    {
+      "speaker": "A",
+      "text": "Last thing. Who's at the door with the sign-in sheet?",
+      "pauseAfterMs": 1500
+    },
+    {
+      "speaker": "B",
+      "text": "I'll grab a volunteer. Sotto, wrap us up.",
+      "pauseAfterMs": 7000
+    }
+  ],
+  "wakeQuestions": [
+    {
+      "line": 21,
+      "question": "what does Eventbrite charge per ticket on a five dollar event?"
+    }
+  ],
+  "moments": [
+    {
+      "id": "bend-drive-time",
+      "type": "research_hook",
+      "setupLines": [
+        7
+      ],
+      "triggerLine": 8,
+      "deadlineLine": 13,
+      "expectedLevel": "research",
+      "description": "EJ wants the Bend mailing list to come (line 7). At line 8 Craig wonders aloud how long the Portland to Bend drive really is, and at line 9 EJ guesses three or four hours. The room plans the start time around the guess through line 13, so the real figure (about three hours) is wanted before they settle on eleven and lunch. This is the V3 path: the classifier takes the question, Sotto claims it at the first gap, and speaks the answer at a later one."
+    },
+    {
+      "id": "capacity-contradiction",
+      "type": "contradiction",
+      "setupLines": [
+        5
+      ],
+      "triggerLine": 15,
+      "deadlineLine": 20,
+      "expectedLevel": "interject",
+      "description": "EJ states the makerspace room is capped at thirty by fire code, a hard limit (line 5), and Craig plans thirty kits on it (line 6). At line 15 EJ proposes opening fifty tickets and Craig accepts it at line 16; by line 18 the ticket page and the Friday invite are being set up on fifty. Nobody notices the cap they stated nine lines earlier."
+    }
+  ]
+}
