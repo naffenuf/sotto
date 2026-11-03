@@ -331,9 +331,18 @@ export class VoiceHub implements VoiceOut {
         this.playback();
         this.bus.setVoice({ ...this.bus.voiceState(), playing: true });
         return;
-      case "position":
+      case "position": {
         this.speaker?.notePlayedMs(frame.playedMs);
+        // So the stage can light the words up as they are heard (every
+        // report, 200 ms apart; the bus dedupes nothing here, but a voice
+        // event is a few hundred bytes).
+        const voice = this.bus.voiceState();
+        const heardChars = this.speaker?.spokenSoFar().length ?? 0;
+        if (voice.utteranceId === frame.id && voice.heardChars !== heardChars) {
+          this.bus.setVoice({ ...voice, heardChars });
+        }
         return;
+      }
       case "ended":
         this.speaker?.notePlayedMs(frame.playedMs);
         // Played out to the end of everything ElevenLabs sent: every character was heard.

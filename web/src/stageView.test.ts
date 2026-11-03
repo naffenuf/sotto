@@ -195,7 +195,13 @@ describe("nowState", () => {
 
   it("is speaking while an utterance is open, with what has been said so far", () => {
     const voice = { speaking: true, playing: true, utteranceId: "voice-1", text: "On the drive time:" };
-    expect(nowState({ ...quiet, voice })).toEqual({ kind: "speaking", text: "On the drive time:", playing: true });
+    expect(nowState({ ...quiet, voice })).toEqual({
+      kind: "speaking",
+      text: "On the drive time:",
+      heardChars: 0,
+      playing: true,
+    });
+    expect(nowState({ ...quiet, voice: { ...voice, heardChars: 7 } })).toMatchObject({ heardChars: 7 });
   });
 
   it("shows the newest card on its way", () => {

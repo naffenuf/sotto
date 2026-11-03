@@ -140,7 +140,7 @@ export function nextTrayDueAt(cards: readonly StageCardView[], now: number): num
  * thing on the room's mind, and the answer card, when it comes, lands below.
  */
 export type NowState =
-  | { kind: "speaking"; text: string; playing: boolean }
+  | { kind: "speaking"; text: string; heardChars: number; playing: boolean }
   | { kind: "working"; card: StageCard }
   | { kind: "waiting"; line: WaitingLine; behind: number }
   | { kind: "listening"; named: boolean; inConversation: boolean };
@@ -153,7 +153,12 @@ export function nowState(input: {
   inConversation: boolean;
 }): NowState {
   if (input.voice.speaking) {
-    return { kind: "speaking", text: input.voice.text, playing: input.voice.playing };
+    return {
+      kind: "speaking",
+      text: input.voice.text,
+      heardChars: input.voice.heardChars ?? 0,
+      playing: input.voice.playing,
+    };
   }
   if (input.listening) {
     return { kind: "listening", named: !input.inConversation, inConversation: input.inConversation };

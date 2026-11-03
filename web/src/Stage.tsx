@@ -97,7 +97,9 @@ export function Stage({
             <p className="zone__label">
               <span>Holding</span>
               <small>
-                <span data-testid="raised-hand-count">{held.length}</span>
+                <span className="zone__count" data-testid="raised-hand-count" key={held.length}>
+                  {held.length}
+                </span>
                 {held.length === 1 ? " thing" : " things"} · {CALL_ON_HINT}, or open one
                 {onSeenAll !== undefined && (
                   <>

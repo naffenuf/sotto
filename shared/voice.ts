@@ -91,6 +91,12 @@ export interface VoiceState {
   utteranceId: string | null;
   /** What Sotto is saying, as far as it has been written. */
   text: string;
+  /**
+   * How much of {@link text} the room has actually heard, in characters,
+   * read off the synthesis alignment at the page's last playback report.
+   * Absent until the first report; the stage lights the words up with it.
+   */
+  heardChars?: number;
 }
 
 /** Nothing is being said. */

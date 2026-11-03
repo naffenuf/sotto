@@ -38,7 +38,9 @@ const WAITING_LABEL: Record<string, string> = {
 export function Now({ state, session, turnCount, live, speakers, onStopVoice }: NowProps) {
   return (
     <div className="now" data-testid="now" data-state={state.kind} data-idle={session === null ? "true" : undefined}>
-      {state.kind === "speaking" && <Speaking text={state.text} playing={state.playing} onStop={onStopVoice} />}
+      {state.kind === "speaking" && (
+        <Speaking text={state.text} heardChars={state.heardChars} playing={state.playing} onStop={onStopVoice} />
+      )}
       {state.kind === "working" && <Working card={state.card} />}
       {state.kind === "waiting" && <Waiting line={state.line} behind={state.behind} />}
       {state.kind === "listening" && (
@@ -59,7 +61,21 @@ function Pulse() {
   return <span className="now__pulse" aria-hidden="true" />;
 }
 
-function Speaking({ text, playing, onStop }: { text: string; playing: boolean; onStop?: (() => void) | undefined }) {
+function Speaking({
+  text,
+  heardChars,
+  playing,
+  onStop,
+}: {
+  text: string;
+  heardChars: number;
+  playing: boolean;
+  onStop?: (() => void) | undefined;
+}) {
+  // The words the room has heard, and the ones still to come: the split is
+  // the synthesis alignment's, at a word boundary so a word never lights up
+  // half way through.
+  const at = wordBoundary(text, Math.min(heardChars, text.length));
   return (
     // The old `voice-speaking` indicator, in its new place: the checks that
     // wait for `data-playing="true"` read it here.
@@ -69,7 +85,14 @@ function Speaking({ text, playing, onStop }: { text: string; playing: boolean; o
         Speaking
       </p>
       <p className="now__words" data-testid="now-words">
-        {text === "" ? <span className="now__ahead">…</span> : text}
+        {text === "" ? (
+          <span className="now__ahead">…</span>
+        ) : (
+          <>
+            <span className="now__heard" data-testid="now-heard">{text.slice(0, at)}</span>
+            <span className="now__ahead">{text.slice(at)}</span>
+          </>
+        )}
       </p>
       {onStop !== undefined && (
         <button type="button" className="now__stop" data-testid="voice-stop" onClick={onStop}>
@@ -180,4 +203,13 @@ function speakerText(label: string | null, speakers: SpeakerNames): string {
   if (label === null) return "";
   if (label === SOTTO_SPEAKER) return `${SOTTO_SPEAKER}:`;
   return `${speakers[label] ?? label}:`;
+}
+
+/** The last word boundary at or before `at`, so a word lights up whole. */
+export function wordBoundary(text: string, at: number): number {
+  if (at >= text.length) return text.length;
+  if (at <= 0) return 0;
+  if (text[at] === " ") return at;
+  const space = text.lastIndexOf(" ", at);
+  return space === -1 ? 0 : space;
 }
