@@ -70,6 +70,52 @@ describe("model-assisted addressing", () => {
     }));
   });
 
+  it("keeps a verdict that arrives after the deadline, and asks the question then", async () => {
+    let release = (_value: unknown): void => {};
+    const t = setup(() => new Promise((resolve) => { release = resolve; }));
+    // No question word and no auxiliary after the name: the word rule reads
+    // this as a mention when the model is late, and the model is late.
+    t.watcher.acceptTurn(turn("Soto look up the bus times for Sunday"));
+    await Promise.resolve();
+    t.wall.advanceBy(ADDRESS_TIMEOUT_MS);
+    await t.watcher.flush();
+    expect(t.timing).toContainEqual(expect.objectContaining({ stage: "address", kind: "mention", fallback: true }));
+    expect(t.questions).toEqual([]);
+
+    t.wall.advanceBy(2_000);
+    release({ kind: "request", question: "look up the bus times for Sunday" });
+    await t.clock.settle();
+    expect(t.questions).toEqual([{ turnId: "0:1", speaker: "A", question: "look up the bus times for Sunday" }]);
+    expect(t.timing).toContainEqual(expect.objectContaining({
+      stage: "address_late", kind: "request", latencyMs: ADDRESS_TIMEOUT_MS + 2_000,
+    }));
+  });
+
+  it("does not ask twice when the fallback had already read the request", async () => {
+    let release = (_value: unknown): void => {};
+    const t = setup(() => new Promise((resolve) => { release = resolve; }));
+    t.watcher.acceptTurn(turn("Soto what are the bus times for Sunday"));
+    await Promise.resolve();
+    t.wall.advanceBy(ADDRESS_TIMEOUT_MS);
+    await t.watcher.flush();
+    expect(t.questions).toHaveLength(1);
+    release({ kind: "request", question: "what are the bus times for Sunday" });
+    await t.clock.settle();
+    expect(t.questions).toHaveLength(1);
+  });
+
+  it("ignores a late verdict that agrees it was a mention, or that fails", async () => {
+    let release = (_value: unknown): void => {};
+    const t = setup(() => new Promise((resolve) => { release = resolve; }));
+    t.watcher.acceptTurn(turn("Soto has been quiet today"));
+    await Promise.resolve();
+    t.wall.advanceBy(ADDRESS_TIMEOUT_MS);
+    await t.watcher.flush();
+    release({ kind: "mention", question: "" });
+    await t.clock.settle();
+    expect(t.questions).toEqual([]);
+  });
+
   it("never classifies Sotto's own transcript line (V2-008a)", async () => {
     const t = setup(async () => ({ kind: "request", question: "anything" }));
     t.watcher.acceptTurn(
@@ -164,14 +210,16 @@ describe("model-assisted addressing", () => {
     expect(t.listening.at(-1)).toBe(false);
   });
 
-  it("falls back after six seconds, aborts transport and ignores a late model result", async () => {
+  it("falls back after six seconds, keeps the call going, and ignores a late duplicate", async () => {
     let release = (_value: unknown): void => {};
     const t = setup(() => new Promise((resolve) => { release = resolve; }));
     t.watcher.acceptTurn(turn("Sotto, what is the price?"));
     await Promise.resolve();
     t.wall.advanceBy(ADDRESS_TIMEOUT_MS);
     await t.watcher.flush();
-    expect(t.signals[0]?.aborted).toBe(true);
+    // The deadline hands the turn to the word rule; the model's verdict is
+    // still wanted, so the call is not cancelled.
+    expect(t.signals[0]?.aborted).toBe(false);
     expect(t.questions).toHaveLength(1);
     expect(t.timing.at(-1)).toMatchObject({ latencyMs: ADDRESS_TIMEOUT_MS, fallback: true });
     release({ kind: "request", question: "duplicate" });

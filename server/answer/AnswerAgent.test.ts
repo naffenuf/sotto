@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Answer, AnswerLogRecord } from "../../shared/answers.js";
+import { ANSWER_LATE_MS, type Answer, type AnswerLogRecord } from "../../shared/answers.js";
 import { emptyBoard, type Board } from "../../shared/board.js";
 import type { StageCard } from "../../shared/cards.js";
 import type { SpeakerNames } from "../../shared/events.js";
@@ -712,6 +712,46 @@ describe("AnswerAgent out loud (V2-005)", () => {
     expect(record?.spokenSoFar).toBeUndefined();
     // And the card carries the spoken half for "transcript of answer".
     expect(h.cards.at(-1)?.spokenText).toBe(SAID);
+  });
+
+  it("answers a question that reaches it late on the screen only, hand raised", async () => {
+    const { h, voice } = spoken([
+      async (call) => {
+        for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    // The question ended at 0 and the address check only let it through
+    // eleven seconds later (a slow classifier): a voice starting up now would
+    // be an interruption, so the answer is a card with the hand up instead.
+    h.wall.advanceBy(ANSWER_LATE_MS + 1_000);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2", heardAtMs: 0 });
+    await h.clock.settle();
+
+    expect(voice.utterances).toEqual([]);
+    expect(h.timing).toContainEqual(expect.objectContaining({ stage: "answer_late", answerId: "ans-1" }));
+    const last = h.cards.at(-1);
+    expect(last).toMatchObject({ variant: "answer", state: "ready", raised: true });
+    // Still written to be heard, which is what "Sotto, go ahead" reads out.
+    expect(last?.spokenText ?? "").not.toBe("");
+    // A hand up for a card that only says "thinking" would be asking the room
+    // to wait on it: the first push is not raised.
+    expect(h.cards[0]?.raised).toBeUndefined();
+    expect(h.records[0]).toMatchObject({ late: true, ackMs: null, firstAudioMs: null });
+  });
+
+  it("speaks a question that reaches it in time, however it was classified", async () => {
+    const { h, voice } = spoken([
+      async (call) => {
+        for (const text of STREAM) call.onText?.({ itemId: ANSWER_ITEM, text });
+        return reply({ text: STREAM.at(-1) as string });
+      },
+    ]);
+    h.wall.advanceBy(ANSWER_LATE_MS - 1_000);
+    h.agent.ask({ question: "what do rivals charge?", askedBy: "A", turnId: "0:2", heardAtMs: 0 });
+    await h.clock.settle();
+    expect(voice.utterances.length).toBeGreaterThan(0);
+    expect(h.cards.at(-1)?.raised).toBeUndefined();
   });
 
   it("logs what the room waited from the end of the question to the first sound", async () => {

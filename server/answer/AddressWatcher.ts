@@ -274,6 +274,9 @@ export class AddressWatcher {
     this.settling.delete(turnId);
   }
 
+  /** Verdicts still on their way after the deadline handed a turn to the fallback. */
+  private readonly lateVerdicts = new Map<string, Promise<AddressResult>>();
+
   /** The real time `speechEnd` arrived, kept for the few turns still open. */
   private noteSpeechEnd(turnId: string): void {
     if (this.heard.has(turnId)) return;
@@ -318,6 +321,9 @@ export class AddressWatcher {
       this.options.onTiming({
         stage: "address_fallback", atMs: this.options.clock.now(), turnId: turn.turnId,
       });
+      this.keepLateVerdict(turn, result, started);
+    } else {
+      this.lateVerdicts.delete(turn.turnId);
     }
     this.options.onTiming({
       stage: "address", atMs: this.options.clock.now(), turnId: turn.turnId,
@@ -406,35 +412,79 @@ export class AddressWatcher {
     });
   }
 
-  /** One classification, bounded by real time. Never rejects. */
+  /**
+   * One classification, bounded by real time. Never rejects.
+   *
+   * The deadline does not cancel the call: it hands the turn to the lexical
+   * fallback *now* and keeps the model's verdict for when it comes. A slow
+   * API answered "request" at second eight on `2026-11-03_0915-mic`, after
+   * the word rule had already read the turn as a mention, and the verdict was
+   * thrown away — the room asked and nothing happened. {@link lateVerdicts}
+   * holds it for {@link classify} to pick up.
+   */
   private async run(
     turn: TurnUpdate,
     previous: readonly TurnUpdate[],
     controller: AbortController,
   ): Promise<AddressResult | null> {
     const cancelled = new Promise<never>((_resolve, reject) => {
-      controller.signal.addEventListener("abort", () => reject(new Error("address cancelled or timed out")),
+      controller.signal.addEventListener("abort", () => reject(new Error("address cancelled")),
         { once: true });
     });
-    const cancelTimeout = this.wall.setTimeout(() => controller.abort(), ADDRESS_TIMEOUT_MS);
+    let cancelTimeout = (): void => {};
+    const timedOut = new Promise<null>((resolve) => {
+      cancelTimeout = this.wall.setTimeout(() => resolve(null), ADDRESS_TIMEOUT_MS);
+    });
+    const verdict = this.options
+      .classify(
+        {
+          turn,
+          previous,
+          speakers: this.options.speakers(),
+          raised: this.options.raised?.() ?? 0,
+        },
+        controller.signal,
+      )
+      .then((value) => AddressSchema.parse(value));
     try {
-      return AddressSchema.parse(await Promise.race([
-        this.options.classify(
-          {
-            turn,
-            previous,
-            speakers: this.options.speakers(),
-            raised: this.options.raised?.() ?? 0,
-          },
-          controller.signal,
-        ),
-        cancelled,
-      ]));
+      const result = await Promise.race([verdict, cancelled, timedOut]);
+      if (result === null) this.lateVerdicts.set(turn.turnId, verdict);
+      return result;
     } catch {
       return null;
     } finally {
       cancelTimeout();
     }
+  }
+
+  /**
+   * Acts on a verdict that arrived after the deadline (see {@link run}): a
+   * request the fallback did not see becomes the question it was. Anything
+   * else — the fallback already asked it, the model agrees it was a mention,
+   * the call failed — changes nothing.
+   */
+  private keepLateVerdict(turn: TurnUpdate, fallback: AddressResult, startedAtMs: number): void {
+    const verdict = this.lateVerdicts.get(turn.turnId);
+    this.lateVerdicts.delete(turn.turnId);
+    if (verdict === undefined || fallback.kind === "request") return;
+    const late = verdict.then(
+      (result) => {
+        if (this.stopped || this.ignored.has(turn.turnId)) return;
+        if (result.kind !== "request") return;
+        this.options.onTiming({
+          stage: "address_late", atMs: this.options.clock.now(), turnId: turn.turnId,
+          kind: result.kind, latencyMs: this.wall.now() - startedAtMs,
+        });
+        const heardAtMs = this.heard.get(turn.turnId);
+        this.heard.delete(turn.turnId);
+        this.options.onQuestion({
+          turnId: turn.turnId, speaker: turn.speaker, question: result.question,
+          ...(heardAtMs === undefined ? {} : { heardAtMs }),
+        });
+      },
+      () => {},
+    );
+    void this.options.clock.track("address", late);
   }
 
   private arm(turn: TurnUpdate, speaker: string, arrivedAt: number): void {

@@ -2015,3 +2015,15 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `is/are/should`) for the fallback only. Every Spark call in that session was slow — board
   updates 16–44 s, both 6 s classifier deadlines hit — so when a live run goes quiet, read
   `timing.jsonl`'s `latencyMs` and `fallback: true` before reading the prompts.
+- **A late answer is a hand up, not a voice starting.** Two rules, both from the same morning's
+  session. `AddressWatcher`'s six-second deadline (`ADDRESS_TIMEOUT_MS`) no longer *cancels* the
+  classification: it hands the turn to the word rule at once and keeps the model's verdict in
+  `lateVerdicts`; a `request` arriving afterwards that the fallback read as a mention is asked
+  then (`address_late` in `timing.jsonl`), and one the fallback already asked is dropped as a
+  duplicate. And `AnswerAgent` compares the question's `heardAtMs` (else the `ask()` wall time)
+  with now when it *starts* an answer: past `ANSWER_LATE_MS` (10 s, `shared/answers.ts`) the
+  answer is `late` — no acknowledgment, no holding line, no voice — and `cardForAnswer` sets
+  `raised` once it is past "thinking", which puts it in Holding and in the `RaisedHand` queue,
+  where `calledOnCardLine` reads an answer card's `spokenText` rather than its bullets. Typed
+  questions and `continue` are never late. The lexical fallback's loose openers are
+  `did/do/does/can/could/would` only: "Sotto has been quiet today" is a mention.

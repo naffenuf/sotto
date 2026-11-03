@@ -90,12 +90,13 @@ const QUESTION_OPENERS: ReadonlySet<string> = new Set([
  * fallback only (V2-008's six-second classifier timeout). "Sotto, did you
  * look up any of the things we were talking about" came back with no comma
  * and was read as a mention when the classifier timed out
- * (`2026-11-03_0915-mic`). Deliberately without "is"/"are"/"should": "Sotto is
- * being too chatty" and "Sotto should stay quiet" are about Sotto, and those
- * are what the `no-wake` fixture is made of.
+ * (`2026-11-03_0915-mic`). Deliberately without "is"/"are"/"should"/"has"/
+ * "will": "Sotto is being too chatty", "Sotto should stay quiet" and "Sotto
+ * has been quiet today" are about Sotto, and those are what the `no-wake`
+ * fixture is made of.
  */
 const LOOSE_QUESTION_OPENERS: ReadonlySet<string> = new Set([
-  "did", "do", "does", "can", "could", "would", "will", "have", "has", "may", "might",
+  "did", "do", "does", "can", "could", "would",
 ]);
 
 /** Punctuation that ends a sentence, so that what follows starts one. */

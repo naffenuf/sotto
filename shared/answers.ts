@@ -66,6 +66,12 @@ export const answerStatuses = ["thinking", "done", "error"] as const;
 export type AnswerStatus = (typeof answerStatuses)[number];
 
 /** One answer, at whatever stage it has reached. */
+/**
+ * How long after the question was heard an answer may still open its voice.
+ * Past this it is shown and raised rather than said: see {@link Answer.late}.
+ */
+export const ANSWER_LATE_MS = 10_000;
+
 export interface Answer {
   /** `ans-1`, `ans-2`: unique within the session. */
   id: string;
@@ -102,6 +108,14 @@ export interface Answer {
    * to be heard, and the record should say what would have been said.
    */
   spokenText: string;
+  /**
+   * The answer started more than {@link ANSWER_LATE_MS} after the question
+   * was heard — a slow classification, a queue — so it was not spoken: a
+   * voice starting up that long after the question is an interruption, not
+   * a reply. The card goes up with the hand raised instead, and "Sotto, go
+   * ahead" reads it out (V3-017).
+   */
+  late?: true;
   /**
    * The question arriving to the acknowledgment's first audio, in **real**
    * milliseconds; `null` when nothing was acknowledged out loud.

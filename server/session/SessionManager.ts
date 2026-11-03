@@ -1870,6 +1870,9 @@ export class SessionManager {
       // until the next one starts, not only while it is running: a question
       // typed after Stop (US-019) must put its answer somewhere.
       onCard: (card, answer) => {
+        // V3-017: an answer that came too late to be said is held like
+        // anything else Sotto has not said, and "Sotto, go ahead" reads it.
+        if (card.raised === true) hand.observe(card, calledOnCardLine(card), clock.now());
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
         onTiming({ stage: "answer_card", atMs: clock.now(), answerId: answer.id, status: answer.status, hasHeadline: answer.headline !== "", latencyMs: answer.latencyMs, published: this.last?.sessionId === info.id });
       },

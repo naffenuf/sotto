@@ -47,6 +47,19 @@ describe("the line one raised card is read out in", () => {
     );
   });
 
+  it("reads a late answer in the half that was written to be heard", () => {
+    expect(
+      calledOnCardLine(
+        card("card-ans-1", {
+          variant: "answer",
+          headline: "Buses leave hourly from 7",
+          detailMd: "- Hourly 07:00–22:00\n- $18 one way",
+          spokenText: "Buses run hourly from seven in the morning, and a one-way ticket is about eighteen dollars.",
+        }),
+      ),
+    ).toBe("Buses run hourly from seven in the morning, and a one-way ticket is about eighteen dollars.");
+  });
+
   it("says the headline alone when there is no detail", () => {
     expect(calledOnCardLine(card("card-1"))).toBe(
       "Before six gardens: what if only one signs up?",

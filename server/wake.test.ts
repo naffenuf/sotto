@@ -90,6 +90,7 @@ describe("detect", () => {
     // Talking about Sotto is still not asking it, loose or not.
     expect(detect("Sotto is being too chatty", { looseQuestions: true }).triggered).toBe(false);
     expect(detect("Sotto should stay quiet", { looseQuestions: true }).triggered).toBe(false);
+    expect(detect("Sotto has been quiet today", { looseQuestions: true }).triggered).toBe(false);
   });
 
   it("takes the spellings it is given", () => {

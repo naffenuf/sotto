@@ -39,6 +39,7 @@
  * skips all of it and behaves exactly as the core build did.
  */
 import {
+  ANSWER_LATE_MS,
   SCREEN_HEADING_TEXT,
   SPOKEN_HEADING_TEXT,
   TYPED_ASKER,
@@ -513,7 +514,26 @@ export class AnswerAgent {
     // Filled in as the model draws (US-020), so a diagram can be on the stage
     // while the sentence under it is still being written.
     const artifacts: Artifact[] = [];
-    const speech = this.speech(queued);
+    // A late start is answered on the screen only (shared/answers.ts,
+    // `Answer.late`): no acknowledgment, no holding line, no voice. The
+    // question's `speechEnd` is the honest origin where there is one (a live
+    // spoken question); a typed or replayed one counts from `ask()`.
+    const heardAtWallMs = asked.heardAtMs ?? queued.askedAtWallMs;
+    const late =
+      asked.turnId !== null &&
+      asked.resume !== true &&
+      this.wallClock.now() - heardAtWallMs > ANSWER_LATE_MS;
+    if (late) {
+      answer.late = true;
+      this.logger.log(
+        `[answer] ${answer.id} is late (${Math.round(this.wallClock.now() - heardAtWallMs)} ms after the question): screen only, hand raised`,
+      );
+      this.options.onTiming?.({
+        stage: "answer_late", atMs: this.clock.now(), answerId: answer.id, turnId: asked.turnId,
+        afterMs: this.wallClock.now() - heardAtWallMs,
+      });
+    }
+    const speech = late ? undefined : this.speech(queued);
     this.activeSpeech = speech;
     // V2-015: the research this session has done is context for every
     // question, and when the question is *asking* for it the packets it is
@@ -539,7 +559,7 @@ export class AnswerAgent {
     // silence after somebody says Sotto's name reads as "it didn't hear me".
     // A briefing has nothing to wait for, so it says something real instead
     // ({@link briefingOpener}) rather than acknowledging and then pausing.
-    if (!asked.resume && briefing.length === 0) {
+    if (!asked.resume && briefing.length === 0 && !late) {
       speech?.acknowledge(chooseAcknowledgment(answer.question));
     }
 
@@ -556,7 +576,7 @@ export class AnswerAgent {
     /** Everything the room hears, which is the holding line and then the answer. */
     const aloud = (): string =>
       firstLineText === "" ? spokenText : `${firstLineText} ${spokenText}`;
-    const wantsFirstLine = briefing.length > 0 || this.wantsFirstLine(queued);
+    const wantsFirstLine = !late && (briefing.length > 0 || this.wantsFirstLine(queued));
     // A briefing's opening line is written here rather than by a model: the
     // findings are already in hand, so the only thing left to wait for is the
     // voice, and that is what makes it the fastest answer Sotto gives.
@@ -1123,6 +1143,9 @@ export function cardForAnswer(answer: Answer): StageCard {
     ...(answer.error === undefined || answer.error === ""
       ? {}
       : { message: answer.error }),
+    // Raised once there is something to read out: a hand up for a card that
+    // still says "thinking" would be asking the room to wait on it.
+    ...(answer.late === true && answer.status !== "thinking" ? { raised: true } : {}),
   };
 }
 

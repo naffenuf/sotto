@@ -120,6 +120,11 @@ export class RaisedHand {
  * audio would cost the only thing being asked for.
  */
 export function calledOnCardLine(card: StageCard): string {
+  // An answer that was never said (`Answer.late`) carries the half that was
+  // written to be heard; that is the line, not the headline and the bullets.
+  if (card.variant === "answer" && (card.spokenText ?? "").trim() !== "") {
+    return card.spokenText?.trim() ?? "";
+  }
   const headline = spokenText(card.headline);
   const detail = spokenText(card.detailMd ?? "");
   if (headline === "") return detail === "" ? "" : sentence(detail);
