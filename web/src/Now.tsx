@@ -200,7 +200,7 @@ export function Attention({ mode }: { mode: AttentionMode }) {
   if (mode === "stopped") {
     return (
       <p className="attention attention--stopped" data-testid="wake-stopped" role="status">
-        Sotto is no longer listening — say its name to ask
+        Back to taking notes — say “Sotto” to ask again
       </p>
     );
   }

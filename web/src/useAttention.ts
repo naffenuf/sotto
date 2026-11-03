@@ -3,9 +3,10 @@
  *
  * `listening` while somebody is addressing it by name, `conversation` while
  * the follow-up window is open, and — for a few seconds after either ends —
- * `stopped`, so the room sees that it has to say the name again rather than
- * finding out by being ignored. Nothing at all once that has faded, and
- * nothing when a session ends.
+ * `stopped`: back to taking notes, say the name to ask again. Not "not
+ * listening": Sotto is still transcribing everything; what ended is the
+ * window in which a line needs no name. Nothing at all once that has faded,
+ * and nothing when a session ends.
  */
 import { useEffect, useRef, useState } from "react";
 
