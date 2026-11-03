@@ -45,7 +45,7 @@ import {
  * the stylesheet (`.card--<variant>` sets `--kind`), so a reader can tell an
  * answer from an interjection from across a table without reading it.
  */
-const KIND_LABEL: Record<CardVariant, string> = {
+export const KIND_LABEL: Record<CardVariant, string> = {
   answer: "Answer",
   interject: "Noticed",
   glow: "Quiet note",
@@ -119,6 +119,12 @@ export interface CardProps {
    * arrives already open was not opened by anybody.
    */
   onOpen?: ((card: StageCard) => void) | undefined;
+  /**
+   * Whether the room heard this one: said out loud, or cut off part way.
+   * Drawn in the head beside the kind, so the Said zone can tell a spoken
+   * answer from a screen-only one at a glance.
+   */
+  spoken?: "spoken" | "interrupted" | null | undefined;
 }
 
 export function Card({
@@ -127,6 +133,7 @@ export function Card({
   onQuoteClick,
   onFeedback,
   onOpen,
+  spoken = null,
 }: CardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded || card.forward === true);
   // V2-015: somebody asked for this research, so it opens where it stands —
@@ -180,6 +187,11 @@ export function Card({
     >
       <div className="card__head">
         <Kind card={card} />
+        {spoken !== null && (
+          <span className="card__spoken-mark" data-testid="card-spoken-mark" data-spoken={spoken}>
+            <span aria-hidden="true">🔊</span> {spoken === "interrupted" ? "spoken · cut off" : "spoken"}
+          </span>
+        )}
         {isCollapsible(card.variant) && (
           // A card the reader opened keeps a way back, so the stage can go quiet again.
           <button

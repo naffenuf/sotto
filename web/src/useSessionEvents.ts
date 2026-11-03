@@ -11,6 +11,7 @@ import type {
   StatusChannel,
   StatusUpdate,
   TurnUpdate,
+  WaitingLine,
 } from "../../shared/index.js";
 import { defaultSettings, emptyBoard } from "../../shared/index.js";
 import { foldCard, type StageCardView } from "./stageView.js";
@@ -95,6 +96,12 @@ export interface SessionEventsState {
    * the stage shows in a collapsed tray under the cards.
    */
   suppressed: SuppressedCandidate[];
+  /**
+   * What Sotto has ready and is waiting for a gap to say, next first — the
+   * stage's "waiting for a gap" state. Empty the moment the line is handed
+   * to the voice, when `voice.speaking` takes over.
+   */
+  waiting: WaitingLine[];
 }
 
 function idle(channel: StatusChannel): StatusUpdate {
@@ -123,6 +130,7 @@ const initial: SessionEventsState = {
   inConversation: false,
   settings: defaultSettings(),
   suppressed: [],
+  waiting: [],
 };
 
 /**
@@ -187,7 +195,7 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
       // and nobody is mid-question across either boundary — which is also what
       // takes the indicator down if a session ends while a turn is still open.
       return event.session === null
-        ? { ...state, session: null, listening: false, inConversation: false }
+        ? { ...state, session: null, listening: false, inConversation: false, waiting: [] }
         : {
             ...state,
             session: event.session,
@@ -205,6 +213,7 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
             // has it: a session starting clears them, one ending leaves the
             // tray up to read.
             suppressed: [],
+            waiting: [],
           };
     case "speakers":
       return { ...state, speakers: event.speakers };
@@ -226,6 +235,8 @@ function apply(state: SessionEventsState, event: ServerEvent): SessionEventsStat
       return { ...state, cards: withCard(state.cards, event.card) };
     case "suppressed":
       return { ...state, suppressed: event.suppressed };
+    case "waiting":
+      return { ...state, waiting: event.lines };
     case "board":
       return {
         ...state,

@@ -1978,3 +1978,21 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   estimate reads, is re-measured at 16.8 (was 19.6): change the voice or the speed and both that
   constant and `scripts/measure-hello.ts`'s budget (22 s now, "about" read as two seconds either
   way) need a fresh render.
+
+- **The stage is three zones, and the raised hand is the middle one.** `Stage.tsx` lays out
+  **Now** (`web/src/Now.tsx`: what Sotto is doing this second), **Holding** (the raised cards as
+  one-line buttons, V3-017's count moved out of the header) and **Said** (the old card stack,
+  with a `🔊 spoken` mark). `nowState()` in `stageView.ts` is pure and ranks the four states:
+  `speaking` (`voice.speaking`, words from `voice.text`) > somebody addressing Sotto (the
+  `wake` event) > `working` (the newest `thinking` card — an answer being written or a question
+  being looked up) > `waiting` (the first line of the new **`waiting`** bus event) > listening,
+  with the live partial faded through. The `waiting` event is `Reservations.onWaiting`, called
+  from one `changed()` at the end of `review()`, in `stop()` and on the overtaken branch — it is
+  empty the moment a line is handed to the voice, because what is being *said* is the `voice`
+  event's. The bus remembers it and clears it on a session event either way, so the snapshot is
+  **twelve** events plus one per card. Three selectors moved and kept their test ids:
+  `voice-speaking` (with `data-playing`), `wake-listening` (with `data-in-conversation`) and
+  `session-state` all live inside `[data-testid="now"]` now, and `raised-hand` is the Holding
+  zone (`data-count`, `raised-hand-count`, rows `held-card`, `raised-hand-clear` for "seen").
+  A held card opened from Holding mounts fresh in Said, so `opened` (exposed by
+  `useRaisedHand`) is passed as `defaultExpanded` — otherwise a glow would land collapsed again.

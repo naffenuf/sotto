@@ -9,7 +9,8 @@
  */
 import { useRef } from "react";
 import { Card } from "./Card.js";
-import { RaisedHand, useRaisedHand } from "./RaisedHand.js";
+import { Now } from "./Now.js";
+import { useRaisedHand } from "./RaisedHand.js";
 import { Stage } from "./Stage.js";
 import { QUIET_TRAY_MS, type StageCardView } from "./stageView.js";
 import type { StageCard } from "../../shared/index.js";
@@ -437,9 +438,6 @@ export function DevCards() {
       <header className="header">
         <h1 className="brand">Sotto</h1>
         <p className="dev__title">/dev/cards — every variant and state</p>
-        {/* V3-017: three of the stage's cards are held and not said, and two
-            more have aged into the tray and so no longer count. */}
-        <RaisedHand cards={hand.cards} onOpenAll={hand.openAll} />
         <a className="dev__back" href="/">
           back to the app
         </a>
@@ -451,10 +449,24 @@ export function DevCards() {
           and what the policy held back is collapsed under both (V3-016).
         </p>
         <div className="dev__stage" data-testid="dev-stage">
+          {/* V3-017: three of the stage's cards are held and not said, and
+              two more have aged into the tray; they show in Holding. */}
           <Stage
             cards={stageCards}
             almostSaid={almostSaid}
+            held={hand.cards}
+            opened={hand.opened}
+            onSeenAll={hand.openAll}
             onOpen={(card) => hand.open(card.id)}
+            now={
+              <Now
+                state={{ kind: "listening", named: false, inConversation: false }}
+                session={{ id: "dev", source: { kind: "events", fixture: "brainstorm" }, startedAtMs: 0 }}
+                turnCount={12}
+                live={{ turnId: "dev:1", speaker: "A", text: "so if we open fifty tickets the Bend people alone will take", final: false, startMs: 0, endMs: null, speakerMappingUncertain: false }}
+                speakers={{ A: "Craig" }}
+              />
+            }
           />
         </div>
       </section>

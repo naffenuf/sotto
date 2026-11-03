@@ -1666,6 +1666,8 @@ export class SessionManager {
       // unprompted contribution" is inside the window too, not only the
       // fifteen seconds after the record is written.
       onSaying: () => steering.noteContribution(),
+      // What is waiting for a gap, so the stage can show it before it is said.
+      onWaiting: (lines) => this.bus.setWaiting(lines),
       onRecord: (record) => {
         onTiming({ ...record });
         // V3-006: everything said here unprompted opens the fifteen-second

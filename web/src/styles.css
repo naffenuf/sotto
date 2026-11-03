@@ -80,45 +80,12 @@ body {
   flex-wrap: wrap;
 }
 
-/* V3-017: Sotto has something it has not said. Quiet, and the only thing in
-   the header that is accented — a hand up at the back of the room. */
-.raised-hand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  background: #fdf3e3;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.raised-hand:hover {
-  border-color: var(--ink);
-}
-
-.raised-hand__mark {
-  font-size: 0.95rem;
-  line-height: 1;
-}
-
-.raised-hand__count {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
 .controls {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.voice-status { display: flex; align-items: center; gap: .65rem; color: var(--ink); font-size: .9rem; margin-bottom: 1rem; }
-.voice-status__dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--ok); }
-.voice-status button { border: 1px solid #d5cec2; border-radius: .4rem; background: var(--surface); color: var(--ink); font: inherit; padding: .3rem .65rem; cursor: pointer; }
 
 .controls__label {
   font-size: 0.875rem;
@@ -396,17 +363,15 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 1rem;
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.5rem 2rem 2rem;
 }
 
 .stage__hint {
   margin: 0;
-  max-width: 32rem;
-  text-align: center;
   color: var(--ink-dim);
 }
 
@@ -415,36 +380,6 @@ body {
   max-width: 32rem;
   text-align: center;
   color: var(--bad);
-}
-
-/* Somebody is mid-question to Sotto (US-017). Same three breathing dots as a
-   thinking card, because it is the same promise: an answer is coming. */
-.stage__listening {
-  display: inline-flex;
-  align-items: center;
-  align-self: center;
-  gap: 0.25rem;
-  margin: 0;
-  color: var(--accent);
-  font-size: 0.9375rem;
-}
-
-/* V3-014: the same indicator, in its own style, while the follow-up window
-   is open — Sotto is listening because it just answered, not because somebody
-   said its name, and the room should be able to tell those apart at a glance. */
-.stage__listening--conversation {
-  color: var(--ok);
-  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
-  border-radius: 999px;
-  padding: 0.125rem 0.625rem;
-  background: color-mix(in srgb, var(--ok) 8%, transparent);
-}
-
-.stage__listening-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: 0.125rem;
 }
 
 /* ---- Board panel (US-010) ---- */
@@ -595,12 +530,6 @@ body {
   flex-direction: column;
 }
 
-/* An empty stage centres its hint; a full one stacks from the top. */
-.stage:has(.stage__cards) {
-  place-items: stretch;
-  align-content: start;
-  justify-items: center;
-}
 
 .stage__cards,
 .stage__tray-cards {
@@ -1348,4 +1277,281 @@ body {
   color: var(--ink-dim);
   font-size: 0.8125rem;
   font-style: normal;
+}
+
+/* ---- The stage's three zones: Now, Holding, Said ---- */
+.zone {
+  width: 100%;
+  max-width: 46rem;
+}
+
+.zone__label {
+  margin: 0 0 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.zone__label small {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.zone__seen {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Now: what Sotto is doing this second. The one thing on the stage that
+   moves, so each state has its own colour and its own breathing dot. */
+.now {
+  min-height: 8rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid #e5e0d8;
+  border-radius: 1rem;
+  --now: var(--ink-dim);
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.now > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.now__state {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9375rem;
+  color: var(--now);
+}
+
+.now__pulse {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--now);
+  animation: now-breathe 2.4s ease-in-out infinite;
+}
+
+.now__kind {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--now) 11%, transparent);
+}
+
+.now__text {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.now__sub {
+  margin: 0;
+  color: var(--ink-dim);
+}
+
+.now__live {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+
+.now__live-speaker {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.now__cursor::after {
+  content: "▍";
+  margin-left: 0.1rem;
+  color: var(--accent);
+  animation: now-blink 1s steps(2) infinite;
+}
+
+.now[data-state="listening"] {
+  background: transparent;
+  border-style: dashed;
+  --now: var(--ok);
+}
+
+/* No session: nothing to hear, so the dot is grey and still. */
+.now[data-idle="true"] {
+  --now: var(--ink-dim);
+}
+
+.now[data-idle="true"] .now__pulse {
+  animation: none;
+}
+
+.now__state--addressed {
+  --now: var(--accent);
+  font-weight: 600;
+}
+
+.now__state--conversation {
+  --now: var(--ok);
+}
+
+.now[data-state="working"] {
+  --now: #4d6b5a;
+  border-color: color-mix(in srgb, #4d6b5a 40%, transparent);
+}
+
+.now[data-state="working"] .now__pulse {
+  animation-duration: 1.2s;
+}
+
+.now__progress {
+  height: 3px;
+  margin-top: 0.25rem;
+  border-radius: 2px;
+  background: #ece7df;
+  overflow: hidden;
+}
+
+.now__progress i {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: var(--now);
+  animation: now-slide 1.6s ease-in-out infinite;
+}
+
+.now[data-state="waiting"] {
+  --now: var(--accent);
+  background: #fdf8ef;
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.now[data-state="waiting"] .now__pulse {
+  animation-duration: 1.6s;
+}
+
+.now[data-state="speaking"] {
+  --now: #3f5f86;
+  border-color: #3f5f86;
+  border-left-width: 4px;
+}
+
+.now[data-state="speaking"] .now__pulse {
+  animation-duration: 0.8s;
+}
+
+.now__words {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.45;
+}
+
+.now__ahead {
+  color: #b8b2a8;
+}
+
+.now__stop {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid #d5cec2;
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  cursor: pointer;
+}
+
+.now__stop:hover {
+  border-color: var(--ink);
+}
+
+@keyframes now-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.55; }
+}
+
+@keyframes now-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+
+@keyframes now-blink {
+  50% { opacity: 0; }
+}
+
+/* Holding: the raised hand as the things themselves, one line each. */
+.holding {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.held {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid #e5e0d8;
+  border-left: 3px solid var(--kind);
+  border-radius: 0.75rem;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+}
+
+.held:hover {
+  border-color: #d5cec2;
+  border-left-color: var(--kind);
+}
+
+.held__line {
+  flex: 1 1 20rem;
+}
+
+.held__note {
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+}
+
+/* Said: a spoken card says so beside its kind. */
+.card__spoken-mark {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.card__head .card__collapse {
+  margin-left: auto;
 }

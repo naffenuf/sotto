@@ -54,6 +54,7 @@
  * into the transcript, and the claim is over. Being talked over while saying
  * "I'll check that" is the room telling Sotto it has the floor back.
  */
+import type { WaitingLine } from "../../shared/events.js";
 import { isSottoTurn, sottoTurn, type PauseState, type TurnUpdate } from "../../shared/turns.js";
 // The fourth kind of line is V3-008's: one correction, at boldness `bold`,
 // said under exactly the rules an answer is. See `correctionLine` and
@@ -240,6 +241,12 @@ export interface ReservationsOptions {
    * the record this writes afterwards covers the fifteen seconds after it.
    */
   onSaying?: () => void;
+  /**
+   * The queue changed: what is waiting for a gap, next first. The stage shows
+   * the first of them as "waiting for a gap", so the room can see that Sotto
+   * has something before it says it.
+   */
+  onWaiting?: (lines: WaitingLine[]) => void;
   windowMs?: number;
   logger?: Logger;
 }
@@ -781,6 +788,7 @@ export class Reservations {
     if (waiting !== undefined) {
       this.waiting = this.waiting.filter((line) => line !== waiting);
       this.skip(waiting, "overtaken");
+      this.changed();
       return;
     }
     const claim = this.claimed.get(ideaId);
@@ -885,13 +893,17 @@ export class Reservations {
     this.disarm();
     const stranded = this.waiting;
     this.waiting = [];
+    this.changed();
     for (const line of stranded) this.skip(line, "session_ended");
     this.utterance?.cancel();
   }
 
   /** Looks at everything waiting, and arms the next look. */
   private review(): void {
-    if (this.stopped || this.waiting.length === 0) return;
+    if (this.stopped || this.waiting.length === 0) {
+      this.changed();
+      return;
+    }
     const nowMs = this.clock.now();
     const pause = this.options.pauseState();
     const free = this.options.answering?.() !== true;
@@ -942,7 +954,20 @@ export class Reservations {
       said = true;
     }
     this.waiting = keep;
+    this.changed();
     this.schedule(nowMs, pause);
+  }
+
+  /** Tells the stage what is waiting, next first (the `waiting` event). */
+  private changed(): void {
+    this.options.onWaiting?.(
+      this.waiting.map((line) => ({
+        kind: line.kind,
+        text: line.text,
+        sinceMs: line.sinceMs,
+        ...(line.asked === true ? { asked: true } : {}),
+      })),
+    );
   }
 
   /** Whether this line has waited too long, and what the log calls that. */

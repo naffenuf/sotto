@@ -78,12 +78,20 @@ const thinkingAnimation = await page
 
 const bodyBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-// The stage sample: three cards on it, two glows already in the tray.
+// The stage sample: three cards Sotto is holding (one line each, in
+// Holding), the answer it said (in Said), two glows already in the tray.
 const stageIds = await page.evaluate(() =>
   [...document.querySelectorAll('[data-testid="stage-cards"] [data-testid="card"]')].map(
     (card) => card.querySelector('[data-testid="card-headline"]').textContent.trim(),
   ),
 );
+const heldIds = await page.evaluate(() =>
+  [...document.querySelectorAll('[data-testid="held-card"]')].map((row) => ({
+    variant: row.dataset.variant,
+    line: row.querySelector(".held__line")?.textContent.trim(),
+  })),
+);
+const nowState = await page.evaluate(() => document.querySelector('[data-testid="now"]')?.dataset.state);
 const trayToggle = (await page.getByTestId("stage-tray-toggle").textContent())?.trim();
 const trayOpenBefore = await page.getByTestId("stage-tray-cards").count();
 await page.screenshot({ path: shot, fullPage: true });
@@ -202,6 +210,8 @@ const report = {
   cases,
   thinkingAnimation,
   stageIds,
+  heldIds,
+  nowState,
   trayToggle,
   trayOpenBefore,
   trayed,
@@ -322,15 +332,20 @@ if (byId["a-error"]?.headline !== "") {
 }
 if (byId["i-error"]?.headline === "") problems.push("the interject error card lost its headline");
 
-// The stack and the tray.
-if (stageIds.length !== 3) problems.push(`the sample stage has ${stageIds.length} cards, not 3`);
-// Newest on top: the glow arrived 1 s ago, the interjection 4 s, the answer 20 s.
-const STAGE_ORDER = ["Nobody has said", "A $12 solo tier", "Competitors sit between"];
-STAGE_ORDER.forEach((prefix, at) => {
-  if (!stageIds[at]?.startsWith(prefix)) {
-    problems.push(`stage card ${at + 1} is ${JSON.stringify(stageIds[at])}, expected ${prefix}…`);
+// The three zones: Now is listening, Holding has the three raised cards
+// newest first (the glow arrived 1 s ago, the interjection 4 s, the research
+// 9 s), and Said has the answer alone.
+if (nowState !== "listening") problems.push(`the Now zone is ${JSON.stringify(nowState)}, not listening`);
+if (heldIds.length !== 3) problems.push(`Holding has ${heldIds.length} lines, not 3`);
+const HELD_ORDER = ["Nobody has said", "A $12 solo tier", "Research ready"];
+HELD_ORDER.forEach((prefix, at) => {
+  if (!heldIds[at]?.line?.startsWith(prefix)) {
+    problems.push(`held line ${at + 1} is ${JSON.stringify(heldIds[at])}, expected ${prefix}…`);
   }
 });
+if (stageIds.length !== 1 || !stageIds[0]?.startsWith("Competitors sit between")) {
+  problems.push(`Said has ${JSON.stringify(stageIds)}, expected the answer alone`);
+}
 if (trayOpenBefore !== 0) problems.push("the tray was open before anyone clicked it");
 if (trayToggle !== "2 quiet thoughts ▾") {
   problems.push(`the tray reads ${JSON.stringify(trayToggle)}`);

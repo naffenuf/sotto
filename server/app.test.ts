@@ -727,6 +727,8 @@ describe("/ws/events", () => {
       // Nobody has said its name (US-017).
       { type: "wake", listening: false, inConversation: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
+      // Nothing is written and waiting for a gap: the stage's Now zone is listening.
+      { type: "waiting", lines: [] },
       // And it has held nothing back, because nothing has been noticed (V3-016).
       { type: "suppressed", suppressed: [] },
     ]);

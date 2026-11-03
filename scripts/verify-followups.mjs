@@ -79,7 +79,7 @@ try {
   const open = await indicator.evaluate((element) => ({
     text: element.textContent?.trim() ?? "",
     inConversation: element.getAttribute("data-in-conversation"),
-    conversationStyle: element.className.includes("stage__listening--conversation"),
+    conversationStyle: element.className.includes("now__state--conversation"),
   }));
   await page.screenshot({ path: `${shotPrefix}-in-conversation.png` });
   if (open.inConversation !== "true") problems.push("the indicator is not in its conversation state");

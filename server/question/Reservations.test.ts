@@ -2,6 +2,7 @@
  * V3-015 on a simulated clock: when Sotto claims a question out loud, when it
  * stays quiet, and what happens when the search comes back with nothing.
  */
+import type { WaitingLine } from "../../shared/events.js";
 import { describe, expect, it } from "vitest";
 import {
   FREQUENCY_LIMITS,
@@ -127,6 +128,8 @@ function setup(
     /** V3-005: whether the ten seconds after the last offer have closed. */
     canOffer?: () => boolean;
     streamOffsetMs?: number;
+    /** The stage's `waiting` event, as the queue changes. */
+    onWaiting?: (lines: WaitingLine[]) => void;
   } = {},
 ): Harness {
   const clock = new SimulatedClock(0);
@@ -167,6 +170,7 @@ function setup(
     ...(options.stillCurrent === undefined ? {} : { stillCurrent: options.stillCurrent }),
     ...(options.onAnswered === undefined ? {} : { onAnswered: options.onAnswered }),
     ...(options.canOffer === undefined ? {} : { canOffer: options.canOffer }),
+    ...(options.onWaiting === undefined ? {} : { onWaiting: options.onWaiting }),
     logger: quiet,
   });
   return {
@@ -248,6 +252,25 @@ describe("Reservations: the line", () => {
 });
 
 describe("Reservations: claiming a question", () => {
+  it("tells the stage what is waiting, and that nothing is once it is said", async () => {
+    const voice = new FakeVoice();
+    const seen: WaitingLine[][] = [];
+    const harness = setup(voice, { onWaiting: (lines) => seen.push(lines) });
+    harness.speak();
+    harness.reservations.claim(idea, asked());
+    await harness.tick();
+    expect(seen.at(-1)).toEqual([
+      { kind: "reserve", text: "I'll check the drive time.", sinceMs: 0 },
+    ]);
+
+    harness.hush();
+    harness.clock.advanceBy(PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(1);
+    // Handed to the voice: what is being said is the voice event's, not this one's.
+    expect(seen.at(-1)).toEqual([]);
+  });
+
   it("speaks at the first gap after the question", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice);

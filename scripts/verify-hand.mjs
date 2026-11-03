@@ -1,5 +1,7 @@
 /**
- * Browser check for the raised hand (PRD V3-017).
+ * Browser check for the raised hand (PRD V3-017), which is the stage's
+ * Holding zone: the cards Sotto has not said, one line each, between what it
+ * is doing now and what it has already said.
  *
  * Two pages, because the two halves need different things:
  *
@@ -9,7 +11,8 @@
  *     them on demand.
  *  2. A mocked `/ws/events`, which is the only way to see the server take a
  *     hand down: a card published again without `raised` is what happens when
- *     Sotto says it out loud, or when the room calls on it.
+ *     Sotto says it out loud, or when the room calls on it — it leaves
+ *     Holding for Said.
  *
  * Run with the dev server up, e.g.
  *   python3 ~/.claude/skills/webapp-testing/scripts/with_server.py \
@@ -24,21 +27,23 @@ const url = process.env.SOTTO_URL ?? "http://127.0.0.1:5173";
 const shot = process.argv[2] ?? "/tmp/sotto-shots/hand.png";
 const mockShot = shot.replace(/\.png$/, "-mock.png");
 
-/** What the hand says it is holding, and where it sits in the header. */
+/** What Holding says it is holding, and where it sits on the stage. */
 async function readHand(page) {
   return page.evaluate(() => {
     const hand = document.querySelector('[data-testid="raised-hand"]');
     if (hand === null) return null;
-    const dots = document.querySelector(".dots");
+    const now = document.querySelector('[data-testid="zone-now"]');
+    const said = document.querySelector('[data-testid="zone-said"]');
     const box = hand.getBoundingClientRect();
-    const dotsBox = dots?.getBoundingClientRect();
     return {
       count: Number(hand.dataset.count),
       text: (hand.querySelector('[data-testid="raised-hand-count"]')?.textContent ?? "").trim(),
       title: hand.getAttribute("title") ?? "",
-      // "Beside the status dots", as the PRD puts it.
-      besideDots: dotsBox === undefined ? false : Math.abs(box.top - dotsBox.top) < 40,
-      inHeader: hand.closest(".header") !== null,
+      rows: hand.querySelectorAll('[data-testid="held-card"]').length,
+      // Between Now and Said, on the stage.
+      belowNow: now === null ? false : box.top >= now.getBoundingClientRect().bottom - 1,
+      aboveSaid: said === null ? true : box.bottom <= said.getBoundingClientRect().top + 1,
+      onStage: hand.closest('[data-testid="stage"]') !== null,
     };
   });
 }
@@ -72,18 +77,21 @@ await page.waitForSelector('[data-testid="raised-hand"]');
 const onLoad = await readHand(page);
 await page.screenshot({ path: shot, fullPage: false });
 
-// Opening one of the held cards takes it out of the count: the reader has
-// heard what Sotto had.
-const glow = page
-  .locator('[data-testid="dev-stage"] [data-testid="card"][data-variant="glow"]')
-  .first();
+// Opening one of the held lines takes it out of Holding: the reader has
+// heard what Sotto had, and the card is read in full in Said, open.
+const glow = page.locator('[data-testid="held-card"][data-variant="glow"]').first();
 await glow.click();
 await page.waitForTimeout(200);
 const afterOpen = await readHand(page);
+const openedInSaid = await page.evaluate(
+  () =>
+    document.querySelector('[data-testid="stage-cards"] [data-testid="card"][data-variant="glow"]')
+      ?.dataset.expanded,
+);
 
-// And clicking the hand clears the rest, which is the only way to clear a
-// card that is already shown in full.
-await page.locator('[data-testid="raised-hand"]').click();
+// And "seen" clears the rest, which is the only way to clear a card that
+// would be shown in full and so can never be "opened".
+await page.locator('[data-testid="raised-hand-clear"]').click();
 await page.waitForTimeout(200);
 const afterClick = await readHand(page);
 noise.push(...(await page.evaluate(() => window.__noise)));
@@ -154,7 +162,10 @@ await mockPage.waitForFunction(
   { timeout: 10_000 },
 );
 const afterSpoken = await readHand(mockPage);
-const stillShown = await mockPage.locator('[data-testid="card"]').count();
+// The research card has moved from Holding to Said; the held one is still a line in Holding.
+const stillShown =
+  (await mockPage.locator('[data-testid="card"]').count()) +
+  (await mockPage.locator('[data-testid="held-card"]').count());
 
 // And the room called on the last one, so the hand goes away entirely.
 push({ type: "card", card: { ...held, raised: false } });
@@ -168,15 +179,14 @@ const cleared = await readHand(mockPage);
 await browser.close();
 
 const checks = [
-  // The dev page has no status dots, so where the hand sits relative to them
-  // is read off the app, which is the page that has both.
-  ["the hand is in the header, beside the dots", twoHeld?.inHeader === true && twoHeld?.besideDots === true],
-  ["it counts the three cards Sotto is holding", onLoad?.count === 3],
+  ["Holding sits on the stage between Now and Said", twoHeld?.onStage === true && twoHeld?.belowNow === true && twoHeld?.aboveSaid === true],
+  ["it holds the three cards Sotto is holding, one line each", onLoad?.count === 3 && onLoad?.rows === 3],
   ["the count is on screen as a number", onLoad?.text === "3"],
   ["the tooltip says how to hear it", /Sotto, go ahead/.test(onLoad?.title ?? "")],
   ["two glows in the tray are not counted", onLoad?.count === 3],
   ["opening a held card stops it counting", afterOpen?.count === 2],
-  ["clicking the hand clears the rest", afterClick === null],
+  ["and it is read in full in Said", openedInSaid === "true"],
+  ["\"seen\" clears the rest", afterClick === null],
   ["no sound and no modal", noise.length === 0],
   ["no hand before any card arrives", noHand === null],
   ["a mocked pair of raised cards puts it up", twoHeld?.count === 2],

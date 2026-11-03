@@ -30,8 +30,10 @@ import { useStoredFlag } from "./useStoredFlag.js";
 import { Backstage } from "./Backstage.js";
 import { SessionControls } from "./SessionControls.js";
 import type { HistoryDetail, HistoryEntry } from "../../shared/history.js";
-import { RaisedHand, useRaisedHand } from "./RaisedHand.js";
+import { Now } from "./Now.js";
+import { useRaisedHand } from "./RaisedHand.js";
 import { Stage } from "./Stage.js";
+import { liveTurn, nowState, spokenMark } from "./stageView.js";
 import { StatusDots } from "./StatusDots.js";
 import { TranscriptPanel, type TurnHighlight } from "./TranscriptPanel.js";
 import { useServerStatus } from "./useServerStatus.js";
@@ -60,6 +62,14 @@ export function App() {
   const [cited, setCited] = useState<TurnHighlight | null>(null);
   /** What Sotto is holding and has not said (V3-017). */
   const hand = useRaisedHand(events.cards);
+  /** What Sotto is doing this second: the stage's Now zone. */
+  const now = nowState({
+    voice: events.voice,
+    cards: events.cards,
+    waiting: events.waiting,
+    listening: events.listening,
+    inConversation: events.inConversation,
+  });
 
   /** Set by Stop until the session is gone, so letting go of the mic is not read as losing it. */
   const stopping = useRef(false);
@@ -243,7 +253,6 @@ export function App() {
         />
         {/* Beside the dots, as the PRD puts it: the one place that says
             Sotto has something it has not said (V3-017). */}
-        <RaisedHand cards={hand.cards} onOpenAll={hand.openAll} />
         <StatusDots statuses={statuses} />
       </header>
       <div className="layout">
@@ -303,47 +312,28 @@ export function App() {
           cards={events.cards}
           // V3-016: what Sotto noticed and held back, under the cards.
           almostSaid={events.suppressed}
+          // V3-017: the raised hand, as its own zone between Now and Said.
+          held={hand.cards}
+          opened={hand.opened}
+          inNow={now.kind === "working" ? now.card.id : undefined}
+          onSeenAll={hand.cards.length > 0 ? hand.openAll : undefined}
+          spokenMark={(card) => spokenMark(card, events.turns)}
           onQuoteClick={onQuoteClick}
           onFeedback={onFeedback}
           onOpen={(card) => hand.open(card.id)}
           footer={<AskBox onAsk={onAsk} />}
+          now={
+            <Now
+              state={now}
+              session={session}
+              turnCount={events.turnCount}
+              live={liveTurn(events.turns)}
+              speakers={events.speakers}
+              onStopVoice={onStopVoice}
+            />
+          }
           banner={
             <>
-              {/* Sotto is talking (V2-004), with the way to make it stop
-                  right next to it. Muting is in the header. */}
-              {events.voice.speaking && (
-                <div
-                  className="voice-status"
-                  role="status"
-                  data-testid="voice-speaking"
-                  data-playing={events.voice.playing}
-                >
-                  <span className="voice-status__dot" aria-hidden="true" />
-                  Sotto is speaking
-                  <button type="button" onClick={onStopVoice}>
-                    Stop speaking
-                  </button>
-                </div>
-              )}
-              {/* Somebody has said Sotto's name and is still asking (US-017),
-                  or Sotto has just answered and the room can carry on without
-                  the name (V3-014). It sits above the cards because the answer
-                  lands there. */}
-              {events.listening && (
-                <p
-                  className={`stage__listening${events.inConversation ? " stage__listening--conversation" : ""}`}
-                  data-testid="wake-listening"
-                  data-in-conversation={events.inConversation ? "true" : "false"}
-                  role="status"
-                >
-                  {events.inConversation ? "Sotto is listening — carry on" : "Sotto is listening"}
-                  <span className="stage__listening-dots" aria-hidden="true">
-                    <span className="card__dot" />
-                    <span className="card__dot" />
-                    <span className="card__dot" />
-                  </span>
-                </p>
-              )}
               {discussion && <p className="history-stage-note">The stage shows the current discussion. The selected previous discussion is shown on the left.</p>}
               {problem !== null && (
                 <p className="stage__problem" data-testid="session-problem" role="alert">
@@ -351,13 +341,6 @@ export function App() {
                 </p>
               )}
             </>
-          }
-          placeholder={
-            <p className="stage__hint" data-testid="session-state">
-              {session === null
-                ? "Sotto listens to a brainstorm and speaks up only when it matters."
-                : `Listening to ${describeSource(session.source)} — ${events.turnCount} turns so far.`}
-            </p>
           }
         />
       </div>

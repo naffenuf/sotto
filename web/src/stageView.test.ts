@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { StageCard } from "../../shared/index.js";
+import { silentVoice } from "../../shared/voice.js";
 import {
   QUIET_TRAY_MS,
   arrangeCards,
   foldCard,
+  liveTurn,
   nextTrayDueAt,
+  nowState,
   raisedCards,
+  saidCards,
+  spokenMark,
   trayLabel,
   type StageCardView,
 } from "./stageView.js";
@@ -178,5 +183,104 @@ describe("raisedCards", () => {
   it("is empty when Sotto is holding nothing", () => {
     expect(raisedCards([card("card-ans-1", "answer", NOW)], none, NOW)).toEqual([]);
     expect(raisedCards([], none, NOW)).toEqual([]);
+  });
+});
+
+describe("nowState", () => {
+  const quiet = { voice: silentVoice(), cards: [], waiting: [], listening: false, inConversation: false };
+
+  it("is listening when nothing is happening", () => {
+    expect(nowState(quiet)).toEqual({ kind: "listening", named: false, inConversation: false });
+  });
+
+  it("is speaking while an utterance is open, with what has been said so far", () => {
+    const voice = { speaking: true, playing: true, utteranceId: "voice-1", text: "On the drive time:" };
+    expect(nowState({ ...quiet, voice })).toEqual({ kind: "speaking", text: "On the drive time:", playing: true });
+  });
+
+  it("shows the newest card on its way", () => {
+    const cards = [
+      { ...card("research-idea-1", "research", NOW), state: "thinking" as const },
+      { ...card("card-ans-1", "answer", NOW), state: "thinking" as const, question: "What does Eventbrite charge?" },
+    ];
+    expect(nowState({ ...quiet, cards })).toEqual({ kind: "working", card: cards[1] });
+  });
+
+  it("shows the next line waiting for a gap, and how many are behind it", () => {
+    const waiting = [
+      { kind: "answer", text: "On the drive time: about three hours.", sinceMs: 10 },
+      { kind: "readback", text: "Got it: six sheds.", sinceMs: 12 },
+    ];
+    expect(nowState({ ...quiet, waiting })).toEqual({ kind: "waiting", line: waiting[0], behind: 1 });
+  });
+
+  it("puts somebody addressing Sotto ahead of a lookup", () => {
+    const cards = [{ ...card("card-ans-1", "answer", NOW), state: "thinking" as const }];
+    expect(nowState({ ...quiet, cards, listening: true })).toEqual({
+      kind: "listening",
+      named: true,
+      inConversation: false,
+    });
+    expect(nowState({ ...quiet, listening: true, inConversation: true })).toEqual({
+      kind: "listening",
+      named: false,
+      inConversation: true,
+    });
+  });
+
+  it("speaking outranks everything", () => {
+    const voice = { speaking: true, playing: false, utteranceId: "voice-1", text: "" };
+    const waiting = [{ kind: "answer", text: "x", sinceMs: 1 }];
+    expect(nowState({ ...quiet, voice, waiting, listening: true }).kind).toBe("speaking");
+  });
+});
+
+function turn(turnId: string, text: string, final: boolean, startMs: number) {
+  return { turnId, speaker: "A", text, final, startMs, endMs: final ? startMs + 1 : null, speakerMappingUncertain: false };
+}
+
+describe("liveTurn", () => {
+  it("is null with no turns", () => {
+    expect(liveTurn([])).toBeNull();
+  });
+
+  it("prefers the turn somebody is in the middle of", () => {
+    const turns = [turn("0:1", "done", true, 0), turn("0:2", "still goi", false, 5), turn("0:3", "late final", true, 3)];
+    expect(liveTurn(turns)?.turnId).toBe("0:2");
+  });
+
+  it("falls back to the most recent turn", () => {
+    const turns = [turn("0:1", "first", true, 0), turn("0:2", "second", true, 5)];
+    expect(liveTurn(turns)?.turnId).toBe("0:2");
+  });
+});
+
+describe("spokenMark", () => {
+  it("reads an answer's own transcript row", () => {
+    const answer = card("card-ans-1", "answer", NOW);
+    const turns = [{ ...turn("sotto:ans-1", "Here's where you're at", true, 0), sotto: true as const }];
+    expect(spokenMark(answer, turns)).toBe("spoken");
+    expect(spokenMark(answer, [{ ...turns[0]!, interrupted: true as const }])).toBe("interrupted");
+    expect(spokenMark(answer, [])).toBeNull();
+  });
+
+  it("reads a card the server republished after saying it", () => {
+    expect(spokenMark({ ...card("card-cand-1", "interject", NOW), raised: false }, [])).toBe("spoken");
+    expect(spokenMark({ ...card("card-cand-1", "interject", NOW), raised: true }, [])).toBeNull();
+    expect(spokenMark(card("card-cand-1", "interject", NOW), [])).toBeNull();
+  });
+});
+
+describe("saidCards", () => {
+  it("takes what is held out of the stack", () => {
+    const held = { ...card("held", "interject", NOW - 1_000), raised: true };
+    const stack = [held, card("said", "answer", NOW - 2_000)];
+    expect(saidCards(stack, [held]).map((one) => one.id)).toEqual(["said"]);
+  });
+
+  it("leaves out the card the Now zone is showing on its way", () => {
+    const working = { ...card("research-idea-1", "research", NOW), state: "thinking" as const };
+    const stack = [working, card("said", "answer", NOW - 2_000)];
+    expect(saidCards(stack, [], "research-idea-1").map((one) => one.id)).toEqual(["said"]);
   });
 });

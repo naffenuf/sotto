@@ -7,7 +7,9 @@
  * cannot say how old a card is on screen. The stage stamps each arrival with
  * `Date.now()` instead, the same way the board panel's freshness line does.
  */
-import type { StageCard } from "../../shared/index.js";
+import type { StageCard, TurnUpdate, WaitingLine } from "../../shared/index.js";
+import type { VoiceState } from "../../shared/voice.js";
+import { sottoTurnId } from "../../shared/turns.js";
 
 /** A card, plus when the browser got it. */
 export interface StageCardView extends StageCard {
@@ -117,4 +119,95 @@ export function nextTrayDueAt(cards: readonly StageCardView[], now: number): num
     .map((card) => card.receivedAtMs + QUIET_TRAY_MS)
     .filter((due) => due > now);
   return dues.length === 0 ? null : Math.min(...dues);
+}
+
+/**
+ * What Sotto is doing this second — the stage's Now zone.
+ *
+ * One of four, in this order of precedence:
+ *
+ *   - `speaking`: an utterance is open (`voice.speaking`), and `text` is what
+ *     has been handed to it so far.
+ *   - `working`: a card is on its way (`state: "thinking"`) — an answer being
+ *     written, or a question the room wondered aloud being looked up.
+ *   - `waiting`: a line is written and waiting for a gap to be said in; the
+ *     first of the queue is the next one out.
+ *   - `listening`: everything else, which is most of a meeting.
+ *
+ * Somebody addressing Sotto by name is `listening` too — `named` says so —
+ * because the question is still being asked and nothing has been decided.
+ * It outranks `working` and `waiting`: the person talking to Sotto is the
+ * thing on the room's mind, and the answer card, when it comes, lands below.
+ */
+export type NowState =
+  | { kind: "speaking"; text: string; playing: boolean }
+  | { kind: "working"; card: StageCard }
+  | { kind: "waiting"; line: WaitingLine; behind: number }
+  | { kind: "listening"; named: boolean; inConversation: boolean };
+
+export function nowState(input: {
+  voice: VoiceState;
+  cards: readonly StageCard[];
+  waiting: readonly WaitingLine[];
+  listening: boolean;
+  inConversation: boolean;
+}): NowState {
+  if (input.voice.speaking) {
+    return { kind: "speaking", text: input.voice.text, playing: input.voice.playing };
+  }
+  if (input.listening) {
+    return { kind: "listening", named: !input.inConversation, inConversation: input.inConversation };
+  }
+  // The newest card on its way: an answer being written outranks a lookup
+  // started earlier, because it is the one somebody is waiting on.
+  const working = [...input.cards].reverse().find((card) => card.state === "thinking");
+  if (working !== undefined) return { kind: "working", card: working };
+  const line = input.waiting[0];
+  if (line !== undefined) return { kind: "waiting", line, behind: input.waiting.length - 1 };
+  return { kind: "listening", named: false, inConversation: false };
+}
+
+/**
+ * The live line: the turn somebody is in the middle of saying, if any, else
+ * the most recent one. What the Now zone fades through while listening, so
+ * the room can see Sotto hears.
+ */
+export function liveTurn(turns: readonly TurnUpdate[]): TurnUpdate | null {
+  if (turns.length === 0) return null;
+  const open = [...turns].reverse().find((turn) => !turn.final);
+  return open ?? turns[turns.length - 1] ?? null;
+}
+
+/**
+ * Whether a card was said out loud, and whether the room cut it off, read off
+ * Sotto's own transcript rows (V2-008a) and the card itself.
+ *
+ * An answer's utterance is its answer id, so `card-ans-1` was spoken when
+ * `sotto:ans-1` is in the transcript; a card the server republished with
+ * `raised: false` was said because the room called on it or a `bold` session
+ * spoke it (V3-017). Everything else is screen only.
+ */
+export function spokenMark(
+  card: StageCard,
+  turns: readonly TurnUpdate[],
+): "spoken" | "interrupted" | null {
+  if (card.variant === "answer" && card.id.startsWith("card-")) {
+    const turn = turns.find((one) => one.turnId === sottoTurnId(card.id.slice("card-".length)));
+    if (turn !== undefined) return turn.interrupted === true ? "interrupted" : "spoken";
+  }
+  if (card.raised === false) return "spoken";
+  return null;
+}
+
+/**
+ * The stack with what Sotto is holding taken out, and without the card the
+ * Now zone is already showing on its way: the Said zone.
+ */
+export function saidCards(
+  stack: readonly StageCardView[],
+  held: readonly StageCardView[],
+  inNow?: string,
+): StageCardView[] {
+  const holding = new Set(held.map((card) => card.id));
+  return stack.filter((card) => !holding.has(card.id) && card.id !== inNow);
 }

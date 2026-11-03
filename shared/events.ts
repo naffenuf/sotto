@@ -170,6 +170,33 @@ export interface SuppressedEvent {
   suppressed: SuppressedCandidate[];
 }
 
+/**
+ * One line Sotto has written and is waiting for a gap to say (V3-004,
+ * V3-015, V3-008, V3-013, V3-005): the stage's "waiting for a gap" state.
+ */
+export interface WaitingLine {
+  /** Which kind of line, as `timing.jsonl` names them. */
+  kind: string;
+  /** The sentence, as it would be said. */
+  text: string;
+  /** When it started waiting, on the session clock. */
+  sinceMs: number;
+  /** The room asked for this one (V3-017), so it waits only its turn. */
+  asked?: boolean;
+}
+
+/**
+ * Everything Sotto has ready to say and has not said yet, in queue order
+ * (first is the next to be said). The whole list every time, like the
+ * speakers' and the suppressed list: it is short and a browser must never
+ * have to accumulate it. Empty the moment the line is handed to the voice —
+ * what is being *said* is the `voice` event's.
+ */
+export interface WaitingEvent {
+  type: "waiting";
+  lines: WaitingLine[];
+}
+
 /** A session started (`session`) or ended (`null`). */
 export interface SessionEvent {
   type: "session";
@@ -187,4 +214,5 @@ export type ServerEvent =
   | CardEvent
   | WakeEvent
   | VoiceEvent
+  | WaitingEvent
   | SuppressedEvent;

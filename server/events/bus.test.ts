@@ -41,6 +41,7 @@ describe("EventBus", () => {
       { type: "settings", settings: { frequency: "normal", boldness: "normal", voiceMuted: false } },
       { type: "wake", listening: false, inConversation: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
+      { type: "waiting", lines: [] },
       // V3-016: the "almost said" tray's list, empty until the policy has
       // decided against something.
       { type: "suppressed", suppressed: [] },
@@ -137,6 +138,7 @@ describe("EventBus", () => {
       { type: "settings", settings: { frequency: "normal", boldness: "normal", voiceMuted: false } },
       { type: "wake", listening: false, inConversation: false },
       { type: "voice", voice: { speaking: false, playing: false, utteranceId: null, text: "" } },
+      { type: "waiting", lines: [] },
       { type: "suppressed", suppressed: [] },
     ]);
     expect(bus.currentSession()).toEqual(session);

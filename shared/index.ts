@@ -125,6 +125,8 @@ export type {
   StatusUpdate,
   SuppressedEvent,
   TurnEvent,
+  WaitingEvent,
+  WaitingLine,
   WakeEvent,
 } from "./events.js";
 export { FeedbackRequestSchema, feedbackVerdicts } from "./feedback.js";

@@ -1,18 +1,18 @@
 /**
- * The raised hand in the header (PRD V3-017).
+ * The raised hand (PRD V3-017).
  *
  * Sotto holds almost everything it notices back (V3-008): a contradiction, a
  * number that looks wrong, a question nobody answered, a search that finished
- * while two people were mid-sentence. All of it is on the stage and none of it
- * is said out loud, which is the promise — and the risk of that promise is
- * that a group looking at its own notes never finds out Sotto had anything.
+ * while two people were mid-sentence. None of it is said out loud, which is
+ * the promise — and the risk of that promise is that a group looking at its
+ * own notes never finds out Sotto had anything.
  *
- * So one small thing in the header says it does: `✋ 2`, beside the status
- * dots, with the way to hear it in the tooltip. No sound, no modal, nothing
- * that moves. Clicking it is the keyboard-and-mouse equivalent of calling on
- * Sotto out loud — it marks what is held as seen and the hand goes down —
- * which is also the only way to clear a card that is already shown in full
- * and so can never be "opened".
+ * So the stage shows what is held as its own zone, "Holding", between what
+ * Sotto is doing now and what it has already said: the cards themselves, one
+ * line each, rather than a count in the header. No sound, no modal, nothing
+ * that moves. Opening one is the keyboard-and-mouse equivalent of calling on
+ * Sotto out loud — it leaves the zone and is read in full below — and "seen"
+ * clears the rest.
  */
 import { useEffect, useMemo, useState } from "react";
 import { nextTrayDueAt, raisedCards, type StageCardView } from "./stageView.js";
@@ -28,6 +28,8 @@ export interface RaisedHandState {
   open: (cardId: string) => void;
   /** All of them have: the hand goes down. */
   openAll: () => void;
+  /** The cards the reader has opened, so they are read in full where they land. */
+  opened: ReadonlySet<string>;
 }
 
 /**
@@ -52,6 +54,7 @@ export function useRaisedHand(cards: readonly StageCardView[]): RaisedHandState 
   return {
     // Already newest first, which is what the tooltip names.
     cards: held,
+    opened,
     open: (cardId) => setOpened((seen) => new Set(seen).add(cardId)),
     openAll: () => setOpened((seen) => {
       const next = new Set(seen);
@@ -59,39 +62,4 @@ export function useRaisedHand(cards: readonly StageCardView[]): RaisedHandState 
       return next;
     }),
   };
-}
-
-export interface RaisedHandProps {
-  /** The cards Sotto is holding, newest first. */
-  cards: readonly StageCardView[];
-  /** Clears the hand. Absent on a page where there is nothing to clear. */
-  onOpenAll?: (() => void) | undefined;
-}
-
-/** `✋ 2`, or nothing at all when Sotto is holding nothing. */
-export function RaisedHand({ cards, onOpenAll }: RaisedHandProps) {
-  if (cards.length === 0) return null;
-  const newest = cards[0];
-  const title =
-    `Sotto is holding ${cards.length} thing${cards.length === 1 ? "" : "s"}` +
-    ` it has not said — ${CALL_ON_HINT}` +
-    (newest === undefined || newest.headline === "" ? "" : `. Latest: ${newest.headline}`);
-  return (
-    <button
-      type="button"
-      className="raised-hand"
-      data-testid="raised-hand"
-      data-count={cards.length}
-      title={title}
-      aria-label={title}
-      onClick={onOpenAll}
-    >
-      <span className="raised-hand__mark" aria-hidden="true">
-        ✋
-      </span>
-      <span className="raised-hand__count" data-testid="raised-hand-count">
-        {cards.length}
-      </span>
-    </button>
-  );
 }

@@ -28,6 +28,7 @@ import {
   type StatusChannel,
   type StatusState,
   type StatusUpdate,
+  type WaitingLine,
 } from "../../shared/events.js";
 import { defaultSettings, type SessionInfo, type SessionSettings } from "../../shared/session.js";
 import { silentVoice, type VoiceState } from "../../shared/voice.js";
@@ -80,6 +81,8 @@ export class EventBus {
   /** Server-wide, not per session: the next session inherits what is set. */
   private settings: SessionSettings = defaultSettings();
   private voice: VoiceState = silentVoice();
+  /** What Sotto has ready and is waiting for a gap to say, next first. */
+  private waiting: WaitingLine[] = [];
 
   constructor(logger: Logger = console) {
     this.logger = logger;
@@ -102,8 +105,12 @@ export class EventBus {
     }
     if (event.type === "suppressed") this.suppressed = event.suppressed;
     if (event.type === "voice") this.voice = event.voice;
+    if (event.type === "waiting") this.waiting = event.lines;
     if (event.type === "session") {
       this.session = event.session;
+      // Nothing waits across a session boundary in either direction: the
+      // queue is stranded on stop, and a new one starts empty.
+      this.waiting = [];
       // Nobody is mid-question across the end of a session, whatever the
       // last partial said, and no conversation carries across one either.
       this.listening = false;
@@ -160,6 +167,22 @@ export class EventBus {
 
   setVoice(voice: VoiceState): void { this.publish({ type: "voice", voice }); }
   voiceState(): VoiceState { return this.voice; }
+
+  /**
+   * Publishes what Sotto is waiting for a gap to say, skipping it when the
+   * list has not changed — the queue is re-reviewed on every turn and most
+   * reviews move nothing.
+   */
+  setWaiting(lines: readonly WaitingLine[]): void {
+    const next = [...lines];
+    if (JSON.stringify(next) === JSON.stringify(this.waiting)) return;
+    this.publish({ type: "waiting", lines: next });
+  }
+
+  /** What is waiting to be said, next first. */
+  waitingState(): readonly WaitingLine[] {
+    return this.waiting;
+  }
 
   /**
    * Publishes whether somebody is in the middle of addressing Sotto by name
@@ -240,6 +263,7 @@ export class EventBus {
       { type: "settings", settings: this.settings },
       { type: "wake", listening: this.listening, inConversation: this.inConversation },
       { type: "voice", voice: this.voice },
+      { type: "waiting", lines: [...this.waiting] },
       { type: "suppressed", suppressed: [...this.suppressed] },
       // One event per card, in the order they went up, rather than a second
       // shape for "all of them": a browser folds each one in the same way it
