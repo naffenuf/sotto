@@ -2140,3 +2140,19 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   the full `introducedNames` path for second names and corrections, and the model read is
   unchanged. A partial has no speaker until the API's `speaker` frame, so a partial can carry
   `speaker: null` — the test builds the frames by hand for that reason.
+- **An unprompted line waits for a verdict that covers the latest turn, and the room's own
+  question is not rationed.** Three rules from the design review before the demo. (1)
+  `StillCurrentState.coversTurnId` is the newest human final turn a verdict was made over (`null`
+  when nobody had spoken since the question); `StillCurrentWatcher.covers(ideaId)` is true only
+  when that is the watcher's latest turn and the last check did not fail, and `Reservations`
+  holds any unprompted non-claim line while `stillCurrentCovers` is false, looking again on the
+  watcher's `onVerdict` (`verdictChanged`). The ordering bug this closes: `SessionManager` fanned a
+  turn out to the speaking queue *before* the watcher, so the queue read a verdict that "covered"
+  everything the watcher had seen while the latest turn was the one it had not. The watcher now
+  sees each turn first. A hand-built verdict or a record without the field reads as covering.
+  (2) `ANSWER_DEADLINE_MS` (60 s) is measured from the **question** (`Expiry.fromMs`), not from the
+  packet landing — the classification and the search are time the room already spent; corrections
+  keep `ANSWER_STALE_MS` from when they were queued. (3) `charges()` is false for `reserve`,
+  `answer` and `no_answer`: the checkpoint had an answer the room asked for consume the allowance
+  a contradiction then needed. What bounds the room's own questions now is the covered verdict,
+  the deadline and one line at a time; V2-017's budget is for what Sotto says unasked.

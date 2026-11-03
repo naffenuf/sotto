@@ -208,6 +208,58 @@ describe("StillCurrentWatcher", () => {
     expect(harness.calls).toEqual([]);
   });
 
+  it("says which turn a verdict covers, and is uncovered while a newer turn is being judged", async () => {
+    let release = (_value: unknown): void => {};
+    const t = setup(() => new Promise((resolve) => { release = resolve; }));
+    t.watcher.watch("idea-1", { question: "the drive time?", answer: "two hours", askedAtMs: 0 });
+    // Nobody has spoken since the question: covered, with no call.
+    expect(t.watcher.covers("idea-1")).toBe(true);
+    expect(t.watcher.verdict("idea-1")?.coversTurnId).toBeNull();
+
+    // Turn 1 arrives: the check about it is out, and nothing covers it yet.
+    t.watcher.acceptTurn(turn("0:1", "Is it really two hours?", 5_000));
+    expect(t.watcher.covers("idea-1")).toBe(false);
+    release(CURRENT);
+    await t.settle();
+    expect(t.watcher.verdict("idea-1")?.coversTurnId).toBe("0:1");
+    expect(t.watcher.covers("idea-1")).toBe(true);
+
+    // Turn 2 arrives while turn 1's verdict stands: uncovered again until the
+    // next check lands, even though the cached verdict says current.
+    t.watcher.acceptTurn(turn("0:2", "Actually I looked, it's three.", 9_000));
+    expect(t.watcher.verdict("idea-1")?.verdict).toBe("current");
+    expect(t.watcher.covers("idea-1")).toBe(false);
+    release({ verdict: "answered", agrees: false, why: "they looked it up" });
+    await t.settle();
+    expect(t.watcher.covers("idea-1")).toBe(true);
+    expect(t.watcher.verdict("idea-1")).toMatchObject({ verdict: "answered", coversTurnId: "0:2" });
+  });
+
+  it("tells the listener each time a verdict lands, and stays uncovered after a failed check", async () => {
+    const landed: string[] = [];
+    let fail = false;
+    const t = setup(() => { if (fail) throw new Error("down"); return CURRENT; });
+    const watcher = new StillCurrentWatcher({
+      clock: t.clock, wallClock: systemClock,
+      classify: async (input) => { if (fail) throw new Error("down"); t.calls.push(input); return CURRENT; },
+      speakers: () => ({ A: "Craig" }),
+      onTiming: () => {},
+      onVerdict: (ideaId) => landed.push(ideaId),
+    });
+    watcher.watch("idea-1", { question: "q", answer: "a", askedAtMs: 0 });
+    expect(landed).toEqual(["idea-1"]);
+    watcher.acceptTurn(turn("0:1", "hm", 5_000));
+    await watcher.flush();
+    expect(landed).toEqual(["idea-1", "idea-1"]);
+    expect(watcher.covers("idea-1")).toBe(true);
+    fail = true;
+    watcher.acceptTurn(turn("0:2", "and?", 9_000));
+    await watcher.flush();
+    // The old verdict stands, but it is about turn one; nothing is said on it.
+    expect(watcher.verdict("idea-1")).toMatchObject({ verdict: "current", fallback: true, coversTurnId: "0:1" });
+    expect(watcher.covers("idea-1")).toBe(false);
+  });
+
   it("knows nothing about a question nobody is watching, and forgets on request", async () => {
     const harness = setup(() => CURRENT);
     expect(harness.watcher.verdict("idea-9")).toBeUndefined();

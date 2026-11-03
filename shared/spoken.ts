@@ -120,6 +120,14 @@ export interface StillCurrentState {
   fallback: boolean;
   /** How many turns the verdict was made over. */
   turns: number;
+  /**
+   * The newest human final turn the verdict was made over, or `null` when
+   * nobody had spoken since the question. Unprompted speech waits for a
+   * verdict that covers the latest turn, because a verdict about turns one to
+   * three is no judgment about turn four. Absent on records written before
+   * this field, and on a test's hand-built verdict: both read as covering.
+   */
+  coversTurnId?: string | null;
 }
 
 /** What a read-back carries beside the decision itself (V3-013). */

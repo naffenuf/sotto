@@ -72,6 +72,8 @@ export interface StillCurrentWatcherOptions {
   speakers: () => SpeakerNames;
   /** Every verdict, for `timing.jsonl`. */
   onTiming: (record: Record<string, unknown>) => void;
+  /** A verdict landed: whoever is holding a line on it can look again. */
+  onVerdict?: (ideaId: string) => void;
 }
 
 /** The verdict a question starts with, and the one a failed check leaves. */
@@ -81,6 +83,7 @@ const CURRENT: StillCurrentState = {
   latencyMs: 0,
   fallback: true,
   turns: 0,
+  coversTurnId: null,
 };
 
 export class StillCurrentWatcher {
@@ -131,6 +134,25 @@ export class StillCurrentWatcher {
     return this.watched.get(ideaId)?.state;
   }
 
+  /** The newest human final turn this watcher has seen, or `null`. */
+  latestTurnId(): string | null {
+    return this.history.at(-1)?.turnId ?? null;
+  }
+
+  /**
+   * Whether the cached verdict was made over everything the room has said:
+   * the one question the speaking path asks before saying a line unasked.
+   * A question nobody is watching is covered (there is nothing to judge);
+   * one whose last check failed is not, until a check succeeds — losing the
+   * check costs the line its turn, not the room an answer nobody wants.
+   */
+  covers(ideaId: string): boolean {
+    const watched = this.watched.get(ideaId);
+    if (watched === undefined) return true;
+    if (watched.state.fallback && watched.state.turns > 0) return false;
+    return (watched.state.coversTurnId ?? null) === this.latestTurnId();
+  }
+
   /** Nothing more to say about this question: stop paying for verdicts on it. */
   forget(ideaId: string): void {
     this.watched.delete(ideaId);
@@ -170,8 +192,9 @@ export class StillCurrentWatcher {
     );
     // Nobody has spoken since the question, so nothing can have moved on.
     if (since.length === 0) {
-      watched.state = { ...CURRENT, turns: 0 };
+      watched.state = { ...CURRENT, turns: 0, coversTurnId: null };
       watched.stale = false;
+      this.options.onVerdict?.(ideaId);
       return;
     }
     watched.inFlight = true;
@@ -195,6 +218,7 @@ export class StillCurrentWatcher {
     if (this.stopped || !this.watched.has(ideaId)) return;
     // A failed check keeps whatever was decided last; it must not silence the
     // answer, which is what a `moved_on` default would amount to.
+    const covers = since.at(-1)?.turnId ?? null;
     const state: StillCurrentState =
       result === null
         ? { ...watched.state, latencyMs, fallback: true, turns: since.length }
@@ -204,6 +228,7 @@ export class StillCurrentWatcher {
             latencyMs,
             fallback: false,
             turns: since.length,
+            coversTurnId: covers,
           };
     watched.state = state;
     this.options.onTiming({
@@ -219,6 +244,7 @@ export class StillCurrentWatcher {
     // Turns arrived while this was out: the verdict they would have changed is
     // the one being spoken from, so ask again rather than wait for the next.
     if (watched.stale) this.check(ideaId);
+    else this.options.onVerdict?.(ideaId);
   }
 
   /** Bounded by real time, because a replay's clock stands still inside a call. */

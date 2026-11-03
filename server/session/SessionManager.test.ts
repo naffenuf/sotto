@@ -2898,15 +2898,11 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
       yielded: false,
     });
     expect(answers[0]?.["questionToSpeechMs"]).toBeGreaterThanOrEqual(0);
-    // The verdict it decided on was the cached one (V3-004) — and in a `max`
-    // replay it is the no-call one: simulated time stands still inside the
-    // search, so no final turn arrives between the question and the packet,
-    // and "nobody has spoken since" needs no model.
-    expect(answers[0]?.["stillCurrent"]).toMatchObject({
-      verdict: "current",
-      latencyMs: 0,
-      turns: 0,
-    });
+    // The verdict it decided on was the cached one (V3-004), made over the
+    // turn that arrived before the pause — the watcher sees each turn before
+    // the speaking queue does, and an unprompted line waits for a verdict
+    // that covers the latest one.
+    expect(answers[0]?.["stillCurrent"]).toMatchObject({ verdict: "current", fallback: false });
 
     // Said out loud, and in the transcript as Sotto's, after the claim.
     const mine = published.filter(isSottoTurn).map((turn) => turn.text);

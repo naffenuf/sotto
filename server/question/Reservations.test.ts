@@ -24,6 +24,7 @@ import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js
 import type { StillCurrentState } from "./StillCurrentWatcher.js";
 import { READBACK_EXPIRY_MS } from "../decision/readback.js";
 import {
+  ANSWER_DEADLINE_MS,
   ANSWER_STALE_MS,
   ANSWER_STALE_TURNS,
   OFFER_STALE_TURNS,
@@ -124,6 +125,8 @@ function setup(
     verdict?: SpendVerdict;
     answering?: () => boolean;
     stillCurrent?: (ideaId: string) => StillCurrentState | undefined;
+    /** Whether that verdict covers the latest turn; absent means always. */
+    stillCurrentCovers?: (ideaId: string) => boolean;
     onAnswered?: (ideaId: string, state: StillCurrentState) => void;
     /** V3-005: whether the ten seconds after the last offer have closed. */
     canOffer?: () => boolean;
@@ -168,6 +171,7 @@ function setup(
     },
     ...(options.answering === undefined ? {} : { answering: options.answering }),
     ...(options.stillCurrent === undefined ? {} : { stillCurrent: options.stillCurrent }),
+    ...(options.stillCurrentCovers === undefined ? {} : { stillCurrentCovers: options.stillCurrentCovers }),
     ...(options.onAnswered === undefined ? {} : { onAnswered: options.onAnswered }),
     ...(options.canOffer === undefined ? {} : { canOffer: options.canOffer }),
     ...(options.onWaiting === undefined ? {} : { onWaiting: options.onWaiting }),
@@ -292,7 +296,7 @@ describe("Reservations: claiming a question", () => {
     expect(voice.said).toEqual(["I'll check the drive time."]);
   });
 
-  it("is the contribution for budget purposes, spent once", async () => {
+  it("spends nothing: the room's own question is not rationed", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice);
     harness.reservations.claim(idea, asked());
@@ -300,7 +304,8 @@ describe("Reservations: claiming a question", () => {
     await harness.tick();
     voice.played();
     await harness.reservations.flush();
-    expect(harness.spend.spent).toBe(1);
+    expect(voice.opened).toBe(1);
+    expect(harness.spend.spent).toBe(0);
   });
 
   it("records the claim with its latency and no yield", async () => {
@@ -376,25 +381,23 @@ describe("Reservations: claiming a question", () => {
     expect(voice.opened).toBe(1);
   });
 
-  it("says nothing when the frequency's budget is spent", async () => {
+  it("is said even when the frequency's budget is spent: it answers the room, unasked speech is what the budget rations", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice, { verdict: "budget" });
     harness.reservations.claim(idea, asked());
     harness.clock.advanceBy(PAUSE_MS);
     await harness.tick();
-    expect(voice.opened).toBe(0);
+    expect(voice.opened).toBe(1);
     expect(harness.spend.spent).toBe(0);
-    expect(harness.records[0]).toMatchObject({ spoken: false, reason: "budget" });
   });
 
-  it("says nothing inside the frequency's cooldown", async () => {
+  it("is said inside the frequency's cooldown too", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice, { verdict: "cooldown" });
     harness.reservations.claim(idea, asked());
     harness.clock.advanceBy(PAUSE_MS);
     await harness.tick();
-    expect(voice.opened).toBe(0);
-    expect(harness.records[0]).toMatchObject({ spoken: false, reason: "cooldown" });
+    expect(voice.opened).toBe(1);
     // The numbers are the frequency's, not this module's.
     expect(FREQUENCY_LIMITS.normal.cooldownMs).toBeGreaterThan(RESERVE_WINDOW_MS);
   });
@@ -601,7 +604,7 @@ describe("Reservations: nothing came back", () => {
     voice.played();
     await harness.reservations.flush();
     expect(harness.records[0]).toMatchObject({ kind: "no_answer", spoken: true });
-    expect(harness.spend.spent).toBe(1);
+    expect(harness.spend.spent).toBe(0);
   });
 
   it("says nothing when the room has moved on", async () => {
@@ -640,16 +643,16 @@ describe("Reservations: nothing came back", () => {
   });
 
   it("says nothing when the room never heard the claim", async () => {
-    const voice = new FakeVoice();
-    const harness = setup(voice, { verdict: "budget" });
+    // No voice at all: the claim is written off as unheard.
+    const harness = setup(null);
     harness.reservations.claim(idea, asked());
     harness.clock.advanceBy(PAUSE_MS);
     await harness.tick();
+    expect(harness.records[0]).toMatchObject({ kind: "reserve", spoken: false, reason: "unheard" });
     harness.records.length = 0;
     harness.reservations.noAnswer(idea.id);
     harness.clock.advanceBy(PAUSE_MS);
     await harness.tick();
-    expect(voice.opened).toBe(0);
     expect(harness.records).toEqual([]);
   });
 
@@ -912,17 +915,54 @@ describe("Reservations: speaking the answer (V3-004)", () => {
     });
   });
 
-  it("gives up after ninety seconds without a pause", async () => {
+  it("holds the answer while the verdict does not cover the latest turn, and says it once it does", async () => {
+    const voice = new FakeVoice();
+    const covered = { now: false };
+    const harness = setup(voice, { stillCurrent: () => current, stillCurrentCovers: () => covered.now });
+    asking(harness);
+    harness.reservations.answer(packet());
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    // A pause, a current verdict — but about an older turn: nothing is said.
+    expect(voice.opened).toBe(0);
+    expect(harness.records).toEqual([]);
+
+    covered.now = true;
+    harness.reservations.verdictChanged();
+    await harness.tick();
+    expect(voice.opened).toBe(1);
+  });
+
+  it("drops the answer once the covering verdict says the room moved on", async () => {
+    const voice = new FakeVoice();
+    const state = { verdict: current, covered: false };
+    const harness = setup(voice, { stillCurrent: () => state.verdict, stillCurrentCovers: () => state.covered });
+    asking(harness);
+    harness.reservations.answer(packet());
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    state.verdict = movedOn;
+    state.covered = true;
+    harness.reservations.verdictChanged();
+    await harness.tick();
+    expect(voice.opened).toBe(0);
+    expect(harness.records[0]).toMatchObject({ kind: "answer", spoken: false, reason: "moved_on" });
+  });
+
+  it("gives up a minute after the question without a pause", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice, { stillCurrent: () => current });
     asking(harness);
     harness.speak();
+    // The search took twenty seconds the room has already spent waiting.
+    harness.clock.advanceBy(20_000);
     harness.reservations.answer(packet());
-    harness.clock.advanceBy(ANSWER_STALE_MS);
+    harness.clock.advanceBy(ANSWER_DEADLINE_MS - 20_000);
     await harness.tick();
     expect(voice.opened).toBe(0);
     expect(harness.records[0]).toMatchObject({
-      kind: "answer", spoken: false, reason: "expired", pauseWaitMs: ANSWER_STALE_MS,
+      kind: "answer", spoken: false, reason: "expired", pauseWaitMs: ANSWER_DEADLINE_MS - 20_000,
     });
     // And not in the pause that follows either: the moment has gone.
     harness.hush();
@@ -948,23 +988,15 @@ describe("Reservations: speaking the answer (V3-004)", () => {
     expect(voice.opened).toBe(0);
   });
 
-  it("spends the frequency's allowance, and is turned down by it", async () => {
+  it("is said inside the frequency's cooldown and spends none of its allowance", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice, { stillCurrent: () => current, verdict: "cooldown" });
     asking(harness);
     harness.reservations.answer(packet());
     harness.clock.advanceBy(SPEAK_PAUSE_MS);
     await harness.tick();
-    expect(voice.opened).toBe(0);
-    expect(harness.records[0]).toMatchObject({ reason: "cooldown" });
-
-    // With room in the budget it is said, and charged for once.
-    const second = setup(new FakeVoice(), { stillCurrent: () => current });
-    second.reservations.noteQuestion(idea, asked(0));
-    second.reservations.answer(packet());
-    second.clock.advanceBy(SPEAK_PAUSE_MS);
-    await second.tick();
-    expect(second.spend.spent).toBe(1);
+    expect(voice.opened).toBe(1);
+    expect(harness.spend.spent).toBe(0);
   });
 
   it("spends nothing when the claim already did: one contribution, two lines", async () => {
@@ -975,7 +1007,7 @@ describe("Reservations: speaking the answer (V3-004)", () => {
     await harness.tick();
     voice.played();
     await harness.reservations.flush();
-    expect(harness.spend.spent).toBe(1);
+    expect(harness.spend.spent).toBe(0);
 
     // The answer lands twenty seconds later; it is the claim's completion.
     harness.spend.verdict = "budget";
@@ -988,7 +1020,7 @@ describe("Reservations: speaking the answer (V3-004)", () => {
     expect(voice.said.at(-1)).toBe(
       "On the drive time: about two hours fifteen from the city.",
     );
-    expect(harness.spend.spent).toBe(1);
+    expect(harness.spend.spent).toBe(0);
   });
 
   it("waits behind the claim on its own question", async () => {

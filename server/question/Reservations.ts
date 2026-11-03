@@ -113,6 +113,14 @@ export const RESERVE_TRACK_LABEL = "reserve";
  * way, so nothing is lost but the sentence.
  */
 export const ANSWER_STALE_MS = 90_000;
+/**
+ * How long after the room's *question* a looked-up answer may still be said
+ * out loud. Measured from the question, not from the packet landing: the
+ * classification and the search are time the room has already spent waiting,
+ * and a minute on, the answer is for the card. Corrections keep
+ * {@link ANSWER_STALE_MS} from when they were queued.
+ */
+export const ANSWER_DEADLINE_MS = 60_000;
 
 /** And the faster of the two: six more final turns is a different subject. */
 export const ANSWER_STALE_TURNS = 6;
@@ -218,6 +226,13 @@ export interface ReservationsOptions {
    */
   stillCurrent?: (ideaId: string) => StillCurrentState | undefined;
   /**
+   * Whether that verdict covers everything the room has said. `false` holds
+   * the line — the room may have just answered itself, and the check that
+   * would say so is still out — until {@link Reservations.verdictChanged}.
+   * Absent means always covered.
+   */
+  stillCurrentCovers?: (ideaId: string) => boolean;
+  /**
    * Somebody in the room answered the question themselves (V3-004).
    *
    * The answer is not said; the card says so instead — `confirmed` when the
@@ -266,6 +281,8 @@ export interface Asked {
 /** When a line waiting for a gap stops being worth saying. */
 interface Expiry {
   afterMs: number;
+  /** Where `afterMs` counts from; the line's `sinceMs` when absent. */
+  fromMs?: number;
   /** Final turns since it started waiting; the faster of the two wins. */
   afterTurns?: number;
   /** What the log calls it, which is not the same thing for all three kinds. */
@@ -442,11 +459,18 @@ export class Reservations {
       ...this.line(packet.ideaId, question, "answer", answerLine(question.topic, spoken)),
       pauseMs: SPEAK_PAUSE_MS,
       expiry: {
-        afterMs: ANSWER_STALE_MS,
+        afterMs: ANSWER_DEADLINE_MS,
+        fromMs: question.askedAtMs,
         afterTurns: ANSWER_STALE_TURNS,
         reason: "expired",
       },
     });
+    this.review();
+  }
+
+  /** A still-current verdict landed: a line held for it can be looked at again. */
+  verdictChanged(): void {
+    if (this.stopped) return;
     this.review();
   }
 
@@ -745,10 +769,16 @@ export class Reservations {
    * claim may have been said in between.
    */
   private charges(line: Pending): boolean {
-    // A claim asks for the floor, and so does a read-back nobody asked for
-    // (V3-013) and an offer of something nobody asked about (V3-005): all of
-    // them are Sotto choosing to speak.
-    if (line.kind === "reserve" || line.kind === "offer") return true;
+    // The room's own question — the claim, the answer, the closing line —
+    // spends nothing and waits for no cooldown: the checkpoint run had an
+    // answer the room asked for consume the allowance a contradiction then
+    // needed, and that is the wrong thing to ration. What keeps these in
+    // check is the still-current verdict, the deadline from the question and
+    // one line at a time. V2-017's budget is for what Sotto says unasked.
+    if (line.kind === "reserve" || line.kind === "answer" || line.kind === "no_answer") return false;
+    // A read-back nobody asked for (V3-013) and an offer of something nobody
+    // asked about (V3-005) are Sotto choosing to speak.
+    if (line.kind === "offer") return true;
     if (line.kind === "readback") {
       // Unless the question on it is one the room can already see: the card
       // spent the contribution when the policy delivered it, and this is that
@@ -760,7 +790,7 @@ export class Reservations {
     // A correction was already paid for by the interject card it was
     // delivered as (V3-008), and a closing line is the end of a claim. A card
     // the room called for (V3-017) is not Sotto choosing to speak at all.
-    if (line.kind === "no_answer" || line.kind === "correction") return false;
+    if (line.kind === "correction") return false;
     // V3-007: the offer charged the allowance, and the ideas are that same
     // contribution reaching the room's ears — and the room asked for them.
     if (line.kind === "called_on" || line.kind === "ideas") return false;
@@ -956,6 +986,14 @@ export class Reservations {
         keep.push(line);
         continue;
       }
+      // A verdict that does not cover the latest turn is no judgment about
+      // it: the room may have just answered itself. Hold until the check
+      // that would say so comes back ({@link verdictChanged}), or the line
+      // expires. A claim lives inside a five-second window and is not held.
+      if (line.asked !== true && line.kind !== "reserve" && this.options.stillCurrentCovers?.(line.ideaId) === false) {
+        keep.push(line);
+        continue;
+      }
       // V3-013: the boldness is read here rather than when the read-back was
       // queued, so a session turned down mid-wait loses the attachment rather
       // than the read-back.
@@ -989,7 +1027,7 @@ export class Reservations {
   private expiry(line: Pending, nowMs: number): ReserveSkipReason | null {
     const expiry = line.expiry;
     if (expiry === null) return null;
-    if (nowMs - line.sinceMs >= expiry.afterMs) return expiry.reason;
+    if (nowMs - (expiry.fromMs ?? line.sinceMs) >= expiry.afterMs) return expiry.reason;
     if (expiry.afterTurns !== undefined && line.turnsWaited >= expiry.afterTurns) {
       return expiry.reason;
     }
@@ -1236,7 +1274,7 @@ export class Reservations {
         due.push(line.pauseMs - pause.silentForMs);
       }
       if (line.expiry !== null) {
-        due.push(Math.max(1, line.sinceMs + line.expiry.afterMs - nowMs));
+        due.push(Math.max(1, (line.expiry.fromMs ?? line.sinceMs) + line.expiry.afterMs - nowMs));
       }
     }
     if (due.length === 0) return;

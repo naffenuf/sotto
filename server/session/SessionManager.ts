@@ -1129,10 +1129,13 @@ export class SessionManager {
         loops.researchCards?.acceptTurn(turn);
         // And so does a claim waiting for its gap (V3-015), and the answer
         // waiting for a real pause behind it (V3-004).
-        loops.reservations?.acceptTurn(turn);
         // V3-004: every later final turn is another look at whether the room
-        // still wants an answer that is waiting to be said.
+        // still wants an answer that is waiting to be said — and it has to
+        // see the turn *before* the speaking queue does, or the queue reads a
+        // verdict that "covers the latest turn" when the latest turn is the
+        // one it has not seen yet.
         loops.stillCurrent?.acceptTurn(turn);
+        loops.reservations?.acceptTurn(turn);
         // And so does the wake phrase: the indicator is the point of reading
         // a partial at all (US-017).
         // V2-007 privately owns interrupted commands; ordinary side talk stays suppressed.
@@ -1726,6 +1729,10 @@ export class SessionManager {
       classify: (input, signal) => classifyStillCurrent(model, input, signal),
       speakers: () => this.bus.speakerNames(),
       onTiming,
+      // A line held for a verdict that covers the latest turn looks again
+      // the moment one lands. `reservations` is built just below; the first
+      // verdict is a model call away.
+      onVerdict: () => reservations.verdictChanged(),
     });
     const reservations = new Reservations({
       clock,
@@ -1736,6 +1743,7 @@ export class SessionManager {
       allowed: () => policy.unpromptedAllowed(),
       noteContribution: () => policy.noteSpokenContribution(),
       stillCurrent: (ideaId) => stillCurrent.verdict(ideaId),
+      stillCurrentCovers: (ideaId) => stillCurrent.covers(ideaId),
       // Somebody in the room answered it first (V3-004): nothing is said, and
       // the card carries whether the search agrees with them.
       onAnswered: (ideaId, state) => {
