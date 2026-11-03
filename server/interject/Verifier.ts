@@ -31,6 +31,7 @@ import {
   VerificationReplySchema,
   correctedDetail,
   knowledgeVerificationJsonSchema,
+  knowledgeVerificationWithToolsJsonSchema,
   verificationJsonSchema,
   type Candidate,
   type CandidateVerification,
@@ -47,7 +48,7 @@ import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
 import { mcpCitation, resolveMcpCitation } from "../../shared/mcp.js";
 import type { McpClient } from "../mcp/McpClient.js";
 import { ModelCallError, citationTitle, type ModelClient } from "../model/client.js";
-import { PROMPTS, loadPrompt } from "../prompts/index.js";
+import { PROMPTS, loadPrompt, withMcpPrompt } from "../prompts/index.js";
 
 /** The label a check is tracked under on the clock, and in the model logs. */
 export const VERIFY_TRACK_LABEL = "verify";
@@ -273,12 +274,16 @@ export class Verifier {
     // ask: no call, no cost.
     if (snippets.length === 0 && tools.length === 0) return null;
     try {
+      const withTools = tools.length > 0;
       const request = {
         label: KNOWLEDGE_TRACK_LABEL,
-        system: loadPrompt(PROMPTS.verifyKnowledge),
-        user: renderKnowledgeVerificationRequest(candidate, snippets, tools.length > 0),
+        // The MCP section and the wider `file` description ride only on a
+        // call that carries a tool: without one this is V3-009's request,
+        // byte for byte.
+        system: withMcpPrompt(PROMPTS.verifyKnowledge, PROMPTS.mcpVerifyKnowledge, withTools),
+        user: renderKnowledgeVerificationRequest(candidate, snippets, withTools),
         schemaName: KNOWLEDGE_VERIFICATION_SCHEMA_NAME,
-        schema: knowledgeVerificationJsonSchema,
+        schema: withTools ? knowledgeVerificationWithToolsJsonSchema : knowledgeVerificationJsonSchema,
         maxTokens: KNOWLEDGE_VERIFY_MAX_TOKENS,
       };
       // With tools on the table the check is a tool loop — the grounded call

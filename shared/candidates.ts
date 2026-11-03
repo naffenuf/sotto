@@ -692,12 +692,31 @@ export const knowledgeVerificationJsonSchema = {
       type: "string",
       description:
         "The name of the one file the verdict rests on, exactly as it was given to you " +
-        "(\"prices.csv\") — or, when a company tool settled it, that tool as \"mcp:<server>/<tool>\". " +
-        "Empty string when no file or tool settles it.",
+        "(\"prices.csv\"). Empty string when no file settles it.",
     },
   },
   required: ["verdict", "correction", "file"],
   additionalProperties: false,
+} as const;
+
+/**
+ * The same schema for a check that carries company tools (post-V3-011): only
+ * the `file` description differs, because on Muse Spark a description is part
+ * of the prompt and the base one must stay byte for byte what a session
+ * without MCP sends.
+ */
+export const knowledgeVerificationWithToolsJsonSchema = {
+  ...knowledgeVerificationJsonSchema,
+  properties: {
+    ...knowledgeVerificationJsonSchema.properties,
+    file: {
+      type: "string",
+      description:
+        "The name of the one file the verdict rests on, exactly as it was given to you " +
+        "(\"prices.csv\") — or, when a company tool settled it, that tool as \"mcp:<server>/<tool>\". " +
+        "Empty string when no file or tool settles it.",
+    },
+  },
 } as const;
 
 /** The `json_schema.name` a gate request sends (V2-016). */

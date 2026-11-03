@@ -32,6 +32,15 @@ export const PROMPTS = {
   verify: "verify",
   /** Checking a claim against the group's own files, before the web (V3-009). */
   verifyKnowledge: "verify-knowledge",
+  /**
+   * The company's tools over MCP (post-V3-011): one section per prompt that
+   * offers them, appended to its base prompt **only** on a call that carries
+   * at least one MCP function tool — so a session with no servers sends the
+   * base prompt byte for byte. See {@link withMcpPrompt}.
+   */
+  mcpAnswer: "mcp-answer",
+  mcpResearchPacket: "mcp-research-packet",
+  mcpVerifyKnowledge: "mcp-verify-knowledge",
   /** Answering a question somebody asked Sotto out loud (US-018). */
   answer: "answer",
   /** The holding sentence said while a searched answer is written (V2-008c). */
@@ -77,4 +86,15 @@ export function loadPrompt(name: PromptName): string {
   if (text === "") throw new Error(`prompt ${path} is empty`);
   cache.set(name, text);
   return text;
+}
+
+/**
+ * The system prompt for a call that may carry company tools (post-V3-011):
+ * the base prompt alone when `hasMcpTools` is false — the exact bytes every
+ * session before MCP sent — and the base with the MCP section appended when
+ * the call really offers one.
+ */
+export function withMcpPrompt(base: PromptName, section: PromptName, hasMcpTools: boolean): string {
+  const prompt = loadPrompt(base);
+  return hasMcpTools ? `${prompt}\n\n${loadPrompt(section)}` : prompt;
 }

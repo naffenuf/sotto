@@ -2209,6 +2209,16 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `structured` call V3-009 made, byte for byte. `KnowledgeVerificationReply.file` may now be
   `mcp:<server>/<tool>`, resolved with `resolveMcpCitation` against the tools the check really
   called, and `fileCorrectionLine` says "From the crm:" rather than reading a slash out loud.
+- **"Unconfigured behaves exactly as before" includes the prompt bytes.** The first cut put the
+  MCP paragraph into `answer.md`, `research-packet.md` and `verify-knowledge.md`, which sent it
+  on every call of every session. The sections live in `prompts/mcp-answer.md`,
+  `mcp-research-packet.md` and `mcp-verify-knowledge.md` now and `withMcpPrompt(base, section,
+  hasMcpTools)` appends one **only** when the call carries an MCP function tool — the same place
+  the tools are attached — and the wider `file` description is a second schema constant
+  (`knowledgeVerificationWithToolsJsonSchema`) for the same reason, since on Muse Spark a schema
+  description is part of the prompt. Each caller's suite asserts `call.system` is the base
+  `.md` byte for byte without servers and base + section with one. A prompt change is a
+  behaviour change; keep anything conditional out of the base files.
 - **Three places a `mcp:` source could have been lost on the way to a card.** `splitAnswer`'s
   `URL_PATTERN` only matched `https?://`, so a `Sources:` line naming a tool was dropped before
   the answer agent saw it; `plainText` stripped every `_` as emphasis, turning `lookup_customer`

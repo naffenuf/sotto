@@ -10,6 +10,10 @@ import {
 import { SimulatedClock } from "../clock.js";
 import { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
 import { fakeMcpClient } from "../test/fakeMcp.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { PROMPTS, loadPrompt } from "../prompts/index.js";
+import { knowledgeVerificationJsonSchema, knowledgeVerificationWithToolsJsonSchema } from "../../shared/candidates.js";
 import type {
   GroundedCall,
   GroundedReply,
@@ -591,6 +595,60 @@ describe("the knowledge check in front of the web one", () => {
 });
 
 describe("the records check with company tools (post-V3-011)", () => {
+  it("sends the base prompt and schema byte for byte without servers, and the MCP section only with a tool", async () => {
+    const base = readFileSync(fileURLToPath(new URL("../prompts/verify-knowledge.md", import.meta.url)), "utf8").trim();
+    // Files only: V3-009's structured call, unchanged.
+    const dir = mkdtempSync(join(tmpdir(), "sotto-verify-mcp-"));
+    writeFileSync(join(dir, "prices.csv"), ["plan,price", "Pro,40"].join("\n"));
+    const structured: StructuredCall[] = [];
+    const filesOnly = new Verifier({
+      clock: new SimulatedClock(0),
+      model: {
+        structured: async (call) => { structured.push(call); return { verdict: "unclear", correction: "", file: "" }; },
+        prose: async () => { throw new Error("never"); },
+        grounded: async () => reply({ value: verdict("right") }),
+      },
+      knowledge: KnowledgeIndex.load(dir, { logger: { log: () => {}, warn: () => {} } }),
+      onRecord: () => {},
+      onVerified: () => {},
+      logger: { log: () => {}, warn: () => {} },
+    });
+    filesOnly.verify(candidate({ evidence: [{ turnId: "0:1", speaker: "A", quote: "Pro is $49 a seat." }] }));
+    await filesOnly.flush();
+    rmSync(dir, { recursive: true, force: true });
+    expect(structured).toHaveLength(1);
+    expect(structured[0]?.system).toBe(base);
+    expect(structured[0]?.system).toBe(loadPrompt(PROMPTS.verifyKnowledge));
+    expect(structured[0]?.schema).toBe(knowledgeVerificationJsonSchema);
+
+    // With a tool: the section appended, and the wider `file` description.
+    const mcp = fakeMcpClient();
+    const grounded: GroundedCall[] = [];
+    const withTools = new Verifier({
+      clock: new SimulatedClock(0),
+      model: {
+        structured: async () => { throw new Error("never"); },
+        prose: async () => { throw new Error("never"); },
+        grounded: async (call) => {
+          grounded.push(call);
+          return reply({ value: call.webSearch === false ? { verdict: "unclear", correction: "", file: "" } : verdict("right") });
+        },
+      },
+      mcp,
+      onRecord: () => {},
+      onVerified: () => {},
+      logger: { log: () => {}, warn: () => {} },
+    });
+    withTools.verify(candidate());
+    await withTools.flush();
+    expect(grounded[0]?.system).toBe(`${base}\n\n${loadPrompt(PROMPTS.mcpVerifyKnowledge)}`);
+    expect(grounded[0]?.system).toContain("Their company systems, when you are given tools");
+    expect(grounded[0]?.schema).toBe(knowledgeVerificationWithToolsJsonSchema);
+    // And the web half that followed carries neither.
+    expect(grounded[1]?.system).toBe(loadPrompt(PROMPTS.verify));
+    await mcp.close();
+  });
+
   /** The claim the CRM contradicts. */
   function renewal(): Candidate {
     return candidate({

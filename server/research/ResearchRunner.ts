@@ -70,7 +70,7 @@ import type { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
 import { mcpCitation, resolveMcpCitation } from "../../shared/mcp.js";
 import type { McpClient } from "../mcp/McpClient.js";
 import { ModelCallError, type FunctionTool, type ModelClient } from "../model/client.js";
-import { PROMPTS, loadPrompt } from "../prompts/index.js";
+import { PROMPTS, loadPrompt, withMcpPrompt } from "../prompts/index.js";
 
 /** The label a research job is tracked under on the clock and in the logs. */
 export const RUNNER_TRACK_LABEL = "research-packet";
@@ -261,10 +261,13 @@ export class ResearchRunner {
     // in the first seconds waits for that rather than going out without them.
     // Nothing to wait for when no servers are configured.
     if (this.options.mcp) await this.options.mcp.ready();
-    const functions = this.functions(id, read, invoked, artifacts);
+    const company = this.options.mcp?.functionTools(invoked, RUNNER_TRACK_LABEL) ?? [];
+    const functions = this.functions(id, read, company, artifacts);
     const result = await this.model.grounded({
       label: RUNNER_TRACK_LABEL,
-      system: loadPrompt(PROMPTS.researchPacket),
+      // The MCP section rides only on a call that carries a company tool:
+      // without one this is V2-013's prompt, byte for byte.
+      system: withMcpPrompt(PROMPTS.researchPacket, PROMPTS.mcpResearchPacket, company.length > 0),
       user: renderPacketRequest(idea),
       schemaName: RESEARCH_PACKET_SCHEMA_NAME,
       schema: researchPacketJsonSchema,
@@ -355,11 +358,11 @@ export class ResearchRunner {
    * a packet in words is a far better outcome than no packet because a table
    * would not save or a file would not read.
    */
-  private functions(id: string, read: Set<string>, invoked: Set<string>, artifacts: Artifact[]) {
+  private functions(id: string, read: Set<string>, company: readonly FunctionTool[], artifacts: Artifact[]) {
     const tools = [
       ...this.knowledgeTool(id, read),
       // The company's own systems (post-V3-011), each tool its own function.
-      ...(this.options.mcp?.functionTools(invoked, RUNNER_TRACK_LABEL) ?? []),
+      ...company,
       ...this.htmlTool(id, artifacts),
     ];
     return tools.length === 0 ? undefined : tools;

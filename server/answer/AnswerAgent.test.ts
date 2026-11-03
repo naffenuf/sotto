@@ -17,6 +17,9 @@ import { ACK_SEARCH } from "./ack.js";
 import type { ProseCall, ProseReply, ModelClient, StructuredCall } from "../model/client.js";
 import type { McpClient } from "../mcp/McpClient.js";
 import { fakeMcpClient } from "../test/fakeMcp.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import { FIRST_LINE_LABEL } from "./firstLine.js";
 import {
   ANSWER_ITEM_PREFIX,
@@ -1675,6 +1678,33 @@ describe("AnswerAgent and show_html (US-020)", () => {
 });
 
 describe("AnswerAgent and the company tools (post-V3-011)", () => {
+  it("sends the base prompt byte for byte without servers, and the MCP section only with a tool", async () => {
+    const base = readFileSync(fileURLToPath(new URL("../prompts/answer.md", import.meta.url)), "utf8").trim();
+    const without = harness([async (call) => {
+      expect(call.system).toBe(base);
+      expect(call.system).toBe(loadPrompt(PROMPTS.answer));
+      return reply({ text: "An answer\n\nin words." });
+    }]);
+    without.agent.ask({ question: "when does Harborview renew?", askedBy: null, turnId: null });
+    await without.agent.flush();
+
+    const mcp = fakeMcpClient();
+    const with_ = harness(
+      [
+        async (call) => {
+          expect(call.system).toBe(`${base}\n\n${loadPrompt(PROMPTS.mcpAnswer)}`);
+          expect(call.system).toContain("The group's own systems, when you are given them");
+          return reply({ text: "An answer\n\nin words." });
+        },
+      ],
+      { mcp },
+    );
+    with_.agent.ask({ question: "when does Harborview renew?", askedBy: null, turnId: null });
+    await with_.agent.flush();
+    expect(with_.records[0]?.status).toBe("done");
+    await mcp.close();
+  });
+
   it("offers every listed tool before show_html, and nothing extra without servers", async () => {
     const without = harness([async (call) => {
       expect(call.functions ?? []).toEqual([]);

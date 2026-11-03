@@ -23,6 +23,7 @@ import {
   KNOWLEDGE_VERIFICATION_SCHEMA_NAME,
   KnowledgeVerificationReplySchema,
   knowledgeVerificationJsonSchema,
+  knowledgeVerificationWithToolsJsonSchema,
   verificationVerdicts,
 } from "./candidates.js";
 
@@ -306,6 +307,17 @@ describe("knowledgeVerificationJsonSchema (V3-009)", () => {
       const properties = Object.keys(node.properties as JsonSchemaNode);
       expect(node.required, `${path} does not require every property`).toEqual(properties);
     }
+  });
+
+  it("has a tools variant that differs only in the `file` description (post-V3-011)", () => {
+    const strip = (schema: unknown): unknown =>
+      JSON.parse(JSON.stringify(schema, (key, value: unknown) => (key === "description" ? undefined : value)));
+    expect(strip(knowledgeVerificationWithToolsJsonSchema)).toEqual(strip(knowledgeVerificationJsonSchema));
+    const file = (knowledgeVerificationWithToolsJsonSchema.properties as Record<string, JsonSchemaNode>).file!;
+    expect(file.description).toContain("mcp:<server>/<tool>");
+    expect(
+      (knowledgeVerificationJsonSchema.properties as Record<string, JsonSchemaNode>).file!.description,
+    ).not.toContain("mcp:");
   });
 
   it("offers the same verdicts the web check does", () => {

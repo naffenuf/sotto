@@ -15,6 +15,9 @@ import { SimulatedClock } from "../clock.js";
 import { KnowledgeIndex } from "../knowledge/KnowledgeIndex.js";
 import type { McpClient } from "../mcp/McpClient.js";
 import { fakeMcpClient } from "../test/fakeMcp.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import {
   ModelCallError,
   type GroundedCall,
@@ -510,6 +513,21 @@ describe("ResearchRunner and the knowledge folder", () => {
 });
 
 describe("ResearchRunner and the company tools (post-V3-011)", () => {
+  it("sends the base prompt byte for byte without servers, and the MCP section only with a tool", async () => {
+    const base = readFileSync(fileURLToPath(new URL("../prompts/research-packet.md", import.meta.url)), "utf8").trim();
+    const without = harness([() => Promise.resolve(reply({ value: packetReply() }))]);
+    await without.runner.run(idea());
+    expect((without.model.calls[0] as GroundedCall).system).toBe(base);
+    expect((without.model.calls[0] as GroundedCall).system).toBe(loadPrompt(PROMPTS.researchPacket));
+
+    const mcp = fakeMcpClient();
+    const with_ = harness([() => Promise.resolve(reply({ value: packetReply() }))], { mcp });
+    await with_.runner.run(idea());
+    expect((with_.model.calls[0] as GroundedCall).system).toBe(`${base}\n\n${loadPrompt(PROMPTS.mcpResearchPacket)}`);
+    expect((with_.model.calls[0] as GroundedCall).system).toContain("The group's own systems, when you are given them");
+    await mcp.close();
+  });
+
   const renewal = (): ResearchIdea =>
     idea({
       id: "idea-11",

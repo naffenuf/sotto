@@ -76,7 +76,7 @@ import { searchedIndex, resolveCitation } from "../interject/Verifier.js";
 import { mcpCitation, resolveMcpCitation } from "../../shared/mcp.js";
 import type { McpClient } from "../mcp/McpClient.js";
 import { citationTitle, type FunctionTool, type ModelClient } from "../model/client.js";
-import { PROMPTS, loadPrompt } from "../prompts/index.js";
+import { PROMPTS, loadPrompt, withMcpPrompt } from "../prompts/index.js";
 import type { VoiceOut } from "../voice/voiceOut.js";
 import { chooseAcknowledgment, searchLikely } from "./ack.js";
 import { writeFirstLine } from "./firstLine.js";
@@ -701,12 +701,17 @@ export class AnswerAgent {
       // first seconds waits for the listing rather than answering without
       // them. Nothing to wait for when no servers are configured.
       if (this.options.mcp) await this.options.mcp.ready();
+      // The company's own systems (post-V3-011): a CRM lookup, a ticket
+      // search, a wiki page, each its own function, routed back through the
+      // MCP client. An empty list for every session without servers — and
+      // then the prompt is US-018's, byte for byte.
+      const company = this.options.mcp?.functionTools(invoked, ANSWER_TRACK_LABEL) ?? [];
       const reply = await this.model.prose({
         label: ANSWER_TRACK_LABEL,
-        system: loadPrompt(PROMPTS.answer),
+        system: withMcpPrompt(PROMPTS.answer, PROMPTS.mcpAnswer, company.length > 0),
         user: this.render(answer, asked.resume === true, firstLineText, packets, briefing),
         maxTokens: ANSWER_MAX_TOKENS,
-        functions: this.functions(answer, artifacts, invoked, () => pushedHeadline, aloud),
+        functions: this.functions(answer, artifacts, company, () => pushedHeadline, aloud),
         onText: ({ itemId, text }) => {
           // Narration, not the answer: see ANSWER_ITEM_PREFIX.
           if (!itemId.startsWith(ANSWER_ITEM_PREFIX)) return;
@@ -889,16 +894,12 @@ export class AnswerAgent {
   private functions(
     answer: Answer,
     artifacts: Artifact[],
-    invoked: Set<string>,
+    company: readonly FunctionTool[],
     headline: () => string,
     spokenText: () => string,
   ): FunctionTool[] {
-    // The company's own systems first (post-V3-011): a CRM lookup, a ticket
-    // search, a wiki page, each its own function, routed back through the
-    // MCP client. An empty list for every session without servers.
-    const company = this.options.mcp?.functionTools(invoked, ANSWER_TRACK_LABEL) ?? [];
     const save = this.options.onArtifact;
-    if (save === undefined) return company;
+    if (save === undefined) return [...company];
     return [
       ...company,
       {
