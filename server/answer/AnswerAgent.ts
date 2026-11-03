@@ -80,7 +80,9 @@ import { chooseAcknowledgment, searchLikely } from "./ack.js";
 import { writeFirstLine } from "./firstLine.js";
 import { splitSentences } from "./sentences.js";
 import { SpokenAnswer, type SpokenResult } from "./SpokenAnswer.js";
-import { COMMAND_TIMEOUT_MS, classifyCommand, fallbackCommand } from "./command.js";
+import { COMMAND_TIMEOUT_MS, fallbackCommand } from "./command.js";
+import { gatedClassifyCommand } from "./commandFast.js";
+import type { JevLike } from "../model/JevClient.js";
 
 /** The label an answer is tracked under on the clock, and in the model logs. */
 export const ANSWER_TRACK_LABEL = "answer";
@@ -196,6 +198,8 @@ export interface AskedQuestion {
 export interface AnswerAgentOptions {
   /** The session's clock — simulated for a replay, real for a live session. */
   clock: Clock;
+  /** The fast read in front of the command classifier (post-V3-011), or none. */
+  jev?: JevLike | null;
   /**
    * A `continue` with nothing to continue (V3-017): the room said "go on"
    * over a card being read out, so it is calling on the hand again.
@@ -365,7 +369,12 @@ export class AnswerAgent {
         let command: ReturnType<typeof fallbackCommand>;
         try {
           command = await Promise.race([
-            classifyCommand(this.model, asked.question, controller.signal),
+            gatedClassifyCommand(this.options.jev ?? null, this.model, asked.question, {
+              wallClock: this.wallClock,
+              onGate: (verdict) => this.options.onTiming?.({
+                stage: "command_gate", atMs: this.clock.now(), turnId: asked.turnId, ...verdict,
+              }),
+            }, controller.signal),
             new Promise<never>((_, reject) => {
               controller.signal.addEventListener("abort", () => reject(new Error("command timed out")));
             }),

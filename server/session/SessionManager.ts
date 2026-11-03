@@ -1021,7 +1021,12 @@ export class SessionManager {
         loops.reservations?.interrupt();
         return loops.answers?.interrupt() ?? voice?.interrupt?.() ?? Promise.resolve(null);
       },
-      command: (asked) => loops.answers?.command(asked),
+      command: (asked) => {
+        // The room cut in to ask for something else: a line Sotto was going
+        // to try again after being talked over is no longer wanted.
+        loops.reservations?.dropRetries();
+        loops.answers?.command(asked);
+      },
       onTiming: (record) => store.writer?.appendTiming?.(record),
       onListening: (listening) => {
         this.bus.setListening(listening);
@@ -1283,6 +1288,7 @@ export class SessionManager {
           });
           return;
         }
+        loops.reservations?.dropRetries();
         loops.answers?.ask({
           question: trigger.question,
           askedBy: trigger.speaker,
@@ -1922,6 +1928,7 @@ export class SessionManager {
     const answers = new AnswerAgent({
       clock,
       model,
+      jev,
       logger: this.logger,
       onTiming,
       onCallOn: (turnId) => answerHooks.callOn?.(turnId),

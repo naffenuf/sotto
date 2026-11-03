@@ -2106,3 +2106,16 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `listening`. And "Sotto, go ahead" 6 s after a budget line gets "Nothing right now" because the
   observer looks only after a notes update — every four turns or 45 s — which the solo run sheet
   now says.
+- **Two things from the second solo run (`2026-11-03_1534-mic`).** (1) A barge-in's command —
+  "So not now. … Sotto, how long does the bus take?" over the bus answer — waited the whole 6 s
+  `COMMAND_TIMEOUT_MS` for Spark before the new question was even queued, so
+  `server/answer/commandFast.ts` (`gatedClassifyCommand`, `AnswerAgent.jev`) puts Jev in front:
+  stop / new_question / continue / quieter / louder in 95–670 ms, a new question's words off
+  `questionAfterName`, Spark under 0.7. (2) The answer that barge-in cut off was **retried in full**
+  at the next pause (V3-004's one retry after a yield), after the room had asked something else:
+  `Reservations.dropRetries()` skips every waiting line with `yields > 0` as `superseded`, and
+  `SessionManager` calls it where the room asks Sotto something new — the wake watcher's
+  `onQuestion` and `BargeIn`'s `command`. Also seen: `followup_gate` at 1.00 in 492 ms answered the
+  follow-up that was dropped the run before, and "Sotto, not now" came back as `So not now` again,
+  which only the barge-in's yield caught; the name is still the only way "not now" reaches
+  steering.

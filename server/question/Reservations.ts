@@ -887,6 +887,21 @@ export class Reservations {
    * The end of the session: stop talking, stop waiting for a gap, and write
    * down what never got said.
    */
+  /**
+   * The room has asked Sotto something new — by name, or by cutting in on
+   * what it was saying — so a line it was going to try again is no longer
+   * wanted. `2026-11-03_1534-mic`: "So not now. … Sotto, how long does the
+   * bus take?" cut the bus answer off, and the retry then read the whole
+   * answer out before the new question was even acknowledged.
+   */
+  dropRetries(): void {
+    const stale = this.waiting.filter((line) => line.yields > 0);
+    if (stale.length === 0) return;
+    this.waiting = this.waiting.filter((line) => line.yields === 0);
+    this.changed();
+    for (const line of stale) this.skip(line, "superseded");
+  }
+
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;

@@ -99,6 +99,8 @@ export const reserveSkipReasons = [
   "expired",
   "yielded",
   "overtaken",
+  /** A retry after a yield, dropped because the room then asked Sotto something else. */
+  "superseded",
   "session_ended",
 ] as const;
 export type ReserveSkipReason = (typeof reserveSkipReasons)[number];

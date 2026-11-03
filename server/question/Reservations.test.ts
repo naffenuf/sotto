@@ -785,6 +785,31 @@ describe("Reservations: speaking the answer (V3-004)", () => {
     );
   });
 
+  it("drops the retry when the room then asks Sotto something else", async () => {
+    const voice = new FakeVoice();
+    const harness = setup(voice, { stillCurrent: () => current });
+    asking(harness);
+    harness.reservations.answer(packet());
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(1);
+    // Somebody starts talking over it, and keeps talking.
+    harness.speak();
+    harness.reservations.yieldToHuman();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({ kind: "answer", yielded: true, retrying: true });
+
+    // "So not now. Sotto, how long does the bus take?" — a new question:
+    // the retry is no longer wanted, and the next pause gets nothing.
+    harness.reservations.dropRetries();
+    expect(harness.records.at(-1)).toMatchObject({ kind: "answer", spoken: false, reason: "superseded" });
+    harness.clock.advanceBy(2_000);
+    harness.hush();
+    harness.clock.advanceBy(SPEAK_PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(1);
+  });
+
   it("yields to a voice in the room and tries once more, then gives up", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice, { stillCurrent: () => current });
