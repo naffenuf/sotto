@@ -185,6 +185,16 @@ export function useSessionEvents(): SessionEventsState {
 }
 
 function apply(state: SessionEventsState, event: ServerEvent): SessionEventsState {
+  // A page that has just opened with nothing running is greeted with the last
+  // session's notes and cards — the bus keeps them so the page that watched
+  // the session can read them after Stop — but never its transcript, which
+  // only that page had. Half of a finished session is a confusing thing to
+  // open on; the previous discussion is one click away in the sidebar. So a
+  // page with no session and no transcript takes none of it.
+  const fresh = state.session === null && state.turns.length === 0;
+  if (fresh && (event.type === "board" || event.type === "card" || event.type === "suppressed")) {
+    return state;
+  }
   switch (event.type) {
     case "voice": return { ...state, voice: event.voice };
     case "status":
