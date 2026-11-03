@@ -11,9 +11,9 @@
  * *settled* something — so a read-back arrives with the turn rather than with
  * the board update a dozen seconds later, and costs nothing extra.
  *
- * Three things never reach the model. A turn that is not
- * {@link worthClassifying} costs nothing, which is the only reason a call per
- * question is affordable (13% of `brainstorm`'s turns). A turn that addresses
+ * Every human turn reaches the model (post-V3-011): the word check that used
+ * to gate it missed every need said as a statement, and a low-effort call per
+ * turn is a few dollars a meeting. Two things never do. A turn that addresses
  * Sotto by name is the address path's — the room asked *Sotto*, so an answer
  * is owed whatever kind of question it is, and classifying it here would
  * duplicate the answer. And an echo of Sotto's own voice, a playback command
@@ -37,10 +37,14 @@ import {
   type QuestionClassifier,
   type QuestionResult,
 } from "./question.js";
-import { worthClassifying } from "./questionShape.js";
 
-/** A slow classifier must not leave a question hanging; the verdict is then `none`. */
-export const QUESTION_TIMEOUT_MS = 6_000;
+/**
+ * The classifier's deadline, on the wall clock. Nothing in the room waits on
+ * this verdict — a late `open_question` starts its lookup late, which beats
+ * never — so it is generous: the API answered the bus turns in 6–14 s on a
+ * slow afternoon (`2026-11-03`), and the old 6 s would have dropped every one.
+ */
+export const QUESTION_TIMEOUT_MS = 20_000;
 
 /** How many previous final turns the classifier is given, as V3-002 specifies. */
 export const QUESTION_CONTEXT_TURNS = 4;
@@ -114,10 +118,12 @@ export class QuestionWatcher {
       });
       return;
     }
-    // Nothing is written down for a turn that is neither a question nor the
-    // group settling something (V3-013): it is most of the conversation,
-    // `turn_final` already records it, and no classification happened to log.
-    if (!worthClassifying(turn.text)) return;
+    // Every turn is read (post-V3-011). The word check that used to stand
+    // here — question words, a question mark, "wonder" — let "we need the bus
+    // schedules from New York to Philadelphia" go by unread for three minutes
+    // (`2026-11-03_0945-mic`): a need is wondered aloud as a statement as
+    // often as a question, and only a model can tell. A low-effort call is
+    // 1.5–2.5 s and a quarter of a cent; a meeting is a few dollars of them.
     const work = this.decide(turn, previous, atMs);
     this.pending.add(work);
     void work.finally(() => this.pending.delete(work));

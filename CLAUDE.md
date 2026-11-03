@@ -2060,3 +2060,15 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   is dropped. Built in `SessionManager.assembler` beside the patterns and stopped with the
   address watcher; `emptyModel` answers it with no speakers, so `npm test` applies the patterns'
   names only.
+- **Every turn goes to the question classifier; the word check is gone.** `questionShape.ts`
+  (question words, a `?`, the "wondering" family, V3-002's pre-filter) passed about a quarter of
+  turns and was the reason "we need the bus schedules from New York to Philadelphia" went unread
+  for three minutes in `2026-11-03_0945-mic`: a need wondered aloud as a *statement* has no shape
+  a regex can find. `QuestionWatcher` now classifies every final human turn that is not the
+  address path's, `prompts/question.md` says a stated need for something a search can supply is
+  an `open_question`, and `QUESTION_TIMEOUT_MS` is 20 s, because nothing in the room waits on the
+  verdict and the API answered those turns in 6–14 s on a slow afternoon. Measured on the real
+  bus turns: all three needs came back `open_question` with a clean question each, and "we should
+  get the invites out by Friday" came back `none`. The cost is one low-effort call per turn, a
+  quarter of a cent each — a few dollars a meeting. The tests that counted calls per fixture now
+  count turns.

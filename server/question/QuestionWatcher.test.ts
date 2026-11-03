@@ -88,13 +88,14 @@ describe("QuestionWatcher", () => {
     ]);
   });
 
-  it("spends no call on a turn that is not question-shaped", async () => {
-    const { watcher, asked, questions, timing } = watcherFor([open]);
-    watcher.acceptTurn(turn(" He waited for the fork to go down. "));
+  it("reads a turn with no question word in it: a need said as a statement", async () => {
+    // "We need the bus schedules…" went unread for three minutes under the
+    // old word check (`2026-11-03_0945-mic`); every turn is classified now.
+    const { watcher, asked, questions } = watcherFor([open]);
+    watcher.acceptTurn(turn(" We need the bus schedules from New York to Philadelphia. "));
     await watcher.flush();
-    expect(asked).toEqual([]);
-    expect(questions).toEqual([]);
-    expect(timing).toEqual([]);
+    expect(asked).toHaveLength(1);
+    expect(questions).toHaveLength(1);
   });
 
   it("leaves a turn that says Sotto's name to the address path", async () => {
@@ -217,7 +218,9 @@ describe("QuestionWatcher", () => {
     for (const index of [0, 1, 2, 3, 4]) watcher.acceptTurn(turn(`line ${index}`, `0:${index}`));
     watcher.acceptTurn(turn(" Is it an hour and a half? ", "0:5"));
     await watcher.flush();
-    expect(seen).toEqual([["line 1", "line 2", "line 3", "line 4"]]);
+    // Every turn is read now, so the earlier ones were classified too; the
+    // question is still given exactly the four finals before it.
+    expect(seen.at(-1)).toEqual(["line 1", "line 2", "line 3", "line 4"]);
   });
 
   it("takes side talk as context without classifying it", async () => {

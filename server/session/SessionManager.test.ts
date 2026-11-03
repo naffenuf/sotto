@@ -2660,11 +2660,11 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     sessions.start({ kind: "events", fixture: "offsite-plan" });
     await ended;
 
-    // Ten of the conversation's 37 turns are question-shaped, and the one
-    // that says Sotto's name is the address path's, so nine reach the model.
+    // Every human turn is read now (post-V3-011); the one that says Sotto's
+    // name is the address path's, so 36 of the conversation's 37 reach the model.
     const classified = timing.filter((record) => record["stage"] === "question");
-    expect(classified).toHaveLength(9);
-    expect(model.labels.filter((label) => label === "question")).toHaveLength(9);
+    expect(classified).toHaveLength(36);
+    expect(model.labels.filter((label) => label === "question")).toHaveLength(36);
     expect(timing).toContainEqual(expect.objectContaining({
       stage: "question_skipped", reason: "addressed",
     }));
@@ -2676,13 +2676,13 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     // Every verdict is a record of its own, and nothing else: an open
     // question is not a candidate, so it reaches no card and no policy.
     const wondered = timing.filter((record) => record["stage"] === "open_question");
-    expect(wondered).toHaveLength(9);
+    expect(wondered).toHaveLength(36);
     expect(wondered[0]).toMatchObject({ topic: "the drive time" });
     expect(cards.filter((card) => card.variant === "interject")).toEqual([]);
     expect(cards.filter((card) => card.variant === "glow")).toEqual([]);
   }, 60_000);
 
-  it("spends no call at all on a conversation with no questions in it", async () => {
+  it("reads every turn of a conversation with no questions in it", async () => {
     const bus = new EventBus(quiet);
     const model = new WonderingModel();
     const sessions = new SessionManager({
@@ -2705,10 +2705,10 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     sessions.start({ kind: "events", fixture: "moment-fact" });
     await ended;
 
-    // `moment-fact` is a conversation about a date somebody got wrong; two of
-    // its 24 turns are shaped like a question (8%), which is the whole point
-    // of the pre-filter.
-    expect(model.labels.filter((label) => label === "question")).toHaveLength(2);
+    // `moment-fact` is a conversation about a date somebody got wrong: every
+    // one of its 24 turns is read, because a need wondered aloud as a
+    // statement has no shape a word check can find (post-V3-011).
+    expect(model.labels.filter((label) => label === "question")).toHaveLength(24);
   }, 60_000);
 
   /**
@@ -3301,9 +3301,9 @@ describe("SessionManager: read-backs at decision points (V3-013)", () => {
       "six sheds, one per association",
       "paper sheets, typed up monthly",
     ]);
-    // Five of the 27 turns are shaped like a question or a closing, so five
-    // calls — the whole detection, with nothing added to the bill.
-    expect(run.timing.filter((record) => record["stage"] === "question")).toHaveLength(5);
+    // Every one of the 27 turns is read (post-V3-011); the closings come off
+    // the same call, with nothing added to the bill.
+    expect(run.timing.filter((record) => record["stage"] === "question")).toHaveLength(27);
   }, 60_000);
 
   it("reads back the decision the group left a question against, quoted", async () => {

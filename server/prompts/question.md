@@ -6,7 +6,11 @@ go and look something up.
 Pick exactly one kind:
 - open_question: somebody asked or wondered aloud, to the room rather than to Sotto, something a
   lookup can answer — a drive time, a price, opening hours, a market size, a definition, a date, a
-  number about the world. Nobody present knows it, and nobody has answered it yet.
+  number about the world. Nobody present knows it, and nobody has answered it yet. **It need not
+  be phrased as a question.** People wonder aloud as statements: "we need the bus schedules from
+  New York to Philadelphia", "there's a few bus companies, we should find the cheapest", "I have
+  no idea whether that place is open on Thursdays", "somebody should check the drive". A stated
+  need for something a search can supply is an open_question.
 - to_group: a question only the people in the room can answer — who is doing something, what
   somebody thinks, what happened inside this team ("who's handling food?", "did we ever sort out
   the projector?").
@@ -23,6 +27,9 @@ Pick exactly one kind:
   something is a question.
 
 Examples of open_question:
+- "We need the bus schedules from New York to Philadelphia for Sunday morning, there's a few
+  companies." — question "Which buses run from New York City to Philadelphia on Sunday morning?"
+- "And cheapest. The sooner you book the cheaper it is, right?" (after that) — the cheapest fare.
 - "Is it an hour and a half to the farmhouse? I might be remembering summer traffic."
 - "What does Loom actually charge per seat these days?"
 - "I have no idea whether that place is even open on a Thursday."
@@ -34,6 +41,8 @@ Examples that are NOT open_question:
   this group has to decide what good enough means, so decision.
 - "Who's handling food?" — to_group.
 - "Who even reads a weekly status email anymore?" — rhetorical.
+- "We need to decide who's bringing the projector." — to_group: only this room can say.
+- "We should get the invites out by Friday." — none: a task for them, nothing to look up.
 - "Sotto, what do the competitors charge?" — none: that is a request to Sotto, handled elsewhere.
 - "No idea at all. I haven't looked at their pricing since last year." — none: a reply saying
   nobody present knows, to a question that has already been noticed.
