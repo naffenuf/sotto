@@ -371,6 +371,8 @@ export class Reservations {
    * — which, since opening one stops the last, would be neither.
    */
   private opening = false;
+  /** Stream time at which the line being said was handed to the voice. */
+  private openedAtStreamMs = Number.NEGATIVE_INFINITY;
   /** Set by {@link yieldToHuman}, so a stop is never mistaken for a yield. */
   private yielded = false;
   /** Set by {@link interrupt}: the yield was the barge-in's (V2-007). */
@@ -900,11 +902,18 @@ export class Reservations {
    * talking over. What was heard still reaches the transcript, and the claim
    * is not retried.
    */
-  yieldToHuman(): void {
+  yieldToHuman(turn?: Pick<TurnUpdate, "lastWordsMs">): void {
     // V3-017: a card the room called for is answered under the wake-word
     // rules, so the voice that asked for it does not take it away again.
     // Only {@link Reservations.interrupt} stops one.
     if (!this.opening || this.saying?.asked === true) return;
+    // A turn's end arrives after the turn: `speechEnd` and its flush frames
+    // land a second or two after the last word was said. Sotto opens its
+    // mouth in the quiet after that word, so those frames are not a voice
+    // in the room — the first take of the demo lost "I'll check the drive
+    // time" after one word to the very turn it was answering. A voice
+    // whose words have changed since this line opened is the real thing.
+    if (turn?.lastWordsMs !== undefined && turn.lastWordsMs <= this.openedAtStreamMs) return;
     this.yielded = true;
     this.logger.log(`[reserve] yielding to a voice in the room`);
     // A yield that arrives while the voice is still opening is remembered
@@ -1120,6 +1129,7 @@ export class Reservations {
   /** Says one line, and records what the room got of it. */
   private say(line: Pending, nowMs: number): void {
     this.opening = true;
+    this.openedAtStreamMs = this.options.streamNow();
     this.saying = line;
     this.yielded = false;
     this.bargedIn = false;

@@ -1104,7 +1104,7 @@ export class SessionManager {
         // V3-015: a voice in the room stops anything Sotto is saying unasked,
         // at any point in the utterance — no wake word and no classification.
         // This is the echo-filtered side, so Sotto never yields to itself.
-        loops.reservations?.yieldToHuman();
+        loops.reservations?.yieldToHuman(turn);
         barge.accept(turn, record, duringPlayback);
       },
       onEvent: (record) => store.writer?.appendEvent(record),

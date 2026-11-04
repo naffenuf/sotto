@@ -489,6 +489,27 @@ describe("Reservations: yielding", () => {
     expect(line.interrupted).toBe(true);
   });
 
+  it("does not yield to the tail of a turn that ended before it opened", async () => {
+    // The endpointer reports a turn's end a second or two after its last
+    // word, and the line Sotto started in that quiet must not be cut by it.
+    const voice = new FakeVoice();
+    const harness = setup(voice);
+    harness.reservations.claim(idea, asked());
+    harness.clock.advanceBy(PAUSE_MS);
+    await harness.tick();
+    expect(voice.opened).toBe(1);
+    const openedAt = harness.clock.now();
+
+    harness.reservations.yieldToHuman({ lastWordsMs: openedAt - 900 });
+    await harness.tick();
+    expect(voice.cancelled).toBe(0);
+
+    // Words that arrived after it opened are a voice in the room.
+    harness.reservations.yieldToHuman({ lastWordsMs: openedAt + 300 });
+    await harness.reservations.flush();
+    expect(voice.cancelled).toBe(1);
+  });
+
   it("is never retried", async () => {
     const voice = new FakeVoice();
     const harness = setup(voice);
