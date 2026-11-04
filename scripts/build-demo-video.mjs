@@ -10,7 +10,7 @@
 // Pieces are encoded to one format (1080p30 H.264, AAC 48 kHz stereo) and
 // joined with the concat demuxer; the whole thing is loudness-normalised last.
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { TAKE, timelinePath } from "./demo/config.mjs";
 import { alignWords, end, linesIn, resolveSegments, start } from "./demo/cut.mjs";
@@ -66,7 +66,8 @@ const CAPTION_ROW_PX = 66;
  * by length. Written to text files (drawtext's textfile), so nothing in the
  * dialogue has to survive filtergraph escaping.
  */
-function captions(seg, dir) {
+/** A segment's captions, segment-local: { from, to, rows, key }. */
+function captionEntries(seg) {
   const shown = [];
   for (const { line } of linesIn(analysis, seg)) {
     if (line.out - line.in < 0.3) continue;
@@ -105,10 +106,15 @@ function captions(seg, dir) {
   shown.forEach((c, i) => {
     if (shown[i + 1]) c.to = Math.min(c.to, shown[i + 1].from);
   });
+  return shown.filter((x) => x.to - x.from >= 0.2);
+}
+
+/** A segment's captions as drawtext filters. */
+function captions(seg, dir) {
   // One drawtext per caption row: this font draws a newline in a multi-line
   // textfile as a missing-glyph box.
   const filters = [];
-  for (const c of shown.filter((x) => x.to - x.from >= 0.2)) {
+  for (const c of captionEntries(seg)) {
     c.rows.forEach((row, r) => {
       const file = resolve(dir, `cap-${seg.name}-${c.key}-${r}.txt`);
       writeFileSync(file, row);
@@ -121,6 +127,46 @@ function captions(seg, dir) {
     });
   }
   return filters;
+}
+
+/**
+ * The whole programme's subtitles as SRT, beside the video: the slides'
+ * narration (read 0.4 s into each slide, as slide() delays it) and every
+ * segment's captions, placed on the programme clock.
+ */
+function writeSrt() {
+  const narration = JSON.parse(readFileSync(resolve("demo/narration/lines.json"), "utf8"));
+  const entries = [];
+  const slideLen = (name, tail = 0.9) => duration(resolve("demo/narration", `${name}.wav`)) + tail;
+  const narrate = (name, at) => {
+    const spoken = duration(resolve("demo/narration", `${name}.wav`));
+    const chunks = captionChunks(narration[name], CAPTION_LINE * CAPTION_LINES);
+    const total = chunks.reduce((n, c) => n + c.length, 0);
+    let t = at + 0.4;
+    for (const chunk of chunks) {
+      const len = spoken * (chunk.length / total);
+      entries.push({ from: t, to: t + len, rows: wrap(chunk, CAPTION_LINE) });
+      t += len;
+    }
+  };
+  let clock = 0;
+  for (const [name] of CUT.intro) {
+    narrate(name, clock);
+    clock += slideLen(name);
+  }
+  for (const seg of cut) {
+    for (const c of captionEntries(seg)) entries.push({ from: clock + c.from, to: clock + c.to, rows: c.rows });
+    clock += seg.to - seg.from - (seg.crossfadeOut ?? 0);
+  }
+  narrate("03-end", clock);
+  const stamp = (t) => {
+    const ms = Math.round(t * 1000);
+    const p = (n, w = 2) => String(n).padStart(w, "0");
+    return `${p(Math.floor(ms / 3_600_000))}:${p(Math.floor(ms / 60_000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+  };
+  const file = out.replace(/\.mp4$/, ".srt");
+  writeFileSync(file, entries.map((e, i) => `${i + 1}\n${stamp(e.from)} --> ${stamp(e.to)}\n${e.rows.join("\n")}\n`).join("\n"));
+  console.log(`${file}: ${entries.length} subtitles`);
 }
 /**
  * A line's text as captions: whole sentences together while they fit, a long
@@ -297,6 +343,7 @@ function dissolve(files) {
 }
 
 writeReview();
+writeSrt();
 if (CHECK_ONLY) process.exit(0);
 
 for (const [name, opts] of CUT.intro) slide(name, opts);

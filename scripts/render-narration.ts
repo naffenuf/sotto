@@ -5,7 +5,7 @@
  *   npm run demo:narration                 # every line
  *   npm run demo:narration -- 02-stack     # just the ones named
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { AUDIO_SAMPLE_RATE } from "../shared/audio.js";
 import { loadElevenLabsApiKey } from "../server/config.js";
@@ -13,15 +13,10 @@ import { DEFAULT_TTS_MODEL, synthesizeSpeech } from "../server/voice/elevenlabs.
 
 const ADAM = "pNInz6obpgDQGcFmaJgB";
 
-const LINES: Record<string, string> = {
-  // Short on purpose: Sotto's own hello, seconds later, says how it behaves,
-  // and the end card says where the code is.
-  "01-title": "This is Sotto: a voice agent that sits in your meeting and speaks only when it has something worth saying.",
-  "02-stack":
-    "It's built on Meta's Muse Spark for everything it writes, Muse Glimmer running locally " +
-    "for judgment calls, and Meta's realtime transcription. Let's watch a meeting.",
-  "03-end": "That's Sotto. The code is on GitHub, at naffenuf slash sotto.",
-};
+// The copy is demo/narration/lines.json, which the subtitles read too.
+// Short on purpose: Sotto's own hello, seconds later, says how it behaves,
+// and the end card says where the code is.
+const LINES: Record<string, string> = JSON.parse(readFileSync(resolve("demo/narration/lines.json"), "utf8"));
 
 function wav(pcm: Buffer): Buffer {
   const header = Buffer.alloc(44);

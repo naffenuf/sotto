@@ -1,0 +1,5 @@
+{
+  "01-title": "This is Sotto: a voice agent that sits in your meeting and speaks only when it has something worth saying.",
+  "02-stack": "It's built on Meta's Muse Spark for everything it writes, Muse Glimmer running locally for judgment calls, and Meta's realtime transcription. Let's watch a meeting.",
+  "03-end": "That's Sotto. The code is on GitHub, at naffenuf slash sotto."
+}
