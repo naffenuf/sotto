@@ -374,7 +374,7 @@ if (idleDots.transcription !== "idle" || idleDots.model !== "idle") {
 if (runningDots.transcription !== "active" || !["active", "connecting"].includes(runningDots.model)) {
   problems.push(`dots did not go active: ${JSON.stringify(runningDots)}`);
 }
-if (!runningState?.startsWith("Listening to Replay events: brainstorm")) {
+if (!runningState?.startsWith("Taking notes from Replay events: brainstorm")) {
   problems.push(`running state reads ${JSON.stringify(runningState)}`);
 }
 if (firstTextMs > 3_000) problems.push(`first text took ${firstTextMs} ms, over the 3 s budget`);

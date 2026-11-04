@@ -167,17 +167,6 @@ export function nowState(input: {
 }
 
 /**
- * The live line: the turn somebody is in the middle of saying, if any, else
- * the most recent one. What the Now zone fades through while listening, so
- * the room can see Sotto hears.
- */
-export function liveTurn(turns: readonly TurnUpdate[]): TurnUpdate | null {
-  if (turns.length === 0) return null;
-  const open = [...turns].reverse().find((turn) => !turn.final);
-  return open ?? turns[turns.length - 1] ?? null;
-}
-
-/**
  * Whether a card was said out loud, and whether the room cut it off, read off
  * Sotto's own transcript rows (V2-008a) and the card itself.
  *

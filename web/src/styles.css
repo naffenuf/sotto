@@ -1367,6 +1367,20 @@ body {
   color: var(--now);
 }
 
+/* Taking notes / Ready: the state is the whole message, so it is the size
+   the words of an answer would be, with a dot to match. */
+.now__state--big {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  gap: 0.8rem;
+}
+
+.now__state--big .now__pulse {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
 .now__pulse {
   width: 0.6rem;
   height: 0.6rem;
@@ -1396,26 +1410,6 @@ body {
 .now__sub {
   margin: 0;
   color: var(--ink-dim);
-}
-
-.now__live {
-  margin: 0;
-  font-size: 1.5rem;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-}
-
-.now__live-speaker {
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.now__cursor::after {
-  content: "▍";
-  margin-left: 0.1rem;
-  color: var(--accent);
-  animation: now-blink 1s steps(2) infinite;
 }
 
 .now[data-state="listening"] {

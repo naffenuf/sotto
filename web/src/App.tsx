@@ -34,7 +34,7 @@ import { Attention, Now } from "./Now.js";
 import { useAttention } from "./useAttention.js";
 import { useRaisedHand } from "./RaisedHand.js";
 import { Stage } from "./Stage.js";
-import { liveTurn, nowState, spokenMark } from "./stageView.js";
+import { nowState, spokenMark } from "./stageView.js";
 import { StatusDots } from "./StatusDots.js";
 import { TranscriptPanel, type TurnHighlight } from "./TranscriptPanel.js";
 import { useServerStatus } from "./useServerStatus.js";
@@ -325,8 +325,6 @@ export function App() {
               state={now}
               session={session}
               turnCount={events.turnCount}
-              live={liveTurn(events.turns)}
-              speakers={events.speakers}
               onStopVoice={onStopVoice}
             />
           }

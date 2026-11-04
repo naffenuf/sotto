@@ -190,12 +190,12 @@ if (deniedDots.transcription !== "idle") {
 if (runningDots.transcription !== "active") {
   problems.push(`the transcription dot did not go active: ${JSON.stringify(runningDots)}`);
 }
-if (!runningState?.startsWith("Listening to Microphone")) {
+if (!runningState?.startsWith("Taking notes from Microphone")) {
   problems.push(`the stage reads ${JSON.stringify(runningState)}`);
 }
 if (problemWhileRunning !== null) problems.push(`an error while running: ${problemWhileRunning}`);
 if (problemAfterReload !== null) problems.push(`an error after the reload: ${problemAfterReload}`);
-if (!stateAfterReload?.startsWith("Listening to Microphone")) {
+if (!stateAfterReload?.startsWith("Taking notes from Microphone")) {
   problems.push(`after the reload the stage reads ${JSON.stringify(stateAfterReload)}`);
 }
 // The reloaded page rejoined: the same session went on counting audio, by at

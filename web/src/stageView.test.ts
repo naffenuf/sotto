@@ -5,7 +5,6 @@ import {
   QUIET_TRAY_MS,
   arrangeCards,
   foldCard,
-  liveTurn,
   nextTrayDueAt,
   nowState,
   raisedCards,
@@ -230,22 +229,6 @@ describe("nowState", () => {
 function turn(turnId: string, text: string, final: boolean, startMs: number) {
   return { turnId, speaker: "A", text, final, startMs, endMs: final ? startMs + 1 : null, speakerMappingUncertain: false };
 }
-
-describe("liveTurn", () => {
-  it("is null with no turns", () => {
-    expect(liveTurn([])).toBeNull();
-  });
-
-  it("prefers the turn somebody is in the middle of", () => {
-    const turns = [turn("0:1", "done", true, 0), turn("0:2", "still goi", false, 5), turn("0:3", "late final", true, 3)];
-    expect(liveTurn(turns)?.turnId).toBe("0:2");
-  });
-
-  it("falls back to the most recent turn", () => {
-    const turns = [turn("0:1", "first", true, 0), turn("0:2", "second", true, 5)];
-    expect(liveTurn(turns)?.turnId).toBe("0:2");
-  });
-});
 
 describe("spokenMark", () => {
   it("reads an answer's own transcript row", () => {

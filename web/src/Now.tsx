@@ -1,14 +1,14 @@
 /**
  * The Now zone: what Sotto is doing this second, at the top of the stage.
  *
- * Listening (most of a meeting), looking something up, waiting for a gap to
+ * Taking notes (most of a meeting), looking something up, waiting for a gap to
  * say a line it has already written, or speaking — with the words as they
  * are handed to the voice and Stop right beside them. The one part of the
  * stage that moves, so the room can see Sotto hear, think and wait rather
  * than only see what it has already said. `nowState` decides which.
  */
-import type { SessionInfo, SpeakerNames, StageCard, TurnUpdate, WaitingLine } from "../../shared/index.js";
-import { SOTTO_SPEAKER, describeSource } from "../../shared/index.js";
+import type { SessionInfo, StageCard, WaitingLine } from "../../shared/index.js";
+import { describeSource } from "../../shared/index.js";
 import { KIND_LABEL } from "./Card.js";
 import type { NowState } from "./stageView.js";
 import type { AttentionMode } from "./useAttention.js";
@@ -17,9 +17,6 @@ export interface NowProps {
   state: NowState;
   session: SessionInfo | null;
   turnCount: number;
-  /** The turn somebody is in the middle of, faded through while listening. */
-  live: TurnUpdate | null;
-  speakers: SpeakerNames;
   /** Stops the voice mid-sentence (V2-004). */
   onStopVoice?: (() => void) | undefined;
 }
@@ -36,7 +33,7 @@ const WAITING_LABEL: Record<string, string> = {
   ideas: "Ideas",
 };
 
-export function Now({ state, session, turnCount, live, speakers, onStopVoice }: NowProps) {
+export function Now({ state, session, turnCount, onStopVoice }: NowProps) {
   return (
     <div className="now" data-testid="now" data-state={state.kind} data-idle={session === null ? "true" : undefined}>
       {state.kind === "speaking" && (
@@ -44,9 +41,7 @@ export function Now({ state, session, turnCount, live, speakers, onStopVoice }: 
       )}
       {state.kind === "working" && <Working card={state.card} />}
       {state.kind === "waiting" && <Waiting line={state.line} behind={state.behind} />}
-      {state.kind === "listening" && (
-        <Listening session={session} turnCount={turnCount} live={live} speakers={speakers} />
-      )}
+      {state.kind === "listening" && <Listening session={session} turnCount={turnCount} />}
     </div>
   );
 }
@@ -141,42 +136,23 @@ function Waiting({ line, behind }: { line: WaitingLine; behind: number }) {
   );
 }
 
-function Listening({
-  session,
-  turnCount,
-  live,
-  speakers,
-}: {
-  session: SessionInfo | null;
-  turnCount: number;
-  live: TurnUpdate | null;
-  speakers: SpeakerNames;
-}) {
+function Listening({ session, turnCount }: { session: SessionInfo | null; turnCount: number }) {
+  // No transcript here: the room does not need to see its own words back,
+  // and a sentence left in this box read as Sotto being stuck on it. The
+  // state is the whole message, so it is set large.
   return (
     <div>
-      <p className="now__state">
+      <p className="now__state now__state--big">
         <Pulse />
-        {session === null ? "Not listening" : "Listening"}
+        {session === null ? "Ready" : "Taking notes"}
       </p>
-      {live !== null && session !== null && (
-        <p className="now__live" data-testid="now-live">
-          <span className="now__live-speaker">{speakerText(live.speaker, speakers)}</span> {live.text}
-          {!live.final && <span className="now__cursor" aria-hidden="true" />}
-        </p>
-      )}
       <p className="now__sub stage__hint" data-testid="session-state">
         {session === null
-          ? "Sotto listens to a brainstorm and speaks up only when it matters."
-          : `Listening to ${describeSource(session.source)} — ${turnCount} turns so far.`}
+          ? "Press Start and Sotto joins the conversation."
+          : `Taking notes from ${describeSource(session.source)} — ${turnCount} turns so far.`}
       </p>
     </div>
   );
-}
-
-function speakerText(label: string | null, speakers: SpeakerNames): string {
-  if (label === null) return "";
-  if (label === SOTTO_SPEAKER) return `${SOTTO_SPEAKER}:`;
-  return `${speakers[label] ?? label}:`;
 }
 
 /** The last word boundary at or before `at`, so a word lights up whole. */
