@@ -67,9 +67,14 @@ const CAPTION_ROW_PX = 66;
  * dialogue has to survive filtergraph escaping.
  */
 function captions(seg, dir) {
-  const filters = [];
+  const shown = [];
   for (const { line } of linesIn(analysis, seg)) {
     if (line.out - line.in < 0.3) continue;
+    // A line that began before the segment and is mostly outside it is not
+    // captioned: its words are not in the video. (One that starts inside and
+    // runs past the end, like a long hello, keeps the captions that fit.)
+    const inside = Math.min(line.out, seg.to) - Math.max(line.in, seg.from);
+    if (line.in < seg.from - 0.1 && inside < (line.out - line.in) / 2) continue;
     const raw = line.unlisted ? sentence(line.words.map((w) => w.w).join(" ")) : line.text;
     const text = line.voice === "S" ? raw : CAPTION_FIXES.reduce((t, [from, to]) => t.replace(from, to), raw);
     if (!text) continue;
@@ -91,20 +96,28 @@ function captions(seg, dir) {
     chunks.forEach((chunk, k) => {
       const from = Math.max(starts[k], seg.from) - seg.from;
       const to = Math.min(k === chunks.length - 1 ? line.out + 0.3 : starts[k + 1], seg.to) - seg.from;
-      if (to - from < 0.2) return;
-      // One drawtext per caption line: this font draws a newline in a
-      // multi-line textfile as a missing-glyph box.
-      const rows = wrap(`${who}: ${chunk}`, CAPTION_LINE);
-      rows.forEach((row, r) => {
-        const file = resolve(dir, `cap-${seg.name}-${line.id}-${k}-${r}.txt`);
-        writeFileSync(file, row);
-        const y = `h-70-${(rows.length - r) * CAPTION_ROW_PX}`;
-        filters.push(
-          `drawtext=fontfile=${FONT}:textfile=${file}:fontsize=42:fontcolor=white:` +
-          `box=1:boxcolor=black@0.7:boxborderw=12:x=(w-text_w)/2:y=${y}:` +
-          `enable='between(t,${from.toFixed(2)},${to.toFixed(2)})'`,
-        );
-      });
+      shown.push({ from, to, rows: wrap(`${who}: ${chunk}`, CAPTION_LINE), key: `${line.id}-${k}` });
+    });
+  }
+  // One caption at a time: when two people overlap, the earlier caption gives
+  // way to the later one rather than both drawing in the same place.
+  shown.sort((x, y) => x.from - y.from);
+  shown.forEach((c, i) => {
+    if (shown[i + 1]) c.to = Math.min(c.to, shown[i + 1].from);
+  });
+  // One drawtext per caption row: this font draws a newline in a multi-line
+  // textfile as a missing-glyph box.
+  const filters = [];
+  for (const c of shown.filter((x) => x.to - x.from >= 0.2)) {
+    c.rows.forEach((row, r) => {
+      const file = resolve(dir, `cap-${seg.name}-${c.key}-${r}.txt`);
+      writeFileSync(file, row);
+      const y = `h-70-${(c.rows.length - r) * CAPTION_ROW_PX}`;
+      filters.push(
+        `drawtext=fontfile=${FONT}:textfile=${file}:fontsize=42:fontcolor=white:` +
+        `box=1:boxcolor=black@0.7:boxborderw=12:x=(w-text_w)/2:y=${y}:` +
+        `enable='between(t,${c.from.toFixed(2)},${c.to.toFixed(2)})'`,
+      );
     });
   }
   return filters;
