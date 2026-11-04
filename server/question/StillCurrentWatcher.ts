@@ -56,8 +56,14 @@ interface Watched {
   kind: StillCurrentKind;
   question: string;
   answer: string;
-  /** Session clock when the question went final; later turns are the context. */
-  askedAtMs: number;
+  /**
+   * The {@link Seen.seq} of the turn the question was asked in; turns with a
+   * higher sequence number are "since". A sequence number rather than a
+   * time, because a live turn is on the stream's clock and the question's
+   * moment is on the server's, and comparing the two once held every
+   * unprompted line until it expired (`sessions/2026-11-03_2109-mic`).
+   */
+  askedSeq: number;
   state: StillCurrentState;
   /** A turn arrived while a check was in flight, so the verdict is stale. */
   stale: boolean;
@@ -86,11 +92,19 @@ const CURRENT: StillCurrentState = {
   coversTurnId: null,
 };
 
+/** A final human turn as the watcher remembers it: numbered by arrival. */
+interface Seen {
+  turn: TurnUpdate;
+  seq: number;
+}
+
 export class StillCurrentWatcher {
   private readonly wall: Clock;
   private readonly watched = new Map<string, Watched>();
   /** Final turns of the conversation, newest last: the checks' context. */
-  private readonly history: TurnUpdate[] = [];
+  private readonly history: Seen[] = [];
+  /** Sequence number of the newest turn accepted; 0 before any. */
+  private seq = 0;
   private readonly pending = new Set<Promise<void>>();
   private readonly controllers = new Set<AbortController>();
   private stopped = false;
@@ -113,15 +127,22 @@ export class StillCurrentWatcher {
       kind?: StillCurrentKind;
       question: string;
       answer: string;
-      askedAtMs: number;
+      /**
+       * The turn the question (or claim, or decision) was heard in. Turns
+       * that arrived after it are what a check reads; one the watcher has not
+       * seen — or `null` — means nothing said so far counts, only what comes
+       * next.
+       */
+      sinceTurnId: string | null;
     },
   ): void {
     if (this.stopped || this.watched.has(ideaId)) return;
+    const seen = this.history.find((one) => one.turn.turnId === asked.sinceTurnId);
     this.watched.set(ideaId, {
       kind: asked.kind ?? "question",
       question: asked.question,
       answer: asked.answer,
-      askedAtMs: asked.askedAtMs,
+      askedSeq: seen?.seq ?? this.seq,
       state: CURRENT,
       stale: true,
       inFlight: false,
@@ -136,7 +157,7 @@ export class StillCurrentWatcher {
 
   /** The newest human final turn this watcher has seen, or `null`. */
   latestTurnId(): string | null {
-    return this.history.at(-1)?.turnId ?? null;
+    return this.history.at(-1)?.turn.turnId ?? null;
   }
 
   /**
@@ -161,8 +182,9 @@ export class StillCurrentWatcher {
   /** Final turns only: a partial is the same words arriving again. */
   acceptTurn(turn: TurnUpdate): void {
     if (this.stopped || !turn.final || isSottoTurn(turn)) return;
-    if (this.history.some((previous) => previous.turnId === turn.turnId)) return;
-    this.history.push(turn);
+    if (this.history.some((previous) => previous.turn.turnId === turn.turnId)) return;
+    this.seq += 1;
+    this.history.push({ turn, seq: this.seq });
     if (this.history.length > STILL_CURRENT_CONTEXT_TURNS) this.history.shift();
     for (const ideaId of this.watched.keys()) this.check(ideaId);
   }
@@ -187,12 +209,13 @@ export class StillCurrentWatcher {
       watched.stale = true;
       return;
     }
-    const since = this.history.filter(
-      (turn) => (turn.endMs ?? turn.startMs) > watched.askedAtMs,
-    );
-    // Nobody has spoken since the question, so nothing can have moved on.
+    const since = this.history
+      .filter((seen) => seen.seq > watched.askedSeq)
+      .map((seen) => seen.turn);
+    // Nobody has spoken since the question, so nothing can have moved on —
+    // and that verdict covers everything said so far, the question included.
     if (since.length === 0) {
-      watched.state = { ...CURRENT, turns: 0, coversTurnId: null };
+      watched.state = { ...CURRENT, turns: 0, coversTurnId: this.latestTurnId() };
       watched.stale = false;
       this.options.onVerdict?.(ideaId);
       return;

@@ -2903,7 +2903,9 @@ describe("SessionManager, what the room wonders aloud (V3-002)", () => {
     // turn that arrived before the pause — the watcher sees each turn before
     // the speaking queue does, and an unprompted line waits for a verdict
     // that covers the latest one.
-    expect(answers[0]?.["stillCurrent"]).toMatchObject({ verdict: "current", fallback: false });
+    // Nobody spoke between the question and the answer (a max replay's
+    // search takes no time), so the verdict is current with no call made.
+    expect(answers[0]?.["stillCurrent"]).toMatchObject({ verdict: "current", turns: 0 });
 
     // Said out loud, and in the transcript as Sotto's, after the claim.
     const mine = published.filter(isSottoTurn).map((turn) => turn.text);

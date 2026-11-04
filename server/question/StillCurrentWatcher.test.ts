@@ -11,7 +11,7 @@ import type { StillCurrentInput } from "./stillCurrent.js";
 const asked = {
   question: "How long is the drive from the city to the farmhouse?",
   answer: "About two hours fifteen.",
-  askedAtMs: 10_000,
+  sinceTurnId: "0:1",
 };
 
 function turn(turnId: string, text: string, endMs: number): TurnUpdate {
@@ -211,7 +211,7 @@ describe("StillCurrentWatcher", () => {
   it("says which turn a verdict covers, and is uncovered while a newer turn is being judged", async () => {
     let release = (_value: unknown): void => {};
     const t = setup(() => new Promise((resolve) => { release = resolve; }));
-    t.watcher.watch("idea-1", { question: "the drive time?", answer: "two hours", askedAtMs: 0 });
+    t.watcher.watch("idea-1", { question: "the drive time?", answer: "two hours", sinceTurnId: null });
     // Nobody has spoken since the question: covered, with no call.
     expect(t.watcher.covers("idea-1")).toBe(true);
     expect(t.watcher.verdict("idea-1")?.coversTurnId).toBeNull();
@@ -246,7 +246,7 @@ describe("StillCurrentWatcher", () => {
       onTiming: () => {},
       onVerdict: (ideaId) => landed.push(ideaId),
     });
-    watcher.watch("idea-1", { question: "q", answer: "a", askedAtMs: 0 });
+    watcher.watch("idea-1", { question: "q", answer: "a", sinceTurnId: null });
     expect(landed).toEqual(["idea-1"]);
     watcher.acceptTurn(turn("0:1", "hm", 5_000));
     await watcher.flush();

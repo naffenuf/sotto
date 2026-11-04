@@ -1563,7 +1563,7 @@ export class SessionManager {
           kind: "correction",
           question: correctedClaim(interjection),
           answer: line,
-          askedAtMs: candidate.createdAtMs,
+          sinceTurnId: candidate.evidence[0]?.turnId ?? candidate.evidenceTurnIds[0] ?? null,
         });
         reservations.correction({
           candidateId: candidate.id,
@@ -1748,7 +1748,9 @@ export class SessionManager {
         stillCurrent.watch(packet.ideaId, {
           question: idea?.question ?? packet.title,
           answer: spoken === "" ? packet.teaser : spoken,
-          askedAtMs: clock.now(),
+          // An offer is about the world, not a moment: only what the room
+          // says from here on can move on from it.
+          sinceTurnId: null,
         });
         reservations.offer({
           offerId: packet.id,
@@ -1915,7 +1917,7 @@ export class SessionManager {
           kind: "decision",
           question: request.decision,
           answer: request.text,
-          askedAtMs: clock.now(),
+          sinceTurnId: request.turnId,
         });
         reservations.readBack(request);
       },
@@ -1983,7 +1985,7 @@ export class SessionManager {
         stillCurrent.watch(packet.ideaId, {
           question: asked.question,
           answer: spoken,
-          askedAtMs: asked.askedAtMs,
+          sinceTurnId: asked.turnId,
         });
       }
       reservations.answer(packet);
@@ -2224,7 +2226,7 @@ export class SessionManager {
         stillCurrent.watch(ideas.id, {
           question: ideas.stuckOn,
           answer: ideas.ideas.join(" "),
-          askedAtMs: clock.now(),
+          sinceTurnId: null,
         });
         return reservations.offer({
           offerId: ideas.id,
