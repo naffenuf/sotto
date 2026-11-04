@@ -12,6 +12,7 @@ import {
   ADDRESS_SETTLE_MS,
   ADDRESS_TIMEOUT_MS,
   AddressWatcher,
+  ADDRESS_STALL_FINAL_MS,
 } from "./AddressWatcher.js";
 import type { AddressClassifier, AddressInput } from "./address.js";
 
@@ -422,7 +423,8 @@ describe("checking a settled partial early", () => {
   it("leaves no timer behind and starts nothing new after Stop", async () => {
     const t = setup(() => new Promise(() => {}));
     t.watcher.acceptTurn(turn(" Soto, lunch", "0:1", null, false));
-    expect(t.clock.pending).toBe(1);
+    // The settle timer and the stall timer.
+    expect(t.clock.pending).toBe(2);
     t.watcher.stop();
     expect(t.clock.pending).toBe(0);
     t.clock.advanceBy(ADDRESS_SETTLE_MS);
@@ -465,6 +467,60 @@ describe("being called on (V3-017)", () => {
     expect(t.calledOn).toEqual([{ turnId: "0:1", speaker: "A", question: "" }]);
     expect(t.timing).toContainEqual(expect.objectContaining({ stage: "address", kind: "call_on", lexical: true }));
     expect(t.questions).toEqual([]);
+  });
+
+  it("acts on 'go ahead' once its words have stalled, without waiting for a final", async () => {
+    // The API has been seen to leave a short line open until the next
+    // speech ("Sotto, go ahead" sat for 20 s in a demo take, 55 s in
+    // `2026-11-03_2109-mic`), so the watcher finalizes a stalled named turn
+    // itself and reads what the API later appended as a turn of its own.
+    const t = setup(async () => ({ kind: "request", question: "should never be asked" }), 1);
+    t.watcher.acceptTurn(turn("Sotto, go ahead.", "0:1", "A", false));
+    t.clock.advanceBy(ADDRESS_STALL_FINAL_MS - 100);
+    await t.watcher.flush();
+    expect(t.calledOn).toEqual([]);
+    t.clock.advanceBy(100);
+    await t.watcher.flush();
+    await t.clock.settle();
+    expect(t.calledOn).toEqual([{ turnId: "0:1", speaker: "A", question: "" }]);
+    expect(t.timing).toContainEqual(expect.objectContaining({ stage: "address_stall_final", turnId: "0:1" }));
+
+    // The API's own final, 20 s later, carrying the next thing said as well.
+    t.clock.advanceBy(20_000);
+    t.watcher.acceptTurn(turn("Sotto, go ahead. Sotto, what does Eventbrite charge per ticket?", "0:1", "A", true));
+    await t.watcher.flush();
+    await t.clock.settle();
+    expect(t.calledOn).toHaveLength(1);
+    // The remainder is classified on its own, as a turn of its own.
+    expect(t.calls.at(-1)?.turn.text).toBe("Sotto, what does Eventbrite charge per ticket?");
+    expect(t.questions).toEqual([expect.objectContaining({ turnId: "0:1+", speaker: "A" })]);
+  });
+
+  it("ignores the API's final for a stalled turn when it adds nothing", async () => {
+    const t = setup(async () => ({ kind: "request", question: "never" }), 1);
+    t.watcher.acceptTurn(turn("Sotto, go ahead.", "0:1", "A", false));
+    t.clock.advanceBy(ADDRESS_STALL_FINAL_MS);
+    await t.watcher.flush();
+    await t.clock.settle();
+    t.watcher.acceptTurn(turn("Sotto, go ahead.", "0:1", "A", true));
+    await t.watcher.flush();
+    await t.clock.settle();
+    expect(t.calledOn).toHaveLength(1);
+    expect(t.calls).toEqual([]);
+  });
+
+  it("does not finalize a stalled turn whose words are still changing", async () => {
+    const t = setup(async () => ({ kind: "request", question: "never" }), 1);
+    t.watcher.acceptTurn(turn("Sotto, go", "0:1", "A", false));
+    t.clock.advanceBy(ADDRESS_STALL_FINAL_MS - 500);
+    t.watcher.acceptTurn(turn("Sotto, go ahead.", "0:1", "A", false));
+    t.clock.advanceBy(ADDRESS_STALL_FINAL_MS - 500);
+    await t.watcher.flush();
+    expect(t.calledOn).toEqual([]);
+    t.clock.advanceBy(500);
+    await t.watcher.flush();
+    await t.clock.settle();
+    expect(t.calledOn).toHaveLength(1);
   });
 
   it("asks the classifier about 'go ahead' when nothing is raised", async () => {

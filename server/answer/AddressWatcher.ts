@@ -108,6 +108,22 @@ export const ADDRESS_SETTLE_MS = 600;
 /** Words a final may add to a checked `mention` before it is read again. */
 export const ADDRESS_EXTENSION_WORDS = 3;
 
+/**
+ * How long a named turn's words may hold still, with no final, before the
+ * watcher treats it as final itself.
+ *
+ * The transcription API does not always close a turn: after a short line
+ * followed by quiet ("Sotto, go ahead", "Um, so, go ahead" in
+ * `sessions/2026-11-03_2109-mic`, 55 s) it has been seen to wait for the
+ * *next* speech and merge the two, so the call-on sat unanswered until
+ * somebody said something else. The pause side already counts silence from
+ * the last word; this is the same rule for intent. 2.5 s is well past the
+ * ~0.65 s the endpointer normally takes and past the p90 gap between
+ * mid-speech partials (641 ms), so a turn still open and unchanged this long
+ * is one the API is not going to close on its own.
+ */
+export const ADDRESS_STALL_FINAL_MS = 2_500;
+
 /** What one classification came to, once it has been through the schema. */
 type AddressResult = {
   kind: "request" | "name_only" | "mention" | "call_on";
@@ -169,6 +185,10 @@ export class AddressWatcher {
   private readonly listeningTurns = new Set<string>();
   private readonly armed = new Map<string, ArmedSpeaker>();
   private readonly settling = new Map<string, Settling>();
+  /** Stall timers for named partials, by turn: fires {@link finalizeStalled}. */
+  private readonly stalling = new Map<string, Settling>();
+  /** Turns this watcher finalized itself, with the text it acted on. */
+  private readonly selfFinal = new Map<string, string>();
   private readonly early = new Map<string, EarlyCheck>();
   /** Real time each turn's `speechEnd` reached the server, for `speechEndToAckMs`. */
   private readonly heard = new Map<string, number>();
@@ -201,7 +221,20 @@ export class AddressWatcher {
   acceptTurn(turn: TurnUpdate): void {
     // Sotto's own line is in the transcript (V2-008a), never in its ears.
     if (isSottoTurn(turn)) return;
-    if (this.stopped || this.seen.has(turn.turnId) || this.ignored.has(turn.turnId)) return;
+    if (this.stopped || this.ignored.has(turn.turnId)) return;
+    // The API's final for a turn this watcher already finalized on a stall:
+    // the same words are done with, and words it appended afterwards — the
+    // next thing the room said, merged in — are read as a turn of their own.
+    const acted = this.selfFinal.get(turn.turnId);
+    if (acted !== undefined && turn.final) {
+      this.selfFinal.delete(turn.turnId);
+      const text = turn.text.trim();
+      const remainder = text.startsWith(acted) ? text.slice(acted.length).trim() : text === acted ? "" : text;
+      if (remainder === "") return;
+      this.acceptTurn({ ...turn, turnId: `${turn.turnId}+`, text: remainder });
+      return;
+    }
+    if (this.seen.has(turn.turnId)) return;
     const named = detectsAddress(turn.text);
     if (named) this.listeningTurns.add(turn.turnId);
     else this.listeningTurns.delete(turn.turnId);
@@ -210,8 +243,12 @@ export class AddressWatcher {
       // A closed partial is `speechEnd`: the room has stopped talking, which
       // is where the acknowledgment latency is measured from.
       if (turn.endMs !== null) this.noteSpeechEnd(turn.turnId);
-      if (named) this.watchPartial(turn);
-      else this.unwatch(turn.turnId);
+      if (named) {
+        this.watchPartial(turn);
+        this.watchStall(turn);
+      } else {
+        this.unwatch(turn.turnId);
+      }
       return;
     }
     this.unwatch(turn.turnId);
@@ -232,7 +269,9 @@ export class AddressWatcher {
   stop(): void {
     this.stopped = true;
     this.active?.abort();
-    for (const turnId of [...this.settling.keys(), ...this.early.keys()]) this.abandon(turnId);
+    for (const turnId of [...this.settling.keys(), ...this.stalling.keys(), ...this.early.keys()]) {
+      this.abandon(turnId);
+    }
     for (const speaker of this.armed.keys()) this.disarm(speaker);
     this.listeningTurns.clear();
     this.publishListening();
@@ -308,6 +347,39 @@ export class AddressWatcher {
   private unwatch(turnId: string): void {
     this.settling.get(turnId)?.cancel();
     this.settling.delete(turnId);
+    this.stalling.get(turnId)?.cancel();
+    this.stalling.delete(turnId);
+  }
+
+  /**
+   * Arms the stall timer for a named partial, reset by every change of text:
+   * when it fires the turn is treated as final ({@link ADDRESS_STALL_FINAL_MS}).
+   */
+  private watchStall(turn: TurnUpdate): void {
+    const text = turn.text.trim();
+    if (text === "") return;
+    const stalling = this.stalling.get(turn.turnId);
+    if (stalling?.text === text) return;
+    stalling?.cancel();
+    const cancel = this.options.clock.setTimeout(() => {
+      this.stalling.delete(turn.turnId);
+      this.finalizeStalled(turn);
+    }, ADDRESS_STALL_FINAL_MS);
+    this.stalling.set(turn.turnId, { text, cancel });
+  }
+
+  /** The API has not closed this turn and its words have stopped: act on them now. */
+  private finalizeStalled(turn: TurnUpdate): void {
+    if (this.stopped || this.seen.has(turn.turnId) || this.ignored.has(turn.turnId)) return;
+    const text = turn.text.trim();
+    this.options.onTiming({
+      stage: "address_stall_final", atMs: this.options.clock.now(), turnId: turn.turnId,
+      characters: text.length,
+    });
+    this.acceptTurn({ ...turn, final: true, endMs: turn.endMs ?? turn.lastWordsMs ?? turn.startMs });
+    // Remembered *after* the dispatch, so the final just handed over is not
+    // itself read as the API's late one.
+    this.selfFinal.set(turn.turnId, text);
   }
 
   /** Verdicts still on their way after the deadline handed a turn to the fallback. */

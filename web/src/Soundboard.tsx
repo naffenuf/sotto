@@ -20,6 +20,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FixtureScript, FixtureTiming } from "../../shared/fixtures.js";
 import { MicCapture, startMicCaptureFrom } from "./audio/micCapture.js";
 
+/** Comfort noise on the mic bus: white noise at about -60 dBFS (see `start`). */
+const NOISE_FLOOR_GAIN = 0.001;
+
 /** The main script, from `?fixture=`; the ad-libs are always the same set. */
 const DEFAULT_FIXTURE = "launch-workshop";
 const EXTRAS_FIXTURE = "soundboard-extras";
@@ -180,21 +183,34 @@ export function Soundboard(): JSX.Element {
     setProblem(null);
     setStarting(true);
     try {
-      const ctx = new AudioContext({ latencyHint: "interactive" });
+      const params = new URLSearchParams(window.location.search);
+      const rate = Number(params.get("rate") ?? "0");
+      const ctx = new AudioContext({ latencyHint: "interactive", ...(rate > 0 ? { sampleRate: rate } : {}) });
       if (ctx.state === "suspended") await ctx.resume();
       // Everything fired is also summed, mono, into this node, which is what
       // the capture reads — in this same context, so no `MediaStream` hop.
       const mic = ctx.createGain();
       mic.channelCount = 1;
       mic.channelCountMode = "explicit";
-      // A clip's source node leaves the graph when it ends, and Chrome then
-      // hands the capture's worklet an input with no channels. The worklet
-      // treats that as silence now; this silent source keeps the input
-      // bus active as well, so the capture never depends on that reading.
-      const keepAlive = ctx.createConstantSource();
-      keepAlive.offset.value = 0;
-      keepAlive.connect(mic);
-      keepAlive.start();
+      // A real microphone never sends exact zeros, and the transcription
+      // API's endpointer turns out to need the noise: fed digital silence
+      // between clips it never closed a turn on its own — every speechEnd in
+      // the first two board takes arrived only when the *next* clip began
+      // (2.2 s median after the last word, against 0.7 s on a real mic), and
+      // "Sotto, go ahead" stayed open for 20 s until the next line merged
+      // into it. So the mic bus carries a faint noise floor, about -60 dBFS,
+      // which also keeps the input bus active between clips. It never goes
+      // to the speakers.
+      const floor = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const samples = floor.getChannelData(0);
+      for (let i = 0; i < samples.length; i += 1) samples[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = floor;
+      noise.loop = true;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = Number(params.get("noise") ?? NOISE_FLOOR_GAIN);
+      noise.connect(noiseGain).connect(mic);
+      noise.start();
       const response = await fetch("/api/session/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
