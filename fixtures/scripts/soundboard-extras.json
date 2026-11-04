@@ -1,0 +1,17 @@
+{
+  "lines": [
+    { "speaker": "B", "text": "Sotto, not now.", "pauseAfterMs": 1500 },
+    { "speaker": "A", "text": "Sotto, go ahead.", "pauseAfterMs": 1500 },
+    { "speaker": "A", "text": "Yes, please.", "pauseAfterMs": 1500 },
+    { "speaker": "B", "text": "No, thanks.", "pauseAfterMs": 1500 },
+    { "speaker": "A", "text": "Thanks, Sotto.", "pauseAfterMs": 1500 },
+    { "speaker": "B", "text": "Sotto, what did you find?", "pauseAfterMs": 1500 },
+    { "speaker": "A", "text": "Mm-hm.", "pauseAfterMs": 1500 },
+    { "speaker": "B", "text": "Hang on, let me think.", "pauseAfterMs": 1500 },
+    { "speaker": "A", "text": "Sotto, wrap us up.", "pauseAfterMs": 1500 }
+  ],
+  "wakeQuestions": [
+    { "line": 5, "question": "what did you find?" }
+  ],
+  "moments": []
+}

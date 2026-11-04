@@ -22,6 +22,17 @@ export function fixtureAudioPath(name: string): string {
   return join(FIXTURE_AUDIO_DIR, `${name}.wav`);
 }
 
+/** `fixtures/scripts/<name>.json`, the script the WAV was rendered from. */
+export const FIXTURE_SCRIPTS_DIR = fileURLToPath(new URL("../../fixtures/scripts/", import.meta.url));
+export function fixtureScriptPath(name: string): string {
+  return join(FIXTURE_SCRIPTS_DIR, `${name}.json`);
+}
+
+/** `fixtures/audio/<name>.timing.json`, written beside the WAV by the renderer. */
+export function fixtureTimingPath(name: string): string {
+  return join(FIXTURE_AUDIO_DIR, `${name}.timing.json`);
+}
+
 export class UnsupportedWavFormatError extends Error {
   constructor(path: string, problem: string) {
     super(

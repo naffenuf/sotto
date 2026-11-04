@@ -15,6 +15,8 @@
 
 /** Batch length, matching the 80 ms chunks the server's AudioSource takes. */
 const BATCH_MS = 80;
+/** One render quantum of silence, for a process() call with no input channel. */
+const SILENCE = new Float32Array(128);
 
 class MicCaptureProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -26,9 +28,12 @@ class MicCaptureProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
-    // No input yet (or the track ended): stay alive and wait for one.
-    if (!channel) return true;
+    // An input with no channel is not "no audio yet": Chrome hands over an
+    // empty input whenever nothing upstream is active — which, for a graph
+    // fed by clips rather than a microphone (the soundboard), is every gap
+    // between two clips. The stream the server reads has to stay continuous
+    // through those gaps, so a missing channel is a quantum of silence.
+    const channel = (inputs[0] && inputs[0][0]) || SILENCE;
 
     for (let i = 0; i < channel.length; i += 1) {
       this.batch[this.filled] = channel[i];

@@ -1,0 +1,334 @@
+{"atMs":524.964,"session":0,"frame":{"sessionId":"voyager/duplex/7582B071E9CE4AC1A802AD8441C169B4"}}
+{"atMs":525.8465,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":80}}
+{"atMs":543.861458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":160}}
+{"atMs":544.10875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":240}}
+{"atMs":544.1380829999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":320}}
+{"atMs":544.154292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":400}}
+{"atMs":606.078958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":480}}
+{"atMs":674.064958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":560}}
+{"atMs":674.150792,"session":0,"frame":{"type":"speechStart","audioProcessedMs":60,"turnId":0}}
+{"atMs":728.984333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":640}}
+{"atMs":805.7657499999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":720}}
+{"atMs":895.2505,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":800}}
+{"atMs":1043.2023330000002,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":880}}
+{"atMs":1191.1733749999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":960}}
+{"atMs":1191.2835,"session":0,"frame":{"type":"transcript","transcript":" Sotto, not","final":false,"audioProcessedMs":960}}
+{"atMs":1259.3635,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1040}}
+{"atMs":1259.4872500000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1120}}
+{"atMs":1259.515167,"session":0,"frame":{"type":"transcript","transcript":" Sotto, not now.","final":false,"audioProcessedMs":1120}}
+{"atMs":1287.4130420000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1200}}
+{"atMs":1360.319625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1280}}
+{"atMs":1456.815917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1360}}
+{"atMs":1567.5315420000002,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1440}}
+{"atMs":1662.8896250000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1520}}
+{"atMs":1693.844458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1600}}
+{"atMs":1802.06075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1680}}
+{"atMs":1853.569333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1760}}
+{"atMs":1927.3795420000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1840}}
+{"atMs":2093.276167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":1920}}
+{"atMs":2175.777458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2000}}
+{"atMs":2201.106292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2080}}
+{"atMs":2274.680083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2160}}
+{"atMs":2341.171208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2240}}
+{"atMs":2416.127667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2320}}
+{"atMs":2485.7133750000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2400}}
+{"atMs":2616.0771250000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2480}}
+{"atMs":2726.358917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2560}}
+{"atMs":2751.949042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2640}}
+{"atMs":2841.296375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2720}}
+{"atMs":2886.289083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2800}}
+{"atMs":2978.767083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2880}}
+{"atMs":3141.9104580000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":2960}}
+{"atMs":3142.018875,"session":0,"frame":{"type":"transcript","transcript":" Sotto, not now. ","final":false,"audioProcessedMs":2960}}
+{"atMs":3142.05175,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":2960}}
+{"atMs":3142.0922920000003,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":2460,"turnId":0}}
+{"atMs":3142.120125,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":2460,"turnId":0,"transcript":" Sotto, not now. "}}
+{"atMs":3172.942625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3040}}
+{"atMs":3291.310917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3120}}
+{"atMs":3291.511458,"session":0,"frame":{"type":"speechStart","audioProcessedMs":2620,"turnId":1}}
+{"atMs":3331.236417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3200}}
+{"atMs":3391.7825000000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3280}}
+{"atMs":3454.602583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3360}}
+{"atMs":3541.1808330000003,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3440}}
+{"atMs":3681.6965,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3520}}
+{"atMs":3681.788875,"session":0,"frame":{"type":"transcript","transcript":" Sotto, go","final":false,"audioProcessedMs":3520}}
+{"atMs":3770.0319580000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3600}}
+{"atMs":3799.036,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3680}}
+{"atMs":3852.189542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3760}}
+{"atMs":3946.2168330000004,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3840}}
+{"atMs":4044.2618330000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":3920}}
+{"atMs":4044.331833,"session":0,"frame":{"type":"transcript","transcript":" Sotto, go ahead.","final":false,"audioProcessedMs":3920}}
+{"atMs":4097.113125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4000}}
+{"atMs":4190.732417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4080}}
+{"atMs":4290.874958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4160}}
+{"atMs":4336.704375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4240}}
+{"atMs":4417.648042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4320}}
+{"atMs":4496.686375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4400}}
+{"atMs":4583.794083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4480}}
+{"atMs":4713.660625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4560}}
+{"atMs":4843.19275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4640}}
+{"atMs":4878.233125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4720}}
+{"atMs":4911.243125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4800}}
+{"atMs":4974.281083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4880}}
+{"atMs":5053.185583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":4960}}
+{"atMs":5133.353,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5040}}
+{"atMs":5241.478833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5120}}
+{"atMs":5330.200667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5200}}
+{"atMs":5363.87475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5280}}
+{"atMs":5450.761417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5360}}
+{"atMs":5531.88525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5440}}
+{"atMs":5619.340792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5520}}
+{"atMs":5761.71925,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5600}}
+{"atMs":5853.077125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5680}}
+{"atMs":5877.202417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5760}}
+{"atMs":5955.533792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5840}}
+{"atMs":5955.886583,"session":0,"frame":{"type":"transcript","transcript":" Sotto, go ahead. Yes,","final":false,"audioProcessedMs":5840}}
+{"atMs":6012.273833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":5920}}
+{"atMs":6083.278542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6000}}
+{"atMs":6164.309208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6080}}
+{"atMs":6286.2475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6160}}
+{"atMs":6286.364833,"session":0,"frame":{"type":"transcript","transcript":" Sotto, go ahead. Yes, please.","final":false,"audioProcessedMs":6160}}
+{"atMs":6369.2685,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6240}}
+{"atMs":6432.401917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6320}}
+{"atMs":6495.692917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6400}}
+{"atMs":6573.889292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6480}}
+{"atMs":6689.919042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6560}}
+{"atMs":6811.443625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6640}}
+{"atMs":6893.108542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6720}}
+{"atMs":6919.286,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6800}}
+{"atMs":6956.198458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6880}}
+{"atMs":7048.343667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":6960}}
+{"atMs":7127.341833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7040}}
+{"atMs":7197.5575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7120}}
+{"atMs":7334.6497500000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7200}}
+{"atMs":7425.782708000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7280}}
+{"atMs":7450.739917000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7360}}
+{"atMs":7528.346874999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7440}}
+{"atMs":7618.696042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7520}}
+{"atMs":7695.419542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7600}}
+{"atMs":7860.0248329999995,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7680}}
+{"atMs":7860.087417000001,"session":0,"frame":{"type":"transcript","transcript":" Sotto, go ahead. Yes, please. ","final":false,"audioProcessedMs":7680}}
+{"atMs":7860.099708,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":7680}}
+{"atMs":7860.107375,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":7180,"turnId":1}}
+{"atMs":7860.1162079999995,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":7180,"turnId":1,"transcript":" Sotto, go ahead. Yes, please. "}}
+{"atMs":7926.174208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7760}}
+{"atMs":7926.278542,"session":0,"frame":{"type":"speechStart","audioProcessedMs":7260,"turnId":2}}
+{"atMs":7957.2798330000005,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7840}}
+{"atMs":8018.316375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":7920}}
+{"atMs":8018.387042,"session":0,"frame":{"type":"transcript","transcript":" No","final":false,"audioProcessedMs":7920}}
+{"atMs":8094.950417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8000}}
+{"atMs":8173.878500000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8080}}
+{"atMs":8257.3895,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8160}}
+{"atMs":8383.637083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8240}}
+{"atMs":8383.739542,"session":0,"frame":{"type":"transcript","transcript":" No thanks.","final":false,"audioProcessedMs":8240}}
+{"atMs":8477.005958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8320}}
+{"atMs":8508.221958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8400}}
+{"atMs":8569.611542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8480}}
+{"atMs":8651.750792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8560}}
+{"atMs":8731.63325,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8640}}
+{"atMs":8909.047,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8720}}
+{"atMs":8909.258292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8800}}
+{"atMs":8986.171833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8880}}
+{"atMs":9052.20225,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":8960}}
+{"atMs":9122.500917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9040}}
+{"atMs":9203.488667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9120}}
+{"atMs":9281.45025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9200}}
+{"atMs":9431.325208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9280}}
+{"atMs":9528.651167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9360}}
+{"atMs":9554.784458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9440}}
+{"atMs":9598.5365,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9520}}
+{"atMs":9683.927,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9600}}
+{"atMs":9758.550792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9680}}
+{"atMs":9957.244958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9760}}
+{"atMs":9957.369333,"session":0,"frame":{"type":"transcript","transcript":" No thanks. ","final":false,"audioProcessedMs":9760}}
+{"atMs":9957.42225,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":9760}}
+{"atMs":9957.457917,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":9260,"turnId":2}}
+{"atMs":9957.47625,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":9260,"turnId":2,"transcript":" No thanks. "}}
+{"atMs":9957.569167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9840}}
+{"atMs":10079.370708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":9920}}
+{"atMs":10079.457875,"session":0,"frame":{"type":"speechStart","audioProcessedMs":9420,"turnId":3}}
+{"atMs":10110.423667000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10000}}
+{"atMs":10182.470542000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10080}}
+{"atMs":10287.993125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10160}}
+{"atMs":10288.042333,"session":0,"frame":{"type":"transcript","transcript":" Thanks,","final":false,"audioProcessedMs":10160}}
+{"atMs":10331.631,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10240}}
+{"atMs":10480.04025,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10320}}
+{"atMs":10581.869833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10400}}
+{"atMs":10645.060417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10480}}
+{"atMs":10645.134833,"session":0,"frame":{"type":"transcript","transcript":" Thanks, Sotto.","final":false,"audioProcessedMs":10480}}
+{"atMs":10672.135417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10560}}
+{"atMs":10724.876833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10640}}
+{"atMs":10798.744875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10720}}
+{"atMs":10882.014542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10800}}
+{"atMs":11006.011542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10880}}
+{"atMs":11077.406,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":10960}}
+{"atMs":11125.313958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11040}}
+{"atMs":11206.253917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11120}}
+{"atMs":11277.605458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11200}}
+{"atMs":11358.720875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11280}}
+{"atMs":11528.515708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11360}}
+{"atMs":11639.247917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11440}}
+{"atMs":11663.11725,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11520}}
+{"atMs":11693.91475,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11600}}
+{"atMs":11774.581458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11680}}
+{"atMs":11855.882333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11760}}
+{"atMs":11924.162042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11840}}
+{"atMs":12052.922792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":11920}}
+{"atMs":12146.483208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12000}}
+{"atMs":12174.411625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12080}}
+{"atMs":12244.466333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12160}}
+{"atMs":12334.302,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12240}}
+{"atMs":12577.518458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12320}}
+{"atMs":12577.58825,"session":0,"frame":{"type":"transcript","transcript":" Thanks, Sotto. ","final":false,"audioProcessedMs":12320}}
+{"atMs":12577.599167,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":12320}}
+{"atMs":12577.606208,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":11820,"turnId":3}}
+{"atMs":12577.61425,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":11820,"turnId":3,"transcript":" Thanks, Sotto. "}}
+{"atMs":12577.668,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12400}}
+{"atMs":12588.383125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12480}}
+{"atMs":12765.020625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12560}}
+{"atMs":12765.071333,"session":0,"frame":{"type":"speechStart","audioProcessedMs":12060,"turnId":4}}
+{"atMs":12765.082792,"session":0,"frame":{"type":"transcript","transcript":" Sotto,","final":false,"audioProcessedMs":12560}}
+{"atMs":12793.088667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12640}}
+{"atMs":12831.110542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12720}}
+{"atMs":12831.179375,"session":0,"frame":{"type":"transcript","transcript":" Sotto, what","final":false,"audioProcessedMs":12720}}
+{"atMs":12929.019208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12800}}
+{"atMs":12929.159792,"session":0,"frame":{"type":"transcript","transcript":" Sotto, what did you","final":false,"audioProcessedMs":12800}}
+{"atMs":12982.759917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12880}}
+{"atMs":13102.784292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":12960}}
+{"atMs":13203.317917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13040}}
+{"atMs":13223.445333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13120}}
+{"atMs":13291.619458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13200}}
+{"atMs":13372.837333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13280}}
+{"atMs":13477.806917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13360}}
+{"atMs":13477.929375,"session":0,"frame":{"type":"transcript","transcript":" Sotto, what did you find?","final":false,"audioProcessedMs":13360}}
+{"atMs":13519.87675,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13440}}
+{"atMs":13625.238542000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13520}}
+{"atMs":13718.059542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13600}}
+{"atMs":13785.121083,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13680}}
+{"atMs":13843.038583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13760}}
+{"atMs":13931.90825,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13840}}
+{"atMs":14008.865292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":13920}}
+{"atMs":14151.803708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14000}}
+{"atMs":14232.28075,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14080}}
+{"atMs":14263.850708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14160}}
+{"atMs":14325.474875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14240}}
+{"atMs":14399.6585,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14320}}
+{"atMs":14478.366292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14400}}
+{"atMs":14570.786375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14480}}
+{"atMs":14673.979375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14560}}
+{"atMs":14756.021417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14640}}
+{"atMs":14822.839958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14720}}
+{"atMs":14892.135583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14800}}
+{"atMs":15025.429292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14880}}
+{"atMs":15025.62775,"session":0,"frame":{"type":"transcript","transcript":" Sotto, what did you find? ","final":false,"audioProcessedMs":14880}}
+{"atMs":15025.728917,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":14880}}
+{"atMs":15025.746458,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":14380,"turnId":4}}
+{"atMs":15025.763042,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":14380,"turnId":4,"transcript":" Sotto, what did you find? "}}
+{"atMs":15049.079542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":14960}}
+{"atMs":15199.45575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15040}}
+{"atMs":15351.160750000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15120}}
+{"atMs":15351.302958,"session":0,"frame":{"type":"speechStart","audioProcessedMs":14620,"turnId":5}}
+{"atMs":15351.334667,"session":0,"frame":{"type":"transcript","transcript":" Mm-hmm.","final":false,"audioProcessedMs":15120}}
+{"atMs":15378.605417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15200}}
+{"atMs":15378.697333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15280}}
+{"atMs":15450.69525,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15360}}
+{"atMs":15527.744375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15440}}
+{"atMs":15608.278291999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15520}}
+{"atMs":15722.624042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15600}}
+{"atMs":15804.506916999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15680}}
+{"atMs":15848.217874999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15760}}
+{"atMs":15926.960167000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15840}}
+{"atMs":16002.138749999998,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":15920}}
+{"atMs":16087.134624999999,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16000}}
+{"atMs":16246.948667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16080}}
+{"atMs":16328.530792000001,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16160}}
+{"atMs":16356.87575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16240}}
+{"atMs":16411.687125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16320}}
+{"atMs":16508.701167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16400}}
+{"atMs":16580.819542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16480}}
+{"atMs":16650.979375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16560}}
+{"atMs":16774.339917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16640}}
+{"atMs":16921.11575,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16720}}
+{"atMs":16921.165250000002,"session":0,"frame":{"type":"transcript","transcript":" Mm-hmm. ","final":false,"audioProcessedMs":16720}}
+{"atMs":16921.175292,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":16720}}
+{"atMs":16921.181125,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":16220,"turnId":5}}
+{"atMs":16921.187667,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":16220,"turnId":5,"transcript":" Mm-hmm. "}}
+{"atMs":16971.359708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16800}}
+{"atMs":16971.42075,"session":0,"frame":{"type":"speechStart","audioProcessedMs":16300,"turnId":6}}
+{"atMs":17026.224833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16880}}
+{"atMs":17026.287125,"session":0,"frame":{"type":"transcript","transcript":" Hang on,","final":false,"audioProcessedMs":16880}}
+{"atMs":17053.570458,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":16960}}
+{"atMs":17128.951667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17040}}
+{"atMs":17297.761417,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17120}}
+{"atMs":17298.067042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17200}}
+{"atMs":17380.824708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17280}}
+{"atMs":17458.580875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17360}}
+{"atMs":17526.824333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17440}}
+{"atMs":17648.151792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17520}}
+{"atMs":17648.329625,"session":0,"frame":{"type":"transcript","transcript":" Hang on, let me","final":false,"audioProcessedMs":17520}}
+{"atMs":17689.949625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17600}}
+{"atMs":17819.751667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17680}}
+{"atMs":17923.957375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17760}}
+{"atMs":17950.295875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17840}}
+{"atMs":18042.431583,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":17920}}
+{"atMs":18042.636917,"session":0,"frame":{"type":"transcript","transcript":" Hang on, let me think.","final":false,"audioProcessedMs":17920}}
+{"atMs":18091.373958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18000}}
+{"atMs":18172.6795,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18080}}
+{"atMs":18253.460958,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18160}}
+{"atMs":18353.148375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18240}}
+{"atMs":18444.745125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18320}}
+{"atMs":18489.294667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18400}}
+{"atMs":18560.740792,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18480}}
+{"atMs":18657.35675,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18560}}
+{"atMs":18736.230125000002,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18640}}
+{"atMs":18868.289,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18720}}
+{"atMs":18942.718667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18800}}
+{"atMs":18974.344333,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18880}}
+{"atMs":19050.403542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":18960}}
+{"atMs":19124.27925,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19040}}
+{"atMs":19210.152375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19120}}
+{"atMs":19392.582833,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19200}}
+{"atMs":19392.748208,"session":0,"frame":{"type":"transcript","transcript":" Hang on, let me think. ","final":false,"audioProcessedMs":19200}}
+{"atMs":19392.875917,"session":0,"frame":{"type":"speaker","label":"A","audioProcessedMs":19200}}
+{"atMs":19392.894333,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":18700,"turnId":6}}
+{"atMs":19392.911667,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":18700,"turnId":6,"transcript":" Hang on, let me think. "}}
+{"atMs":19398.776125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19280}}
+{"atMs":19498.01975,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19360}}
+{"atMs":19532.898292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19440}}
+{"atMs":19645.344292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19520}}
+{"atMs":19645.56675,"session":0,"frame":{"type":"speechStart","audioProcessedMs":19020,"turnId":7}}
+{"atMs":19699.918917,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19600}}
+{"atMs":19770.445167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19680}}
+{"atMs":19918.648875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19760}}
+{"atMs":20013.782167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19840}}
+{"atMs":20085.204708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":19920}}
+{"atMs":20085.324458,"session":0,"frame":{"type":"transcript","transcript":" Sotto,","final":false,"audioProcessedMs":19920}}
+{"atMs":20116.002167,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20000}}
+{"atMs":20182.52275,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20080}}
+{"atMs":20182.58625,"session":0,"frame":{"type":"transcript","transcript":" Sotto, wrap","final":false,"audioProcessedMs":20080}}
+{"atMs":20258.580292,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20160}}
+{"atMs":20258.727042,"session":0,"frame":{"type":"transcript","transcript":" Sotto, wrap us","final":false,"audioProcessedMs":20160}}
+{"atMs":20329.511125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20240}}
+{"atMs":20441.231708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20320}}
+{"atMs":20526.849625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20400}}
+{"atMs":20575.311542,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20480}}
+{"atMs":20658.91625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20560}}
+{"atMs":20749.201125,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20640}}
+{"atMs":20749.30475,"session":0,"frame":{"type":"transcript","transcript":" Sotto, wrap us up.","final":false,"audioProcessedMs":20640}}
+{"atMs":20812.58425,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20720}}
+{"atMs":20965.739042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20800}}
+{"atMs":21069.423375,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20880}}
+{"atMs":21099.204625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":20960}}
+{"atMs":21132.423667,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21040}}
+{"atMs":21198.5785,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21120}}
+{"atMs":21290.936625,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21200}}
+{"atMs":21373.193208,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21280}}
+{"atMs":21490.875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21360}}
+{"atMs":21585.786875,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21440}}
+{"atMs":21615.880042,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21520}}
+{"atMs":21696.058708,"session":0,"frame":{"type":"audioProgress","audioProcessedMs":21600}}
+{"atMs":21799.586375,"session":0,"frame":{"type":"transcript","transcript":" Sotto, wrap us up. ","final":false,"audioProcessedMs":21600}}
+{"atMs":21799.701208,"session":0,"frame":{"type":"speaker","label":"B","audioProcessedMs":21600}}
+{"atMs":21799.724458,"session":0,"frame":{"type":"speechEnd","audioProcessedMs":21100,"turnId":7}}
+{"atMs":21799.742,"session":0,"frame":{"type":"speechComplete","audioProcessedMs":21100,"turnId":7,"transcript":" Sotto, wrap us up. "}}
+{"atMs":21830.267958,"session":0,"frame":{"type":"transcript","transcript":"","final":true,"audioProcessedMs":21600}}

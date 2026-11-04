@@ -284,9 +284,10 @@ export interface SessionManagerOptions {
   createReplaySource?: ReplaySourceFactory;
   /**
    * How often and how boldly the policy starts out (US-014, split in two by
-   * V2-017). The header changes both live.
+   * V2-017). The header changes both live. Either half may be left out and
+   * takes its default, which is what a test about one of them wants.
    */
-  settings?: PolicySettings;
+  settings?: Partial<PolicySettings>;
   /**
    * Who scores a candidate before the policy sees it (V2-016). Defaults to
    * {@link DEFAULT_GATE_MODE}, which V3-001 made `spark`: the observer's own

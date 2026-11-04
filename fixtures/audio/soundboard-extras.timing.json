@@ -1,0 +1,61 @@
+{
+  "name": "soundboard-extras",
+  "sampleRate": 24000,
+  "durationMs": 21591,
+  "lines": [
+    {
+      "index": 0,
+      "speaker": "B",
+      "startMs": 0,
+      "endMs": 888
+    },
+    {
+      "index": 1,
+      "speaker": "A",
+      "startMs": 2388,
+      "endMs": 3575
+    },
+    {
+      "index": 2,
+      "speaker": "A",
+      "startMs": 5075,
+      "endMs": 5762
+    },
+    {
+      "index": 3,
+      "speaker": "B",
+      "startMs": 7262,
+      "endMs": 7908
+    },
+    {
+      "index": 4,
+      "speaker": "A",
+      "startMs": 9408,
+      "endMs": 10204
+    },
+    {
+      "index": 5,
+      "speaker": "B",
+      "startMs": 11704,
+      "endMs": 12873
+    },
+    {
+      "index": 6,
+      "speaker": "A",
+      "startMs": 14373,
+      "endMs": 14821
+    },
+    {
+      "index": 7,
+      "speaker": "B",
+      "startMs": 16321,
+      "endMs": 17333
+    },
+    {
+      "index": 8,
+      "speaker": "A",
+      "startMs": 18833,
+      "endMs": 20091
+    }
+  ]
+}

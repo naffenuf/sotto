@@ -21,7 +21,7 @@ import {
 } from "./policy.js";
 
 /** Fixture names are file stems under `fixtures/`, never paths. */
-const FixtureNameSchema = z
+export const FixtureNameSchema = z
   .string()
   .min(1)
   .regex(/^[a-z0-9][a-z0-9-]*$/, "fixture names are lowercase, digits and dashes");

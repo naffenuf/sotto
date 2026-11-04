@@ -83,38 +83,43 @@ still-current check runs at `reasoning_effort: "minimal"` (`server/question/stil
 which on the other gated classifiers halved the latency with identical verdicts — re-read
 `timing.jsonl`'s `still_current` lines on the next take to confirm it covers in time.
 
-So the video is recorded **live, voices only**: Craig and EJ read
-`tasks/checkpoint-speaking-lines.md` (it already has the "go quiet" cues) into the microphone
-with the screen recorded. The product's thesis is reacting to a room; a room that cannot react
-makes it look worse than it is. The WAV take stays as the safety copy and as B-roll.
+So the video is recorded from the **soundboard** (`/dev/soundboard`): the scripted lines, fired
+by hand on cue, so the room goes quiet when Sotto speaks, leaves a gap when a card is ready, and
+talks over it only when the script says so. Nobody is on camera and nobody has to read lines.
 
-## Recording a take (live)
+## Recording a take (soundboard)
 
-1. `npm run dev`, open `http://localhost:5173`, mute off.
-2. Start recording the browser window with system audio (OBS: "macOS Screen Capture" with
-   audio; or Screen Studio). Record at the final frame size.
-3. Press **Start** (the microphone). **Then** set frequency **often** and boldness **bold** in
-   the header — Start resets both to normal/normal, so setting them first is lost.
-4. Read the sheet. Go quiet whenever Sotto starts; let it finish unless the cue says to talk
-   over it. "Sotto, wrap us up", let it finish, Stop.
-5. A take is about four minutes and under a dollar. Do three; keep the best.
+Two browser windows, both on `npm run dev`:
 
-**Room audio.** A mic session writes what Sotto heard to the session folder's `audio.wav`
-(24 kHz mono, on the same clock as every Sotto line in `transcript.md`), so the room track is
-already recorded and already aligned: lay it under the screen capture with its start at the
-hello's first audio. For hard-panned voices, record each of you on your own mic in Logic at
-the same time and sync by a clap, or sit either side of one mic and leave it mono.
+1. **Window A, the one you record:** `http://localhost:5173`. Click on it once (Chrome needs a
+   gesture before it will play audio). This page plays Sotto's voice.
+2. **Window B, the controls:** `http://localhost:5173/dev/soundboard`. It plays the room —
+   EJ hard left, Craig hard right — and sends the same audio to Sotto as the microphone.
+3. Start the screen recording of window A with **system audio** (OBS "macOS Screen Capture"
+   with audio, or Screen Studio). Both windows' audio lands in it, already mixed and in stereo.
+4. In window B press **Start**, then in window A set frequency **often** and boldness **bold**
+   (Start resets both to normal/normal, so set them after). Then fire line 0 straight away.
+5. Fire lines with **Space** (next) or by clicking any line; **Esc** cuts whatever is playing;
+   digits **1–9** fire the ad-libs ("Sotto, not now", "go ahead", "yes please", …). Follow the
+   yellow cues: go quiet when Sotto starts, leave a gap where a card is ready, and fire line 23
+   while Sotto is answering to cut it off.
+6. "Sotto, wrap us up", let it finish, then **Stop** on the board. The session folder
+   (`sessions/<stamp>-mic/`) has `transcript.md`, `timing.jsonl` and `audio.wav` for the record.
+7. A take is about four minutes and under a dollar. Do three; keep the best.
 
-**Fallback, WAV take.** Same as above but start with, from the devtools console:
+The soundtrack needs no syncing: the recording already carries the panned room from window B
+and Sotto from window A.
+
+**Fallback, WAV take.** `fixtures/audio/launch-workshop.stereo.wav` (EJ left, Craig right, from
+`node scripts/pan-fixture.mjs launch-workshop`) laid under a screen capture of a `wav` session
+started from the devtools console:
 
 ```js
 await fetch("/api/session/start", { method: "POST", headers: { "content-type": "application/json" },
   body: JSON.stringify({ source: { kind: "wav", fixture: "launch-workshop" } }) }).then(r => r.json())
 ```
 
-and set often/bold *after* it returns. Lay `fixtures/audio/launch-workshop.stereo.wav` (EJ left,
-Craig right, `node scripts/pan-fixture.mjs launch-workshop`) under the capture with its start at
-the hello's first audio minus about 0.3 s. Expect Sotto to be talked over and stepped down.
+Expect Sotto to be talked over and stepped down; the dry run above is what that looks like.
 
 ## Narration
 

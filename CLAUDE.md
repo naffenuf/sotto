@@ -2326,3 +2326,18 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   is back, and 3.5–8 s at `low` loses to a scripted room landing a line every four seconds.
   A fixed recording cannot go quiet for Sotto, so a `wav` take always shows it talked over and
   stepped down; the demo video is recorded live, voices only (`tasks/demo-video.md`).
+
+- **The demo room is a soundboard, and the mic worklet had to learn that silence is audio.**
+  `/dev/soundboard` (`web/src/Soundboard.tsx`) fires a fixture's lines on cue into an ordinary
+  `mic` session: each clip goes to the speakers through a `StereoPanner` (A left, B right) and
+  into a mono `GainNode` that `startMicCaptureFrom` captures **in the same AudioContext** — a
+  `MediaStreamDestination` consumed by a second context delivered pure silence (56 s of it,
+  measured off the session's `audio.wav`). The second trap cost three sessions: a clip's
+  `AudioBufferSourceNode` leaves the graph when it ends, Chrome then hands the worklet an input
+  with **no channels**, and `mic-worklet.js` returned without posting on `!channel` — so the
+  stream stopped dead after the first clip until the next one woke it (the line fired in that
+  gap was lost). A missing channel is a quantum of silence now, and the board also keeps a
+  zero `ConstantSource` on the mic bus. A real microphone never produced the empty input, which
+  is why the branch had never fired. The dev route `GET /api/dev/fixtures/:name/{audio.wav,
+  timing.json,script.json}` serves the clips; `fixtures/scripts/soundboard-extras.json` is the
+  ad-lib set. Measured in real Chrome: 12.5 chunks/s through two clips, both names transcribed.

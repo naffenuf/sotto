@@ -17,6 +17,7 @@ import {
   type SpeakerRenameResponse,
 } from "../shared/session.js";
 import { EventBus } from "./events/bus.js";
+import { fixtureAudioPath, fixtureScriptPath, fixtureTimingPath } from "./audio/WavReplaySource.js";
 import { listFixtures } from "./fixtures.js";
 import { SessionManager, SessionStartError } from "./session/SessionManager.js";
 import { KnowledgeIndex } from "./knowledge/KnowledgeIndex.js";
@@ -24,6 +25,7 @@ import { glimmerFromEnv } from "./model/GlimmerClient.js";
 import { jevFromEnv } from "./model/JevClient.js";
 import { listHistory, readHistory } from "./session/history.js";
 import { VoiceTestRequestSchema, type VoiceActionResponse } from "../shared/voice.js";
+import { FixtureNameSchema } from "../shared/session.js";
 import { loadElevenLabsApiKey, loadKnowledgeDir, loadMcpConfig, loadSottoVoiceId } from "./config.js";
 import { mcpFromEnv } from "./mcp/McpClient.js";
 import { Speaker } from "./voice/Speaker.js";
@@ -162,6 +164,33 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     voice.stop();
     return { utteranceId: null, speaking: false };
   });
+
+  // Dev only: a fixture's rendered audio and line timings, for the soundboard
+  // (`/dev/soundboard`), which plays scripted lines into a mic session on cue.
+  // The name is validated as a fixture name, never used as a path.
+  if (process.env.SOTTO_DEV === "1") {
+    app.get<{ Params: { name: string; file: string } }>(
+      "/api/dev/fixtures/:name/:file",
+      async (request, reply) => {
+        const name = FixtureNameSchema.safeParse(request.params.name);
+        if (!name.success) return reply.code(400).send({ error: "not a fixture name" } satisfies ApiError);
+        const file = request.params.file;
+        const paths: Record<string, (name: string) => string> = {
+          "audio.wav": fixtureAudioPath,
+          "timing.json": fixtureTimingPath,
+          "script.json": fixtureScriptPath,
+        };
+        const locate = paths[file];
+        if (locate === undefined) return reply.code(404).send({ error: "not found" } satisfies ApiError);
+        try {
+          const body = await readFile(locate(name.data));
+          return reply.type(file === "audio.wav" ? "audio/wav" : "application/json").send(body);
+        } catch {
+          return reply.code(404).send({ error: `no rendered fixture "${name.data}"` } satisfies ApiError);
+        }
+      },
+    );
+  }
 
   // Dev only (`npm run dev:server` sets SOTTO_DEV=1): speaks a test line
   // through real ElevenLabs, so playback can be checked without asking Sotto

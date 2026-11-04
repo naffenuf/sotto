@@ -88,6 +88,24 @@ export interface MicCaptureOptions {
   url?: string;
 }
 
+/**
+ * {@link startMicCaptureFrom}: audio that is already in a page's own graph —
+ * the soundboard's scripted clips — rather than a microphone. The capture
+ * joins that context instead of opening one, so nothing crosses between
+ * contexts through a `MediaStream` (which Chrome delivers as silence when
+ * the producing context is not the consuming one).
+ */
+export interface MicGraphCaptureOptions {
+  /** The context the audio lives in; closed by {@link MicCapture.stop}. */
+  context: AudioContext;
+  /** Whatever to capture connects into this node. */
+  source: AudioNode;
+  /** Tracks to stop when the capture stops, if any. */
+  stream?: MediaStream;
+  onError?: (message: string) => void;
+  url?: string;
+}
+
 /** How long the page keeps redialling a dropped socket before giving up. */
 export const MIC_REDIAL_FOR_MS = 60_000;
 /** The first wait before redialling; it doubles, up to {@link MIC_REDIAL_MAX_WAIT_MS}. */
@@ -132,9 +150,26 @@ export class MicCapture {
     this.socket = this.dial();
   }
 
+  /** Batches the worklet has handed over, sent or not; for diagnostics. */
+  batches = 0;
+
+  /** A snapshot for a dev page to read; nothing in the app depends on it. */
+  inspect(): { chunksSent: number; batches: number; redials: number; pendingSamples: number; socket: number; context: string; currentTime: number } {
+    return {
+      chunksSent: this.chunksSent,
+      batches: this.batches,
+      redials: this.redials,
+      pendingSamples: this.pending.length,
+      socket: this.socket.readyState,
+      context: this.context.state,
+      currentTime: this.context.currentTime,
+    };
+  }
+
   /** Takes one batch of mono samples from the worklet, at the context's rate. */
   accept(samples: Float32Array): void {
     if (this.stopped) return;
+    this.batches += 1;
     const resampled = this.resampler.process(samples);
     if (resampled.length === 0) return;
 
@@ -217,11 +252,24 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
   const { stream } = options;
   const context = new AudioContext({ latencyHint: "interactive" });
   try {
+    const source = context.createMediaStreamSource(stream);
+    return await startMicCaptureFrom({ ...options, context, source });
+  } catch (error) {
+    for (const track of stream.getTracks()) track.stop();
+    void context.close().catch(() => undefined);
+    throw new Error(describeMicError(error));
+  }
+}
+
+/** Streams whatever is connected into `source`, in the caller's own context. */
+export async function startMicCaptureFrom(options: MicGraphCaptureOptions): Promise<MicCapture> {
+  const { context, source } = options;
+  const stream = options.stream ?? new MediaStream();
+  try {
     await context.audioWorklet.addModule(MIC_WORKLET_URL);
     // Chrome starts a context suspended when the page has had no gesture.
     if (context.state === "suspended") await context.resume();
 
-    const source = context.createMediaStreamSource(stream);
     const worklet = new AudioWorkletNode(context, "mic-capture", {
       numberOfInputs: 1,
       numberOfOutputs: 1,
