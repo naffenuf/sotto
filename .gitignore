@@ -33,3 +33,6 @@ shadow/runs/
 
 # Demo soundtrack mixes, rebuilt by scripts/pan-fixture.mjs
 fixtures/audio/*.stereo.wav
+
+# Screen recordings of demo takes (large; the keeper is copied here)
+demo/takes/

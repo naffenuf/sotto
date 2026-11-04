@@ -122,6 +122,31 @@ await fetch("/api/session/start", { method: "POST", headers: { "content-type": "
 
 Expect Sotto to be talked over and stepped down; the dry run above is what that looks like.
 
+## Take 4 (the keeper): `demo/takes/take4.mov`
+
+OBS window capture of the Chrome Sotto window, 1920×1080 H.264, stereo AAC (EJ hard left,
+Craig hard right, Sotto centre), 348 s. Session `sessions/2026-11-04_1106-mic`. The top 145 px
+are Chrome's tab strip, address bar and a yellow extension banner: crop them off. Beats on the
+recording's clock:
+
+| Recording time | What happens |
+|---|---|
+| 0–32 | nothing (OBS was started before the session): cut |
+| 32.0 | "Okay, it's running" then the hello, to 53.5 |
+| 55–58 | "Hi, I'm Craig" / "And I'm EJ", names land |
+| 108.9–111.7 | **claim**: "I'll check the drive time from Portland to Bend." |
+| 135.8–147.9 | **spoken answer**: 160 miles, three to three and a half hours |
+| 208.9 | "Sotto, go ahead" |
+| 213.5–225.9 | **the correction read out**: 50 tickets against the cap of 30 |
+| 226.6 | "Sotto, what does Eventbrite charge…" → "One sec." → "Let me pull the current ticketing fees" |
+| 238.8 | "Sotto, hold on, we'll read it after" cuts it off; the answer stays raised on its card |
+| 254–309 | **wrap-up** (55 s: fade out partway) |
+| 312 | Stop; an offer line follows during the drain: cut |
+
+Warts to cut or live with: a read-back the board talked over shows as "Sotto: G (interrupted)"
+in the transcript from ~1:10 on; the spoken correction says "B proposes" (a diarization label
+where the name should be); the wrap-up lists the drive-time question as open.
+
 ## Narration
 
 Craig's voice over the recording, recorded alone in QuickTime or Logic, no camera. Say little
