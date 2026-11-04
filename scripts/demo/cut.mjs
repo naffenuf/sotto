@@ -171,7 +171,7 @@ export function resolveSegments(analysis, segments, { crossfade = 0 } = {}) {
       const v = voicesIn(analysis, to.t - xOut, to.t);
       if (v) problems.push(`${seg.name}: the crossfade out (${formatTime(to.t)} − ${xOut} s) has ${[...v].map(voiceName).join(" and ")} talking; the pause after "${seg.to.fragment}" is too short`);
     }
-    const callouts = (seg.callouts ?? []).map(([at, text]) => ({ at: locate(analysis, at).t, text }));
+    const callouts = (seg.callouts ?? []).map(([at, text, seconds]) => ({ at: locate(analysis, at).t, text, seconds }));
     const edges = [
       ["in", from, seg.fadeIn],
       ["out", to, seg.fadeOut],

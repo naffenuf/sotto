@@ -24,6 +24,7 @@
     "demo:timeline": "node scripts/demo-timeline.mjs",
     "demo:video": "node scripts/build-demo-video.mjs",
     "demo:check": "node scripts/build-demo-video.mjs --check",
+    "demo:x": "node scripts/build-demo-video.mjs --cut x",
     "e2e": "tsx scripts/e2e.ts",
     "eval": "tsx scripts/eval.ts",
     "eval:report": "tsx scripts/eval-report.ts",

@@ -232,3 +232,14 @@ Craig's voice over the recording, recorded alone in QuickTime or Logic, no camer
 over the session itself: the callouts carry it ("Nobody asked. It waited for a pause.").
 If not narrating by voice, render the intro through ElevenLabs in a voice that is **not**
 Matilda, so the narrator never sounds like Sotto.
+
+## The X cut
+
+`npm run demo:x` builds `demo/sotto-x.mp4` (1:17) from the same take with the same checks:
+no intro slides, straight into "Is Bend really drivable…", through the claim, the spoken
+answer, "I say we open 50", "Sotto, go ahead", the correction and "Sotto, hold on", then the
+end card. The feed autoplays muted, so it is captioned: every line in the timeline becomes
+captions of up to two 46-character rows, split at sentence and clause ends and spread over the
+line's measured in/out, drawn one row per `drawtext` (a multi-line textfile renders its newline
+as a missing glyph in this font). Callouts sit at the top so they never cover a caption.
+`node scripts/build-demo-video.mjs --check --cut x` writes `demo/build/x/review.md`.
