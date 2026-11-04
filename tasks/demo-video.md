@@ -147,6 +147,44 @@ Warts to cut or live with: a read-back the board talked over shows as "Sotto: G 
 in the transcript from ~1:10 on; the spoken correction says "B proposes" (a diarization label
 where the name should be); the wrap-up lists the drive-time question as open.
 
+## The cut (target 2:55 total)
+
+Hard cuts at line boundaries, each segment a beat. Times are on `take4.mov`'s clock.
+
+| # | In → out | Length | What the audience gets |
+|---|---|---|---|
+| A | 32.0 → 38.3 | 6 s | "Hi, I'm Sotto. I'm listening and keeping notes, and I'll only speak up when it's worth it." |
+| A' | 51.9 → 61.2 | 9 s | "…just say Sotto. Would you each say your name?" / "Hi, I'm Craig." / "And I'm EJ." |
+| B | 74.5 → 83.4 | 9 s | EJ: "One thing, though: it caps at thirty people. Fire code, hard thirty." |
+| C | 88.4 → 111.7 | 23 s | Bend crowd → "How long is the drive?" → "Three hours? Four?" → **"I'll check the drive time…"** |
+| C' | 135.0 → 148.0 | 13 s | **the spoken answer**: 160 miles, three to three and a half hours |
+| D | 166.0 → 177.8 | 12 s | "I say we open fifty… The Bend people alone will take twenty." / "Fifty. Okay. Free, or five bucks?" |
+| E | 206.9 → 243.1 | 36 s | "Sotto, go ahead" → **the correction read out** → "Sotto, what does Eventbrite charge…" → "One sec." → "Let me pull…" → **"Sotto, hold on"** |
+| F | 248.0 → 266.0 | 18 s | "Sotto, wrap us up." → the wrap-up's first twelve seconds, fading out |
+
+Demo total ≈ 2:06. Intro slides ≈ 25 s, close ≈ 20 s → about 2:50.
+
+Callouts (bottom third, two seconds each, white on a dark band): at 108.5 "Nobody asked. It
+waited for a pause."; at 135.5 "A sourced answer, in the next gap."; at 208.6 "It raised a
+hand. The room called on it."; at 238.4 "It stops the moment anyone talks."; at 253.5 "A
+wrap-up from its own notes."
+
+Frame: crop x 101–1820, y 145–1080 (Chrome's tab strip, address bar and the extension banner
+go), scale to 1920 wide, letterbox to 1080. Audio: a 20 ms crossfade at every cut, loudness
+normalised to −16 LUFS, Sotto centre and the room panned as recorded.
+
+## Building the video
+
+```
+npm run demo:slides      # demo/slides/*.html -> demo/build/*.png (Playwright, 1920x1080)
+npm run demo:narration   # Adam reads the three narration lines -> demo/narration/*.wav
+npm run demo:video       # the cut above from demo/takes/take4.mov -> demo/sotto-demo.mp4
+```
+
+`scripts/build-demo-video.mjs` holds the segment list and the callouts; change the cut there.
+The narration WAVs are committed (they cost credits); the slides' PNGs and the MP4 are rebuilt.
+First build: 2:40, −16.7 LUFS, 12 MB.
+
 ## Narration
 
 Craig's voice over the recording, recorded alone in QuickTime or Logic, no camera. Say little

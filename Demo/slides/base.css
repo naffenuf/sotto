@@ -1,0 +1,25 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0f1412; color: #f3efe6;
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.slide { position: relative; width: 1920px; height: 1080px; }
+.photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.shade { position: absolute; inset: 0; background:
+  linear-gradient(90deg, rgba(10,14,12,0.05) 35%, rgba(10,14,12,0.78) 68%, rgba(10,14,12,0.9) 100%); }
+.title { position: absolute; right: 120px; top: 230px; width: 760px; text-align: left; }
+.title h1 { font-size: 168px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: #f7f3ea; }
+.title p { margin-top: 36px; font-size: 44px; line-height: 1.3; color: #e6e0d2; font-weight: 400; }
+.title .tag { margin-top: 28px; font-size: 30px; color: #b9c9b3; letter-spacing: 0.04em; }
+.dark { background: #0f1412; padding: 120px 160px; }
+.dark h2 { font-size: 64px; font-weight: 600; color: #f7f3ea; margin-bottom: 56px; }
+.stack { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 80px; }
+.stack .row { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: baseline;
+  padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.stack .what { font-size: 30px; color: #9fb39a; letter-spacing: 0.03em; text-transform: uppercase; }
+.stack .who { font-size: 38px; color: #f3efe6; }
+.stack .who small { display: block; font-size: 26px; color: #b7b1a3; margin-top: 4px; }
+.foot { position: absolute; left: 160px; right: 160px; bottom: 90px; font-size: 30px; color: #b7b1a3; }
+.end { background: #0f1412; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.end h1 { font-size: 200px; font-weight: 700; letter-spacing: -0.02em; color: #f7f3ea; }
+.end p { font-size: 48px; color: #e6e0d2; margin-top: 30px; }
+.end .url { font-size: 56px; color: #c9d8c3; margin-top: 70px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.end .lic { font-size: 30px; color: #9a9488; margin-top: 24px; }

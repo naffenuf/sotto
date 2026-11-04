@@ -36,3 +36,7 @@ fixtures/audio/*.stereo.wav
 
 # Screen recordings of demo takes (large; the keeper is copied here)
 demo/takes/
+
+# Demo video build products (rebuilt by npm run demo:video)
+demo/build/
+demo/*.mp4
