@@ -66,11 +66,14 @@ import { SimulatedClock, systemClock, type Clock } from "../clock.js";
 import type { EventBus } from "../events/bus.js";
 import { CandidateGate, DEFAULT_GATE_MODE, type GateMode } from "../interject/CandidateGate.js";
 import { correctedClaim, spokenCorrection } from "../interject/corrections.js";
+import { checkHeld } from "./heldCheck.js";
 import {
   NOTHING_RAISED_LINE,
   RaisedHand,
   calledOnCardLine,
   calledOnPacketLine,
+  heldOfferLine,
+  type RaisedItem,
 } from "./raisedHand.js";
 import { cardForInterjection, deliveredCardId } from "../interject/delivery.js";
 import { InterjectionPolicy, type Interjection } from "../interject/InterjectionPolicy.js";
@@ -398,6 +401,8 @@ interface ModelLoops {
    * "Sotto, go ahead" always has somewhere to land.
    */
   hand: RaisedHand;
+  /** Held offers said and waiting for their window (V3-017); absent with no model. */
+  heldOffers?: Map<string, { item: RaisedItem; queue: RaisedItem[] }>;
   /**
    * What Sotto decides to look up, and how much of it (V2-012).
    *
@@ -1365,24 +1370,19 @@ export class SessionManager {
       onCallOn: (trigger) => {
         if (!current()) return;
         loops.policy?.wakePhraseDetected();
-        const held = loops.hand.latest();
+        const held = loops.hand.newestFirst();
         store.writer?.appendTiming?.({
           stage: "wake_call_on",
           atMs: clock.now(),
           turnId: trigger.turnId,
-          raised: loops.hand.count(),
-          cardId: held?.cardId ?? null,
+          raised: held.length,
+          cardId: held[0]?.cardId ?? null,
         });
         this.logger.log(
           `[wake] ${info.id} ${trigger.turnId} called on Sotto` +
-            (held === null ? " with nothing raised" : `: ${held.cardId}`),
+            (held.length === 0 ? " with nothing raised" : `: ${held.map((item) => item.cardId).join(", ")}`),
         );
-        loops.reservations?.calledOn({
-          ...(held === null ? {} : { cardId: held.cardId }),
-          turnId: trigger.turnId,
-          topic: held?.cardId ?? "nothing",
-          text: held?.line ?? NOTHING_RAISED_LINE,
-        });
+        void this.calledOn(info, loops, trigger.turnId, held);
       },
     });
     loops.address = address;
@@ -1431,7 +1431,7 @@ export class SessionManager {
     // V3-017: the queue of things Sotto is holding, kept whether or not there
     // is a model — a session with no key notices nothing, so the hand simply
     // stays down.
-    const hand = new RaisedHand();
+    const hand = new RaisedHand({ latestTurnId: () => transcript().at(-1)?.turnId ?? null });
     if (model === null) {
       this.logger.warn(
         `[board] ${info.id} has no model client (MODEL_API_KEY is missing); the board will stay empty`,
@@ -1709,6 +1709,8 @@ export class SessionManager {
     // agent it briefs from. Nothing can be offered before the first search
     // has come back, which is a gate and a search away.
     let offers: OfferWindow | undefined;
+    /** Held offers said and not yet opened as a window, by card id (V3-017). */
+    const heldOffers = new Map<string, { item: RaisedItem; queue: RaisedItem[] }>();
     // V3-007: and the ideas for a group going round in circles, built below
     // with the reservations that offer them. The observer's `stall` candidate
     // is at least a board update away, so nothing reaches it before then.
@@ -1727,7 +1729,8 @@ export class SessionManager {
         // spoken line. A thinking card and a search that came back with
         // nothing carry no `raised`, so they leave the queue rather than
         // joining it.
-        hand.observe(card, packet === null ? "" : calledOnPacketLine(packet), clock.now());
+        const topic = packet === null ? "" : research.ideas().find((one) => one.id === packet.ideaId)?.topic ?? "";
+        hand.observe(card, packet === null ? "" : calledOnPacketLine(packet), clock.now(), heldOfferLine(card, topic));
         if (packet !== null) researchCardByIdea.set(packet.ideaId, card.id);
         if (this.last?.sessionId === info.id) this.bus.publishCard(card);
         onTiming({ stage: "research_publish", atMs: clock.now(), packetId: packet?.id ?? null, cardId: card.id, state: card.state, published: this.last?.sessionId === info.id });
@@ -1858,6 +1861,20 @@ export class SessionManager {
           stillCurrent.forget(record.ideaId);
           if (!record.spoken) {
             this.raiseHand(info, deliveries, hand, clock.now(), record.ideaId);
+          }
+        }
+        // V3-017: "Want to hear it?" was said, so the room has the same ten
+        // seconds; a yes reads the card, a no moves on to the next held one.
+        if (record.kind === "held_offer" && record.cardId !== undefined) {
+          const pending = heldOffers.get(record.cardId);
+          heldOffers.delete(record.cardId);
+          if (pending !== undefined && record.spoken && record.yielded !== true) {
+            offers?.offered({
+              subject: { kind: "held", item: pending.item, queue: pending.queue },
+              topic: pending.item.cardId,
+              title: pending.item.offer,
+              spokenText: record.text,
+            });
           }
         }
         // V3-005: the offer was made out loud, so the room has ten seconds to
@@ -2250,11 +2267,31 @@ export class SessionManager {
       classify: (input, signal) => classifyOfferReply(model, input, signal),
       speakers: () => this.bus.speakerNames(),
       onTiming,
+      onClosed: (subject, outcome) => {
+        if (subject.kind !== "held" || this.current?.info.id !== info.id) return;
+        // A no moves on to the next thing in hand; anything else (a yes, the
+        // room turning to something else, ten seconds of quiet) ends it.
+        if (outcome === "no") this.offerHeld(info, { hand, reservations, heldOffers }, subject.queue);
+      },
       onAccepted: (subject: OfferSubject, asked) => {
         if (this.current?.info.id !== info.id) return;
         // The floor belongs to whoever just asked, exactly as it does for a
         // question by name (US-017).
         policy.wakePhraseDetected();
+        if (subject.kind === "held") {
+          // V3-017: the room said yes to one of the things Sotto is holding,
+          // and the line was written when the hand went up.
+          store.writer?.appendTiming?.({
+            stage: "held_accepted", atMs: clock.now(), turnId: asked.turnId, cardId: subject.item.cardId,
+          });
+          reservations.calledOn({
+            cardId: subject.item.cardId,
+            turnId: asked.turnId,
+            topic: subject.item.cardId,
+            text: subject.item.line,
+          });
+          return;
+        }
         if (subject.kind === "stall") {
           // V3-007: the ideas are already written, so the yes is answered
           // with no model call at all — said under V3-017's rules (the room
@@ -2293,7 +2330,7 @@ export class SessionManager {
         });
       },
     });
-    return { modelClient: model, jev, judgment, board, observer, verifier, mcp, gate, policy, answers, answerHooks, deliveries, hand, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
+    return { modelClient: model, jev, judgment, board, observer, verifier, mcp, gate, policy, answers, answerHooks, deliveries, hand, heldOffers, research, researchRunner, researchCards, questions, followUp, offers, stalls, reservations, stillCurrent, readBacks, steering };
   }
 
   /**
@@ -2476,6 +2513,81 @@ export class SessionManager {
    * count from the cards it has — and the card itself stays on the stage,
    * which is the whole promise of V3-008.
    */
+  /**
+   * "Sotto, go ahead" (V3-017), with the room's own answers taken out first.
+   *
+   * Holding nothing: say so. Holding one thing: read it. Holding several:
+   * ask about them one at a time, newest first — a yes reads that one, a no
+   * moves on ({@link offerHeld}). Before any of that, one Jev call asks which
+   * of them the room has already answered since the hand went up, and those
+   * come down unsaid: reading out an answer the room gave itself a minute
+   * ago is the worse failure. No Jev, or a late one, drops nothing.
+   */
+  private async calledOn(
+    info: SessionInfo,
+    loops: ModelLoops,
+    turnId: string,
+    held: RaisedItem[],
+  ): Promise<void> {
+    const running = this.current;
+    const reservations = loops.reservations;
+    if (running === undefined || running.info.id !== info.id || reservations === null) return;
+    const clock = running.clock;
+    const check = await clock.track(
+      "held-check",
+      checkHeld(
+        loops.jev,
+        { items: held, turns: running.assembler.finalTurns(), speakers: this.bus.speakerNames() },
+        this.wallClock,
+      ),
+    );
+    if (this.current?.info.id !== info.id) return;
+    this.current.store.writer?.appendTiming?.({
+      stage: "held_check", atMs: clock.now(), turnId, raised: held.length,
+      answered: [...check.answered], scores: check.scores, latencyMs: check.latencyMs,
+      ...(check.skipped === undefined ? {} : { skipped: check.skipped }),
+    });
+    for (const cardId of check.answered) {
+      this.logger.log(`[wake] ${info.id} ${cardId} was answered by the room; hand down`);
+      this.lowerHand(info, loops.deliveries, loops.hand, cardId);
+    }
+    const left = held.filter((item) => !check.answered.has(item.cardId));
+    if (left.length <= 1) {
+      const one = left[0];
+      reservations.calledOn({
+        ...(one === undefined ? {} : { cardId: one.cardId }),
+        turnId,
+        topic: one?.cardId ?? "nothing",
+        text: one?.line ?? NOTHING_RAISED_LINE,
+      });
+      return;
+    }
+    if (loops.heldOffers === undefined) return;
+    this.offerHeld(info, { hand: loops.hand, reservations, heldOffers: loops.heldOffers }, left, turnId);
+  }
+
+  /** Asks about the first of `queue`; the rest wait on the answer (V3-017). */
+  private offerHeld(
+    info: SessionInfo,
+    parts: {
+      hand: RaisedHand;
+      reservations: Reservations;
+      heldOffers: Map<string, { item: RaisedItem; queue: RaisedItem[] }>;
+    },
+    queue: RaisedItem[],
+    turnId = "",
+  ): void {
+    const [item, ...rest] = queue;
+    if (item === undefined || this.current?.info.id !== info.id) return;
+    // Still held: a card said or lowered meanwhile has nothing to offer.
+    if (!parts.hand.held().some((one) => one.cardId === item.cardId)) {
+      this.offerHeld(info, parts, rest, turnId);
+      return;
+    }
+    parts.heldOffers.set(item.cardId, { item, queue: rest });
+    parts.reservations.heldOffer({ cardId: item.cardId, turnId, topic: item.cardId, text: item.offer });
+  }
+
   private lowerHand(
     info: SessionInfo,
     deliveries: Map<string, Delivered>,

@@ -42,6 +42,21 @@ export interface RaisedItem {
   atMs: number;
   /** What Sotto says when the room calls on it. */
   line: string;
+  /**
+   * What Sotto asks when it is called on holding several: one short line
+   * naming this one ("I looked up the bus schedule. Want to hear it?").
+   */
+  offer: string;
+  /**
+   * The newest human final turn when the hand went up, or `null` before any:
+   * the turns after it are what can have answered this already.
+   */
+  sinceTurnId: string | null;
+}
+
+export interface RaisedHandOptions {
+  /** The newest human final turn of the conversation, for {@link RaisedItem.sinceTurnId}. */
+  latestTurnId?: () => string | null;
 }
 
 /**
@@ -55,6 +70,8 @@ export interface RaisedItem {
 export class RaisedHand {
   private readonly items = new Map<string, RaisedItem>();
 
+  constructor(private readonly options: RaisedHandOptions = {}) {}
+
   /**
    * Folds one published card in. A raised card joins the queue (or refreshes
    * its place in it); anything else leaves, including a card that was raised
@@ -63,15 +80,20 @@ export class RaisedHand {
    * `line` is what calling on this card would be answered with, so a card
    * with nothing sayable on it never raises a hand it could not honour.
    */
-  observe(card: StageCard, line: string, atMs: number): void {
+  observe(card: StageCard, line: string, atMs: number, offer = heldOfferLine(card)): void {
     if (card.raised !== true || line.trim() === "") {
       this.items.delete(card.id);
       return;
     }
+    // A card republished while it is already held keeps its place and what
+    // it was raised after: the room has not asked about it in between.
+    const existing = this.items.get(card.id);
+    const sinceTurnId =
+      existing !== undefined ? existing.sinceTurnId : (this.options.latestTurnId?.() ?? null);
     // Deleted first so the insertion order says which is newest, for a queue
     // read back by {@link RaisedHand.items}.
     this.items.delete(card.id);
-    this.items.set(card.id, { cardId: card.id, atMs, line });
+    this.items.set(card.id, { cardId: card.id, atMs, line, offer, sinceTurnId });
   }
 
   /** Said, or written off: the hand comes down for this one. */
@@ -105,6 +127,13 @@ export class RaisedHand {
     return [...this.items.values()];
   }
 
+  /** Everything being held, newest first: the order a "go ahead" goes through them in. */
+  newestFirst(): RaisedItem[] {
+    // Reversed before the (stable) sort, so two cards raised in the same
+    // instant come out last-published first, as {@link latest} reads them.
+    return [...this.items.values()].reverse().sort((a, b) => b.atMs - a.atMs);
+  }
+
   /** The session is over; nothing is being held any more. */
   clear(): void {
     this.items.clear();
@@ -130,6 +159,37 @@ export function calledOnCardLine(card: StageCard): string {
   if (headline === "") return detail === "" ? "" : sentence(detail);
   if (detail === "") return sentence(headline);
   return `${sentence(headline)} ${sentence(detail)}`;
+}
+
+/**
+ * What Sotto asks about one held card when it is called on holding several:
+ * a line that names the thing without saying it, so the room can pick.
+ *
+ * Written locally, like {@link calledOnCardLine}: the "go ahead" has already
+ * been said and a model call here would cost the only thing being asked for.
+ * A research card is offered by what was looked up (`topic`, V3-002's four
+ * to ten words, or the packet's title); an answer by the question it
+ * answers; anything Sotto noticed by the first few words of its headline.
+ */
+export function heldOfferLine(card: StageCard, topic?: string): string {
+  const named = (topic ?? "").trim();
+  if (card.variant === "research") {
+    const about = named !== "" ? named : spokenText(card.headline);
+    return about === "" ? "I have something I looked up. Want to hear it?" : `I looked up ${noStop(about)}. Want to hear it?`;
+  }
+  if (card.variant === "answer") {
+    const question = noStop(spokenText(card.question ?? ""));
+    return question === "" ? "I have an answer waiting. Want to hear it?" : `I have an answer on ${question}. Want to hear it?`;
+  }
+  // A headline is at most 90 characters (US-012) and is the point in one
+  // line; the detail behind it is what the yes buys.
+  const headline = noStop(spokenText(card.headline));
+  return headline === "" ? "I noticed something. Want to hear it?" : `I have a note: ${headline}. Want to hear it?`;
+}
+
+/** Trailing stop or question mark off, so the line can carry on past it. */
+function noStop(text: string): string {
+  return text.replace(/[.?!…]+$/, "").trim();
 }
 
 /**

@@ -105,22 +105,16 @@ export const RESERVE_WINDOW_MS = 5_000;
 export const RESERVE_TRACK_LABEL = "reserve";
 
 /**
- * How long a sourced answer is still worth saying out loud (PRD V3-004).
+ * How long a correction or an offer is still worth saying out loud (V3-008,
+ * V3-005). An *answer* to one of the room's own questions never expires:
+ * see {@link Reservations.answer}.
  *
- * Ninety seconds from the packet being ready, the same number the policy's
+ * Ninety seconds from being queued, the same number the policy's
  * {@link STALE_MS} gives a candidate — and for the same reason: after that it
  * is Sotto raising a topic rather than answering one. The card stays either
  * way, so nothing is lost but the sentence.
  */
 export const ANSWER_STALE_MS = 90_000;
-/**
- * How long after the room's *question* a looked-up answer may still be said
- * out loud. Measured from the question, not from the packet landing: the
- * classification and the search are time the room has already spent waiting,
- * and a minute on, the answer is for the card. Corrections keep
- * {@link ANSWER_STALE_MS} from when they were queued.
- */
-export const ANSWER_DEADLINE_MS = 60_000;
 
 /** And the faster of the two: six more final turns is a different subject. */
 export const ANSWER_STALE_TURNS = 6;
@@ -455,15 +449,15 @@ export class Reservations {
     const spoken = packet.spokenAnswer?.trim() ?? "";
     if (question === undefined || spoken === "") return;
     this.answered.add(packet.ideaId);
+    // No expiry: an answer to the room's own question waits for its pause
+    // however long that takes. What takes it off the queue is the room
+    // answering it themselves or moving on (the still-current verdict), and
+    // either way the card stays raised, so "Sotto, go ahead" can still reach
+    // it (V3-017).
     this.waiting.push({
       ...this.line(packet.ideaId, question, "answer", answerLine(question.topic, spoken)),
       pauseMs: SPEAK_PAUSE_MS,
-      expiry: {
-        afterMs: ANSWER_DEADLINE_MS,
-        fromMs: question.askedAtMs,
-        afterTurns: ANSWER_STALE_TURNS,
-        reason: "expired",
-      },
+      expiry: null,
     });
     this.review();
   }
@@ -693,6 +687,35 @@ export class Reservations {
   }
 
   /**
+   * Called on with several things in hand (V3-017): ask about one of them.
+   *
+   * Said under {@link calledOn}'s rules — the room said "go ahead", so there
+   * is no gap to wait for and nothing charged — and the ten seconds that
+   * follow are an offer window ({@link OfferWindow}): a yes has the card
+   * read out through {@link calledOn}, a no moves on to the next one.
+   */
+  heldOffer(input: { cardId: string; turnId: string; topic: string; text: string }): void {
+    if (this.stopped || input.text.trim() === "") return;
+    const nowMs = this.clock.now();
+    this.waiting.unshift({
+      kind: "held_offer",
+      ideaId: input.cardId,
+      turnId: input.turnId,
+      topic: input.topic,
+      text: input.text,
+      askedAtMs: nowMs,
+      sinceMs: nowMs,
+      pauseMs: 0,
+      expiry: null,
+      turnsWaited: 0,
+      yields: 0,
+      asked: true,
+      cardId: input.cardId,
+    });
+    this.review();
+  }
+
+  /**
    * Somebody took the offer of ideas up (PRD V3-007): say them.
    *
    * The words are already written — the ideas were composed before the offer
@@ -793,7 +816,7 @@ export class Reservations {
     if (line.kind === "correction") return false;
     // V3-007: the offer charged the allowance, and the ideas are that same
     // contribution reaching the room's ears — and the room asked for them.
-    if (line.kind === "called_on" || line.kind === "ideas") return false;
+    if (line.kind === "called_on" || line.kind === "ideas" || line.kind === "held_offer") return false;
     return !this.spent.has(line.ideaId);
   }
 

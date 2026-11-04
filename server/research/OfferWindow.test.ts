@@ -96,6 +96,32 @@ function outcome(timing: readonly Record<string, unknown>[]): unknown {
     .at(-1)?.["outcome"];
 }
 
+describe("OfferWindow, told how each offer ended", () => {
+  it("reports a no on a held card, which is what moves a go-ahead on to the next", async () => {
+    const clock = new SimulatedClock(0);
+    const closed: [string, string][] = [];
+    const accepted: string[] = [];
+    const item = { cardId: "card-2", atMs: 1_000, line: "Nobody has said who writes the copy.", offer: "I have a note. Want to hear it?", sinceTurnId: null };
+    const queue = [{ ...item, cardId: "card-1" }];
+    const window = new OfferWindow({
+      clock,
+      wallClock: clock,
+      classify: async () => no,
+      speakers: () => ({}),
+      onAccepted: (taken) => accepted.push(offerSubjectId(taken)),
+      onClosed: (taken, outcome) => closed.push([offerSubjectId(taken), outcome]),
+      onTiming: () => {},
+    });
+    window.offered({ subject: { kind: "held", item, queue }, topic: "card-2", title: item.offer, spokenText: item.offer });
+    clock.advanceTo(2_000);
+    window.acceptTurn(turn(" No, not that one. ", "0:9", "B"));
+    await window.flush();
+    expect(closed).toEqual([["card-2", "no"]]);
+    expect(accepted).toEqual([]);
+    expect(window.isOpen()).toBe(false);
+  });
+});
+
 describe("OfferWindow", () => {
   it("briefs the room from that packet when somebody says go on", async () => {
     const { window, clock, briefed, timing } = windowFor([yes]);

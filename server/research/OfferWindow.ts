@@ -37,6 +37,7 @@
  * seconds a room would.
  */
 import type { ResearchPacket } from "../../shared/research.js";
+import type { RaisedItem } from "../session/raisedHand.js";
 import type { StallIdeas } from "../../shared/stall.js";
 import { isSottoTurn, type TurnUpdate } from "../../shared/turns.js";
 import type { SpeakerNames } from "../../shared/events.js";
@@ -64,11 +65,19 @@ export const OFFER_TIMEOUT_CALL_MS = 6_000;
  */
 export type OfferSubject =
   | { kind: "research"; packet: ResearchPacket }
-  | { kind: "stall"; ideas: StallIdeas };
+  | { kind: "stall"; ideas: StallIdeas }
+  /**
+   * One of the things Sotto is holding, offered because it was called on
+   * with several in hand (V3-017): a yes reads this one out, a no moves on
+   * to the next of `queue`.
+   */
+  | { kind: "held"; item: RaisedItem; queue: RaisedItem[] };
 
 /** What the log calls the thing offered, so a reader can find it again. */
 export function offerSubjectId(subject: OfferSubject): string {
-  return subject.kind === "research" ? subject.packet.id : subject.ideas.id;
+  if (subject.kind === "research") return subject.packet.id;
+  if (subject.kind === "stall") return subject.ideas.id;
+  return subject.item.cardId;
 }
 
 /** What became of one offer, as `timing.jsonl` records it. */
@@ -90,6 +99,8 @@ export interface OfferWindowOptions {
     subject: OfferSubject,
     asked: { turnId: string; speaker: string | null; topic: string },
   ) => void;
+  /** Every way an offer ends, with how; a `no` is what moves a held offer on. */
+  onClosed?: (subject: OfferSubject, outcome: OfferOutcome) => void;
   onTiming: (record: Record<string, unknown>) => void;
 }
 
@@ -306,5 +317,6 @@ export class OfferWindow {
       outcome,
       openMs: Math.max(0, this.options.clock.now() - open.saidAtMs),
     });
+    this.options.onClosed?.(open.subject, outcome);
   }
 }

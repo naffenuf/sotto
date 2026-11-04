@@ -24,7 +24,6 @@ import type { VoiceOut, VoiceSpoken, VoiceUtterance } from "../voice/voiceOut.js
 import type { StillCurrentState } from "./StillCurrentWatcher.js";
 import { READBACK_EXPIRY_MS } from "../decision/readback.js";
 import {
-  ANSWER_DEADLINE_MS,
   ANSWER_STALE_MS,
   ANSWER_STALE_TURNS,
   OFFER_STALE_TURNS,
@@ -950,42 +949,34 @@ describe("Reservations: speaking the answer (V3-004)", () => {
     expect(harness.records[0]).toMatchObject({ kind: "answer", spoken: false, reason: "moved_on" });
   });
 
-  it("gives up a minute after the question without a pause", async () => {
+  it("never gives up: an answer waits for its pause however long that takes", async () => {
+    // The room's own question is not rationed and not expired (post-V3-017
+    // review): what takes an answer off the queue is the room answering it
+    // or moving on, and the card stays raised for "Sotto, go ahead" either
+    // way. `sessions/2026-11-03_2109-mic` lost its one answer to a 60 s
+    // deadline that ran out 0.9 s after the room finally went quiet.
     const voice = new FakeVoice();
     const harness = setup(voice, { stillCurrent: () => current });
     asking(harness);
     harness.speak();
-    // The search took twenty seconds the room has already spent waiting.
     harness.clock.advanceBy(20_000);
     harness.reservations.answer(packet());
-    harness.clock.advanceBy(ANSWER_DEADLINE_MS - 20_000);
+    // Many turns and many minutes, and nobody stops talking.
+    for (let index = 0; index < ANSWER_STALE_TURNS + 4; index += 1) {
+      harness.reservations.acceptTurn(final(`0:${10 + index}`));
+    }
+    harness.clock.advanceBy(ANSWER_STALE_MS * 4);
     await harness.tick();
     expect(voice.opened).toBe(0);
-    expect(harness.records[0]).toMatchObject({
-      kind: "answer", spoken: false, reason: "expired", pauseWaitMs: ANSWER_DEADLINE_MS - 20_000,
-    });
-    // And not in the pause that follows either: the moment has gone.
+    expect(harness.records).toEqual([]);
+    // The first real pause, whenever it comes, is the answer's.
     harness.hush();
     harness.clock.advanceBy(SPEAK_PAUSE_MS);
     await harness.tick();
-    expect(voice.opened).toBe(0);
-  });
-
-  it("gives up after six more final turns, which is the faster of the two", async () => {
-    const voice = new FakeVoice();
-    const harness = setup(voice, { stillCurrent: () => current });
-    asking(harness);
-    harness.speak();
-    harness.reservations.answer(packet());
-    for (let index = 0; index < ANSWER_STALE_TURNS; index += 1) {
-      harness.reservations.acceptTurn(final(`0:${10 + index}`));
-    }
-    await harness.tick();
-    expect(harness.records[0]).toMatchObject({
-      kind: "answer", spoken: false, reason: "expired",
-    });
-    // Sotto's own lines are not the room moving on (V2-008a).
-    expect(voice.opened).toBe(0);
+    expect(voice.opened).toBe(1);
+    voice.played();
+    await harness.reservations.flush();
+    expect(harness.records[0]).toMatchObject({ kind: "answer", spoken: true });
   });
 
   it("is said inside the frequency's cooldown and spends none of its allowance", async () => {

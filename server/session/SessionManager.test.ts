@@ -34,6 +34,7 @@ import type {
   ProseReply,
   StructuredCall,
 } from "../model/client.js";
+import type { JevLike } from "../model/JevClient.js";
 import { SessionManager, SessionStartError, type AsrClient } from "./SessionManager.js";
 import type { SessionWriter } from "./SessionStore.js";
 import { emptyModel } from "../test/emptyModel.js";
@@ -3460,11 +3461,17 @@ describe("SessionManager: raising a hand and being called on (V3-017)", () => {
   /** Offers `candidates` on its first observer look, then nothing. */
   class HoldingModel implements ModelClient {
     private looked = false;
+    private replied = 0;
 
-    constructor(private readonly candidates: unknown[]) {}
+    constructor(
+      private readonly candidates: unknown[],
+      /** What the room says to each "want to hear it?", in order. */
+      private readonly replies: ("yes" | "no")[] = [],
+    ) {}
 
     async structured(call: StructuredCall): Promise<unknown> {
       if (call.label === "address") return { kind: "call_on", question: "" };
+      if (call.label === "offer-reply") return { kind: this.replies[this.replied++] ?? "unrelated" };
       if (call.label === "board") return { operations: [] };
       if (call.label === "research-planner") return { ideas: [] };
       if (call.label === "question") return { kind: "none", question: "", topic: "" };
@@ -3519,7 +3526,10 @@ describe("SessionManager: raising a hand and being called on (V3-017)", () => {
     };
   }
 
-  async function replay(candidates: unknown[]): Promise<{
+  async function replay(
+    candidates: unknown[],
+    options: { replies?: ("yes" | "no")[]; jev?: JevLike } = {},
+  ): Promise<{
     cards: StageCard[];
     timing: Record<string, unknown>[];
     utterances: string[];
@@ -3559,8 +3569,9 @@ describe("SessionManager: raising a hand and being called on (V3-017)", () => {
       apiKey: "test-key",
       logger: quiet,
       createStore: () => writer(timing),
-      createModel: () => new HoldingModel(candidates),
+      createModel: () => new HoldingModel(candidates, options.replies ?? []),
       createVoice: () => voice,
+      ...(options.jev === undefined ? {} : { createJev: () => options.jev ?? null }),
       replaySpeed: "max",
       wallClock: systemClock,
     });
@@ -3573,6 +3584,9 @@ describe("SessionManager: raising a hand and being called on (V3-017)", () => {
     await ended;
     return { cards, timing, utterances, turns };
   }
+
+  const solo = "The $12 solo tier does not fit the floor";
+  const copy = "Nobody has said who writes the copy";
 
   it("reads out the one thing it is holding", async () => {
     const run = await replay([
@@ -3603,21 +3617,66 @@ describe("SessionManager: raising a hand and being called on (V3-017)", () => {
     );
   }, 60_000);
 
-  it("reads out the most recent of several", async () => {
-    const run = await replay([
-      noticed("The $12 solo tier does not fit the floor", "You would need 333 solos."),
-      noticed("Nobody has said who writes the copy", "It has been dropped twice."),
-    ]);
+  it("asks about the most recent of several rather than reading it, and stops on anything but a no", async () => {
+    const run = await replay([noticed(solo, "You would need 333 solos."), noticed(copy, "It has been dropped twice.")]);
 
     const held = run.cards.filter((card) => card.raised === true);
     expect(held.length).toBeGreaterThanOrEqual(2);
     const call = run.timing.find((record) => record["stage"] === "wake_call_on");
     expect(call?.["raised"]).toBeGreaterThanOrEqual(2);
-    // The newest one Sotto was holding when the room asked, which is the last
-    // card to have gone up before the call.
-    expect(run.utterances).toEqual([
-      "Nobody has said who writes the copy. It has been dropped twice.",
+    // Without Jev nothing is dropped; the check says so and costs nothing.
+    expect(run.timing.find((record) => record["stage"] === "held_check")).toMatchObject({ raised: 2, answered: [], skipped: "no_jev" });
+    // The newest one Sotto was holding when the room asked is *offered*, not
+    // read, and the room's next line ("Good. Let's see what comes back…")
+    // is neither a yes nor a no, so that is the end of it.
+    expect(run.utterances).toEqual([`I have a note: ${copy}. Want to hear it?`]);
+    expect(run.timing.filter((record) => record["stage"] === "spoken_contribution" && record["kind"] === "held_offer")).toHaveLength(1);
+    expect(run.timing.filter((record) => record["stage"] === "offer_window" && record["event"] === "closed")).toEqual([
+      expect.objectContaining({ offer: "held", outcome: "unrelated" }),
     ]);
+    // Nothing was read, so both hands stay up.
+    expect(run.cards.filter((card) => card.raised === false)).toEqual([]);
+  }, 60_000);
+
+  it("moves on to the next on a no, and reads the one that gets a yes", async () => {
+    const run = await replay(
+      [noticed(solo, "You would need 333 solos."), noticed(copy, "It has been dropped twice.")],
+      { replies: ["no", "yes"] },
+    );
+    expect(run.utterances).toEqual([
+      `I have a note: ${copy}. Want to hear it?`,
+      `I have a note: ${solo}. Want to hear it?`,
+      `${solo}. You would need 333 solos.`,
+    ]);
+    expect(run.timing.filter((record) => record["stage"] === "offer_window" && record["event"] === "closed").map((record) => record["outcome"])).toEqual(["no", "yes"]);
+    expect(run.timing.find((record) => record["stage"] === "held_accepted")).toBeDefined();
+    // The one read out came down; the one declined is still held.
+    const lastOf = (headline: string) => run.cards.filter((card) => card.headline === headline).at(-1);
+    expect(lastOf(solo)?.raised).toBe(false);
+    expect(lastOf(copy)?.raised).toBe(true);
+  }, 60_000);
+
+  it("takes down what the room answered itself before asking, and reads the one left", async () => {
+    // Jev reads the two held notes against what was said since: item 1 (the
+    // newest, the copy) was dealt with, item 2 was not.
+    const jev: JevLike = {
+      systemOne: async (request) => {
+        const answers: Record<string, { type: "noul"; noul: number }> = {};
+        for (const [id, question] of Object.entries(request.questions)) {
+          answers[id] = { type: "noul", noul: question.instructions.includes("item 1") ? 0.9 : 0.1 };
+        }
+        return { model: "jev-test", answers };
+      },
+    };
+    const run = await replay([noticed(solo, "You would need 333 solos."), noticed(copy, "It has been dropped twice.")], { jev });
+    const check = run.timing.find((record) => record["stage"] === "held_check");
+    expect(check?.["answered"]).toHaveLength(1);
+    expect(check?.["skipped"]).toBeUndefined();
+    // One left, so it is read straight out, no question first.
+    expect(run.utterances).toEqual([`${solo}. You would need 333 solos.`]);
+    const lastOf = (headline: string) => run.cards.filter((card) => card.headline === headline).at(-1);
+    expect(lastOf(copy)?.raised).toBe(false);
+    expect(lastOf(solo)?.raised).toBe(false);
   }, 60_000);
 
   it("says so when it is holding nothing", async () => {

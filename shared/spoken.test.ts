@@ -54,12 +54,14 @@ describe("asSpokenContribution", () => {
 });
 
 describe("isUnpromptedKind", () => {
-  it("is every kind but the two the room asked for", () => {
+  it("is every kind but the three the room asked for", () => {
     const unprompted = spokenContributionKinds.filter(isUnpromptedKind);
-    // V3-017's card read out on request, and V3-007's ideas said after a yes.
+    // V3-017's card read out on request (and the "want to hear it?" asked
+    // when several are held), and V3-007's ideas said after a yes.
     expect(unprompted).not.toContain("called_on");
+    expect(unprompted).not.toContain("held_offer");
     expect(unprompted).not.toContain("ideas");
-    expect(unprompted).toHaveLength(spokenContributionKinds.length - 2);
+    expect(unprompted).toHaveLength(spokenContributionKinds.length - 3);
   });
 });
 

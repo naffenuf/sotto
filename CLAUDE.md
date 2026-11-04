@@ -2272,3 +2272,23 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   turn rather than `null`. Fourth time the two-timeline bug has bitten (V2-008 ×2, V2-008a, this);
   the replay tests cannot catch it because both clocks start at zero there.
 
+- **An answer to the room's own question never expires, and "go ahead" with several in hand asks
+  before it reads.** The 60-second deadline and the six-turn limit on a spoken answer are gone
+  (`Reservations.answer` queues with `expiry: null`): what takes an answer off the queue is the
+  still-current verdict — the room answered it or moved on — and the card stays raised either
+  way, so "Sotto, go ahead" can still reach it. On a `call_on`, `SessionManager.calledOn` first
+  makes **one** Jev call (`server/session/heldCheck.ts`: every held item is a `noul` under its own
+  card id over one state — the held lines numbered, then everything said since the oldest hand
+  went up) and lowers the hands the room has answered itself (≥ `HELD_ANSWERED_THRESHOLD`, 0.7);
+  no Jev or a late Jev drops nothing. One left: read it, as before. Several: `heldOffer` says the
+  newest one's `RaisedItem.offer` ("I looked up the cheapest Sunday bus… Want to hear it?",
+  written locally at `hand.observe` time by `heldOfferLine` — the research topic, the answer's
+  question, or a note's headline) as the new `held_offer` kind (asked, uncharged, front of the
+  queue), and the ten seconds after it are an `OfferWindow` with a `held` subject: **yes** reads
+  that card through `calledOn`, **no** moves on to the next (`OfferWindow.onClosed`, the new hook),
+  anything else ends it. `RaisedItem.sinceTurnId` is the newest human final turn when the hand
+  went up — an order, not a time, for the same reason the still-current watcher counts turns —
+  and is kept across a republish. Measured on the `ask-search` replay with a fake room: offer,
+  "no", next offer, "yes", card read; and with a fake Jev, the answered note came down and the
+  other was read with no question first.
+

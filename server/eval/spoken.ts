@@ -44,7 +44,7 @@ import { pauseAt, turnIntervals, type TurnInterval } from "./pause.js";
  * nobody was mid-sentence.
  */
 export function pauseThresholdFor(kind: SpokenContributionKind): number {
-  if (kind === "called_on" || kind === "ideas") return 0;
+  if (kind === "called_on" || kind === "ideas" || kind === "held_offer") return 0;
   if (kind === "reserve" || kind === "no_answer") return PAUSE_MS;
   return SPEAK_PAUSE_MS;
 }

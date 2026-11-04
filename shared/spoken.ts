@@ -39,6 +39,9 @@ export const SPOKEN_CONTRIBUTION_STAGE = "spoken_contribution";
  * one fits. `offer` is V3-005's: a finding nobody asked for, mentioned as a
  * statement so that nobody owes it a reply. `called_on` is V3-017's and
  * `ideas` is V3-007's, and those two are the odd ones out — the room asked.
+ * `held_offer` is the question Sotto asks when it is called on with more
+ * than one thing in hand ("I looked up the bus schedule. Want to hear it?"):
+ * asked for too, since it only ever follows a "go ahead".
  */
 export const spokenContributionKinds = [
   "reserve",
@@ -49,6 +52,7 @@ export const spokenContributionKinds = [
   "offer",
   "called_on",
   "ideas",
+  "held_offer",
 ] as const;
 export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
 
@@ -63,7 +67,7 @@ export type SpokenContributionKind = (typeof spokenContributionKinds)[number];
  * of that exchange, and is counted.
  */
 export function isUnpromptedKind(kind: SpokenContributionKind): boolean {
-  return kind !== "called_on" && kind !== "ideas";
+  return kind !== "called_on" && kind !== "ideas" && kind !== "held_offer";
 }
 
 /**

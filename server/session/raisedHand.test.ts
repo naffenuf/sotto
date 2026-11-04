@@ -10,6 +10,7 @@ import {
   RaisedHand,
   calledOnCardLine,
   calledOnPacketLine,
+  heldOfferLine,
 } from "./raisedHand.js";
 
 function card(id: string, over: Partial<StageCard> = {}): StageCard {
@@ -155,5 +156,62 @@ describe("RaisedHand", () => {
 
   it("has a short answer for a call with nothing raised", () => {
     expect(NOTHING_RAISED_LINE).toBe("Nothing right now.");
+  });
+
+  it("goes through what it holds newest first, last published first on a tie", () => {
+    const hand = new RaisedHand();
+    hand.observe(card("card-1"), "one", 1_000);
+    hand.observe(card("card-2"), "two", 2_000);
+    hand.observe(card("card-3"), "three", 2_000);
+    expect(hand.newestFirst().map((item) => item.cardId)).toEqual(["card-3", "card-2", "card-1"]);
+  });
+
+  it("remembers which turn each card was raised after, and keeps it on a republish", () => {
+    let latest: string | null = null;
+    const hand = new RaisedHand({ latestTurnId: () => latest });
+    hand.observe(card("card-1"), "one", 1_000);
+    latest = "0:3";
+    hand.observe(card("card-2"), "two", 2_000);
+    latest = "0:5";
+    // Pinned beside a decision (V3-013): the room has not asked about it since.
+    hand.observe(card("card-1"), "one, pinned", 3_000);
+    expect(hand.held().map((item) => [item.cardId, item.sinceTurnId])).toEqual([
+      ["card-2", "0:3"],
+      ["card-1", null],
+    ]);
+    // Lowered and raised again: it is raised after whatever is newest now.
+    hand.lower("card-1");
+    hand.observe(card("card-1"), "one, again", 4_000);
+    expect(hand.held().at(-1)?.sinceTurnId).toBe("0:5");
+  });
+});
+
+describe("heldOfferLine", () => {
+  it("offers a research card by what was looked up", () => {
+    const research = card("research-idea-1", { variant: "research", headline: "NYC to Philly buses: 40 Greyhound runs" });
+    expect(heldOfferLine(research, "the cheapest Sunday bus from New York to Philadelphia")).toBe(
+      "I looked up the cheapest Sunday bus from New York to Philadelphia. Want to hear it?",
+    );
+    // No topic: the packet's title stands in.
+    expect(heldOfferLine(research)).toBe("I looked up NYC to Philly buses: 40 Greyhound runs. Want to hear it?");
+  });
+
+  it("offers an answer by the question it answers", () => {
+    const answer = card("card-ans-1", { variant: "answer", question: "How long does the bus take?" });
+    expect(heldOfferLine(answer)).toBe("I have an answer on How long does the bus take. Want to hear it?");
+  });
+
+  it("offers anything Sotto noticed by its headline", () => {
+    expect(heldOfferLine(card("card-cand-1"))).toBe(
+      "I have a note: Before six gardens: what if only one signs up. Want to hear it?",
+    );
+  });
+
+  it("is what a card is held with unless told otherwise", () => {
+    const hand = new RaisedHand();
+    hand.observe(card("card-1"), "the line", 1_000);
+    expect(hand.latest()?.offer).toBe(heldOfferLine(card("card-1")));
+    hand.observe(card("card-2", { variant: "research", headline: "Buses" }), "the line", 2_000, "I looked up the buses. Want to hear it?");
+    expect(hand.latest()?.offer).toBe("I looked up the buses. Want to hear it?");
   });
 });
