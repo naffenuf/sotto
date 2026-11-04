@@ -2292,3 +2292,18 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   "no", next offer, "yes", card read; and with a fake Jev, the answered note came down and the
   other was read with no question first.
 
+- **A turn said over Sotto's voice without its name is read once for "stop".** Echo cancellation eats
+  the first syllables of anything said over the playback, so "Sotto, not now" over an answer came
+  through as `So not now` (`2026-11-03_2253-mic`) — no name, so no command, so the one retry
+  V3-004 grants an answer a voice cut off fired 14 s later, which is the opposite of what was
+  said. `BargeIn` now hands a **final, unaddressed turn that arrived during playback** to
+  `options.overheard`, which `SessionManager` routes to `AnswerAgent.command(asked,
+  { overheard: true })`: the same Jev-gated command classifier (`commandFast.ts`, Spark under
+  0.7), with a new `side_talk` kind so it can say "not about me". Only `stop`, `quieter` and
+  `louder` act on an overheard turn — they cut the speech and go to steering — and the
+  classifier's timeout fallback is `side_talk` rather than the lexical rule's `stop`, because a
+  slow API must not steer Sotto down on a side remark. The turn is **not** owned: the question
+  classifier, the follow-up window and the transcript all still get it. `onSteer` with `stop` or
+  `quieter` now calls `Reservations.dropRetries()`, which is what cancels the retry. Nothing is
+  read this way while Sotto is silent.
+

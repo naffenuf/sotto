@@ -663,6 +663,37 @@ describe("AnswerAgent out loud (V2-005)", () => {
     },
   );
 
+  it("acts on an overheard stop or steer, cutting the speech, and on nothing else", async () => {
+    // A turn over Sotto's voice with no name in it (the barge-in's
+    // `overheard` route): only a stop or a steer may come of it.
+    const { h, voice } = spoken([]);
+    h.model.commands.push({ command: "quieter", question: "" });
+    h.agent.command({ question: "So not now", askedBy: "A", turnId: "0:2" }, { overheard: true });
+    await h.clock.settle();
+    expect(h.steers).toEqual([["quieter", "0:2"]]);
+    expect(h.timing.find((record) => record["stage"] === "voice_command")).toMatchObject({ command: "quieter", overheard: true });
+
+    h.model.commands.push({ command: "new_question", question: "how much is the hotel" });
+    h.agent.command({ question: "and how much is the hotel", askedBy: "B", turnId: "0:3" }, { overheard: true });
+    await h.clock.settle();
+    h.model.commands.push({ command: "side_talk", question: "" });
+    h.agent.command({ question: "the hotel is 200 a night", askedBy: "B", turnId: "0:4" }, { overheard: true });
+    await h.clock.settle();
+    // Neither was answered, steered on or recorded as anything but a verdict.
+    expect(h.steers).toEqual([["quieter", "0:2"]]);
+    expect(voice.utterances).toEqual([]);
+    expect(h.records).toEqual([]);
+  });
+
+  it("reads a late classifier on an overheard turn as side talk, never as stop", async () => {
+    const h = harness();
+    h.model.commands.push({ command: "invented" });
+    h.agent.command({ question: "yeah the hotel is fine", askedBy: "A", turnId: "0:5" }, { overheard: true });
+    await h.clock.settle();
+    expect(h.steers).toEqual([]);
+    expect(h.timing.find((record) => record["stage"] === "voice_command")).toMatchObject({ command: "side_talk", overheard: true });
+  });
+
   it("reports a stop too, leaving what it was about to the caller (V3-006)", async () => {
     const h = harness();
     h.model.commands.push({ command: "stop", question: "" });

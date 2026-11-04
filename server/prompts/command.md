@@ -11,6 +11,9 @@ about this classifier. Return the required JSON object with one command:
 - louder: asking Sotto to contribute more from now on — you can jump in more, speak up more
   often, don't be shy, chime in whenever, we want to hear more from you.
 - new_question: a new question, request, correction or redirection.
+- side_talk: the turn was not said to Sotto at all — people talking to each other over it,
+  reacting among themselves, carrying on the meeting. Only possible when the turn does not
+  address Sotto.
 For new_question, question is the user's actual request with the address removed.
 For every other command, question is an empty string. Do not answer the request.
 A turn that only stops what is being said right now is stop, not quieter; quieter and louder

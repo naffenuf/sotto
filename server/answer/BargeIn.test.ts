@@ -15,6 +15,7 @@ function setup(playingInitially = true, answering = false, unprompted = false) {
   let playing = playingInitially;
   let stops = 0;
   const commands: AskedQuestion[] = [];
+  const overheard: AskedQuestion[] = [];
   const timing: Record<string, unknown>[] = [];
   const publicText: string[] = [];
   const listening: boolean[] = [];
@@ -28,6 +29,7 @@ function setup(playingInitially = true, answering = false, unprompted = false) {
       return Promise.resolve(35);
     },
     command: (asked) => commands.push(asked),
+    overheard: (asked) => overheard.push(asked),
     onTiming: (record) => timing.push(record),
     onListening: (value) => listening.push(value),
     unprompted: () => unprompted,
@@ -56,7 +58,7 @@ function setup(playingInitially = true, answering = false, unprompted = false) {
     frame({ type: "speechEnd", turnId: id });
     frame({ type: "speechComplete", turnId: id, transcript: text });
   };
-  return { watcher, start, end, frame, commands, timing, publicText, listening, stops: () => stops };
+  return { watcher, start, end, frame, commands, overheard, timing, publicText, listening, stops: () => stops };
 }
 
 describe("barge-in at the transcription boundary", () => {
@@ -172,4 +174,30 @@ describe("barge-in at the transcription boundary", () => {
       expect(detectsAddress(text)).toBe(false);
     },
   );
+
+  it("hands a turn said over the voice without the name to the overheard read, and claims nothing", () => {
+    // `2026-11-03_2253-mic`: "Sotto, not now" came through as "So not now"
+    // over the answer's playback; nothing stopped the retry.
+    const t = setup(true);
+    t.start(7, "So not");
+    t.end(7, "So not now");
+    expect(t.stops()).toBe(0);
+    expect(t.commands).toEqual([]);
+    expect(t.overheard).toEqual([{ question: "So not now", askedBy: null, turnId: "0:7" }]);
+    // Not owned: the ordinary pipeline still gets the turn.
+    expect(t.watcher.owns("0:7")).toBe(false);
+    expect(t.publicText).toContain("So not now");
+  });
+
+  it("overhears nothing when Sotto is not speaking, and nothing addressed", () => {
+    const quiet = setup(false);
+    quiet.start(8, "not now");
+    quiet.end(8, "not now, let's do the hotel");
+    expect(quiet.overheard).toEqual([]);
+    const named = setup(true);
+    named.start(9, "Sotto stop");
+    named.end(9, "Sotto stop");
+    expect(named.overheard).toEqual([]);
+    expect(named.commands).toHaveLength(1);
+  });
 });

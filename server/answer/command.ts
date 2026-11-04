@@ -16,7 +16,12 @@ import { detect } from "../wake.js";
  * already the classifier an addressed turn reaches while Sotto is speaking or
  * has just spoken unasked — the two moments a group says either of them.
  */
-export const commandKinds = ["stop", "new_question", "continue", "quieter", "louder"] as const;
+/**
+ * `side_talk` exists for a turn *overheard* over Sotto's voice (post-V3-017):
+ * one that was not addressed to Sotto at all, so the classifier needs a way
+ * to say "this was not about me". An addressed turn is never side talk.
+ */
+export const commandKinds = ["stop", "new_question", "continue", "quieter", "louder", "side_talk"] as const;
 export type CommandKind = (typeof commandKinds)[number];
 
 /** Validate even strict model replies before allowing them to restart speech. */

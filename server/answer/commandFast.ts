@@ -26,6 +26,7 @@ export const COMMAND_CRITERIA: Record<CommandKind, string> = {
   continue: "Carry on from where it was cut off: 'go on', 'continue', 'sorry, keep going'.",
   quieter: "Sotto should contribute less for the rest of the meeting: 'not now', 'that's too much', 'you're being too chatty', 'stay out of it'.",
   louder: "Sotto should contribute more: 'you can jump in more', 'speak up when you have something'.",
+  side_talk: "Not about Sotto at all: people talking to each other, reacting among themselves, carrying on the meeting over it.",
 };
 
 export interface CommandGateVerdict {

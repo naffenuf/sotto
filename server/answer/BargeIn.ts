@@ -34,6 +34,13 @@ export interface BargeInOptions {
   answering?: () => boolean;
   interrupt: () => Promise<number | null>;
   command: (asked: AskedQuestion) => void;
+  /**
+   * A final turn said over Sotto's voice that did not say its name. Not a
+   * command — it stays in the ordinary pipeline — but the room was talking
+   * while Sotto was, and "not now" with the name eaten by echo cancellation
+   * (`2026-11-03_2253-mic`: "So not now") is what this exists to hear.
+   */
+  overheard?: (asked: AskedQuestion) => void;
   onTiming: (record: Record<string, unknown>) => void;
   onListening: (listening: boolean) => void;
   /**
@@ -51,6 +58,7 @@ export interface BargeInOptions {
 export class BargeIn {
   private readonly interrupted = new Set<string>();
   private readonly commands = new Set<string>();
+  private readonly overheard = new Set<string>();
   private hasInterrupted = false;
 
   constructor(private readonly options: BargeInOptions) {}
@@ -86,7 +94,14 @@ export class BargeIn {
     }
     if (!turn.final) return;
     if (this.interrupted.has(turn.turnId)) this.options.onListening(false);
-    if (!addressed) return;
+    if (!addressed) {
+      // Said over Sotto's voice without its name: let the command classifier
+      // say whether it was a stop, with no claim on the turn otherwise.
+      if (duringPlayback && this.overheard.add(turn.turnId)) {
+        this.options.overheard?.({ question: turn.text, askedBy: turn.speaker, turnId: turn.turnId });
+      }
+      return;
+    }
     const control = /\b(stop|thanks|go on|continue|resume|carry on)\b/i.test(turn.text);
     // Outside playback, only an existing answer can receive a control command.
     // Ordinary requests (including "thanks Soto ... can you ...") belong to

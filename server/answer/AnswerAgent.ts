@@ -362,11 +362,13 @@ export class AnswerAgent {
   }
 
   /** Classifies only final human text, once cancellation has already happened. */
-  command(asked: AskedQuestion): void {
+  command(asked: AskedQuestion, options: { overheard?: boolean } = {}): void {
     if (this.stopped) return;
+    const overheard = options.overheard === true;
     // The acknowledgment may already have ended while the model is still
     // thinking. A final stop in that silent gap must cancel the future speech too.
-    if (this.activeSpeech !== undefined) void this.interrupt();
+    // An overheard turn has not stopped anything yet: only its verdict can.
+    if (!overheard && this.activeSpeech !== undefined) void this.interrupt();
     const version = ++this.commandVersion;
     this.commands = this.commands.then(async () => {
       try {
@@ -392,7 +394,10 @@ export class AnswerAgent {
         } catch (error) {
           fallback = true;
           this.logger.warn(`[voice] command fallback: ${message(error)}`);
-          command = fallbackCommand(asked.question);
+          // The lexical fallback reads anything that is not a question as
+          // "stop"; for a turn nobody addressed to Sotto that is the wrong
+          // guess, so a late classifier means it was side talk.
+          command = overheard ? { command: "side_talk", question: "" } : fallbackCommand(asked.question);
         } finally {
           cancelTimeout();
         }
@@ -400,7 +405,18 @@ export class AnswerAgent {
         this.options.onTiming?.({
           stage: "voice_command", atMs: this.clock.now(), turnId: asked.turnId,
           command: command.command, ...(fallback ? { fallback: true } : {}),
+          ...(overheard ? { overheard: true } : {}),
         });
+        // A turn overheard over Sotto's voice, with no name in it, may only
+        // tell Sotto to stop or to say less; anything else was the room
+        // talking to itself, and the ordinary pipeline already has the turn.
+        if (overheard) {
+          if (command.command !== "stop" && command.command !== "quieter" && command.command !== "louder") return;
+          if (this.activeSpeech !== undefined) void this.interrupt();
+          this.options.onSteer?.(command.command, asked.turnId);
+          return;
+        }
+        if (command.command === "side_talk") return;
         // V3-006: the two kinds that are about Sotto's behaviour rather than
         // about this answer, and a stop that may be about either.
         if (command.command === "quieter" || command.command === "louder") {

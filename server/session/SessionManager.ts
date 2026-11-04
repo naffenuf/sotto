@@ -1062,6 +1062,12 @@ export class SessionManager {
         loops.reservations?.dropRetries();
         loops.answers?.command(asked);
       },
+      // Said over Sotto's voice with no name: a quick read for "stop" (Jev,
+      // a few hundred milliseconds), because echo cancellation eats the
+      // first syllables of anything said over the playback and "Sotto, not
+      // now" came through as "So not now". Only a stop or a steer does
+      // anything; side talk leaves the one retry (V3-004) standing.
+      overheard: (asked) => loops.answers?.command(asked, { overheard: true }),
       onTiming: (record) => store.writer?.appendTiming?.(record),
       onListening: (listening) => {
         this.bus.setListening(listening);
@@ -2102,7 +2108,12 @@ export class SessionManager {
       // V3-006: "not now" and "you can jump in more" steer the frequency; a
       // bare "stop" does too, but only when Sotto has just said something
       // unasked — during an answer to a direct question it means this answer.
-      onSteer: (command, turnId) => steering.commanded(command, turnId),
+      onSteer: (command, turnId) => {
+        // A stop or a "not now" is also the answer to whether the line the
+        // room talked over should be tried again (V3-004): it should not.
+        if (command === "stop" || command === "quieter") reservations.dropRetries();
+        steering.commanded(command, turnId);
+      },
       onModelState,
     });
     // V3-002: what the room wonders aloud, noticed per final turn rather than
