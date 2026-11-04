@@ -2,15 +2,20 @@
 // Assembles the demo video from a recorded take, the rendered slides and the
 // narration: see tasks/demo-video.md ("The cut").
 //
-//   node scripts/build-demo-video.mjs [demo/takes/take4.mov]
+//   npm run demo:check    resolve the cut, write demo/build/review.md, encode nothing
+//   npm run demo:video    the same, then build demo/sotto-demo.mp4
 //
 // Pieces are encoded to one format (1080p30 H.264, AAC 48 kHz stereo) and
 // joined with the concat demuxer; the whole thing is loudness-normalised last.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { TAKE, timelinePath } from "./demo/config.mjs";
+import { end, linesIn, resolveSegments, start } from "./demo/cut.mjs";
+import { analyseTake, formatTime, voiceName } from "./demo/take.mjs";
 
-const take = resolve(process.argv[2] ?? "demo/takes/take4.mov");
+const CHECK_ONLY = process.argv.includes("--check");
+const take = resolve(TAKE.video);
 const build = resolve("demo/build");
 const out = resolve("demo/sotto-demo.mp4");
 mkdirSync(build, { recursive: true });
@@ -39,23 +44,41 @@ function callout(text, at, seconds = 2.6) {
   );
 }
 
-// The cut, on the take's clock (tasks/demo-video.md). `callouts` are at take times.
+// The cut, by what is said: see scripts/demo/cut.mjs for start()/end(), and
+// demo/take4.timeline.md for the lines. Every edge is checked against the
+// take's own audio; `npm run demo:check` resolves the cut and writes the
+// review sheet without encoding anything.
 const SEGMENTS = [
-  { name: "A", from: 32.0, to: 38.3, fadeIn: 0.6 },
-  { name: "A2", from: 51.9, to: 61.2 },
-  { name: "B", from: 74.5, to: 83.4 },
-  { name: "C", from: 88.4, to: 111.7, callouts: [[108.5, "Nobody asked. It waited for a pause."]] },
-  { name: "C2", from: 135.0, to: 148.0, callouts: [[135.5, "A sourced answer, in the next gap."]] },
-  { name: "D", from: 166.0, to: 177.9 },
-  // "Sotto, go ahead" and the correction, with the 2.5 s the call-on takes
-  // to be acted on cut out between them.
-  { name: "E1", from: 208.2, to: 210.5 },
+  // One unbroken stretch: the whole hello, the names, Craig's opener, the
+  // fire-code cap and "30 kits" (which the correction later cites), the Bend
+  // crowd, the drive-time question, EJ's guess, and the claim.
+  // "Okay, it's running" before the hello is left out.
   {
-    name: "E2", from: 212.9, to: 243.1,
-    callouts: [[212.9, "It raised a hand. The room called on it."], [238.4, "It stops the moment anyone talks."]],
+    name: "A", from: start("Hi, I'm Sotto"), to: end("I'll check the drive time from Portland to Bend"), fadeIn: 0.6,
+    callouts: [[start("I'll check the drive time"), "Nobody asked. It waited for a pause."]],
   },
-  { name: "F", from: 248.0, to: 266.0, callouts: [[253.5, "A wrap-up from its own notes."]], fadeOut: 2.5 },
+  {
+    name: "C2", from: start("On the drive time from Portland to Bend"), to: end("gets you there by lunch"),
+    callouts: [[start("On the drive time from Portland to Bend"), "A sourced answer, in the next gap."]],
+  },
+  { name: "D", from: start("Good. And tickets"), to: end("Free or five bucks") },
+  // "Sotto, go ahead" and the correction, with the pause the call-on takes
+  // to be acted on cut out between them.
+  { name: "E1", from: start("Sotto, go ahead"), to: end("Sotto, go ahead") },
+  {
+    name: "E2", from: start("50 tickets"), to: end("we'll read it after"),
+    callouts: [[start("50 tickets"), "It raised a hand. The room called on it."], [start("Sotto, hold on"), "It stops the moment anyone talks."]],
+  },
+  {
+    name: "F", from: start("I'll grab a volunteer"), to: end("Charge 5 dollars for tickets."), fadeOut: 2.0,
+    callouts: [[start("Here's where we got to"), "A wrap-up from its own notes."]],
+  },
 ];
+/** Picture and sound dissolve between take segments over this long. */
+const CROSSFADE_S = 0.4;
+
+const analysis = analyseTake({ take, session: TAKE.session });
+const cut = resolveSegments(analysis, SEGMENTS, { crossfade: CROSSFADE_S });
 
 const parts = [];
 
@@ -82,7 +105,7 @@ function segment(seg) {
   const len = seg.to - seg.from;
   const file = resolve(build, `seg-${seg.name}.mp4`);
   const vf = [FRAME];
-  for (const [at, text] of seg.callouts ?? []) vf.push(callout(text, at - seg.from));
+  for (const { at, text } of seg.callouts) vf.push(callout(text, at - seg.from));
   if (seg.fadeIn) vf.push(`fade=t=in:st=0:d=${seg.fadeIn}`);
   if (seg.fadeOut) vf.push(`fade=t=out:st=${(len - seg.fadeOut).toFixed(2)}:d=${seg.fadeOut}`);
   // 20 ms ramps at both ends so a cut never clicks.
@@ -91,19 +114,107 @@ function segment(seg) {
     "-ss", seg.from.toFixed(3), "-to", seg.to.toFixed(3), "-i", take,
     "-vf", vf.join(","), "-af", af.join(","), ...VIDEO, ...AUDIO, file,
   ]);
-  parts.push(file);
   console.log(`segment ${seg.name}: ${len.toFixed(1)} s`);
+  return file;
 }
+
+/** The take's segments as one piece, each dissolving into the next (picture and sound). */
+function dissolve(files) {
+  const file = resolve(build, "session.mp4");
+  const lens = files.map(duration);
+  const graph = [];
+  let v = "0:v", a = "0:a", at = 0;
+  for (let k = 1; k < files.length; k++) {
+    at += lens[k - 1] - CROSSFADE_S;
+    const last = k === files.length - 1;
+    // xfade outputs yuv444p; the slides are yuv420p, and the concat demuxer
+    // joins without re-encoding, so a mismatch leaves players showing black
+    // (with sound) from the first segment on.
+    graph.push(`[${v}][${k}:v]xfade=transition=fade:duration=${CROSSFADE_S}:offset=${at.toFixed(3)}${last ? ",format=yuv420p[v]" : `[v${k}]`}`);
+    graph.push(`[${a}][${k}:a]acrossfade=d=${CROSSFADE_S}:c1=tri:c2=tri${last ? "[a]" : `[a${k}]`}`);
+    v = `v${k}`;
+    a = `a${k}`;
+  }
+  ffmpeg([...files.flatMap((f) => ["-i", f]), "-filter_complex", graph.join(";"), "-map", "[v]", "-map", "[a]", ...VIDEO, ...AUDIO, file]);
+  parts.push(file);
+  console.log(`session: ${duration(file).toFixed(1)} s, ${files.length - 1} crossfades`);
+}
+
+writeReview();
+if (CHECK_ONLY) process.exit(0);
 
 slide("01-title", { fadeIn: 0.6 });
 slide("02-stack", { fadeOut: 0.4 });
-for (const seg of SEGMENTS) segment(seg);
+dissolve(cut.map(segment));
 slide("03-end", { fadeIn: 0.5, fadeOut: 1.0, tail: 2.5 });
 
+// The concat demuxer copies streams as they are, so every part must agree.
+const formats = new Set(parts.map((p) => execFileSync("ffprobe", ["-v", "error", "-select_streams", "v", "-show_entries", "stream=pix_fmt,width,height,r_frame_rate,time_base,profile", "-of", "csv=p=0", p]).toString().trim()));
+if (formats.size !== 1) throw new Error(`parts disagree on video format, so concat would break playback:\n  ${[...formats].join("\n  ")}`);
 const list = resolve(build, "concat.txt");
 writeFileSync(list, parts.map((p) => `file '${p}'`).join("\n") + "\n");
 const joined = resolve(build, "joined.mp4");
 ffmpeg(["-f", "concat", "-safe", "0", "-i", list, "-c", "copy", joined]);
 // Loudness last, over the whole programme, video untouched.
-ffmpeg(["-i", joined, "-c:v", "copy", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", ...AUDIO, "-movflags", "+faststart", out]);
+// Two passes, applied linearly: single-pass loudnorm is dynamic (it rides the
+// gain through the programme) and missed the target, −16.8 LUFS against −16;
+// measured first and applied as one gain, the build lands on −16.1.
+const LOUDNESS = "I=-16:TP=-1.5:LRA=11";
+const probe = spawnSync("ffmpeg", ["-hide_banner", "-i", joined, "-af", `loudnorm=${LOUDNESS}:print_format=json`, "-f", "null", "-"]).stderr.toString();
+const m = JSON.parse(probe.slice(probe.lastIndexOf("{"), probe.lastIndexOf("}") + 1));
+const linear = `loudnorm=${LOUDNESS}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
+ffmpeg(["-i", joined, "-c:v", "copy", "-af", linear, ...AUDIO, "-movflags", "+faststart", out]);
 console.log(`\n${out}: ${duration(out).toFixed(1)} s`);
+
+/**
+ * demo/build/review.md: per segment, its edges (how each was found and who, if
+ * anyone, is talking there), every line it contains — whole or cut — and the
+ * first and last frame. Read this, not the MP4, to check a cut.
+ */
+function writeReview() {
+  const slideLen = (name, tail = 0.9) => duration(resolve("demo/narration", `${name}.wav`)) + tail;
+  let clock = slideLen("01-title") + slideLen("02-stack");
+  const out = [
+    "# Demo cut review",
+    "",
+    `Generated by \`npm run demo:check\` from \`${TAKE.video}\` (session \`${TAKE.session}\`, offset ${analysis.offset.toFixed(2)} s, r=${analysis.r.toFixed(2)}).`,
+    `Lines are from \`${timelinePath()}\`. Times are take time; "programme" is time in the finished video.`,
+    "",
+  ];
+  for (const [k, seg] of cut.entries()) {
+    const len = seg.to - seg.from;
+    out.push(`## ${seg.name}: ${formatTime(seg.from)} → ${formatTime(seg.to)} (${len.toFixed(1)} s, programme ${formatTime(clock)})`, "");
+    for (const e of seg.edges) {
+      const at = e.talking ? `**${[...e.talking].map(voiceName).join(" + ")} talking** (covered by a ${e.fade} s fade)` : "silence";
+      out.push(`- ${e.side} ${formatTime(e.t)}: ${e.how}${e.line ? ` of "${e.line.text.slice(0, 50)}…"` : ""}; ${at}`);
+    }
+    if (seg.crossfadeIn || seg.crossfadeOut) out.push(`- crossfades: ${[seg.crossfadeIn && `in ${seg.crossfadeIn} s`, seg.crossfadeOut && `out ${seg.crossfadeOut} s`].filter(Boolean).join(", ")}, both over silence`);
+    for (const c of seg.callouts) out.push(`- callout at ${formatTime(c.at)} (programme ${formatTime(clock + c.at - seg.from)}): "${c.text}"`);
+    out.push("", "| | In | Out | Who | Line |", "|---|---|---|---|---|");
+    for (const { line, whole } of linesIn(analysis, seg)) {
+      const mark = whole ? "✓" : line.in < seg.from ? "⚠ starts before the cut" : "⚠ runs past the cut";
+      out.push(`| ${mark} | ${formatTime(line.in)} | ${formatTime(line.out)} | ${voiceName(line.voice)} | ${line.text.replace(/\|/g, "\\|")} |`);
+    }
+    const shot = resolve(build, `review-${seg.name}.jpg`);
+    ffmpeg([
+      "-ss", seg.from.toFixed(3), "-i", take, "-ss", Math.max(0, seg.to - 0.05).toFixed(3), "-i", take,
+      "-filter_complex", `[0:v]${FRAME},scale=640:-2[a];[1:v]${FRAME},scale=640:-2[b];[a][b]hstack`,
+      "-frames:v", "1", "-q:v", "4", shot,
+    ]);
+    out.push("", `First and last frame: ![${seg.name}](review-${seg.name}.jpg)`, "");
+    // What the cut drops before the next segment: dialogue the audience never
+    // hears should be a decision someone made, not a surprise in the MP4.
+    const next = cut[k + 1];
+    if (next) {
+      const dropped = analysis.lines.filter((l) => l.in >= seg.to - 0.05 && l.out <= next.from + 0.05 && l.out - l.in > 0.3);
+      out.push(dropped.length === 0 ? `**Left out before ${next.name}:** nothing said.` : `**Left out before ${next.name}** (${(next.from - seg.to).toFixed(1)} s of take):`);
+      for (const l of dropped) out.push(`- ${formatTime(l.in)} ${voiceName(l.voice)}: ${l.text}`);
+      out.push("");
+    }
+    clock += len - (seg.crossfadeOut ?? 0);
+  }
+  clock += slideLen("03-end", 2.5);
+  out.push(`**Total: ${formatTime(clock)}**`, "");
+  writeFileSync(resolve(build, "review.md"), out.join("\n"));
+  console.log(`demo/build/review.md: ${cut.length} segments, ${formatTime(clock)} total`);
+}

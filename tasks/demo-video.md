@@ -22,15 +22,16 @@ Read by Adam, the ElevenLabs voice that plays Craig at the table, so the one voi
 audience meets in the intro is the one they then hear in the meeting. No introduction and
 no "I built": the narrator is a voice, not a person.
 
-> This is Sotto: a voice agent that sits in your meeting, answers when it is asked, and looks
-> things up on its own when the room wonders something out loud. It speaks only in a pause,
-> and only when it has something worth saying.
+> This is Sotto: a voice agent that sits in your meeting and speaks only when it has something
+> worth saying.
 >
-> Sotto is built on Meta's Muse Spark 1.3 for everything it writes, Muse Glimmer running
-> locally for judgment calls, and Meta's realtime transcription. The rest of the stack is on
-> screen.
->
-> The code is open source on GitHub under the MIT licence. Let's watch Sotto in a meeting.
+> It's built on Meta's Muse Spark for everything it writes, Muse Glimmer running locally for
+> judgment calls, and Meta's realtime transcription. Let's watch a meeting.
+
+Cut from the first version (28 s, now 15 s) because Sotto's own hello says how it behaves a few
+seconds later, and the end card says where the code is: the repeat was the first thing a viewer
+noticed. The copy lives in `scripts/render-narration.ts`; `npm run demo:narration -- 01-title`
+re-renders one line.
 
 The repo is public at github.com/naffenuf/sotto with the MIT licence on `main`.
 
@@ -127,7 +128,7 @@ Expect Sotto to be talked over and stepped down; the dry run above is what that 
 OBS window capture of the Chrome Sotto window, 1920×1080 H.264, stereo AAC (EJ hard left,
 Craig hard right, Sotto centre), 348 s. Session `sessions/2026-11-04_1106-mic`. The top 145 px
 are Chrome's tab strip, address bar and a yellow extension banner: crop them off. Beats on the
-recording's clock:
+recording's clock, as first noted by eye (the measured ones are in `demo/take4.timeline.md`):
 
 | Recording time | What happens |
 |---|---|
@@ -147,43 +148,83 @@ Warts to cut or live with: a read-back the board talked over shows as "Sotto: G 
 in the transcript from ~1:10 on; the spoken correction says "B proposes" (a diarization label
 where the name should be); the wrap-up lists the drive-time question as open.
 
-## The cut (target 2:55 total)
+## Cutting by line, not by second
 
-Hard cuts at line boundaries, each segment a beat. Times are on `take4.mov`'s clock.
+The first cut was a list of seconds read off the video, and every revision moved them by a second
+or two because nobody could see where a word started (E2 ran to 243.1, which is EJ's "Last thing"
+starting at 243.14). The take already says exactly when everything was said, two ways:
 
-| # | In → out | Length | What the audience gets |
-|---|---|---|---|
-| A | 32.0 → 38.3 | 6 s | "Hi, I'm Sotto. I'm listening and keeping notes, and I'll only speak up when it's worth it." |
-| A' | 51.9 → 61.2 | 9 s | "…just say Sotto. Would you each say your name?" / "Hi, I'm Craig." / "And I'm EJ." |
-| B | 74.5 → 83.4 | 9 s | EJ: "One thing, though: it caps at thirty people. Fire code, hard thirty." |
-| C | 88.4 → 111.7 | 23 s | Bend crowd → "How long is the drive?" → "Three hours? Four?" → **"I'll check the drive time…"** |
-| C' | 135.0 → 148.0 | 13 s | **the spoken answer**: 160 miles, three to three and a half hours |
-| D | 166.0 → 177.8 | 12 s | "I say we open fifty… The Bend people alone will take twenty." / "Fifty. Okay. Free, or five bucks?" |
-| E | 206.9 → 243.1 | 36 s | "Sotto, go ahead" → **the correction read out** → "Sotto, what does Eventbrite charge…" → "One sec." → "Let me pull…" → **"Sotto, hold on"** |
-| F | 248.0 → 266.0 | 18 s | "Sotto, wrap us up." → the wrap-up's first twelve seconds, fading out |
+- **The session folder lines up with the take at one offset.** Cross-correlating the session's
+  `audio.wav` (what the API heard) with the take's soundtrack puts the take's clock at the
+  session's plus **31.98 s**, the same in every window that has room speech: no drift. So every ASR
+  frame in `events.jsonl` (each line's text and speaker, and how far into the audio each partial
+  had got) is on the take's clock.
+- **The take's stereo separates the three voices.** EJ is hard left, Craig hard right, Sotto
+  centre, mixed digitally with zero leakage, so per 10 ms the shared part of L and R is Sotto and
+  what is left on each side is a person. That is where each voice's words begin and end, and the
+  only record of where Sotto *stopped* (a Sotto transcript row has a start and nothing else).
 
-Demo total ≈ 2:06. Intro slides ≈ 25 s, close ≈ 20 s → about 2:50.
+Sotto's words inside a long line (the hello, the wrap-up) need one more measurement: its comma
+pauses are as long as its sentence pauses, so the pauses alone cannot say which is which.
+`npm run demo:transcribe-sotto` takes Sotto's channel out of the take and sends only those
+stretches through the realtime transcription, the same instrument the room's partials come from,
+and maps the frames back (2 min of real time, a few cents, written beside the take).
 
-Callouts (bottom third, two seconds each, white on a dark band): at 108.5 "Nobody asked. It
-waited for a pause."; at 135.5 "A sourced answer, in the next gap."; at 208.6 "It raised a
-hand. The room called on it."; at 238.4 "It stops the moment anyone talks."; at 253.5 "A
-wrap-up from its own notes."
+### The workflow
+
+```
+npm run demo:transcribe-sotto   # once per take: Sotto's word positions (real API)
+npm run demo:timeline           # demo/take4.timeline.md: every line, exact in/out
+npm run demo:check              # resolve the cut, write demo/build/review.md, encode nothing
+npm run demo:video              # the same check, then the MP4
+```
+
+1. **Pick lines from `demo/take4.timeline.md`**, never from the video. It is committed, so it can
+   be read without the take or the session (both are git-ignored).
+2. **Name cut points by what is said** in `SEGMENTS` in `scripts/build-demo-video.mjs`:
+   `start("Venue's easy")`, `end("not a soft one")`. A fragment that opens or closes its line is
+   that line's measured edge; one inside a line goes between the two words around it, in a pause
+   in that voice. `start(…, -1)` shifts by a second; `{ who: "Sotto" }` disambiguates. Callouts
+   take the same refs. The resolver pads each edge (0.3 s in, 0.4 s out) into the surrounding
+   silence, never past half of it.
+3. **The build refuses a cut that lands on a voice** unless that edge has a fade, and names the
+   segment, the time and who is talking. It also refuses a fragment that is in no line or in
+   several, and a mid-line cut with no pause to cut in ("I'll grab a volunteer. Sotto, wrap us up"
+   has none between its sentences).
+4. **Check `demo/build/review.md`**, not the MP4: per segment, how each edge was found, who is
+   talking there, every line it contains (✓ whole, ⚠ cut), callouts in programme time, and the
+   first and last frame side by side. An edge marked **ESTIMATED** was placed by share of
+   characters; run `demo:transcribe-sotto` and it goes away.
+
+A new take needs only `scripts/demo/config.mjs` pointed at it and the session it recorded.
+
+### The cut (take 4)
+
+| # | From → to | What the audience gets |
+|---|---|---|
+| A | "Hi, I'm Sotto" → Sotto's "I'll check the drive time…" | one unbroken stretch: the hello, the names, Craig's opener, the cap of 30 and "30 kits", the drive-time question, EJ's guess, the claim |
+| C2 | Sotto's "On the drive time…" → "…by lunch" | the spoken answer |
+| D | "Good. And tickets" → "Free or five bucks?" | 50 tickets |
+| E1 | "Sotto, go ahead" | the call-on |
+| E2 | Sotto's "50 tickets — how does that fit…" → "…we'll read it after" | the correction, the Eventbrite question, the yield |
+| F | "I'll grab a volunteer" → wrap-up's "…Charge 5 dollars for tickets." | the wrap-up, fading out |
 
 Frame: crop x 101–1820, y 145–1080 (Chrome's tab strip, address bar and the extension banner
-go), scale to 1920 wide, letterbox to 1080. Audio: a 20 ms crossfade at every cut, loudness
-normalised to −16 LUFS, Sotto centre and the room panned as recorded.
+go), scale to 1920 wide, letterbox to 1080. Segments dissolve into each other, picture and sound,
+over 0.4 s (`CROSSFADE_S`). The overlap must be silent on both sides, so the resolver pads those
+edges by the crossfade plus `JOIN_BREATH_S` (0.25 s) and the check fails a join whose pause is too
+short; measured, every join has 0.8–0.95 s of quiet between speakers. Loudness is normalised to
+−16 LUFS in two passes (measured −16.1). Total 2:54.
+
+The review sheet lists what each join leaves out. As of this cut: the start-at-11 exchange, the
+mechanic, "Five bucks… Friday… which ticketing thing", and "who's at the door". Note the wrap-up
+still names "start at 11" and "5 dollars" as decisions the audience never heard made.
 
 ## Building the video
 
-```
-npm run demo:slides      # demo/slides/*.html -> demo/build/*.png (Playwright, 1920x1080)
-npm run demo:narration   # Adam reads the three narration lines -> demo/narration/*.wav
-npm run demo:video       # the cut above from demo/takes/take4.mov -> demo/sotto-demo.mp4
-```
-
-`scripts/build-demo-video.mjs` holds the segment list and the callouts; change the cut there.
-The narration WAVs are committed (they cost credits); the slides' PNGs and the MP4 are rebuilt.
-First build: 2:40, −16.7 LUFS, 12 MB.
+`npm run demo:slides` (slides to 1080p PNGs) and `npm run demo:narration` (Adam reads the three
+narration lines; the WAVs are committed because they cost credits), then the workflow above. The
+slides' PNGs and the MP4 are rebuilt.
 
 ## Narration
 

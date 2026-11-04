@@ -2,7 +2,8 @@
  * Renders the demo video's narration through ElevenLabs as Adam — the voice
  * that plays Craig at the table — into demo/narration/<n>.wav (24 kHz mono).
  *
- *   npm run demo:narration
+ *   npm run demo:narration                 # every line
+ *   npm run demo:narration -- 02-stack     # just the ones named
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -13,14 +14,12 @@ import { DEFAULT_TTS_MODEL, synthesizeSpeech } from "../server/voice/elevenlabs.
 const ADAM = "pNInz6obpgDQGcFmaJgB";
 
 const LINES: Record<string, string> = {
-  "01-title":
-    "This is Sotto: a voice agent that sits in your meeting, answers when it's asked, " +
-    "and looks things up on its own when the room wonders something out loud. " +
-    "It speaks only in a pause, and only when it has something worth saying.",
+  // Short on purpose: Sotto's own hello, seconds later, says how it behaves,
+  // and the end card says where the code is.
+  "01-title": "This is Sotto: a voice agent that sits in your meeting and speaks only when it has something worth saying.",
   "02-stack":
-    "Sotto is built on Meta's Muse Spark 1.3 for everything it writes, Muse Glimmer running " +
-    "locally for judgment calls, and Meta's realtime transcription. " +
-    "The code is open source on GitHub under the MIT licence. Let's watch Sotto in a meeting.",
+    "It's built on Meta's Muse Spark for everything it writes, Muse Glimmer running locally " +
+    "for judgment calls, and Meta's realtime transcription. Let's watch a meeting.",
   "03-end": "That's Sotto. The code is on GitHub, at naffenuf slash sotto.",
 };
 
@@ -37,7 +36,11 @@ function wav(pcm: Buffer): Buffer {
 const apiKey = loadElevenLabsApiKey();
 const out = resolve("demo/narration");
 mkdirSync(out, { recursive: true });
-for (const [name, text] of Object.entries(LINES)) {
+// Name lines to render only those (each costs credits): npm run demo:narration -- 01-title
+const only = process.argv.slice(2);
+const unknown = only.filter((n) => !(n in LINES));
+if (unknown.length) throw new Error(`no narration line ${unknown.join(", ")}; lines: ${Object.keys(LINES).join(", ")}`);
+for (const [name, text] of Object.entries(LINES).filter(([n]) => only.length === 0 || only.includes(n))) {
   const pcm = await synthesizeSpeech(
     {
       text, voiceId: ADAM, modelId: DEFAULT_TTS_MODEL, seed: 7,
