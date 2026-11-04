@@ -18,9 +18,13 @@ The rendered conversation is 148 s, so the middle section needs about 15–20 s 
 
 ## Intro copy (slides 1–2)
 
-> I'm Craig, and I built Sotto: a voice agent that sits in your meeting, answers when it is
-> asked, and looks things up on its own when the room wonders something out loud. It speaks only
-> in a pause, and only when it has something worth saying.
+Read by Adam, the ElevenLabs voice that plays Craig at the table, so the one voice the
+audience meets in the intro is the one they then hear in the meeting. No introduction and
+no "I built": the narrator is a voice, not a person.
+
+> This is Sotto: a voice agent that sits in your meeting, answers when it is asked, and looks
+> things up on its own when the room wonders something out loud. It speaks only in a pause,
+> and only when it has something worth saying.
 >
 > Sotto is built on Meta's Muse Spark 1.3 for everything it writes, Muse Glimmer running
 > locally for judgment calls, and Meta's realtime transcription. The rest of the stack is on
@@ -28,10 +32,7 @@ The rendered conversation is 148 s, so the middle section needs about 15–20 s 
 >
 > The code is open source on GitHub under the MIT licence. Let's watch Sotto in a meeting.
 
-Two corrections to the draft: the model is **Muse Spark 1.3** (not "Meta Spark"), and the
-repo currently has **no LICENSE file, no `license` field and no GitHub remote**, so the last
-line is a promise to keep before recording: add a LICENSE, set `"license"` in `package.json`,
-push.
+The repo is public at github.com/naffenuf/sotto with the MIT licence on `main`.
 
 **Slide 2, stack:** Meta Realtime ASR (`api.meta.ai`, diarized) · Muse Spark 1.3 (answers,
 notes, observer, research) · Muse Glimmer 30B via Ollama (local judgment) · Jev (TypeSafe

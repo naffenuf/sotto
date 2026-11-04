@@ -6,7 +6,10 @@
  * reads as "it didn't hear me", and the group says the question again. So the
  * first thing out is two words, and which two depends on how long the wait is
  * about to be: "Mm-hm." is a listener's acknowledgment for a question the
- * board already answers, and "Let me check." buys the time a search needs.
+ * board already answers, and "One sec." buys the time a search needs. Not
+ * "Let me check.": the holding line that follows two seconds later says
+ * where Sotto is going ("Let me pull the current ticketing fees"), and the
+ * demo's second take heard the two "let me"s back to back.
  *
  * Both are short on purpose. They are spoken before the answer exists and are
  * cut off the moment its first sentence does, so anything longer would be
@@ -17,7 +20,7 @@
 export const ACK_QUICK = "Mm-hm.";
 
 /** Heard, and going to look it up — said when the wait will be a long one. */
-export const ACK_SEARCH = "Let me check.";
+export const ACK_SEARCH = "One sec.";
 
 /**
  * The ways a question says it is about *this conversation*.
