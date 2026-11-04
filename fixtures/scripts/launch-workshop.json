@@ -8,7 +8,12 @@
     {
       "speaker": "A",
       "text": "Mm-hm.",
-      "pauseAfterMs": 9000
+      "pauseAfterMs": 10000
+    },
+    {
+      "speaker": "A",
+      "text": "Okay.",
+      "pauseAfterMs": 3000
     },
     {
       "speaker": "B",
@@ -128,7 +133,7 @@
   ],
   "wakeQuestions": [
     {
-      "line": 21,
+      "line": 22,
       "question": "what does Eventbrite charge per ticket on a five dollar event?"
     }
   ],
@@ -137,10 +142,10 @@
       "id": "bend-drive-time",
       "type": "research_hook",
       "setupLines": [
-        7
+        8
       ],
-      "triggerLine": 8,
-      "deadlineLine": 13,
+      "triggerLine": 9,
+      "deadlineLine": 14,
       "expectedLevel": "research",
       "description": "EJ wants the Bend mailing list to come (line 7). At line 8 Craig wonders aloud how long the Portland to Bend drive really is, and at line 9 EJ guesses three or four hours. The room plans the start time around the guess through line 13, so the real figure (about three hours) is wanted before they settle on eleven and lunch. This is the V3 path: the classifier takes the question, Sotto claims it at the first gap, and speaks the answer at a later one."
     },
@@ -148,10 +153,10 @@
       "id": "capacity-contradiction",
       "type": "contradiction",
       "setupLines": [
-        5
+        6
       ],
-      "triggerLine": 15,
-      "deadlineLine": 20,
+      "triggerLine": 16,
+      "deadlineLine": 21,
       "expectedLevel": "interject",
       "description": "EJ states the makerspace room is capped at thirty by fire code, a hard limit (line 5), and Craig plans thirty kits on it (line 6). At line 15 EJ proposes opening fifty tickets and Craig accepts it at line 16; by line 18 the ticket page and the Friday invite are being set up on fifty. Nobody notices the cap they stated nine lines earlier."
     }

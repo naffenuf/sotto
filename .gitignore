@@ -30,3 +30,6 @@ shadow/runs/
 # The group's MCP servers (post-V3-011). A real config names real systems and
 # may carry a command line nobody else should see; `docs/mcp.md` has examples.
 /mcp.json
+
+# Demo soundtrack mixes, rebuilt by scripts/pan-fixture.mjs
+fixtures/audio/*.stereo.wav

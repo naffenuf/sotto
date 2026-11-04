@@ -463,6 +463,30 @@ describe("the card a question puts up (V3-003)", () => {
     expect(h.cards.shown()).toEqual([]);
   });
 
+  it("brings a packet forward on the card it filled in, never a second one", () => {
+    // The launch-workshop dry run: the room's guess at the answer was read as
+    // the same question 19 s later, and the packet came forward as
+    // `research-packet-1` beside the `research-idea-1` card it had already
+    // filled in — two identical cards on the stage.
+    const h = harness();
+    h.cards.pending(idea);
+    const first = packet();
+    h.cards.accept(first);
+    h.cards.reuse({ ...idea, id: "idea-2" }, first);
+
+    expect(h.delivered.map((card) => card.id)).toEqual([
+      "research-idea-1",
+      "research-idea-1",
+      "research-idea-1",
+    ]);
+    const forward = h.delivered[2] as StageCard;
+    expect(forward.state).toBe("ready");
+    expect(forward.forward).toBe(true);
+    expect(h.pendings[1]).toMatchObject({ ideaId: "idea-2", cardId: "research-idea-1" });
+    // And the record says which card it went to.
+    expect(h.records.at(-1)).toMatchObject({ kind: "card", cardId: "research-idea-1", broughtForward: true });
+  });
+
   it("says nothing once the session is over", () => {
     const h = harness();
     h.cards.stop();

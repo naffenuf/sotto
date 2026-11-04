@@ -9,12 +9,17 @@
  * is worth saying out loud — re-raising a question the group has left behind
  * is exactly the interruption the pause rule exists to prevent.
  *
- * Built like V3-002's classifier: one `reasoning_effort: "low"` Spark call,
- * named turns, a strict schema. The thing that makes it affordable in a
+ * Built like V3-002's classifier: one `reasoning_effort: "minimal"` Spark
+ * call, named turns, a strict schema. The thing that makes it affordable in a
  * *spoken* path is that it is never in the critical path — the verdict is
  * computed when the packet lands and again on every later final turn, and
  * {@link StillCurrentWatcher.verdict} reads the cache, so between "a pause
  * was detected" and the first audio there is no model call at all.
+ *
+ * `minimal`, not `low`: a verdict only *covers* the latest turn once it is
+ * back, and a check that takes 3.5–8 s (measured at `low`) loses to a room
+ * that lands a line every four seconds — the drive-time answer in the
+ * launch-workshop dry run was never said for exactly that reason.
  *
  * A check that fails leaves the last verdict standing, or `current` when there
  * is none. The same rule the candidate gate follows for the same reason:
@@ -132,7 +137,7 @@ export async function classifyStillCurrent(
         },
       },
     },
-    reasoningEffort: "low",
+    reasoningEffort: "minimal",
     maxTokens: 2_000,
     ...(signal === undefined ? {} : { signal }),
   });

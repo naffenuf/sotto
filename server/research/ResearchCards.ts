@@ -235,7 +235,7 @@ export class ResearchCards {
       kind: "pending",
       atMs: this.clock.now(),
       ideaId: idea.id,
-      cardId: researchCardId(packet.id),
+      cardId: this.cardIdFor(packet),
       question: idea.question,
       reusedPacketId: packet.id,
     });
@@ -301,6 +301,15 @@ export class ResearchCards {
   }
 
   /**
+   * The card a packet is shown on: the one it was already delivered on, else
+   * its own. A packet that filled in a question's thinking card keeps that
+   * card's id for good (the id outlives the thing it was derived from).
+   */
+  private cardIdFor(packet: ResearchPacket): string {
+    return this.cardIds.get(packet.id)?.cardId ?? researchCardId(packet.id);
+  }
+
+  /**
    * Somebody asked for research, so its card comes to the top of the stage,
    * open, while Sotto briefs them on it (V2-015).
    *
@@ -320,13 +329,17 @@ export class ResearchCards {
     for (const packet of packets) {
       const waited = held.get(packet.id);
       const already = this.delivered.has(packet.id);
+      // A packet that filled in a question's thinking card (V3-003) lives on
+      // *that* card, not on `research-<packetId>`: bringing it forward under
+      // its own id would put a second, identical card on the stage.
+      const cardId = this.cardIdFor(packet);
       this.delivered.add(packet.id);
       this.onRecord({
         kind: "card",
         atMs: nowMs,
         packetId: packet.id,
         ideaId: packet.ideaId,
-        cardId: researchCardId(packet.id),
+        cardId,
         title: packet.title,
         heldForMs: waited === undefined ? 0 : nowMs - waited.seenAtMs,
         waiting: this.waiting.length,
@@ -334,12 +347,12 @@ export class ResearchCards {
         broughtForward: true,
       });
       this.logger.log(
-        `[research] ${researchCardId(packet.id)} ${
+        `[research] ${cardId} ${
           already ? "brought forward" : "shown now, because they asked for it"
         }: ${packet.title}`,
       );
-      this.cardIds.set(packet.id, { cardId: researchCardId(packet.id), atMs: nowMs });
-      this.onDeliver({ ...cardForPacket(packet, nowMs), forward: true }, packet);
+      this.cardIds.set(packet.id, { cardId, atMs: nowMs });
+      this.onDeliver({ ...cardForPacket(packet, nowMs), id: cardId, forward: true }, packet);
     }
     // The queue may have lost the packet a timer was armed for.
     this.review();

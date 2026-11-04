@@ -2316,3 +2316,13 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   with nothing running still works and still survives a reload; it just does not survive Start.
   The mute is a device setting and stays.
 
+- **A card id outlives its packet, in both directions.** `bringForward` built the card as
+  `research-<packetId>` while a packet that had filled in a question's thinking card lived on
+  `research-<ideaId>` — so when the room's *guess* at the answer ("Three hours? Four?") was
+  classified as the same open question 19 s later, the `reused` path put a second, identical
+  card on the stage. `ResearchCards.cardIdFor(packet)` reads `cardIds` first, and every path
+  that shows a packet again goes through it. The still-current check moved to `minimal`
+  effort for the same dry run's other lesson: a verdict only covers the latest turn once it
+  is back, and 3.5–8 s at `low` loses to a scripted room landing a line every four seconds.
+  A fixed recording cannot go quiet for Sotto, so a `wav` take always shows it talked over and
+  stepped down; the demo video is recorded live, voices only (`tasks/demo-video.md`).
