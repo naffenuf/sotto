@@ -11,7 +11,6 @@ import {
   type SpokenContributionRecord,
 } from "../../shared/spoken.js";
 import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
-import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { PAUSE_MS } from "../interject/policy.js";
 import { SESSION_FILES } from "../session/SessionStore.js";
 import { loadTiming } from "./moments.js";
@@ -239,7 +238,7 @@ describe("deliveriesFrom", () => {
     });
     expect(delivery?.pause).toEqual({
       speaking: false,
-      silentForMs: 3_000 + ENDPOINTER_HANGOVER_MS,
+      silentForMs: 3_000,
     });
   });
 
@@ -253,7 +252,7 @@ describe("deliveriesFrom", () => {
     // is `PAUSE_MS` rather than a number, so tuning the threshold (US-023)
     // moves the boundary this test is about instead of breaking it — less the
     // hangover, since the room was already quiet when the turn closed.
-    const tooSoonAtMs = 9_000 + PAUSE_MS - ENDPOINTER_HANGOVER_MS - 1;
+    const tooSoonAtMs = 9_000 + PAUSE_MS - 1;
     const [tooSoon] = deliveriesFrom(result({ cards: [card({ createdAtMs: tooSoonAtMs })] }));
     expect(tooSoon?.inPause).toBe(false);
     expect(tooSoon?.pause).toEqual({ speaking: false, silentForMs: PAUSE_MS - 1 });

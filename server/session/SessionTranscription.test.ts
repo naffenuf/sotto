@@ -70,9 +70,11 @@ describe("the session's echo boundary", () => {
     clock.advanceBy(2_000);
     transcription.accept({ session: 0, atMs: 3_000,
       frame: { type: "speechEnd", turnId: 0, audioProcessedMs: 2_900 } });
-    expect(transcription.pauseState()).toEqual({ speaking: false, silentForMs: 650 });
+    // Quiet counts from the turn's last words — its opening, here — not
+    // from the speechEnd.
+    expect(transcription.pauseState()).toEqual({ speaking: false, silentForMs: 2_000 });
     clock.advanceBy(50);
-    expect(transcription.pauseState()).toEqual({ speaking: false, silentForMs: 700 });
+    expect(transcription.pauseState()).toEqual({ speaking: false, silentForMs: 2_050 });
   });
 
   it("puts now on the stream timeline, not on server uptime (V2-008a)", () => {

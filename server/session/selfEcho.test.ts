@@ -10,6 +10,7 @@ import type { TurnUpdate } from "../../shared/turns.js";
 import { silentVoice } from "../../shared/voice.js";
 import { SimulatedClock } from "../clock.js";
 import { EventBus } from "../events/bus.js";
+import { PAUSE_MS } from "../interject/policy.js";
 import type { ModelClient } from "../model/client.js";
 import { PROMPTS, loadPrompt } from "../prompts/index.js";
 import type { SpeechPlayback } from "../voice/selfEcho.js";
@@ -226,7 +227,9 @@ describe("self-echo suppression throughout a session", () => {
       expect(t.sessions.interjectionPolicy()?.delivered()).toBe(0);
       t.frame({ type: "speechEnd", turnId: 99 });
       t.frame({ type: "speechComplete", turnId: 99, transcript: "An answer that is still playing" });
-      t.clock.advanceBy(100);
+      // Quiet counts from the echo's last word, so the policy's pause has to
+      // be waited out from there.
+      t.clock.advanceBy(PAUSE_MS);
     }
     expect(t.sessions.interjectionPolicy()?.delivered()).toBe(1);
     await t.sessions.stop();

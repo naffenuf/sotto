@@ -63,7 +63,21 @@ export class SessionTranscription {
       clock: options.clock,
       startedAtMs: 0,
       logger: options.logger,
+      onStall: (turn) => this.stalled(turn),
     });
+  }
+
+  /**
+   * An open turn stopped growing `OPEN_TURN_STALL_MS` ago, so the room is
+   * quiet with no frame to say so: hand the unchanged snapshot to whatever
+   * re-decides on turn updates. Nothing new was said, so the barge-in hook
+   * and the echo bookkeeping are left alone, and a turn held for the echo
+   * window stays held.
+   */
+  private stalled(turn: TurnUpdate): void {
+    const pending = this.pending.get(turn.turnId);
+    if (pending === undefined || pending.held) return;
+    this.options.onUpdate(turn, pending.duringPlayback);
   }
 
   /** Applies the same boundary to live transcription and event replay. */

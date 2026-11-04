@@ -31,6 +31,17 @@ export interface TurnUpdate {
   /** Arrival time of its `speechEnd`, or `null` while the speaker is talking. */
   endMs: number | null;
   /**
+   * Arrival time of the last frame that changed this turn's words — the
+   * `speechStart` until the first partial, then each partial that grew or
+   * revised the text, never `speechEnd` or `speechComplete`. This is where
+   * silence is counted from: the endpointer can hold a turn open through
+   * nearly a minute of room noise (`sessions/2026-11-03_2109-mic`, 55 s for
+   * "Um, So, go ahead"), and the transcript stopping is the evidence that
+   * the talking did. Optional only so records written before it existed
+   * still read; the assembler always sets it.
+   */
+  lastWordsMs?: number;
+  /**
    * True when this turn came from a session after the first one, so its
    * `speaker` is a *guess*: the API renumbers diarization labels from scratch
    * in every session (`fixtures/events/NOTES.md`), and the assembler maps the
@@ -104,10 +115,17 @@ export function sottoTurn(options: {
   };
 }
 
-/** Whether anybody is talking, and for how long nobody has been. */
+/**
+ * Whether anybody is talking, and for how long nobody has been.
+ *
+ * Both are read off the words, not off the endpointer: silence is the time
+ * since the transcript last grew (`TurnUpdate.lastWordsMs`), and speaking
+ * means an open turn whose words grew within `OPEN_TURN_STALL_MS`
+ * (`server/asr/turns.ts`). A `speechEnd` neither starts nor extends silence.
+ */
 export interface PauseState {
-  /** True while some turn has had a `speechStart` and no `speechEnd` yet. */
+  /** True while some turn is open *and* its words are still arriving. */
   speaking: boolean;
-  /** Milliseconds since the last `speechEnd`; `0` while `speaking`. */
+  /** Milliseconds since the last new word arrived; `0` while `speaking`. */
   silentForMs: number;
 }

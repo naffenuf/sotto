@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parseAsrFrameRecords, type AsrFrameRecord } from "../../shared/asr.js";
 import type { TurnUpdate } from "../../shared/turns.js";
 import { SimulatedClock } from "../clock.js";
-import { ENDPOINTER_HANGOVER_MS, TurnAssembler, turnKey } from "./turns.js";
+import { OPEN_TURN_STALL_MS, TurnAssembler, turnKey } from "./turns.js";
 
 const eventsDir = join(process.cwd(), "fixtures", "events");
 
@@ -71,6 +71,9 @@ describe("TurnAssembler", () => {
         final: true,
         startMs: 100,
         endMs: 420,
+        // The partial 20 ms before the speechEnd is read as its flush
+        // (END_FLUSH_WINDOW_MS), so the words stopped at the one before.
+        lastWordsMs: 300,
         speakerMappingUncertain: false,
       },
     ]);
@@ -124,6 +127,7 @@ describe("TurnAssembler", () => {
         final: true,
         startMs: 100,
         endMs: 170,
+        lastWordsMs: 100,
         speakerMappingUncertain: false,
       },
       {
@@ -133,6 +137,7 @@ describe("TurnAssembler", () => {
         final: true,
         startMs: 0,
         endMs: 220,
+        lastWordsMs: 50,
         speakerMappingUncertain: false,
       },
     ]);
@@ -209,6 +214,7 @@ describe("TurnAssembler", () => {
         final: false,
         startMs: 100,
         endMs: null,
+        lastWordsMs: 100,
         speakerMappingUncertain: true,
       },
     ]);
@@ -236,49 +242,91 @@ describe("TurnAssembler", () => {
     expect(assembler.speakers()).toEqual(["A", "B"]);
   });
 
-  it("reports speaking while a turn is open and silence from the last speechEnd", () => {
+  it("reports speaking while words are arriving and silence from the last word, not the speechEnd", () => {
     const clock = new SimulatedClock();
     const assembler = new TurnAssembler({ clock, startedAtMs: 0 });
 
-    // Before the first turn there is no endpointer decision to undo.
     clock.advanceTo(500);
     expect(assembler.pauseState()).toEqual({ speaking: false, silentForMs: 500 });
 
+    clock.advanceTo(1_000);
     assembler.accept(speechStart(1_000, 0));
+    clock.advanceTo(1_400);
+    assembler.accept(transcript(1_400, " Done"));
+    clock.advanceTo(2_100);
+    assembler.accept(transcript(2_100, " Done here."));
     clock.advanceTo(3_000);
     expect(assembler.pauseState()).toEqual({ speaking: true, silentForMs: 0 });
+    expect(assembler.openTurns()[0]?.lastWordsMs).toBe(2_100);
 
-    // The talking stopped ENDPOINTER_HANGOVER_MS before `speechEnd` said so,
-    // so silence is already that long at the instant the frame arrives.
+    // The endpointer's decision adds nothing: silence has been counting from
+    // the last partial that changed the words, and `speechComplete`'s
+    // revision of them is not somebody talking.
     assembler.accept(speechEnd(3_000, 0));
-    assembler.accept(speechComplete(3_010, 0, " Done. "));
-    expect(assembler.pauseState(3_000)).toEqual({
-      speaking: false,
-      silentForMs: ENDPOINTER_HANGOVER_MS,
-    });
+    assembler.accept(speechComplete(3_010, 0, " Done here. "));
+    expect(assembler.pauseState(3_000)).toEqual({ speaking: false, silentForMs: 900 });
     clock.advanceTo(4_600);
-    expect(assembler.pauseState()).toEqual({
-      speaking: false,
-      silentForMs: 1_600 + ENDPOINTER_HANGOVER_MS,
-    });
-    expect(assembler.pauseState(3_500)).toEqual({
-      speaking: false,
-      silentForMs: 500 + ENDPOINTER_HANGOVER_MS,
-    });
+    expect(assembler.pauseState()).toEqual({ speaking: false, silentForMs: 2_500 });
+    expect(assembler.finalTurns()[0]?.lastWordsMs).toBe(2_100);
   });
 
-  it("stays speaking until the last overlapping turn ends", () => {
+  it("a partial that repeats the words is not somebody talking", () => {
+    const assembler = new TurnAssembler({ clock: new SimulatedClock(), startedAtMs: 0 });
+    assembler.accept(speechStart(1_000, 0));
+    assembler.accept(transcript(1_300, " So"));
+    assembler.accept(transcript(1_900, " So"));
+    expect(assembler.openTurns()[0]?.lastWordsMs).toBe(1_300);
+    assembler.accept(transcript(2_200, " So, go"));
+    expect(assembler.openTurns()[0]?.lastWordsMs).toBe(2_200);
+  });
+
+  it("an open turn that stops growing counts as quiet after OPEN_TURN_STALL_MS, and says so once", () => {
+    // sessions/2026-11-03_2109-mic: "Um, So, go ahead" stayed open for 55 s
+    // on room noise, and nothing Sotto had to say could be said meanwhile.
+    const clock = new SimulatedClock(0);
+    const stalled: TurnUpdate[] = [];
+    const assembler = new TurnAssembler({ clock, startedAtMs: 0, onStall: (turn) => stalled.push(turn) });
+    clock.advanceTo(1_000);
+    assembler.accept(speechStart(1_000, 0));
+    clock.advanceTo(1_500);
+    assembler.accept(transcript(1_500, " Um, So, go ahead."));
+    clock.advanceTo(1_500 + OPEN_TURN_STALL_MS - 1);
+    expect(assembler.pauseState()).toEqual({ speaking: true, silentForMs: 0 });
+    expect(stalled).toEqual([]);
+
+    clock.advanceTo(1_500 + OPEN_TURN_STALL_MS);
+    expect(assembler.pauseState()).toEqual({ speaking: false, silentForMs: OPEN_TURN_STALL_MS });
+    expect(stalled.map((turn) => [turn.turnId, turn.text, turn.final])).toEqual([["0:0", " Um, So, go ahead.", false]]);
+    clock.advanceTo(50_000);
+    expect(assembler.pauseState()).toEqual({ speaking: false, silentForMs: 48_500 });
+    expect(stalled).toHaveLength(1);
+
+    // Words again: speaking, and a fresh stall timer behind them.
+    assembler.accept(transcript(50_000, " Um, So, go ahead. Are you there?"));
+    expect(assembler.pauseState()).toEqual({ speaking: true, silentForMs: 0 });
+    clock.advanceTo(50_000 + OPEN_TURN_STALL_MS);
+    expect(stalled).toHaveLength(2);
+
+    // Closing the turn cancels the timer it would otherwise fire.
+    clock.advanceTo(53_000);
+    assembler.accept(transcript(53_000, " Um, So, go ahead. Are you there? Hello."));
+    assembler.accept(speechEnd(53_400, 0));
+    assembler.accept(speechComplete(53_410, 0, " Um, So, go ahead. Are you there? Hello. "));
+    clock.advanceTo(60_000);
+    expect(stalled).toHaveLength(2);
+    expect(assembler.pauseState()).toEqual({ speaking: false, silentForMs: 7_000 });
+  });
+
+  it("stays speaking while any overlapping turn is still being spoken into", () => {
     const assembler = new TurnAssembler({ clock: new SimulatedClock() });
     assembler.accept(speechStart(0, 0));
     assembler.accept(speechStart(100, 1));
-    assembler.accept(speechEnd(200, 1));
-    expect(assembler.pauseState(300)).toEqual({ speaking: true, silentForMs: 0 });
+    assembler.accept(transcript(250, " Second voice."));
+    assembler.accept(speechEnd(300, 1));
+    expect(assembler.pauseState(400)).toEqual({ speaking: true, silentForMs: 0 });
 
     assembler.accept(speechEnd(400, 0));
-    expect(assembler.pauseState(900)).toEqual({
-      speaking: false,
-      silentForMs: 500 + ENDPOINTER_HANGOVER_MS,
-    });
+    expect(assembler.pauseState(900)).toEqual({ speaking: false, silentForMs: 650 });
   });
 
   it("ignores frames that carry no turn information", () => {

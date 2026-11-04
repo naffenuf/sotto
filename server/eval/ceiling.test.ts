@@ -15,7 +15,6 @@ import {
   type MomentReach,
   type SpeakReach,
 } from "./ceiling.js";
-import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { SPEAK_PAUSE_MS } from "../interject/policy.js";
 import { turnIntervals } from "./pause.js";
 
@@ -84,7 +83,7 @@ describe("longestSilence", () => {
     // 3,500 -> 4,000 is the only gap that both starts and ends inside here,
     // and the last instant nobody is talking in it is 3,999 — by which point
     // the room has been quiet since 3,500 less the endpointer's hangover.
-    expect(longestSilence(intervals, 3_500, 4_000)).toBe(499 + ENDPOINTER_HANGOVER_MS);
+    expect(longestSilence(intervals, 3_500, 4_000)).toBe(499);
   });
 
   it("is zero while somebody is talking throughout", () => {
@@ -92,7 +91,7 @@ describe("longestSilence", () => {
   });
 
   it("keeps counting after the last turn closes", () => {
-    expect(longestSilence(intervals, 9_500, 12_000)).toBe(2_500 + ENDPOINTER_HANGOVER_MS);
+    expect(longestSilence(intervals, 9_500, 12_000)).toBe(2_500);
   });
 });
 
@@ -107,7 +106,7 @@ describe("momentReach", () => {
       // the trigger turn's end is the one that carries it.
       lookAtMs: 3_500,
       lookDelayMs: 0,
-      bestSilenceMs: 499 + ENDPOINTER_HANGOVER_MS,
+      bestSilenceMs: 499,
     });
   });
 
@@ -115,7 +114,7 @@ describe("momentReach", () => {
     const reach = momentReach("fx", moment({ triggerTurnEndMs: 3_600 }), conversation, 2);
     expect(reach.lookAtMs).toBe(7_500);
     expect(reach.lookDelayMs).toBe(3_900);
-    expect(reach.bestSilenceMs).toBe(499 + ENDPOINTER_HANGOVER_MS);
+    expect(reach.bestSilenceMs).toBe(499);
   });
 
   it("has no window when a moment's lines never resolved to turns", () => {
@@ -200,7 +199,7 @@ describe("speakReach and speakThresholdMs (V3-004)", () => {
     expect(reach.windowMs).toEqual({ fromMs: 3_500, untilMs: 9_500 });
     // The gaps between these turns are 500 ms of reported silence, which is
     // 500 ms plus the endpointer's hangover of real quiet.
-    expect(reach.bestSilenceMs).toBe(499 + ENDPOINTER_HANGOVER_MS);
+    expect(reach.bestSilenceMs).toBe(499);
   });
 
   it("reports what the search costs, as the quiet left once it is ready", () => {
@@ -211,7 +210,7 @@ describe("speakReach and speakThresholdMs (V3-004)", () => {
     // Nothing is said after 9,500, so the quiet only grows from there.
     expect(reach.silenceByReady.find((entry) => entry.offsetMs === 15_000)).toEqual({
       offsetMs: 15_000,
-      bestSilenceMs: 20_000 - 9_500 + ENDPOINTER_HANGOVER_MS,
+      bestSilenceMs: 20_000 - 9_500,
     });
     // A search that comes back after the deadline has run out of window.
     expect(reach.silenceByReady.at(-1)?.bestSilenceMs).toBe(0);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TurnUpdate } from "../../shared/turns.js";
-import { ENDPOINTER_HANGOVER_MS, TurnAssembler } from "../asr/turns.js";
+import { OPEN_TURN_STALL_MS, TurnAssembler } from "../asr/turns.js";
 import { SimulatedClock } from "../clock.js";
 import { pauseAt, turnIntervals } from "./pause.js";
 
@@ -24,9 +24,11 @@ describe("turnIntervals", () => {
       turn({ turnId: "0:0", startMs: 100, endMs: 900, final: true }),
       turn({ turnId: "0:1", startMs: 1_200, endMs: 2_000, final: true }),
     ]);
+    // Without `lastWordsMs` a record's words are taken to stop where the
+    // turn ends, which is where silence used to be counted from.
     expect(intervals).toEqual([
-      { turnId: "0:0", startMs: 100, endMs: 900 },
-      { turnId: "0:1", startMs: 1_200, endMs: 2_000 },
+      { turnId: "0:0", startMs: 100, endMs: 900, lastWordsMs: 900 },
+      { turnId: "0:1", startMs: 1_200, endMs: 2_000, lastWordsMs: 2_000 },
     ]);
   });
 
@@ -53,17 +55,33 @@ describe("pauseAt", () => {
     // Less the endpointer's hangover: the talking stopped that much earlier.
     expect(pauseAt(intervals, 5_500)).toEqual({
       speaking: false,
-      silentForMs: 1_500 + ENDPOINTER_HANGOVER_MS,
+      silentForMs: 1_500,
     });
     expect(pauseAt(intervals, 10_000)).toEqual({
       speaking: false,
-      silentForMs: 2_000 + ENDPOINTER_HANGOVER_MS,
+      silentForMs: 2_000,
     });
   });
 
-  it("is speaking for the rest of the session once a turn never closes", () => {
-    const open = turnIntervals([turn({ turnId: "0:0", startMs: 1_000 })]);
-    expect(pauseAt(open, 60_000)).toEqual({ speaking: true, silentForMs: 0 });
+  it("a turn that never closes is speaking only while its words are fresh", () => {
+    const open = turnIntervals([turn({ turnId: "0:0", startMs: 1_000, lastWordsMs: 2_500 })]);
+    expect(pauseAt(open, 2_000)).toEqual({ speaking: true, silentForMs: 0 });
+    expect(pauseAt(open, 2_500 + OPEN_TURN_STALL_MS - 1)).toEqual({ speaking: true, silentForMs: 0 });
+    // Past the stall it is the endpointer holding a turn open on noise
+    // (sessions/2026-11-03_2109-mic held one for 55 s), and the room is quiet.
+    expect(pauseAt(open, 2_500 + OPEN_TURN_STALL_MS)).toEqual({
+      speaking: false,
+      silentForMs: OPEN_TURN_STALL_MS,
+    });
+    expect(pauseAt(open, 60_000)).toEqual({ speaking: false, silentForMs: 57_500 });
+  });
+
+  it("counts silence from the last word, not from the speechEnd that followed it", () => {
+    const intervals = turnIntervals([
+      turn({ turnId: "0:0", startMs: 1_000, endMs: 4_000, lastWordsMs: 3_100, final: true }),
+    ]);
+    expect(pauseAt(intervals, 4_000)).toEqual({ speaking: false, silentForMs: 900 });
+    expect(pauseAt(intervals, 3_500)).toEqual({ speaking: true, silentForMs: 0 });
   });
 
   it("stays quiet while an overlapping turn is still going", () => {
@@ -76,7 +94,7 @@ describe("pauseAt", () => {
     expect(pauseAt(overlapping, 4_500)).toEqual({ speaking: true, silentForMs: 0 });
     expect(pauseAt(overlapping, 8_000)).toEqual({
       speaking: false,
-      silentForMs: 1_000 + ENDPOINTER_HANGOVER_MS,
+      silentForMs: 1_000,
     });
   });
 });

@@ -2231,3 +2231,44 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   *and URLs* — a token in a query string is still a token. `McpClient.test.ts` fails two
   servers with secrets in both places and asserts `[redacted]` is all that reaches the log,
   the record and `session.json`. `docs/mcp.md` is the user-facing half.
+
+- **Quiet is read off the words, and the endpointer's marker is only one of two ways a turn
+  ends.** `sessions/2026-11-03_2109-mic` had the service hold one turn open for **55 s** on room
+  noise after "Um, So, go ahead", and because "somebody is speaking" was read straight off the
+  open turn, nothing Sotto had to say could be said for those 55 s — the claim lost its window as
+  `no_gap` and the answer sat behind it. `TurnAssembler.pauseState` now counts `silentForMs` from
+  the last frame that *changed a turn's words* (`TurnUpdate.lastWordsMs`), and `speaking` is an
+  open turn whose words are younger than `OPEN_TURN_STALL_MS` (2 s; mid-speech partials arrive a
+  median 310 ms apart, p90 641). A turn is done when `speechEnd` arrives **or** when its words
+  have stopped for two seconds, whichever is first; neither `speechEnd` nor `speechComplete` moves
+  the words' time. Two instrument facts carry it: a partial that only adds a trailing space is not
+  a word (`words()` compares whitespace-collapsed text), and **every one of the 380 captured turns
+  has a `transcript` frame arriving at the same instant as its `speechEnd`** — 377 whitespace-only,
+  3 flushing the last word or two of a sentence spoken long before — so a partial inside
+  `END_FLUSH_WINDOW_MS` (50) of the `speechEnd` rolls back to the one before it. Without that the
+  room's silence read **zero** at the very moment the service said the turn was over, and the
+  `offsite-plan` claim went `no_gap` again. `ENDPOINTER_HANGOVER_MS` is gone: it estimated where
+  the words stopped from where the marker landed, and the words themselves are now the measure.
+  `npm run eval:ceiling` reads 1,140–2,439 ms of quiet inside the six interjection windows
+  (was 754–1,137) and 1,925–2,082 inside the three open-question windows (was 968–1,725), with
+  `PAUSE_MS`/`SPEAK_PAUSE_MS` unchanged — a word arrives before its `speechEnd` would have, so
+  the same thresholds now ask for a little *more* real quiet, not less.
+- **A stalled turn is an event, because nothing arrives to say the room went quiet.** Every
+  consumer of the pause (the policy, `Reservations`, `ResearchCards`, the nudge) re-decides on
+  turn updates and arms a re-check only while the room is quiet, so an open turn going silent
+  would have been noticed only when the next person spoke. The assembler arms one timer per
+  word-changing frame and, if the turn is still open and unchanged when it fires, calls `onStall`
+  with the turn's unchanged snapshot; `SessionTranscription.stalled` passes it to `onUpdate` as
+  an ordinary partial (held echo turns stay held, the barge-in hook is not called — nothing new
+  was said). Tests that feed frames by hand must `clock.advanceTo(record.atMs)` before each
+  `accept`, as a replay does, or the timer is armed from wherever the clock happened to be.
+- **"Since the question" is an order, not a time.** `StillCurrentWatcher` compared the question's
+  `askedAtMs` (session clock: hours of server uptime, live) with turns' `endMs` (stream clock:
+  seconds since the microphone opened), so live every turn was "before" the question, every
+  verdict named no turn, and `covers()` was false for as long as any turn existed — which held
+  **every** unprompted line except the claim until it expired (the 21:09 answer went `expired`
+  0.9 s after its turn finally closed; the read-back the same). `watch()` takes `sinceTurnId`
+  and the watcher numbers turns by arrival (`Seen.seq`); "no turns since" now covers the latest
+  turn rather than `null`. Fourth time the two-timeline bug has bitten (V2-008 ×2, V2-008a, this);
+  the replay tests cannot catch it because both clocks start at zero there.
+

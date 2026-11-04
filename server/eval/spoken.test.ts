@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import type { SpokenContributionRecord } from "../../shared/spoken.js";
 import { SPOKEN_CONTRIBUTION_STAGE, estimateSpokenMs } from "../../shared/spoken.js";
 import { sottoTurn, type TurnUpdate } from "../../shared/turns.js";
-import { ENDPOINTER_HANGOVER_MS } from "../asr/turns.js";
 import { PAUSE_MS, SPEAK_PAUSE_MS } from "../interject/policy.js";
 import { isUnpromptedSpeech, pauseThresholdFor, spokenRecords } from "./spoken.js";
 
@@ -67,8 +66,8 @@ describe("pauseThresholdFor", () => {
 describe("spokenRecords", () => {
   it("places a line on the stream clock, off Sotto's own transcript row", () => {
     const said = record();
-    // The room's last turn closed at 80s, so by 82s it has been quiet for
-    // 2s less the endpointer's hangover: comfortably past SPEAK_PAUSE_MS.
+    // The room's last words were at 80s, so by 82s it has been quiet for
+    // 2s: comfortably past SPEAK_PAUSE_MS.
     const [one] = spokenRecords({
       records: [said],
       turns: [roomTurn("0:7", 74_000, 80_000)],
@@ -76,7 +75,7 @@ describe("spokenRecords", () => {
     });
     expect(one?.atStreamMs).toBe(82_000);
     expect(one?.inPause).toBe(true);
-    expect(one?.pause?.silentForMs).toBe(2_000 + ENDPOINTER_HANGOVER_MS);
+    expect(one?.pause?.silentForMs).toBe(2_000);
     expect(one?.overTurnId).toBeNull();
     expect(one?.endsAtStreamMs).toBe(82_000 + estimateSpokenMs(said.text));
     expect(one?.id).toBe("spoken-0");
@@ -96,15 +95,15 @@ describe("spokenRecords", () => {
   it("holds a claim to the policy's gap, not the shorter speaking one", () => {
     const claim = record({ kind: "reserve", text: "I'll check the drive time." });
     const answer = record();
-    // The instant a turn closes, the corrected silence already reads as the
-    // endpointer's hangover (650 ms): past SPEAK_PAUSE_MS, short of PAUSE_MS.
-    const soon = 80_010;
+    // Half a second after the room's last word: past SPEAK_PAUSE_MS, short
+    // of PAUSE_MS.
+    const soon = 80_500;
     const [said, heard] = spokenRecords({
       records: [claim, answer],
       turns: [roomTurn("0:7", 70_000, 80_000)],
       sottoTurns: [row(claim, soon), row(answer, soon)],
     });
-    expect(said?.pause?.silentForMs).toBe(10 + ENDPOINTER_HANGOVER_MS);
+    expect(said?.pause?.silentForMs).toBe(500);
     expect(said?.inPause).toBe(false);
     expect(heard?.inPause).toBe(true);
   });

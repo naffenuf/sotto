@@ -47,11 +47,12 @@ import type { PauseState } from "../../shared/turns.js";
 /**
  * How long the room must really have been quiet before Sotto will say anything.
  *
- * On the *corrected* silence, not the reported one:
- * `ENDPOINTER_HANGOVER_MS` is subtracted in `TurnAssembler.pauseState`,
- * because `speechEnd` arrives a measured median of 647 ms after the talking
- * actually stopped. So this is milliseconds of quiet in the room, which is the
- * only version of the number worth arguing about.
+ * On silence counted from the room's last *word*, not from the endpointer's
+ * `speechEnd` (`TurnAssembler.pauseState`): that marker arrives a measured
+ * median of 647 ms after the talking stopped and can be withheld for far
+ * longer, while the last partial that changed the words lands a median
+ * 882 ms before it. So this is milliseconds since anybody said anything,
+ * which is the only version of the number worth arguing about.
  *
  * 700 ms is the point at which a gap between turns stops being a handover and
  * becomes a lapse somebody has to fill — comfortably past the ~200 ms that
@@ -65,7 +66,7 @@ import type { PauseState } from "../../shared/turns.js";
  * capped at 0.17 by the instrument rather than by the conversation. Every one
  * of those windows does contain 0.93–1.61 s of real quiet
  * (`npm run eval:ceiling`, and the WAVs themselves). See
- * `ENDPOINTER_HANGOVER_MS` in `server/asr/turns.ts` for the measurement.
+ * `OPEN_TURN_STALL_MS` in `server/asr/turns.ts` for how silence is read.
  */
 export const PAUSE_MS = 700;
 
@@ -86,10 +87,10 @@ export const PAUSE_MS = 700;
  * near 1,000 ms, from the 930–1,610 ms of quiet US-023 measured inside the
  * *interjection* windows; the open-question windows are narrower in their
  * quietest stretch, and 1,000 would have cost `competitor-gaps` its window
- * outright. And 450 is *below* the floor the endpointer correction puts on
- * corrected silence — `silentForMs` reads {@link ENDPOINTER_HANGOVER_MS}
- * (650 ms) the instant a turn closes — so in practice this threshold means
- * "the first moment the transcription says nobody is talking". That is the
+ * outright. And 450 is *below* what `silentForMs` typically reads the instant
+ * a turn closes (the last word landed a median 882 ms before the `speechEnd`),
+ * so in practice this threshold means "the first moment the transcription
+ * says nobody is talking". That is the
  * point: an answer the room is still waiting for has a window measured in
  * seconds, and it is `pause.speaking` rather than the threshold that keeps
  * Sotto off somebody's sentence.

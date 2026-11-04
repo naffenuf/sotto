@@ -30,37 +30,67 @@ import { normalizeWakeSpelling } from "../wake.js";
 type Logger = Pick<Console, "warn">;
 
 /**
- * How long after speech really stopped the endpointer says it stopped.
+ * How long an open turn may go without a new word before the room counts as
+ * quiet anyway.
  *
- * `speechEnd` is not an observation, it is a *decision*: the endpointer waits
- * out a hangover before it will declare a turn over, and its
- * `audioProcessedMs` is the position it made the call at, not the position the
- * talking ended. Measured over all 198 captured turns, against the rendered
- * position of the line each `speechEnd` closes
- * (`<fixture>.timing.json`): median **647 ms** late, p25 506, p75 841, p10
- * 375, p90 1,155.
+ * Silence is counted from the last frame that changed a turn's words, never
+ * from the endpointer's `speechEnd`. `speechEnd` is a *decision*, made a
+ * median 647 ms after the talking stopped (p90 1,155, over all 198 captured
+ * turns), and it can be withheld far longer than that: in
+ * `sessions/2026-11-03_2109-mic` one turn stayed open for **55 s** on room
+ * noise after "Um, So, go ahead", and for those 55 s nothing Sotto had to say
+ * could be said, because "somebody is speaking" was read straight off the
+ * open turn. The transcript stopping is the evidence that the talking did;
+ * the last partial of a turn lands a median 882 ms before `speechEnd`, so
+ * reading silence off it is also the earlier of the two.
  *
- * Which makes the raw gap between two turns a bad measure of a pause. Inside
- * the six planted moments' windows the longest gap the API reported is
- * 104–487 ms, while the longest stretch of real quiet in that same stretch of
- * WAV is **930–1,610 ms** — every one of them an unmistakable pause that the
- * instrument hands over as a rounding error. So silence is counted from
- * `speechEnd` less this constant, and `PAUSE_MS` (`server/interject/policy.ts`)
- * is a threshold on how long the room has really been quiet.
- *
- * It is a constant because nothing better is available at runtime: the last
- * `transcript` frame of a turn is no help — its `audioProcessedMs` is exactly
- * `speechEnd + 500` in all 198 turns — and the hangover does not scale with
- * the pause it eats.
+ * An open turn still means somebody is mid-sentence for as long as its words
+ * keep coming — mid-speech partials arrive a median 310 ms apart, p90 641 —
+ * so `speaking` holds while the newest word is younger than this. Past it the
+ * turn has stalled: the endpointer closes a turn at every breath, so an open
+ * turn two seconds past its last word is one it is holding on something that
+ * is not speech. Two seconds is well clear of the partial spacing and well
+ * short of anything a room would call a pause being missed.
  */
-export const ENDPOINTER_HANGOVER_MS = 650;
+export const OPEN_TURN_STALL_MS = 2_000;
+
+/**
+ * A partial that lands this close ahead of the turn's `speechEnd` is the
+ * endpointer flushing what it already had, not somebody still talking.
+ *
+ * Every one of the 380 captured turns has a `transcript` frame arriving at
+ * the same instant as its `speechEnd`; 377 of them only add a trailing
+ * space, and the other three add the last word or two of a sentence that
+ * had been spoken well before the endpointer made up its mind. Counting that
+ * frame as new words would put the room's silence at zero at the very
+ * moment the service says the turn is over, which is backwards: on a
+ * `speechEnd` the turn's words are taken to have stopped at the last partial
+ * that arrived *before* this window.
+ */
+export const END_FLUSH_WINDOW_MS = 50;
+
+/** Whitespace is not a word: the frame that only adds a trailing space changes nothing. */
+function words(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
 
 
 export interface TurnAssemblerOptions {
-  /** Supplies `pauseState()`'s default "now". Arrival times come from the frames. */
+  /**
+   * Supplies `pauseState()`'s default "now" and the stall timer. Arrival
+   * times come from the frames.
+   */
   clock?: Clock;
   /** Called with every snapshot, in order, including partials. */
   onUpdate?: (turn: TurnUpdate) => void;
+  /**
+   * An open turn has gone {@link OPEN_TURN_STALL_MS} without a new word, so
+   * the room has just become quiet with no frame arriving to say so. Called
+   * with the turn's unchanged snapshot, once per stall, so whatever re-decides
+   * on turn updates (the policy, the speaking queue, the research cards) gets
+   * its look.
+   */
+  onStall?: (turn: TurnUpdate) => void;
   /** Where the silence before the first turn starts. Defaults to `clock.now()`. */
   startedAtMs?: number;
   logger?: Logger;
@@ -74,6 +104,12 @@ interface OpenTurn {
   text: string;
   startMs: number;
   endMs: number | null;
+  /** Arrival time of the last frame that changed `text` (or opened the turn). */
+  lastWordsMs: number;
+  /** The one before it, to fall back to when the last was the endpointer's flush. */
+  prevWordsMs: number;
+  /** Cancels the stall timer armed by that frame. */
+  cancelStall: () => void;
   speakerMappingUncertain: boolean;
 }
 
@@ -85,6 +121,7 @@ export function turnKey(session: number, apiTurnId: number): string {
 export class TurnAssembler {
   private readonly clock: Clock;
   private readonly onUpdate: ((turn: TurnUpdate) => void) | undefined;
+  private readonly onStall: ((turn: TurnUpdate) => void) | undefined;
   private readonly logger: Logger;
 
   /** Turns that have had a `speechStart`, by key, in the order they opened. */
@@ -100,7 +137,8 @@ export class TurnAssembler {
   /** The session whose labels are taken at face value: the first one seen. */
   private firstSession: number | undefined;
 
-  private silenceSinceMs: number;
+  /** Arrival time of the last new word in any turn now closed, or the session's start. */
+  private closedWordsMs: number;
   private malformed = 0;
   /** Turns the endpointer opened and closed without a word in them. */
   private empty = 0;
@@ -108,8 +146,9 @@ export class TurnAssembler {
   constructor(options: TurnAssemblerOptions = {}) {
     this.clock = options.clock ?? systemClock;
     this.onUpdate = options.onUpdate;
+    this.onStall = options.onStall;
     this.logger = options.logger ?? console;
-    this.silenceSinceMs = options.startedAtMs ?? this.clock.now();
+    this.closedWordsMs = options.startedAtMs ?? this.clock.now();
   }
 
   /**
@@ -161,15 +200,21 @@ export class TurnAssembler {
   /**
    * Whether anybody is talking, and for how long nobody has been.
    *
-   * `speaking` is true while any turn has a `speechStart` and no `speechEnd`.
-   * While speaking, `silentForMs` is 0; otherwise it counts from the moment
-   * the room actually went quiet — the most recent `speechEnd` less
-   * {@link ENDPOINTER_HANGOVER_MS} (or from the assembler's start, before the
-   * first turn, where there is no hangover to undo).
+   * Both are read off the words. `speaking` is true while some turn is open
+   * *and* its words grew within {@link OPEN_TURN_STALL_MS}; an open turn
+   * older than that has stalled and counts as quiet. `silentForMs` counts
+   * from the last frame that changed any turn's words (or from the
+   * assembler's start, before the first turn), never from `speechEnd`.
    */
   pauseState(nowMs: number = this.clock.now()): PauseState {
-    if (this.unclosed.length > 0) return { speaking: true, silentForMs: 0 };
-    return { speaking: false, silentForMs: Math.max(0, nowMs - this.silenceSinceMs) };
+    let lastWordsMs = this.closedWordsMs;
+    for (const turnId of this.unclosed) {
+      const turn = this.live.get(turnId);
+      if (turn === undefined) continue;
+      if (nowMs - turn.lastWordsMs < OPEN_TURN_STALL_MS) return { speaking: true, silentForMs: 0 };
+      if (turn.lastWordsMs > lastWordsMs) lastWordsMs = turn.lastWordsMs;
+    }
+    return { speaking: false, silentForMs: Math.max(0, nowMs - lastWordsMs) };
   }
 
   /** The speakers met so far, in order of first appearance. */
@@ -186,7 +231,7 @@ export class TurnAssembler {
       case "transcript":
         // The only `final: true` transcript is the empty marker the server
         // sends after `endStream`; it belongs to no turn.
-        return event.final ? null : this.setText(event.transcript);
+        return event.final ? null : this.setText(event.transcript, atMs);
       case "speaker":
         return this.setSpeaker(event.label);
       case "speechEnd":
@@ -208,11 +253,32 @@ export class TurnAssembler {
       text: "",
       startMs: atMs,
       endMs: null,
+      lastWordsMs: atMs,
+      prevWordsMs: atMs,
+      cancelStall: () => {},
       speakerMappingUncertain: session !== this.firstSession,
     };
     this.live.set(turnId, turn);
     this.unclosed.push(turnId);
+    this.heardWords(turn, atMs);
     return this.emit(turn, false);
+  }
+
+  /**
+   * A frame changed this turn's words (or opened it): silence counts from
+   * here, and the stall timer is re-armed so that an open turn going quiet
+   * is noticed with nothing arriving to say so.
+   */
+  private heardWords(turn: OpenTurn, atMs: number): void {
+    turn.prevWordsMs = turn.lastWordsMs;
+    turn.lastWordsMs = atMs;
+    turn.cancelStall();
+    turn.cancelStall = this.clock.setTimeout(() => {
+      turn.cancelStall = () => {};
+      // Closed, or spoken into, since the timer was armed: nothing stalled.
+      if (turn.endMs !== null || turn.lastWordsMs !== atMs) return;
+      this.onStall?.(snapshot(turn, false));
+    }, OPEN_TURN_STALL_MS);
   }
 
   /** The turn an untagged `transcript` or `speaker` frame belongs to. */
@@ -226,11 +292,15 @@ export class TurnAssembler {
     return turn;
   }
 
-  private setText(text: string): TurnUpdate | null {
+  private setText(text: string, atMs: number): TurnUpdate | null {
     const turn = this.currentTurn("transcript");
     if (turn === null) return null;
-    // Partials are cumulative: each one is the whole turn so far.
-    turn.text = normalizeWakeSpelling(text);
+    // Partials are cumulative: each one is the whole turn so far. One that
+    // repeats the last one word for word is not somebody talking.
+    const next = normalizeWakeSpelling(text);
+    const grew = words(next) !== words(turn.text);
+    turn.text = next;
+    if (grew) this.heardWords(turn, atMs);
     return this.emit(turn, false);
   }
 
@@ -288,12 +358,20 @@ export class TurnAssembler {
       this.logger.warn(`[turns] ignoring speechEnd for unknown turn ${turnId}`);
       return null;
     }
-    turn.endMs = atMs;
-    this.forget(turnId);
-    // Silence only starts once nobody is left talking, and it started before
-    // the API said so (see ENDPOINTER_HANGOVER_MS).
-    if (this.unclosed.length === 0) this.silenceSinceMs = atMs - ENDPOINTER_HANGOVER_MS;
+    // Silence was already counting from the turn's last word: the endpointer
+    // closing it adds nothing (see OPEN_TURN_STALL_MS), and a partial that
+    // arrived with it was its flush, not speech (END_FLUSH_WINDOW_MS).
+    this.close(turn, atMs);
     return this.emit(turn, false);
+  }
+
+  /** The turn's words have stopped, wherever the endpointer put its marker. */
+  private close(turn: OpenTurn, atMs: number): void {
+    turn.endMs = atMs;
+    turn.cancelStall();
+    if (atMs - turn.lastWordsMs < END_FLUSH_WINDOW_MS) turn.lastWordsMs = turn.prevWordsMs;
+    if (turn.lastWordsMs > this.closedWordsMs) this.closedWordsMs = turn.lastWordsMs;
+    this.forget(turn.turnId);
   }
 
   private finalise(turnId: string, text: string, atMs: number): TurnUpdate | null {
@@ -302,14 +380,12 @@ export class TurnAssembler {
       this.logger.warn(`[turns] ignoring speechComplete for unknown turn ${turnId}`);
       return null;
     }
-    // `speechComplete` is the only text frame tied to a turnId, so it wins.
+    // `speechComplete` is the only text frame tied to a turnId, so it wins —
+    // but it is a revision of words already heard, not new ones, so it does
+    // not move `lastWordsMs`.
     const hadWords = turn.text.trim() !== "";
     turn.text = normalizeWakeSpelling(text);
-    if (turn.endMs === null) {
-      turn.endMs = atMs;
-      this.forget(turnId);
-      if (this.unclosed.length === 0) this.silenceSinceMs = atMs - ENDPOINTER_HANGOVER_MS;
-    }
+    if (turn.endMs === null) this.close(turn, atMs);
     this.live.delete(turnId);
     // A turn with no words in it is not a turn. The endpointer occasionally
     // opens and closes a segment of 80 ms with no `transcript` and no
@@ -351,6 +427,7 @@ function snapshot(turn: OpenTurn, final: boolean): TurnUpdate {
     final,
     startMs: turn.startMs,
     endMs: turn.endMs,
+    lastWordsMs: turn.lastWordsMs,
     speakerMappingUncertain: turn.speakerMappingUncertain,
   });
 }

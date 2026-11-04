@@ -554,8 +554,10 @@ describe("unprompted speech", () => {
 
   it("calls any unprompted line on brainstorm false speech", () => {
     const line = said({ kind: "reserve", text: "I'll check the greenhouse." });
+    // A second after the last turn's words: a real pause, so the only thing
+    // wrong with the line is that brainstorm plants nothing to say.
     const checks = checkFixture(
-      input("brainstorm", { sottoTurns: [heard(line, 24_000)] }, { spoken: [line] }),
+      input("brainstorm", { sottoTurns: [heard(line, 24_500)] }, { spoken: [line] }),
     );
     expect(failures(checks)).toEqual(["no false speech"]);
   });
