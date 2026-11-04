@@ -138,11 +138,13 @@ if (afterReload.frequency !== "rare") {
 if (afterReload.boldness !== "normal") {
   problems.push(`changing the frequency also moved the boldness to ${afterReload.boldness}`);
 }
-if (whileRunning.frequency !== "rare" || whileRunning.boldness !== "bold") {
-  problems.push(`mid-session it shows ${JSON.stringify(whileRunning)}, not rare/bold`);
+// Starting a session resets both to normal, so mid-session only the
+// boldness set *during* it is on: normal/bold, not rare/bold.
+if (whileRunning.frequency !== "normal" || whileRunning.boldness !== "bold") {
+  problems.push(`mid-session it shows ${JSON.stringify(whileRunning)}, not normal/bold`);
 }
 if (saved === undefined) problems.push("no session folder was written");
-else if (saved.settings?.frequency !== "rare" || saved.settings?.boldness !== "bold") {
+else if (saved.settings?.frequency !== "normal" || saved.settings?.boldness !== "bold") {
   problems.push(`session.json recorded ${JSON.stringify(saved.settings)}`);
 }
 if (consoleErrors.length > 0) problems.push(`console errors: ${consoleErrors.join("; ")}`);

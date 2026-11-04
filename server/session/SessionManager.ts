@@ -24,6 +24,7 @@
  * session folder (`SessionStore`, US-008), so every session leaves a record on
  * disk whether or not a browser was watching.
  */
+import { defaultPolicySettings } from "../../shared/policy.js";
 import { join } from "node:path";
 import { TYPED_ASKER } from "../../shared/answers.js";
 import {
@@ -612,6 +613,8 @@ export class SessionManager {
    * down between conversations sticks.
    */
   private currentSettings: SessionSettings;
+  /** The pair every session starts at; see the constructor. */
+  private readonly startSettings: PolicySettings;
 
   constructor(options: SessionManagerOptions) {
     this.bus = options.bus;
@@ -660,6 +663,12 @@ export class SessionManager {
     this.currentSettings = options.settings === undefined
       ? remembered
       : { ...defaultSettings(), ...options.settings };
+    // What every session starts at (see `start`): the settings this manager
+    // was built for — an eval or a shadow run asks for a particular pair —
+    // or the defaults for the app, where nothing is asked for.
+    this.startSettings = options.settings === undefined
+      ? defaultPolicySettings()
+      : { frequency: this.currentSettings.frequency, boldness: this.currentSettings.boldness };
     if (
       this.currentSettings.frequency !== remembered.frequency ||
       this.currentSettings.boldness !== remembered.boldness
@@ -682,7 +691,10 @@ export class SessionManager {
    * Changes how often or how boldly Sotto contributes, live (V2-017). A
    * running session's policy picks it up at once — and so do its research
    * cards, which are rationed by the same frequency — and `session.json`
-   * records it; with nothing running it is what the next session starts with.
+   * records it. A new session starts at the defaults ({@link start}): a
+   * "not now" is about the meeting it was said in, and the next one found
+   * Sotto still turned down (`2026-11-03_2253-mic` ran at `rare` from the
+   * run before it).
    */
   setPolicySettings(patch: {
     frequency?: Frequency | undefined;
@@ -743,6 +755,11 @@ export class SessionManager {
         409,
       );
     }
+
+    // Each conversation starts where this manager was built to start it
+    // (normal/normal in the app): what the last room asked for is not what
+    // this one asked for. The mute is a device setting and stays.
+    this.setPolicySettings(this.startSettings);
 
     this.started += 1;
     const info: SessionInfo = {

@@ -1551,7 +1551,7 @@ describe("SessionManager, frequency and boldness", () => {
     },
   };
 
-  it("sets the level with nothing running, and the next session starts there", () => {
+  it("sets the level with nothing running, and a new session starts back at normal", () => {
     const bus = new EventBus(quiet);
     const sessions = new SessionManager({
       bus,
@@ -1585,11 +1585,13 @@ describe("SessionManager, frequency and boldness", () => {
       voiceMuted: false,
     });
 
+    // A "not now" was about the last meeting, not this one.
     sessions.start({ kind: "wav", fixture: "brainstorm" });
     expect(sessions.interjectionPolicy()?.settings()).toEqual({
-      frequency: "rare",
-      boldness: "cautious",
+      frequency: "normal",
+      boldness: "normal",
     });
+    expect(bus.settingsState()).toEqual({ frequency: "normal", boldness: "normal", voiceMuted: false });
   });
 
   it("changes a running session's policy and its folder", async () => {
@@ -3057,8 +3059,8 @@ describe("SessionManager, Sotto's own corrections (V3-008)", () => {
       createVoice: () => voice,
       replaySpeed: "max",
       wallClock: systemClock,
+      settings: { boldness },
     });
-    sessions.setPolicySettings({ boldness });
     const ended = new Promise<void>((resolve) => {
       const off = bus.subscribe((event) => {
         if (event.type === "session" && event.session === null) {
@@ -3298,8 +3300,8 @@ describe("SessionManager: read-backs at decision points (V3-013)", () => {
       createVoice: () => voice,
       replaySpeed: "max",
       wallClock: systemClock,
+      settings,
     });
-    sessions.setPolicySettings(settings);
     const ended = new Promise<void>((resolve) => {
       const off = bus.subscribe((event) => {
         if (event.type === "session" && event.session === null) {

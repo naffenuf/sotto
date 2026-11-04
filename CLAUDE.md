@@ -2307,3 +2307,12 @@ Node 22 + TypeScript (strict), Fastify + `@fastify/websocket` in `server/`, Reac
   `quieter` now calls `Reservations.dropRetries()`, which is what cancels the retry. Nothing is
   read this way while Sotto is silent.
 
+- **A session starts at normal/normal; "not now" is about the meeting it was said in.** V2-017 made
+  the two settings server-wide so turning Sotto down carried into the next conversation — and
+  `2026-11-03_2253-mic` ran its whole length at `rare` because of a "not now" in the run before.
+  `SessionManager.start` now calls `setPolicySettings(this.startSettings)`: the pair the manager
+  was *built* with (`options.settings`, which the eval, the e2e and a shadow run pass for the
+  settings under test) or the defaults when none was given, which is the app. Setting the header
+  with nothing running still works and still survives a reload; it just does not survive Start.
+  The mute is a device setting and stays.
+
