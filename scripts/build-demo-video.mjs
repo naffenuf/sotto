@@ -13,8 +13,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { TAKE, timelinePath } from "./demo/config.mjs";
-import { end, linesIn, resolveSegments, start } from "./demo/cut.mjs";
-import { analyseTake, formatTime, voiceName } from "./demo/take.mjs";
+import { alignWords, end, linesIn, resolveSegments, start } from "./demo/cut.mjs";
+import { analyseTake, formatTime, tokens, voiceName } from "./demo/take.mjs";
 
 const CHECK_ONLY = process.argv.includes("--check");
 const CUT_NAME = process.argv.includes("--cut") ? process.argv[process.argv.indexOf("--cut") + 1] : "demo";
@@ -48,6 +48,15 @@ function callout(text, at, seconds = 2.6, y = "h-200") {
 /** Characters per caption line, and lines per caption. */
 const CAPTION_LINE = 46;
 const CAPTION_LINES = 2;
+/**
+ * What the transcription misheard in the room's lines, fixed for the captions
+ * only (cutting still matches the transcript as heard). Sotto's lines are
+ * never touched: they are what it said.
+ */
+const CAPTION_FIXES = [
+  [/\bBen crowd\b/, "Bend crowd"],
+  [/^Is bend\b/, "Is Bend"],
+];
 /** Vertical distance between caption rows. */
 const CAPTION_ROW_PX = 66;
 
@@ -61,17 +70,27 @@ function captions(seg, dir) {
   const filters = [];
   for (const { line } of linesIn(analysis, seg)) {
     if (line.out - line.in < 0.3) continue;
-    const text = line.unlisted ? sentence(line.words.map((w) => w.w).join(" ")) : line.text;
+    const raw = line.unlisted ? sentence(line.words.map((w) => w.w).join(" ")) : line.text;
+    const text = line.voice === "S" ? raw : CAPTION_FIXES.reduce((t, [from, to]) => t.replace(from, to), raw);
     if (!text) continue;
     const who = voiceName(line.voice);
     const chunks = captionChunks(text, CAPTION_LINE * CAPTION_LINES - who.length - 2);
+    // Each caption starts when its first word does: the word before it was
+    // reported (a partial trails speech by 0.3–0.6 s), or, without word
+    // positions, its share of the line's length.
     const total = chunks.reduce((n, c) => n + c.length, 0);
-    let t = line.in;
+    const heard = line.words?.length ? alignWords(tokens(text), line.words) : null;
+    const starts = [];
+    let chars = 0, words = 0;
+    for (const chunk of chunks) {
+      const prev = words > 0 && heard?.[words - 1] != null ? line.words[heard[words - 1]].at - 0.2 : null;
+      starts.push(words === 0 ? line.in : Math.max(line.in, prev ?? line.in + (line.out - line.in) * (chars / total)));
+      chars += chunk.length;
+      words += tokens(chunk).length;
+    }
     chunks.forEach((chunk, k) => {
-      const len = (line.out - line.in) * (chunk.length / total);
-      const from = Math.max(t, seg.from) - seg.from;
-      const to = Math.min(k === chunks.length - 1 ? line.out + 0.3 : t + len, seg.to) - seg.from;
-      t += len;
+      const from = Math.max(starts[k], seg.from) - seg.from;
+      const to = Math.min(k === chunks.length - 1 ? line.out + 0.3 : starts[k + 1], seg.to) - seg.from;
       if (to - from < 0.2) return;
       // One drawtext per caption line: this font draws a newline in a
       // multi-line textfile as a missing-glyph box.
@@ -169,12 +188,13 @@ const CUTS = {
     calloutY: "60",
     captions: true,
     segments: [
+      // Sotto introduces itself and its rule, then the room gives the drive
+      // question a reason ("Half the mailing list is out there").
+      { name: "X0", from: start("Hi, I'm Sotto"), to: end("only speak up when it's worth it."), fadeIn: 0.5 },
       {
-        name: "X1", from: start("Is bend really drivable"), to: end("I'll check the drive time from Portland to Bend"), fadeIn: 0.5,
-        callouts: [
-          [start("Is bend really drivable"), "Sotto sits in your meeting and speaks only when it’s worth it.", 4.5],
-          [start("I'll check the drive time"), "Nobody asked. It waited for a pause."],
-        ],
+        // The pause after "…worth it." is 0.59 s: room for a short dissolve only.
+        name: "X1", crossfade: 0.15, from: start("I want the Ben crowd"), to: end("I'll check the drive time from Portland to Bend"),
+        callouts: [[start("I'll check the drive time"), "Nobody asked. It waited for a pause."]],
       },
       {
         name: "X2", from: start("On the drive time from Portland to Bend"), to: end("gets you there by lunch"),
@@ -247,13 +267,14 @@ function dissolve(files) {
   const graph = [];
   let v = "0:v", a = "0:a", at = 0;
   for (let k = 1; k < files.length; k++) {
-    at += lens[k - 1] - CROSSFADE_S;
+    const x = cut[k].crossfadeIn;
+    at += lens[k - 1] - x;
     const last = k === files.length - 1;
     // xfade outputs yuv444p; the slides are yuv420p, and the concat demuxer
     // joins without re-encoding, so a mismatch leaves players showing black
     // (with sound) from the first segment on.
-    graph.push(`[${v}][${k}:v]xfade=transition=fade:duration=${CROSSFADE_S}:offset=${at.toFixed(3)}${last ? ",format=yuv420p[v]" : `[v${k}]`}`);
-    graph.push(`[${a}][${k}:a]acrossfade=d=${CROSSFADE_S}:c1=tri:c2=tri${last ? "[a]" : `[a${k}]`}`);
+    graph.push(`[${v}][${k}:v]xfade=transition=fade:duration=${x}:offset=${at.toFixed(3)}${last ? ",format=yuv420p[v]" : `[v${k}]`}`);
+    graph.push(`[${a}][${k}:a]acrossfade=d=${x}:c1=tri:c2=tri${last ? "[a]" : `[a${k}]`}`);
     v = `v${k}`;
     a = `a${k}`;
   }

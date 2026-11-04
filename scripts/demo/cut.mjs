@@ -158,11 +158,14 @@ function voicesIn(analysis, a, b) {
  */
 export function resolveSegments(analysis, segments, { crossfade = 0 } = {}) {
   const problems = [];
-  const overlap = crossfade > 0 ? crossfade + JOIN_BREATH_S : 0;
+  const overlap = (x) => (x > 0 ? x + JOIN_BREATH_S : 0);
   const resolved = segments.map((seg, i) => {
-    const xIn = i > 0 ? crossfade : 0, xOut = i < segments.length - 1 ? crossfade : 0;
-    const from = cutPoint(analysis, seg.from, "in", xIn ? overlap : 0);
-    const to = cutPoint(analysis, seg.to, "out", xOut ? overlap : 0);
+    // A segment's `crossfade` sets the join into it (a short pause can only
+    // hide a short dissolve); otherwise the cut's default.
+    const joinInto = (s) => s.crossfade ?? crossfade;
+    const xIn = i > 0 ? joinInto(seg) : 0, xOut = i < segments.length - 1 ? joinInto(segments[i + 1]) : 0;
+    const from = cutPoint(analysis, seg.from, "in", overlap(xIn));
+    const to = cutPoint(analysis, seg.to, "out", overlap(xOut));
     if (xIn) {
       const v = voicesIn(analysis, from.t, from.t + xIn);
       if (v) problems.push(`${seg.name}: the crossfade in (${formatTime(from.t)} + ${xIn} s) has ${[...v].map(voiceName).join(" and ")} talking; the pause before "${seg.from.fragment}" is too short`);
